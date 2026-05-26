@@ -101,14 +101,46 @@ class LLMClient(ABC):
 
 
 def get_llm_client(role: str | None = None) -> LLMClient:
-    """팩토리 — 환경변수에 따라 적절한 구현체 반환.
+    """팩토리 — 환경변수에 따라 적절한 LLMClient 구현체 반환.
 
     Args:
-        role: 용도별 모델 매핑 (triage/planner/.../judge). None 이면 기본 LLM_MODEL.
+        role: 용도별 모델 매핑 키. 가능한 값:
+              triage | planner | supervisor | research | graph | sql |
+              calculator | validator | synthesizer | judge | None(기본)
+              매핑은 settings.llm_model_<role> 환경변수에서 결정.
 
-    구현은 후속 PR. 지금은 NotImplementedError.
+    Returns:
+        Provider 별 구현체 (OpenAIClient / AnthropicClient / LocalLLMClient).
+        설정은 settings.llm_provider 에 따름.
     """
-    raise NotImplementedError(
-        "LLM 어댑터 구현체는 Phase 1 후속 PR 에서 추가. "
-        "예정: OpenAIClient, AnthropicClient, LocalLLMClient"
-    )
+    # 지연 import — 순환 참조 방지 + 미설치 패키지 호환
+    from ..config import get_settings
+
+    s = get_settings()
+    model = _resolve_model(s, role)
+
+    if s.llm_provider == "openai":
+        from .openai_adapter import OpenAIClient
+        return OpenAIClient(model=model, api_key=s.llm_api_key, timeout=s.llm_timeout)
+    if s.llm_provider == "anthropic":
+        from .anthropic_adapter import AnthropicClient
+        return AnthropicClient(model=model, api_key=s.llm_api_key, timeout=s.llm_timeout)
+    if s.llm_provider == "local":
+        from .local_adapter import LocalLLMClient
+        return LocalLLMClient(
+            model=model,
+            base_url=s.local_llm_base_url,
+            api_key=s.llm_api_key or "EMPTY",
+            timeout=s.llm_timeout,
+        )
+    raise LLMError(f"unknown LLM_PROVIDER: {s.llm_provider}")
+
+
+def _resolve_model(settings: Any, role: str | None) -> str:
+    """역할별 모델 override 결정."""
+    if role:
+        attr = f"llm_model_{role}"
+        v = getattr(settings, attr, None)
+        if v:
+            return v
+    return settings.llm_model

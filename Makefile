@@ -1,4 +1,4 @@
-.PHONY: help install fmt lint test test-int up down logs clean \
+.PHONY: help install fmt lint test test-int up down logs health clean \
         ingest-corp ingest-krx ingest-ecos ingest-all
 
 PYTHON ?= python
@@ -17,6 +17,7 @@ help:
 	@echo "  up              docker compose up -d (Neo4j + PG + Qdrant)"
 	@echo "  down            docker compose down"
 	@echo "  logs            docker compose logs -f --tail=100"
+	@echo "  health          모든 인프라 (Neo4j/PG/Qdrant/임베딩/DART/ECOS) ping"
 	@echo ""
 	@echo "  ingest-corp     DART 회사 코드 마스터 다운로드"
 	@echo "  ingest-krx      KRX 상장사 + KOSPI200/KOSDAQ100 구성 종목"
@@ -54,6 +55,9 @@ down:
 
 logs:
 	$(DOCKER_COMPOSE) logs -f --tail=100
+
+health:
+	$(PYTHON) scripts/healthcheck.py
 
 ingest-corp:
 	$(PYTHON) scripts/ingest/download_corp_codes.py
