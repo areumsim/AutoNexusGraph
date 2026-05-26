@@ -75,10 +75,15 @@ def filter_target_chunks(
     min_token_count: int = 80,
     max_token_count: int = 1200,
     limit_per_corp_year: int = 5,
+    apply_selectivity: bool = True,
+    selectivity_min_signal: int = 2,
+    selectivity_min_corp_candidates: int = 2,
 ) -> list[dict]:
-    """대상 청크 SELECT — 비용 가드의 첫 라인.
+    """대상 청크 SELECT — 비용 가드의 첫 라인 (2단 필터).
 
-    한 회사·연도 조합당 limit_per_corp_year 개만 → 호출 수 폭증 방지.
+    1단 (SQL): section / token_count / per-corp-year cap (호출 수 폭증 방지).
+    2단 (Python — apply_selectivity=True): signal-based filter.
+       회사명 후보 ≥ 2 + 금융 signal ≥ 2 인 청크만 통과. 호출 수 50%+ 추가 절감.
     """
     from ..db.postgres import get_pool
 
@@ -111,7 +116,20 @@ def filter_target_chunks(
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    # 2단 — signal-based selectivity (Python). LLM 호출 전 추가 절감.
+    if apply_selectivity and rows:
+        from ._selective import filter_chunks_by_selectivity
+        kept, skipped = filter_chunks_by_selectivity(
+            rows,
+            min_signal_count=selectivity_min_signal,
+            min_corp_candidates=selectivity_min_corp_candidates,
+        )
+        log.info(f"[p3.filter] sql={len(rows)} → selective_kept={len(kept)} "
+                 f"(skipped={len(skipped)}, savings={100*len(skipped)/max(len(rows),1):.1f}%)")
+        return kept
+    return rows
 
 
 def estimate_p3_cost(chunks: list[dict], model: str = "gpt-4o-mini") -> Any:
