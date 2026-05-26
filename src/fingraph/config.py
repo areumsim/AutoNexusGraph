@@ -65,6 +65,27 @@ class Settings(BaseSettings):
 
     krx_base_url: str = "http://data.krx.co.kr"
 
+    # 공공데이터포털 (data.go.kr) — FTC 기업집단·통계청·환경부 등 공통 키
+    data_go_kr_api_key: str = ""
+
+    # 통계청 KOSIS — kosis.kr/openapi 무료 키
+    kosis_api_key: str = ""
+
+    # 특허청 KIPRIS — kipris.or.kr/kipo-api/ 무료 키
+    kipris_api_key: str = ""
+
+    # 한국ESG기준원 (KCGS) — 공개 CSV 다운로드 URL 또는 manual_path
+    kcgs_csv_dir: str = "data/raw/kcgs"
+
+    # 빅카인즈 — bigkinds.or.kr 키 (미보유 시 skeleton 만)
+    bigkinds_api_key: str = ""
+
+    # LAW.go.kr — 무료 키 (open.law.go.kr/LSO/openApi)
+    law_api_key: str = ""
+
+    # SEC EDGAR — 키 불필요 (User-Agent 만 필요)
+    sec_user_agent: str = "FinGraph-Research/0.1 (ifkbn@kolon.com)"
+
     # === 수집 ===
     ingest_tickers: str = "KOSPI200,KOSDAQ100"
     ingest_years_back: int = 3

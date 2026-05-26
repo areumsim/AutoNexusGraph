@@ -1,7 +1,17 @@
 .PHONY: help install fmt lint test test-int up down logs health clean \
         ingest-corp ingest-krx ingest-ecos ingest-targets ingest-bulk \
+        ingest-structural ingest-wikidata ingest-wikipedia \
+        ingest-news ingest-fss ingest-ftc ingest-kosis \
+        ingest-sec ingest-gleif ingest-kipris ingest-law ingest-kcgs \
+        serve-embeddings embed-chunks \
+        ingest-step1 ingest-step2 ingest-step3 ingest-step4 \
+        ingest-step5 ingest-step6 ingest-step7 ingest-step8 \
         ingest-all inventory \
-        load-companies load-filings load-financials load-all
+        load-companies load-filings load-financials load-all \
+        load-entity-map load-persons load-graph-structural \
+        load-wikidata load-wikipedia load-news load-graph-news \
+        load-sec load-gleif load-kcgs \
+        build-wiki-chunks validate-quality
 
 # 호스트가 Ubuntu/Debian 계열이면 `python` 없이 `python3` 만 있을 수 있음 — auto-detect.
 # 명시 지정하려면: make PYTHON=python3.11 ...
@@ -119,6 +129,53 @@ embed-chunks:
 
 load-graph:
 	$(PYTHON) scripts/load/load_graph_companies.py
+
+# ── Step별 묶음 target — 데이터 통합 고도화 (천천히 안 터지게) ───────────────
+ingest-structural:    ; $(PYTHON) scripts/ingest/bulk_dart_structural.py
+ingest-wikidata:      ; $(PYTHON) scripts/ingest/download_wikidata.py
+ingest-wikipedia:     ; $(PYTHON) scripts/ingest/download_wikipedia.py
+ingest-news:          ; $(PYTHON) scripts/ingest/download_news_rss.py
+ingest-fss:           ; $(PYTHON) scripts/ingest/download_fss_press.py
+ingest-ftc:           ; $(PYTHON) scripts/ingest/download_ftc_groups.py --year 2024
+ingest-kosis:         ; $(PYTHON) scripts/ingest/download_kosis.py
+ingest-sec:           ; $(PYTHON) scripts/ingest/download_sec_edgar.py
+ingest-gleif:         ; $(PYTHON) scripts/ingest/download_gleif.py
+ingest-kipris:        ; $(PYTHON) scripts/ingest/download_kipris.py
+ingest-law:           ; $(PYTHON) scripts/ingest/download_law.py
+ingest-kcgs:          ; $(PYTHON) scripts/ingest/download_kcgs.py --with-body
+
+load-entity-map:        ; $(PYTHON) scripts/load/load_entity_map.py
+load-persons:           ; $(PYTHON) scripts/load/load_persons.py
+load-graph-structural:  ; $(PYTHON) scripts/load/load_graph_structural.py
+load-wikidata:          ; $(PYTHON) scripts/load/load_wikidata.py
+load-wikipedia:         ; $(PYTHON) scripts/load/load_wikipedia.py
+load-news:              ; $(PYTHON) scripts/load/load_news.py
+load-graph-news:        ; $(PYTHON) scripts/load/load_graph_news_corel.py
+load-sec:               ; $(PYTHON) scripts/load/load_sec_edgar.py
+load-gleif:             ; $(PYTHON) scripts/load/load_gleif.py
+load-kcgs:              ; $(PYTHON) scripts/load/load_kcgs.py --year 2024
+build-wiki-chunks:      ; $(PYTHON) scripts/load/build_chunks_wikipedia.py
+
+# ── BGE-M3 임베딩 서버 + backfill ────────────────────────────────────
+serve-embeddings:                                    # 별도 터미널에서 띄우기
+	CUDA_VISIBLE_DEVICES=0 $(PYTHON) scripts/serve_embeddings.py --embed-port 8080 --no-rerank --host 127.0.0.1
+
+embed-chunks:                                        # vec.chunks.embedding 채우기 (서버 가동 후)
+	EMBEDDING_URL=http://127.0.0.1:8080 $(PYTHON) scripts/load/embed_chunks.py --batch-size 64
+
+ingest-step1: ingest-corp ingest-krx ingest-targets        # 마스터
+ingest-step2: ingest-bulk ingest-structural                # DART 정형
+ingest-step3: ingest-wikidata
+ingest-step4: ingest-wikipedia
+ingest-step5: ingest-ftc ingest-kosis ingest-fss
+ingest-step6: ingest-news
+ingest-step7: ingest-sec ingest-gleif ingest-kipris ingest-law
+ingest-step8: ingest-kcgs                                  # KCGS 보도자료 모니터
+	@echo ""
+	@echo "→ KCGS 등급표 CSV 다운로드 후 data/raw/kcgs/<year>/ratings.csv 에 두고 make load-kcgs"
+
+validate-quality:
+	$(PYTHON) scripts/validate_cross_source.py
 
 clean:
 	find . -type d -name __pycache__ -not -path './_legacy/*' -exec rm -rf {} + 2>/dev/null || true

@@ -4,7 +4,7 @@
 BGE-M3 의 토큰 한도 8K → char 약 4,000 (한국어 ~2자/토큰) 이지만
 검색 품질·context 효율 위해 700~1000자 청크 권장.
 
-_legacy/v1/src/pipeline/build_chunks.py 의 핵심 아이디어 단순화 포트:
+설계:
 - 길이 기준 청크 + overlap
 - 문장 경계(. ! ? 또는 줄바꿈) 에서 우선 자르기
 """

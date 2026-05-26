@@ -44,17 +44,12 @@ log = logging.getLogger("serve_embeddings")
 
 def _make_embed_app(model_name: str, device: str):
     """BGE-M3 dense 임베딩 FastAPI 앱."""
-    from fastapi import FastAPI, HTTPException
-    from pydantic import BaseModel
+    from fastapi import Body, FastAPI, HTTPException
     from sentence_transformers import SentenceTransformer
 
     log.info(f"loading embed model: {model_name} on {device} ...")
     model = SentenceTransformer(model_name, device=device)
     log.info(f"loaded embed model. dim={model.get_sentence_embedding_dimension()}")
-
-    class EmbedRequest(BaseModel):
-        inputs: list[str]
-        normalize: bool = True
 
     app = FastAPI(title=f"FinGraph embed ({model_name})")
 
@@ -64,12 +59,15 @@ def _make_embed_app(model_name: str, device: str):
                 "dim": model.get_sentence_embedding_dimension()}
 
     @app.post("/embed")
-    def embed(req: EmbedRequest):
-        if not req.inputs:
+    def embed(req: dict = Body(...)):
+        inputs = req.get("inputs") or []
+        if not inputs:
             return []
+        normalize = bool(req.get("normalize", True))
         try:
-            vecs = model.encode(req.inputs, normalize_embeddings=req.normalize,
-                                convert_to_numpy=True)
+            vecs = model.encode(inputs, normalize_embeddings=normalize,
+                                convert_to_numpy=True, batch_size=32,
+                                show_progress_bar=False)
             return vecs.tolist()
         except Exception as e:
             raise HTTPException(500, str(e)) from e
@@ -79,18 +77,12 @@ def _make_embed_app(model_name: str, device: str):
 
 def _make_rerank_app(model_name: str, device: str):
     """BGE-Reranker FastAPI 앱."""
-    from fastapi import FastAPI, HTTPException
-    from pydantic import BaseModel
+    from fastapi import Body, FastAPI, HTTPException
     from sentence_transformers import CrossEncoder
 
     log.info(f"loading rerank model: {model_name} on {device} ...")
     model = CrossEncoder(model_name, device=device)
     log.info("loaded rerank model")
-
-    class RerankRequest(BaseModel):
-        query: str
-        texts: list[str]
-        raw_scores: bool = False
 
     app = FastAPI(title=f"FinGraph rerank ({model_name})")
 
@@ -99,11 +91,13 @@ def _make_rerank_app(model_name: str, device: str):
         return {"status": "ok", "model": model_name, "device": device}
 
     @app.post("/rerank")
-    def rerank(req: RerankRequest):
-        if not req.texts:
+    def rerank(req: dict = Body(...)):
+        query = req.get("query") or ""
+        texts = req.get("texts") or []
+        if not texts:
             return []
         try:
-            pairs = [[req.query, t] for t in req.texts]
+            pairs = [[query, t] for t in texts]
             scores = model.predict(pairs)
             ranked = sorted(
                 [{"index": i, "score": float(s)} for i, s in enumerate(scores)],

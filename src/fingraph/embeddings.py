@@ -4,7 +4,7 @@ PRD §5 (LLM 어댑터) 와 같은 정신으로, 임베딩도 추상화한다.
 주 경로는 자체 호스팅 BGE-M3 (HuggingFace TEI 컨테이너).
 TEI 미가동 환경에선 OpenAI fallback (선택).
 
-_legacy/v2/src/embeddings/bge_m3.py 의 라우팅·safe_embed 패턴 참고.
+설계 메모: 이전 v2 시스템의 라우팅·safe_embed 패턴을 흡수.
 - Provider 분기 (env 기반)
 - safe_embed: 호출 실패 시 None 반환 (파이프라인 중단 방지)
 - 배치 임베딩 지원
@@ -96,7 +96,7 @@ class EmbeddingClient:
     def safe_embed(self, texts: list[str]) -> list[EmbedResult]:
         """배치 임베딩, 실패 시 row 별 None 반환 (파이프라인 friendly).
 
-        port from _legacy/v2/src/embeddings/safe_embed.py 패턴.
+        이전 v2 의 safe_embed 패턴 흡수 — 실패 1건이 배치 전체를 끊지 못하게.
         """
         if not texts:
             return []

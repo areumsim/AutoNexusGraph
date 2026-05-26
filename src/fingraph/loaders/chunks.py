@@ -22,15 +22,50 @@ from ._common import LoadStats, chunked
 
 
 SQL_INSERT_CHUNK = """
-INSERT INTO vec.chunks (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata)
+INSERT INTO vec.chunks
+  (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata,
+   source, fiscal_year, report_type)
 VALUES (%(corp_code)s, %(rcept_no)s, %(section)s, %(chunk_idx)s, %(text)s,
-        %(token_count)s, %(metadata)s::jsonb)
+        %(token_count)s, %(metadata)s::jsonb,
+        'dart', %(fiscal_year)s, %(report_type)s)
 ON CONFLICT (rcept_no, chunk_idx) DO UPDATE SET
   text        = EXCLUDED.text,
   token_count = EXCLUDED.token_count,
   section     = EXCLUDED.section,
-  metadata    = EXCLUDED.metadata
+  metadata    = EXCLUDED.metadata,
+  source      = EXCLUDED.source,
+  fiscal_year = EXCLUDED.fiscal_year,
+  report_type = EXCLUDED.report_type
 """
+
+# rcept_no → (fiscal_year, report_type) lookup 캐시. _build_rows 호출 시 dict 한 번 채움.
+# fin.filings 와 동일한 매핑: report_nm prefix 로 type 판정.
+_REPORT_TYPE_MAP = [
+    ("사업보고서",     "annual_business"),
+    ("반기보고서",     "half_year"),
+    ("분기보고서",     "quarterly"),
+    ("주요사항보고서", "major_event"),
+]
+
+
+def _load_filing_meta() -> dict[str, tuple[int | None, str]]:
+    """PG fin.filings → {rcept_no: (fiscal_year, report_type)}. RAG filter 용."""
+    from ..db.postgres import get_pool
+    out: dict[str, tuple[int | None, str]] = {}
+    with get_pool().connection() as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT rcept_no, report_nm, rcept_dt
+              FROM fin.filings
+        """)
+        for rcept_no, report_nm, rcept_dt in cur.fetchall():
+            year = rcept_dt.year if rcept_dt else None
+            rtype = "other"
+            for prefix, tp in _REPORT_TYPE_MAP:
+                if report_nm and report_nm.startswith(prefix):
+                    rtype = tp
+                    break
+            out[rcept_no] = (year, rtype)
+    return out
 
 
 def _iter_zips(bulk_root: Path) -> Iterator[tuple[str, str, Path]]:
@@ -45,13 +80,27 @@ def _iter_zips(bulk_root: Path) -> Iterator[tuple[str, str, Path]]:
             yield corp_dir.name, z.stem, z
 
 
-def _build_rows(corp_code: str, rcept_no: str, zip_path: Path) -> Iterator[dict]:
-    """zip 1개 → chunk row dict iterator. global chunk_idx 는 (section, in-section) flatten."""
+def _build_rows(
+    corp_code: str,
+    rcept_no: str,
+    zip_path: Path,
+    filing_meta: dict[str, tuple[int | None, str]] | None = None,
+) -> Iterator[dict]:
+    """zip 1개 → chunk row dict iterator.
+
+    global_idx 는 보고서 내 (section, in-section) 평탄화 — UNIQUE(rcept_no, chunk_idx) 유지.
+    fiscal_year / report_type 은 filing_meta 룩업 (없으면 None / 'other').
+    """
     try:
         sections = parse_dart_zip(zip_path)
-    except Exception as e:
-        # 손상 zip, 파싱 실패 → skip
+    except Exception:
+        # 손상 zip, 파싱 실패 → 다음 zip 으로
         return iter([])
+
+    year, rtype = (None, "other")
+    if filing_meta and rcept_no in filing_meta:
+        year, rtype = filing_meta[rcept_no]
+
     rows: list[dict] = []
     global_idx = 0
     for sect in sections:
@@ -64,10 +113,14 @@ def _build_rows(corp_code: str, rcept_no: str, zip_path: Path) -> Iterator[dict]
                 "chunk_idx": global_idx,
                 "text": ch.text,
                 "token_count": ch.token_est,
+                "fiscal_year": year,
+                "report_type": rtype,
                 "metadata": json.dumps({
                     "section_idx": sect.section_idx,
                     "chunk_in_section": ch.idx,
                     "char_count": ch.char_count,
+                    "fiscal_year": year,
+                    "report_type": rtype,
                 }, ensure_ascii=False),
             })
             global_idx += 1
@@ -107,10 +160,13 @@ def load_chunks(
     else:
         zips_iter = zips
 
+    # filing 메타 (fiscal_year/report_type) 룩업 — 한 번만 load.
+    filing_meta = _load_filing_meta()
+
     # 모든 row 생성 후 배치 INSERT
     def _all_rows() -> Iterator[dict]:
         for corp_code, rcept_no, zip_path in zips_iter:
-            yield from _build_rows(corp_code, rcept_no, zip_path)
+            yield from _build_rows(corp_code, rcept_no, zip_path, filing_meta)
 
     if dry_run:
         count = sum(1 for _ in _all_rows())

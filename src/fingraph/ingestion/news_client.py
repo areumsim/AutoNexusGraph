@@ -37,11 +37,14 @@ class NewsItem:
 # - 정부/공공 RSS 는 자유
 # - 민간 언론 RSS 는 제목+요약 한정 사용
 KOREAN_FEEDS: dict[str, str] = {
-    "yonhap_economy": "https://www.yna.co.kr/rss/economy.xml",         # 연합뉴스 경제
-    "yonhap_industry": "https://www.yna.co.kr/rss/industry.xml",       # 연합뉴스 산업
-    "mois_press":     "https://www.mois.go.kr/cmm/main/rss/news.do",   # 행안부 보도자료
-    "moef_press":     "https://www.moef.go.kr/com/cmm/EgovContentView.do?menuNo=4010100",  # 기재부
-    # 추가는 라이선스 확인 후
+    # 연합뉴스 — 본문 저장 X, 메타+요약만
+    "yonhap_economy":  "https://www.yna.co.kr/rss/economy.xml",
+    "yonhap_industry": "https://www.yna.co.kr/rss/industry.xml",
+    "yonhap_market":   "https://www.yna.co.kr/rss/market.xml",
+    "yonhap_finance":  "https://www.yna.co.kr/rss/finance.xml",
+    # 정부 RSS — KOGL (본문 OK 가능)
+    "kpf_press":       "https://www.korea.kr/rss/policy_briefing.xml",   # 대한민국 정책브리핑
+    "kpf_economy":     "https://www.korea.kr/rss/policy_briefing_economy.xml",
 }
 
 

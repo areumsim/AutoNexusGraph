@@ -33,16 +33,20 @@ UNWIND $rows AS r
 MERGE (parent:Company {corp_code: r.parent_corp_code})
 MERGE (child:Company {name: r.child_name})
 ON CREATE SET child.created_at = datetime(),
-              child.source = 'dart_subsidiary_external'
+              child.source     = 'dart_subsidiary_external'
 WITH parent, child, r
 FOREACH (_ IN CASE WHEN r.ownership_pct >= 50 THEN [1] ELSE [] END |
   MERGE (child)-[rel:SUBSIDIARY_OF {snapshot_date: date(r.snapshot_date)}]->(parent)
   SET rel.ownership_pct = r.ownership_pct,
-      rel.rcept_year    = r.rcept_year
+      rel.rcept_year    = r.rcept_year,
+      rel.source        = 'dart_otr_cpr_invstmnt',
+      rel.extracted_at  = datetime()
 )
 FOREACH (_ IN CASE WHEN r.ownership_pct < 50 AND r.ownership_pct >= 5 THEN [1] ELSE [] END |
   MERGE (child)-[rel:RELATED_TO {snapshot_date: date(r.snapshot_date)}]->(parent)
-  SET rel.ownership_pct = r.ownership_pct
+  SET rel.ownership_pct = r.ownership_pct,
+      rel.source        = 'dart_otr_cpr_invstmnt',
+      rel.extracted_at  = datetime()
 )
 """
 
@@ -59,15 +63,19 @@ FOREACH (_ IN CASE WHEN r.ownership_pct < 50 AND r.ownership_pct >= 5 THEN [1] E
 CYPHER_EXECUTIVES = """
 UNWIND $rows AS r
 MERGE (c:Company {corp_code: r.corp_code})
-MERGE (p:Person {name: r.name})
-SET p.birth_year = coalesce(r.birth_year, p.birth_year),
-    p.gender     = coalesce(r.gender, p.gender)
+// Person 자연키 = (name, birth_year). birth_year 미상은 -1 로 정규화 → 동명이인 안전 분리.
+MERGE (p:Person {name: r.name, birth_year: coalesce(r.birth_year, -1)})
+ON CREATE SET p.created_at = datetime(),
+              p.source     = 'dart_executive'
+SET p.gender = coalesce(r.gender, p.gender)
 WITH p, c, r
 MERGE (p)-[rel:EXECUTIVE_OF {role: r.role, snapshot_year: r.year}]->(c)
-SET rel.registered = r.registered,
-    rel.full_time  = r.full_time,
-    rel.duty       = r.duty,
-    rel.tenure_end = r.tenure_end
+SET rel.registered    = r.registered,
+    rel.full_time     = r.full_time,
+    rel.duty          = r.duty,
+    rel.tenure_end    = r.tenure_end,
+    rel.source        = 'dart_exctv_sttus',
+    rel.extracted_at  = datetime()
 """
 
 # ── 최대주주 ───────────────────────────────────────────────────────
@@ -88,17 +96,23 @@ WITH c, r,
      CASE WHEN r.name =~ '.*(㈜|주식회사|\\\\(주\\\\)|Corp|Inc|Ltd|법인).*'
           THEN 'company' ELSE 'person' END AS holder_kind
 FOREACH (_ IN CASE WHEN holder_kind = 'person' THEN [1] ELSE [] END |
-  MERGE (h:Person {name: r.name})
+  // 최대주주 보고서엔 birth_year 가 거의 없어 -1 로 정규화. 후속 ER 단계에서 보강.
+  MERGE (h:Person {name: r.name, birth_year: -1})
+  ON CREATE SET h.source = 'dart_shareholder'
   MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {snapshot_year: r.year, relation: r.relation}]->(c)
   SET rel.ownership_pct = r.ownership_pct,
-      rel.stock_count   = r.stock_count
+      rel.stock_count   = r.stock_count,
+      rel.source        = 'dart_hyslr_sttus',
+      rel.extracted_at  = datetime()
 )
 FOREACH (_ IN CASE WHEN holder_kind = 'company' THEN [1] ELSE [] END |
   MERGE (h:Company {name: r.name})
   ON CREATE SET h.source = 'dart_shareholder_external'
   MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {snapshot_year: r.year, relation: r.relation}]->(c)
   SET rel.ownership_pct = r.ownership_pct,
-      rel.stock_count   = r.stock_count
+      rel.stock_count   = r.stock_count,
+      rel.source        = 'dart_hyslr_sttus',
+      rel.extracted_at  = datetime()
 )
 """
 

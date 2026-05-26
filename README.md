@@ -2,44 +2,62 @@
 
 > **한국 상장사 공시·재무 데이터를 기반으로, 기업 간 복잡한 관계를 그래프로 추론하여 답변하는 금융 분석 GraphRAG 에이전트**
 
-Vector 단독 RAG가 풀지 못하는 멀티홉 추론(자회사 구조, 임원 겸직, 산업 연계)을 Graph + 정형 SQL + Vector 의 하이브리드로 풀어내는 시스템. Azure 종속을 제거하고 LLM Provider(OpenAI / Anthropic / 로컬)를 환경변수로 교체 가능하게 설계.
+Vector 단독 RAG가 풀지 못하는 멀티홉 추론(자회사 구조, 임원 겸직, 그룹·산업 연계)을 Graph + 정형 SQL + Vector 의 하이브리드로 풀어내는 시스템. Azure 종속을 제거하고 LLM Provider(OpenAI / Anthropic / 로컬)를 환경변수로 교체 가능하게 설계.
 
 상세 요구사항은 [PRD.md](./PRD.md) 참조.
 
-> ⚠️ **현재 단계:** Phase 1(인프라) 착수 전 — 초기 scaffold. 코드·docker 구성은 아직 비어 있음.
+> **현재 단계:** Phase 3.5 → Phase 4 진입. 데이터 통합·정합성 1차 구축 완료, RAG 도구·임베딩 백필 진행 중.
 
 ---
 
-## 1. 핵심 특징
+## 1. 한눈에 보는 현황
 
-- **금융 특화 도메인** — DART 공시 / KRX 마스터 / ECOS 거시지표 → 코스피200+코스닥100 대상
-- **3-Store 하이브리드** — Neo4j(관계) + PostgreSQL(수치) + Qdrant(의미) 역할 분리
-- **Multi-Agent + Planning (LangGraph)** — Triage / Planner / Supervisor / Workers / Validator / Synthesizer 역할 분리, 명시적 DAG 계획, 검증·재계획 루프 — 상세 [PRD §7.5](./PRD.md#75-multi-agent--planning-상세-설계-langgraph)
-- **채팅형 UI + 대화 히스토리** — 단발 질의 X, thread 기반 multi-turn, "위에서 답한 회사 중…" 같은 후속 질문 자연스럽게 — 상세 [PRD §7.6](./PRD.md#76-web-ui-채팅형--대화-히스토리-multi-turn)
-- **Deterministic-first 추출** — XBRL 재무·지배구조는 정형 직매핑 (0% LLM), 서술형 관계만 selective LLM — 상세 [PRD §6.5](./PRD.md#65-추출-전략-v1v2-혼합-deterministic-first--selective-llm)
+| 영역 | 적재량 | 비고 |
+|---|---:|---|
+| `master.companies` (코스피200+코스닥100) | 295 | 활성 회사 |
+| `master.entity_map` (ticker/QID/LEI/CIK/ISIN/…) | 1,979 | 10 종 외부 ID |
+| `master.persons` / 임원 이력 | 9,948 / 22,303 | (name, birth_year) 분리 |
+| `fin.financials` (XBRL) / `fin.filings` | 184K / 4.6K | 3년치 |
+| `news.articles` / 멘션 | 338 / 141 | 연합뉴스 RSS 3종 |
+| `wiki.wikipedia_pages` / `wiki.wikidata_facts` | 276 / 466 | 93.6% / 55.6% 매핑 |
+| `sec.filings` (한국 ADR) / `sec.lei` (GLEIF KR) | 1,857 / 2,700 | LEI 매칭 120 |
+| `vec.chunks` (DART + Wikipedia) | 748,812 | embedding backfill 진행 중 |
+| Neo4j Company / Person / NewsEvent | 12,914 / 14,536 / 85 | 동명이인 2,171 분리 |
+| Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF | 8,661 / 33,064 / 12,548 | 시점(snapshot) + source 부여 |
+
+---
+
+## 2. 핵심 특징
+
+- **금융 특화 도메인** — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100 대상
+- **3-Store 하이브리드** — Neo4j(관계) + PostgreSQL(수치·메타·벡터) + (옵션) Qdrant — 청크 100만 이하는 pgvector 통합 운영
+- **Multi-Agent + Planning (LangGraph)** — Triage / Planner / Supervisor / Workers / Validator / Synthesizer 역할 분리 [PRD §7.5](./PRD.md#75-multi-agent--planning-상세-설계-langgraph)
+- **채팅형 UI + 대화 히스토리** — thread 기반 multi-turn [PRD §7.6](./PRD.md#76-web-ui-채팅형--대화-히스토리-multi-turn)
+- **Deterministic-first 추출** — XBRL 재무·지배구조는 정형 직매핑 (0% LLM), 서술형 관계만 selective LLM [PRD §6.5](./PRD.md#65-추출-전략-v1v2-혼합-deterministic-first--selective-llm)
 - **LLM 어댑터 패턴** — `LLMClient` 단일 인터페이스, `LLM_PROVIDER` 한 줄로 백엔드 교체
-- **한국어 자체 임베딩** — BGE-M3 + BGE-Reranker GPU 컨테이너
-- **재현 가능한 스택** — `docker compose up` 한 줄로 전체 시스템 기동 (Phase 1 부분 구축)
-- **정량 검증 가능** — Multi-hop 100문항 자체 평가셋 + Allganize 금융 벤치마크
+- **한국어 자체 임베딩** — BGE-M3 + BGE-Reranker (GPU 자체 호스팅)
+- **Entity Resolution 마스터** — corp_code 를 단일 키로 wikidata_qid / lei / cik / isin / business_no 등을 묶음. 동명이인 인물은 (name, birth_year) 분리
+- **재실행 가능한 멱등 파이프라인** — raw → processed → DB. 모든 적재 `ON CONFLICT DO UPDATE` / `MERGE`. raw 만 있으면 언제든 재생성 가능
 
 ---
 
-## 2. 아키텍처
+## 3. 아키텍처
 
 ```
 [데이터 계층]
-├─ Neo4j         : 기업·인물·관계 그래프
-├─ PostgreSQL    : 재무 수치, 마스터, 평가 QA, 메타데이터
-└─ Qdrant        : 문서 청크 벡터
+├─ Neo4j        : 기업·인물·관계 그래프 (자회사·임원·주주·뉴스·기업집단)
+├─ PostgreSQL   : 재무 수치 + 마스터 + 메타 + 청크 벡터 (pgvector)
+└─ (옵션) Qdrant: 청크 100만 넘으면 분리
 
 [모델 계층]
-├─ BGE-M3        : 한국어 임베딩 (GPU)
-└─ BGE-Reranker  : 한국어 재랭킹 (GPU)
+├─ BGE-M3 (1024 dim)        : 한국어 임베딩 (GPU 0)
+└─ BGE-Reranker-v2-m3       : 한국어 재랭킹 (GPU, 옵션)
 
 [애플리케이션 계층]
-├─ Ingestion Worker : DART/KRX/ECOS 수집·전처리·그래프 추출 배치
-├─ API (FastAPI)    : 에이전트 오케스트레이션 (LangGraph)
-└─ Web (Streamlit)  : 사용자 인터페이스
+├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS 클라이언트
+├─ Loaders            : PG/Neo4j 멱등 적재
+├─ Tools              : 사전 정의 함수 풀 (financials/graph/retrieve) — 자유 SQL/Cypher 금지
+└─ Agents (LangGraph) : Triage·Planner·Workers — 후속 PR
 
 [외부 의존성]
 └─ LLM Provider : OpenAI / Anthropic / 로컬 (환경변수 전환)
@@ -49,54 +67,73 @@ Vector 단독 RAG가 풀지 못하는 멀티홉 추론(자회사 구조, 임원 
 
 | 저장소 | 책임 | 예시 질의 |
 |---|---|---|
-| Neo4j | **관계 탐색** | "현대차 자회사 중 매출 1조 이상은?" |
-| PostgreSQL | **정확한 수치** | "삼성전자 2023년 매출은?" |
-| Qdrant | **의미·서술** | "삼성전자의 주요 사업 위험 요인은?" |
+| Neo4j | **관계·구조** | "현대차 자회사 중 매출 1조 이상은?" |
+| PostgreSQL | **정확한 수치 + 메타** | "삼성전자 2023년 매출은?" |
+| pgvector / Qdrant | **의미·서술** | "삼성전자의 주요 사업 위험 요인은?" |
 
-> 재무 수치는 절대 LLM이 생성하지 않는다 — 반드시 PostgreSQL 조회 결과만 사용.
+> 재무 수치는 절대 LLM 이 생성하지 않는다 — 반드시 PostgreSQL 조회 결과만 사용.
 
 ---
 
-## 3. 데이터 소스
+## 4. 데이터 소스
 
-모든 데이터는 공개·합법 출처만 사용 (무단 크롤링·약관 위반 금지).
+모든 데이터는 공개·합법 출처만 사용 (무단 크롤링·약관 위반 금지). 라이선스별 본문 저장 정책은 `src/fingraph/ingestion/_license.py` 가 코드 레벨에서 강제.
 
-| 데이터 | 출처 | 형태 | 용도 |
+| 데이터 | 출처 | 라이선스 | 적재 위치 |
 |---|---|---|---|
-| 사업보고서·공시 | DART Open API | XML/PDF | 본문 임베딩 + 관계 추출 |
-| 재무제표 (XBRL) | DART | 정형 | PostgreSQL 정량 노드 |
-| 상장사 마스터 | KRX 정보데이터시스템 | CSV | 종목·업종 분류 |
-| 거시지표 | 한국은행 ECOS API | 시계열 | 거시 컨텍스트 노드 |
-| 기업 지배구조 | DART 지배구조보고서 | 정형 | 임원·자회사 관계 |
+| 사업보고서·공시 | DART Open API | 공공 | `data/raw/dart_bulk/` → `vec.chunks` + `fin.filings` |
+| 재무제표 (XBRL) | DART | 공공 | `fin.financials` |
+| 지배구조 (자회사·임원·최대주주) | DART | 공공 | Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF |
+| 상장사 마스터 | KRX | 공공 | `master.companies` |
+| 거시지표 | 한국은행 ECOS | 공공 | `macro.series` |
+| Wikipedia 본문·Infobox | ko.wikipedia.org | CC BY-SA | `wiki.wikipedia_pages` + `vec.chunks` (section=wikipedia_ko) |
+| Wikidata 글로벌 ID·CEO·자회사 | query.wikidata.org | CC0 | `wiki.wikidata_facts` + `master.entity_map` |
+| 연합뉴스 RSS | 연합뉴스 | 저작권 | `news.articles` (메타+요약만) |
+| SEC EDGAR (ADR) | sec.gov | 공공 | `sec.filings` |
+| GLEIF LEI | gleif.org | CC BY 4.0 | `sec.lei` + `master.entity_map` |
+| KCGS ESG 등급 | cgs.or.kr | 회원 (수동) | `esg.ratings` + Neo4j Company 속성 |
+| 공정위 기업집단 | data.go.kr | 공공 | (키 확보 후) Neo4j Group + BELONGS_TO_GROUP |
+| KOSIS 산업 통계 | kosis.kr | 공공 | (키 확보 후) `macro.kosis_series` |
+| KIPRIS 특허 | kipris.or.kr | 공공 | (키 확보 후) `ip.patents` |
+| LAW.go.kr 법령 | open.law.go.kr | 공공 | (키 확보 후) `law.laws` |
 
 **수집 범위 (1차):** 코스피 200 + 코스닥 100 약 300개사, 최근 3개 회계연도.
+**범위 외 (Out-of-Scope):** 빅카인즈 본문, 나무위키(CC BY-NC-SA), 종목토론방, LinkedIn, Twitter.
 
 ---
 
-## 4. 에이전트 라우팅 (목표)
+## 5. 에이전트 도구 (사전 정의 함수 풀)
 
-사용자 질문 유형에 따라 자동으로 도구를 조합.
+자유 SQL/Cypher/벡터 호출은 금지. LLM 은 함수명 + 파라미터만 결정. SQL injection / 그래프 폭발 / 토큰 폭발 차단 (PRD §7.5.10).
 
-| 질문 유형 | 예시 | 호출 도구 |
-|---|---|---|
-| 단순 사실 | "삼성전자 2023년 매출은?" | `query_financials` (PG 직접) |
-| 의미·서술 | "삼성전자 주요 사업 위험 요인은?" | `search_documents` (Vector + Reranker) |
-| 관계·구조 | "현대차 자회사 중 매출 1조 이상은?" | `query_graph` + `query_financials` |
-| 멀티홉 | "이재용이 임원인 회사들의 합산 영업이익은?" | `query_graph` + `query_financials` + `search_documents` |
+### `tools/financials.py` — PG 정형
+- `lookup_company(query, limit)` — 이름·종목코드·corp_code 매칭
+- `get_company_info(corp_code)` / `get_revenue(corp_code, year)` / `get_operating_income(corp_code, year)`
+- `get_balance_sheet_item(corp_code, year, item)`
+- `compare_companies(corp_codes, year, metric)` / `list_companies_by_market(market)`
 
-### Tool 목록
+### `tools/graph.py` — Neo4j 그래프 탐색
+- `lookup_company(query, limit)` — Wikidata QID / Wikipedia title 까지 반환
+- `lookup_person(name, birth_year=None)` — 동명이인 안전 매칭
+- `list_subsidiaries(parent_corp_code, include_related=False, snapshot_year=None)`
+- `list_parents(corp_code_or_name)` — 모회사 추적
+- `get_executives(corp_code, role_contains=None, snapshot_year=None)` — `대표`, `사외이사` 등 substring
+- `get_companies_of_person(name, birth_year=None, role_contains=None)`
+- `get_major_shareholders(corp_code, min_pct=0.0, snapshot_year=None)`
+- `find_paths(start_corp_code, end_corp_code, max_hops=3)` — 두 회사 최단 경로
+- `get_subgraph(corp_code, depth=1, limit_nodes=50)`
+- `list_mentioning_news(corp_code)` / `list_cooccurring(corp_code)` / `list_group_members(group_name)`
 
-- `search_documents(query, filters)` — 벡터 검색
-- `query_graph(cypher_intent)` — 그래프 탐색 (스키마 인지 Cypher 생성)
-- `query_financials(company, year, metric)` — 재무 정확값 조회
-- `lookup_company(name_or_ticker)` — 회사 식별
-- `get_subgraph(entity, depth)` — 시각화용 서브그래프
+### `tools/retrieve.py` — Hybrid 검색
+- `search_documents(query, top_k=8, corp_code=…, fiscal_year=…, source=…, section_contains=…)` — pgvector 코사인 + 메타 필터
+- `search_by_metadata(corp_code=…, fiscal_year=…, source=…)` — 임베딩 무관, 결정적 fetch
+- `get_chunk(chunk_id)` — 단일 청크 + 메타
 
-답변은 항상 **출처(문서ID/페이지/노드ID) + 회계연도** 를 명시. 불확실하면 "정보 부족"으로 응답.
+답변은 항상 **출처(chunk_id / corp_code / rcept_no / 노드ID) + 회계연도** 명시. 불확실하면 "정보 부족" 응답.
 
 ---
 
-## 5. 평가 전략
+## 6. 평가 전략
 
 ### 평가셋 구성
 - 공개 벤치마크: Allganize RAG-Evaluation-Dataset-KO (금융)
@@ -119,33 +156,34 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 
 ---
 
-## 6. 로드맵
+## 7. 로드맵
 
-| Phase | 주차 | 산출물 |
+| Phase | 상태 | 산출물 |
 |---|---|---|
-| 1. 인프라 | 1주차 | Docker Compose 스택, Neo4j/PG/Qdrant 부트스트랩, BGE-M3 GPU 컨테이너, LLM 어댑터 3종 |
-| 2. 데이터 파이프라인 | 2주차 | DART/KRX/ECOS 수집기, PG 스키마 적재, 청킹+임베딩+Qdrant, LLM 그래프 추출 |
-| 3. RAG 파이프라인 | 3주차 | Vector RAG, Graph RAG(스키마 인지 Cypher), SQL 도구 |
-| 4. 에이전트 + UI | 4주차 | LangGraph 라우팅, Streamlit UI, 그래프 시각화 |
-| 5. 평가 + 튜닝 | 5주차 | 100문항 QA, 12조합 평가, 대시보드, 파라미터 튜닝 |
+| 1. 인프라 | ✅ | Docker Compose, Neo4j/PG, LLM 어댑터 3종, BGE-M3 가동 |
+| 2. 데이터 파이프라인 (DART/KRX/ECOS) | ✅ | corp 마스터, XBRL 184K, filings 4.6K |
+| 3. 청킹·임베딩·그래프 1차 | ✅ | vec.chunks 748K, Neo4j 12K Company / 14K Person |
+| 3.5 데이터 통합·정합성 | ✅ | entity_map 1.9K, Wikidata/Wikipedia/GLEIF/SEC/뉴스/KCGS 통합, ER 마스터 |
+| 4. RAG 도구 + 에이전트 | 🚧 | tools/financials·graph·retrieve 완성, LangGraph DAG 진행 예정 |
+| 5. 평가 + 튜닝 | ⏳ | 100문항 QA, 12조합 평가 |
 
 ---
 
-## 7. 기술 스택
+## 8. 기술 스택
 
 | 영역 | 선택 | 사유 |
 |---|---|---|
-| 그래프 DB | Neo4j | 생태계, Cypher 표준, GDS |
-| 벡터 DB | Qdrant | 성능, 메타데이터 필터링 |
-| 정형 DB | PostgreSQL | JSONB, 시계열 |
-| 임베딩 | BGE-M3 | 한국어 성능 + 멀티벡터 |
+| 그래프 DB | Neo4j 5.18 | Cypher 표준, APOC |
+| 벡터 DB | pgvector (PostgreSQL) | 운영 단순, 100만 청크 이하 충분 |
+| 정형 DB | PostgreSQL 16 | JSONB, 시계열, ON CONFLICT UPSERT |
+| 임베딩 | BGE-M3 (1024d, cosine) | 한국어 성능 + 멀티벡터 |
 | 에이전트 | LangGraph | 명시적 상태 관리 |
-| LLM 추상화 | 자체 어댑터 | 의존성 최소화 |
+| LLM 추상화 | 자체 어댑터 (OpenAI/Anthropic/Local) | 의존성 최소화 |
 | UI | Streamlit | 빠른 프로토타이핑 |
 
 ---
 
-## 8. 비목표 (Non-Goals)
+## 9. 비목표 (Non-Goals)
 
 - 실시간 주가 예측 / 매매 신호 생성
 - 비상장사 데이터 (DART 미제공)
@@ -154,19 +192,18 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 
 ---
 
-## 9. 문서
+## 10. 문서
 
 - [PRD.md](./PRD.md) — 전체 요구사항·아키텍처 정의
-  - §6.5 Deterministic-first + Selective LLM 추출 전략
-  - §7.5 Multi-Agent + Planning 상세 설계 (LangGraph)
-  - §7.6 채팅형 UI + 대화 히스토리
+- [docs/operations/docker_setup.md](./docs/operations/docker_setup.md) — Docker 스택 가이드
+- [docs/operations/kcgs_esg_guide.md](./docs/operations/kcgs_esg_guide.md) — KCGS ESG 등급 수집 가이드
 
 ---
 
-## 10. Quickstart (현재)
+## 11. Quickstart
 
 ```bash
-# 0. .env 작성 (.env.example 복사 후 DART_API_KEY, ECOS_API_KEY 채움)
+# 0. .env 작성 (.env.example 복사 후 DART_API_KEY 채움)
 cp .env.example .env
 
 # 1. 의존성 설치
@@ -175,41 +212,93 @@ make install
 # 2. DB 컨테이너 (PG + Neo4j minimal) — 데이터 폴더 먼저:
 mkdir -p ~/arsim/DB_FG/{postgres,neo4j/data,neo4j/logs,neo4j/import,neo4j/plugins}
 make up
-# 외부 포트:
-#   Neo4j HTTP  31009  /  Bolt  31010
-#   PostgreSQL  31011  (pgvector 내장 — 벡터 통합)
-# (Qdrant/Redis 는 옵션 — compose 에 주석으로 슬롯만)
+# 외부 포트:  Neo4j  31009(HTTP) / 31010(Bolt)   PG  31011(pgvector 내장)
+make health
 
-make health         # 모든 컴포넌트 ping
+# 3. 마스터 + DART 정형 데이터
+make ingest-step1     # DART corp 마스터 + KRX 상장사 + targets 매칭
+make load-companies   # master.companies
+make load-entity-map  # ticker/jurir_no/business_no entity_map 시드
 
-# 3. 데이터 수집 (4단계 또는 make ingest-all)
-make ingest-corp       # DART 회사 코드 마스터 (~3,900 상장사)
-make ingest-krx        # KRX KOSPI top200 + KOSDAQ top100 (시가총액)
-make ingest-targets    # corp_code × stock_code 매칭 → ingest_targets.jsonl
-make ingest-bulk       # 295사 × 3년 일괄 (≈ 2~5분, 이어받기 지원)
-make ingest-ecos       # 거시지표 (ECOS_API_KEY 필요)
+make ingest-step2     # DART filings + 재무 + 정형 지배구조 (자회사/임원/주주)
+make load-all         # PG filings + financials
+make load-graph-structural   # Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF
+make load-persons     # master.persons (동명이인 분리)
 
-# 4. 적재 결과 확인
-make inventory         # 수집 현황·누락 검증
+# 4. 외부 보강 (Wikidata + Wikipedia)
+make ingest-step3     # Wikidata SPARQL (~55% 매핑)
+make load-wikidata    # entity_map 보강 + Neo4j 속성
 
-# 5. PG 적재 (docker stack 가동 + 스키마 적용 후)
-make load-companies    # master.companies (295 rows)
-make load-filings      # fin.filings     (4,584 rows)
-make load-financials   # fin.financials  (184,199 rows, ~수 분)
-# 또는 한 번에
-make load-all
+make ingest-step4     # Wikipedia 본문 + Infobox (~93% 매핑)
+make load-wikipedia
+make build-wiki-chunks   # Wikipedia 본문 → vec.chunks (section=wikipedia_ko)
+
+# 5. 뉴스 + 글로벌 보강
+make ingest-step6     # 연합뉴스 RSS
+make load-news ; make load-graph-news     # 멘션 + CO_MENTIONED_WITH
+
+make ingest-sec       # SEC EDGAR (한국 ADR — CIK 매핑 회사만)
+make load-sec
+make ingest-gleif     # GLEIF LEI (한국 jurisdiction 2,700건)
+make load-gleif
+
+# 6. 그래프 스키마 정합성 마이그레이션 (1회)
+python scripts/migrate_neo4j_schema.py
+
+# 7. KCGS ESG (수동 CSV 다운로드 후)
+make ingest-kcgs                # 보도자료 모니터 — 등급 발표 알림
+# 등급 CSV 를 data/raw/kcgs/<year>/ratings.csv 에 저장 후
+make load-kcgs
+
+# 8. 임베딩 (BGE-M3 GPU 가동 후 backfill)
+# 별도 터미널에서:
+make serve-embeddings
+# 메인 터미널에서:
+make embed-chunks         # vec.chunks.embedding NULL → BGE-M3 1024d 채움
+
+# 9. 검증
+make validate-quality     # 3-way cross 검증 + data/reports/quality_<date>.md
 ```
 
-크롤러는 **이어받기·실패추적·Ctrl+C 안전종료** 지원 — 중단 시 `make ingest-bulk` 재실행하면 이어서, `python scripts/ingest/bulk_dart.py --retry-failed` 로 실패분만 재시도.
+### 도구 사용 예시
 
-로더는 모두 **idempotent** (`INSERT ... ON CONFLICT DO UPDATE`) — 여러 번 실행해도 안전.
+```python
+from fingraph.tools import (
+    lookup_company, list_subsidiaries, get_executives,
+    get_companies_of_person, find_paths, search_documents,
+)
 
-docker 셋업이 막히면 [docs/operations/docker_setup.md](./docs/operations/docker_setup.md) 참조 (3가지 시나리오 가이드).
+# 1) 회사 식별
+lookup_company("삼성전자")
+# → [{"corp_code": "00126380", "name": "삼성전자(주)", "stock_code": "005930",
+#     "wikidata_qid": "Q20718", "wikipedia_title_ko": "삼성전자"}]
 
-상세는 [data/README.md](./data/README.md) 참조. LangGraph 에이전트 본체 + docker compose 의 BGE-M3/Reranker 는 후속 PR.
+# 2) 자회사 그래프
+list_subsidiaries("00126380", snapshot_year=2024, limit=10)
+# → [{"child_name": "삼성디스플레이", "ownership_pct": 84.78, ...}, ...]
+
+# 3) 인물 → 임원직 회사 매트릭스
+get_companies_of_person("이재용")
+# → 동명이인 모두 합쳐 반환 (회사·역할·연도)
+
+# 4) 멀티홉 경로
+find_paths("00126380", "00164779", max_hops=3)
+# → 삼성전자 ↔ SK하이닉스 최단 경로
+
+# 5) Hybrid RAG
+search_documents(
+    "반도체 사업 위험요인",
+    corp_code="00126380",
+    fiscal_year=2024,
+    section_contains="위험",
+    top_k=5,
+)
+```
+
+크롤러는 **이어받기·실패추적·Ctrl+C 안전종료** 지원. 로더는 모두 **idempotent**. raw 만 있으면 `data/processed/` 와 DB 는 언제든 재생성 가능.
 
 ---
 
-## 11. 라이선스
+## 12. 라이선스
 
 내부 연구·개발 단계. 라이선스 미정.
