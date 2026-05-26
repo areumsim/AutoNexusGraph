@@ -200,3 +200,67 @@ sudo chown -R 999:999 ~/arsim/DB_FG/postgres  # postgres UID
 
 ### 데이터 분리 (다른 프로젝트와 섞이지 않게)
 → 이미 `DB_FG` 폴더로 분리. 다른 프로젝트가 `~/arsim/DB` 쓰면 영향 없음.
+
+---
+
+## 임베딩 (BGE-M3 / Reranker) — dev container 안에서 GPU 사용
+
+dev container (`ar-poc-dev-docker`) 가 GPU(1,3) + 64GB RAM 보유 → docker-in-docker 없이 직접 실행:
+
+```bash
+# 의존성 (최초 1회)
+pip install sentence-transformers fastapi 'uvicorn[standard]' torch
+
+# 기동 (둘 다)
+python scripts/serve_embeddings.py
+# → http://0.0.0.0:8080  (BGE-M3 embed)
+# → http://0.0.0.0:8081  (BGE-Reranker)
+
+# 임베딩만
+python scripts/serve_embeddings.py --no-rerank
+
+# CPU 강제 (테스트용)
+python scripts/serve_embeddings.py --device cpu
+```
+
+엔드포인트는 TEI(text-embeddings-inference) 와 동일 schema → `src/fingraph/embeddings.py` 클라이언트 변경 불필요.
+
+`.env`:
+```env
+EMBEDDING_URL=http://localhost:8080
+RERANKER_URL=http://localhost:8081
+EMBEDDING_DIM=1024
+```
+
+자원 사용:
+- BGE-M3: GPU ~2.5GB / RAM ~2GB
+- Reranker-v2-m3: GPU ~1.5GB
+- 단일 GPU 4GB면 둘 다 충분
+
+별도 컨테이너로 띄우고 싶으면 docker-compose.yml 의 `bge-m3 / bge-reranker` 주석 해제 (NVIDIA Container Toolkit 필요).
+
+---
+
+## src/ 컨테이너화 (후속)
+
+현재 dev container 안에서 직접 실행 중. 본격 운영 시 docker-compose.yml 의 `api / web / ingestion-worker` 슬롯 주석 해제:
+
+```yaml
+api:
+  build:
+    context: .
+    dockerfile: infra/Dockerfile          # 후속 PR
+  command: ["uvicorn", "fingraph.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+  ports: ["31020:8000"]
+  ...
+```
+
+지금은 호스트/dev 에서 직접:
+```bash
+# API
+uvicorn fingraph.api.main:app --reload --port 8000
+
+# Streamlit UI
+streamlit run src/fingraph/ui/app.py --server.port 8501
+```
+

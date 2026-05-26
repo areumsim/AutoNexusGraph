@@ -3,8 +3,10 @@
         ingest-all inventory \
         load-companies load-filings load-financials load-all
 
-PYTHON ?= python
-PIP ?= pip
+# 호스트가 Ubuntu/Debian 계열이면 `python` 없이 `python3` 만 있을 수 있음 — auto-detect.
+# 명시 지정하려면: make PYTHON=python3.11 ...
+PYTHON ?= $(shell command -v python3 || command -v python || echo python3)
+PIP ?= $(shell command -v pip3 || command -v pip || echo pip3)
 DOCKER_COMPOSE ?= docker compose
 
 help:
