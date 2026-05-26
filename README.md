@@ -164,8 +164,9 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 | 2. 데이터 파이프라인 (DART/KRX/ECOS) | ✅ | corp 마스터, XBRL 184K, filings 4.6K |
 | 3. 청킹·임베딩·그래프 1차 | ✅ | vec.chunks 748K, Neo4j 12K Company / 14K Person |
 | 3.5 데이터 통합·정합성 | ✅ | entity_map 1.9K, Wikidata/Wikipedia/GLEIF/SEC/뉴스/KCGS 통합, ER 마스터 |
-| 4. RAG 도구 + 에이전트 | 🚧 | tools/financials·graph·retrieve 완성, LangGraph DAG 진행 예정 |
-| 5. 평가 + 튜닝 | ⏳ | 100문항 QA, 12조합 평가 |
+| 4. RAG 도구 + 에이전트 + UI | ✅ | tools/financials·graph·retrieve, agent 4-node + answering brief + grounding, FastAPI /chat, Streamlit UI |
+| 4.5 P3/P4 LLM 추출 | 🚧 | extractor engine (병렬+circuit breaker), selective filter (53% 호출 감소), embedding 완료 후 실행 |
+| 5. 평가 + 튜닝 | 🚧 | eval harness 완성 (6 metric × 4 어댑터), gold set 큐레이션 대기 |
 
 ---
 
@@ -196,7 +197,10 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 
 - [PRD.md](./PRD.md) — 전체 요구사항·아키텍처 정의
 - [docs/operations/docker_setup.md](./docs/operations/docker_setup.md) — Docker 스택 가이드
+- [docs/operations/data_pipeline.md](./docs/operations/data_pipeline.md) — 3-tier 멱등 파이프라인 + Step DAG
+- [docs/operations/rag_tools.md](./docs/operations/rag_tools.md) — 도구 카탈로그 + 시나리오
 - [docs/operations/kcgs_esg_guide.md](./docs/operations/kcgs_esg_guide.md) — KCGS ESG 등급 수집 가이드
+- [eval/qa_gold/README.md](./eval/qa_gold/README.md) — 평가 gold set 스키마 + 큐레이션 가이드
 
 ---
 
@@ -258,6 +262,20 @@ make embed-chunks         # vec.chunks.embedding NULL → BGE-M3 1024d 채움
 
 # 9. 검증
 make validate-quality     # 3-way cross 검증 + data/reports/quality_<date>.md
+
+# 10. P3 LLM 관계 추출 (embedding 완료 후)
+make p3-extract-dry       # 비용 추정 — LLM 호출 0
+make p3-extract           # 실제 추출 (HARD_LIMIT $1.0)
+make p4-load              # P4 검증 + Neo4j 적재
+
+# 11. API + UI 가동
+make serve-api            # FastAPI :31020 — POST /chat
+pip install streamlit     # (선택) UI 의존성
+make serve-ui             # Streamlit :31021 채팅 UI
+
+# 12. 평가 (gold 큐레이션 후)
+make eval-smoke           # 3 row 빠른 검증
+make eval-full            # 100문항 4 어댑터 매트릭스
 ```
 
 ### 도구 사용 예시
