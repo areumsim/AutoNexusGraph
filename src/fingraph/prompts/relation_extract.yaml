@@ -1,0 +1,92 @@
+# P3 관계 추출 프롬프트 (사업보고서 본문 → LLM 관계 추출).
+#
+# Schema-aware 원칙: ontology/relations.yaml 의 P3 관계 (PARTNER_OF / COMPETES_WITH /
+# INVESTED_IN / PRODUCES) 만 허용. 그 외 관계는 LLM 이 만들어내도 검증 단계에서 폐기.
+#
+# 출력은 JSON Schema 강제 → LLMClient.chat_json() 으로 호출.
+
+version: 1
+last_updated: 2026-05-26
+target_relations: [PARTNER_OF, COMPETES_WITH, INVESTED_IN, PRODUCES]
+
+system: |
+  당신은 한국 금융 도메인 정보 추출 전문가다.
+  주어진 사업보고서 본문 청크에서 회사 간의 관계만 정밀하게 추출한다.
+
+  허용 관계 (이외 추출 금지):
+    PARTNER_OF      : 두 회사가 협력·제휴·공급/판매·합작투자 관계
+    COMPETES_WITH   : 두 회사가 경쟁 관계 (시장에서)
+    INVESTED_IN     : A 가 B 에 비지배 투자 (전략적 지분, 50% 미만)
+    PRODUCES        : 회사가 특정 제품/서비스를 생산·판매
+
+  엄격 규칙:
+    1. 본문에 명시적으로 언급된 관계만 추출. 추론·일반 상식 사용 금지.
+    2. 회사명은 본문에 등장한 표기 그대로. (별칭/약칭은 alias 필드에 따로 적기)
+    3. 모회사-자회사 관계는 절대 PARTNER_OF 로 추출 금지. (P2 정형 데이터가 SSOT)
+    4. 단순 '거래은행', '예금기관' 같은 일반 거래는 PARTNER_OF X.
+       장기 공급 계약, 합작법인, 기술 제휴 등 구체적 관계만.
+    5. 한 관계가 불확실하면 confidence < 0.7 로 표시. 0.7 미만은 적재 후 review queue 행.
+    6. 본문에 관계가 없으면 빈 리스트 반환.
+
+  반드시 다음 JSON 스키마로만 응답:
+  {
+    "entities": [
+      {"name": str, "kind": "Company"|"Product",
+       "alias": str|null, "confidence": float}
+    ],
+    "relations": [
+      {"head": str, "relation": "PARTNER_OF"|"COMPETES_WITH"|"INVESTED_IN"|"PRODUCES",
+       "tail": str, "nature": str|null, "ownership_pct": float|null,
+       "amount_krw": int|null, "confidence": float, "evidence": str}
+    ]
+  }
+  evidence 는 본문에서 직접 인용한 1-2 문장 (≤150자).
+
+user_template: |
+  [회사] {company_name} (corp_code={corp_code})
+  [회계연도] {fiscal_year}
+  [섹션] {section}
+
+  [본문 청크]
+  {chunk_text}
+
+  [지시]
+  위 본문에서 명시적으로 드러난 관계를 위 스키마로만 추출하라.
+  엄격하게 본문 근거만 사용. 추론·추측 금지.
+
+# 출력 JSON Schema (chat_json 강제)
+json_schema:
+  name: RelationExtraction
+  schema:
+    type: object
+    additionalProperties: false
+    required: [entities, relations]
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, kind, confidence]
+          properties:
+            name: { type: string }
+            kind: { type: string, enum: [Company, Product] }
+            alias: { type: [string, "null"] }
+            confidence: { type: number, minimum: 0.0, maximum: 1.0 }
+      relations:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [head, relation, tail, confidence, evidence]
+          properties:
+            head: { type: string }
+            relation:
+              type: string
+              enum: [PARTNER_OF, COMPETES_WITH, INVESTED_IN, PRODUCES]
+            tail: { type: string }
+            nature: { type: [string, "null"] }
+            ownership_pct: { type: [number, "null"] }
+            amount_krw: { type: [integer, "null"] }
+            confidence: { type: number, minimum: 0.0, maximum: 1.0 }
+            evidence: { type: string, maxLength: 300 }
