@@ -162,11 +162,16 @@ def synthesizer_node(state: AgentState,
     cost guard: budget_aware_client + tracker 자동 통합.
     aborted_reason 이 있으면 fallback 답변 (LLM 비호출).
     """
+    # 비용/예산 초과 → LLM 호출 안 하고 결정적 brief 로 fallback.
     if state.get("aborted_reason") == "turn_budget":
-        state["answer"] = ("이번 응답에서 사전 정의된 LLM 비용 한도를 초과해 "
-                            "추가 분석을 중단했습니다. 더 구체적인 질문 또는 "
-                            "AGENT_TURN_BUDGET_USD 한도를 조정 후 다시 시도하세요.")
+        from .answering import build_deterministic_brief
+        state["answer"] = (
+            "이번 응답에서 사전 정의된 LLM 비용 한도를 초과했습니다.\n"
+            "도구 결과 기반 결정적 brief 를 제공합니다 (LLM 합성 없음):\n\n"
+            + build_deterministic_brief(state)
+        )
         state["citations"] = []
+        state["grounding"] = {"ok": False, "warnings": ["budget_exceeded"]}
         return state
 
     # 도구 결과 + evidence 를 요약해 LLM 입력으로
@@ -198,12 +203,20 @@ def synthesizer_node(state: AgentState,
         state["answer"] = resp.content
         state["llm_usage_usd"] = float(state.get("llm_usage_usd") or 0.0) + resp.usage.cost_usd
     except BudgetExceeded:
-        state["answer"] = "응답 합성 중 LLM 비용 한도에 도달했습니다."
+        # 비용 한도 도달 — 결정적 brief 로 fallback (LLM 안 부름)
+        from .answering import build_deterministic_brief
+        state["answer"] = (
+            "[LLM 비용 한도 도달 — 결정적 brief]\n\n"
+            + build_deterministic_brief(state)
+        )
         state["aborted_reason"] = "synth_budget"
     except Exception as e:
         log.warning(f"[synth] LLM failed: {e}")
-        state["answer"] = ("답변 합성에 실패했습니다. 도구 결과를 직접 확인하세요: "
-                            f"{len(state.get('tool_results') or [])} 건")
+        from .answering import build_deterministic_brief
+        state["answer"] = (
+            f"[LLM 합성 실패: {type(e).__name__} — 결정적 brief]\n\n"
+            + build_deterministic_brief(state)
+        )
 
     # citations 추출
     cits: list[dict] = []
@@ -217,6 +230,16 @@ def synthesizer_node(state: AgentState,
             "score": ch.get("score"),
         })
     state["citations"] = cits[:10]
+
+    # 답변 grounding 검증 — LLM 답변이 evidence 와 일치하는지
+    from .grounding import verify_answer_grounding
+    grounding = verify_answer_grounding(
+        answer=state.get("answer", ""),
+        evidence_chunks=state.get("evidence_chunks") or [],
+    )
+    state["grounding"] = grounding
+    if not grounding["ok"]:
+        log.warning(f"[synth] grounding failed: {grounding['warnings']}")
     return state
 
 
