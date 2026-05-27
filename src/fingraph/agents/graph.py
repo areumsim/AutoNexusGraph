@@ -18,7 +18,7 @@ PRD §7.6.5: Streaming — UI node-by-node 진행 표시
 from __future__ import annotations
 
 import logging
-from typing import Iterator
+from typing import Any, Iterator
 
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
 from .state import AgentState
@@ -40,6 +40,12 @@ try:
     _HAS_LANGGRAPH = True
 except ImportError:
     _HAS_LANGGRAPH = False
+
+try:
+    from langgraph.types import Command   # type: ignore[import-not-found]
+    _HAS_COMMAND = True
+except ImportError:
+    _HAS_COMMAND = False
 
 
 _LG_APP = None   # 컴파일된 LangGraph app 캐시 (lazy)
@@ -244,19 +250,100 @@ def _stream_with_langgraph(state: AgentState) -> Iterator[tuple[str, AgentState]
     app = _get_langgraph_app()
     config = _make_run_config(state.get("thread_id") or "default")
     final_state: AgentState = state
+    interrupted = False
     for update in app.stream(state, config=config, stream_mode="updates"):
         if not isinstance(update, dict):
             continue
+        # LangGraph 1.x: interrupt 발생 시 update key 가 "__interrupt__"
+        if "__interrupt__" in update:
+            interrupted = True
+            interrupts = update["__interrupt__"]
+            payload = _extract_interrupt_payload(interrupts)
+            if payload:
+                final_state["pending_interrupt"] = payload   # type: ignore[typeddict-unknown-key]
+            yield ("__interrupt__", final_state)
+            break
         for node_name, partial in update.items():
             if isinstance(partial, dict):
                 final_state = {**final_state, **partial}   # type: ignore[misc]
             yield (node_name, final_state)
-    yield ("__final__", final_state)
+    if not interrupted:
+        yield ("__final__", final_state)
+
+
+def _extract_interrupt_payload(interrupts: Any) -> dict | None:
+    """langgraph 의 interrupt 페이로드 추출. 다양한 버전·형식 호환."""
+    if not interrupts:
+        return None
+    # 보통 list[Interrupt] 형태 — 첫 항목의 value 가 우리가 보낸 dict
+    if isinstance(interrupts, list):
+        for it in interrupts:
+            v = getattr(it, "value", None) or getattr(it, "ns", None)
+            if isinstance(v, dict):
+                return v
+            if isinstance(it, dict):
+                return it
+    if isinstance(interrupts, dict):
+        return interrupts
+    val = getattr(interrupts, "value", None)
+    if isinstance(val, dict):
+        return val
+    return None
+
+
+def run_agent_resume(thread_id: str, response: Any) -> AgentState:
+    """interrupt 후 graph 재개 (blocking). PRD §7.5.6.
+
+    동일 thread_id 의 checkpoint 에서 이어감 + Command(resume=response).
+    langgraph 미설치 환경 → InterruptUnavailable 우회: 호출자가 새 turn 으로
+    response 를 question 에 합쳐 재호출하는 패턴 권장.
+    """
+    if not _HAS_LANGGRAPH or not _HAS_COMMAND:
+        raise RuntimeError("LangGraph + Command 필요 — interrupt resume 미지원 환경")
+    app = _get_langgraph_app()
+    config = _make_run_config(thread_id)
+    final_state = app.invoke(Command(resume=response), config=config)
+    return final_state   # type: ignore[return-value]
+
+
+def run_agent_resume_stream(thread_id: str, response: Any
+                             ) -> Iterator[tuple[str, AgentState]]:
+    """interrupt 후 graph 재개 (streaming). SSE 용."""
+    if not _HAS_LANGGRAPH or not _HAS_COMMAND:
+        raise RuntimeError("LangGraph + Command 필요 — interrupt resume 미지원 환경")
+    app = _get_langgraph_app()
+    config = _make_run_config(thread_id)
+    final_state: AgentState = {}   # type: ignore[assignment]
+    interrupted = False
+    for update in app.stream(Command(resume=response),
+                              config=config, stream_mode="updates"):
+        if not isinstance(update, dict):
+            continue
+        if "__interrupt__" in update:
+            interrupted = True
+            payload = _extract_interrupt_payload(update["__interrupt__"])
+            if payload:
+                final_state["pending_interrupt"] = payload   # type: ignore[typeddict-unknown-key]
+            yield ("__interrupt__", final_state)
+            break
+        for node_name, partial in update.items():
+            if isinstance(partial, dict):
+                final_state = {**final_state, **partial}   # type: ignore[misc]
+            yield (node_name, final_state)
+    if not interrupted:
+        yield ("__final__", final_state)
 
 
 def _stream_with_fallback_chain(state: AgentState) -> Iterator[tuple[str, AgentState]]:
     state = triage_node(state)
     yield ("triage", state)
+    # 폴백 환경에서 모호성 감지 — interrupt 호출 못 했으면 pending_interrupt 만 채워졌을 것.
+    # safety_signals 에 자동 해결 흔적이 있으면 그대로 진행, 없으면 사용자에 노출하고 stop.
+    pi = state.get("pending_interrupt") or {}
+    if pi and not state.get("interrupt_handled"):
+        state["aborted_reason"] = "needs_clarification"
+        yield ("__interrupt__", state)
+        return
     while True:
         state = planner_node(state)
         yield ("planner", state)
@@ -291,4 +378,7 @@ def _init_state(question: str, thread_id: str, history: list[dict] | None) -> Ag
     }
 
 
-__all__ = ["run_agent", "run_agent_stream"]
+__all__ = [
+    "run_agent", "run_agent_stream",
+    "run_agent_resume", "run_agent_resume_stream",
+]

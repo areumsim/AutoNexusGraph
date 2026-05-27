@@ -59,24 +59,73 @@ def triage_node(state: AgentState) -> AgentState:
     kind = classify_question(q)
     state["question_kind"] = kind
 
-    # 회사 식별 — 질문에서 회사명 후보 추출 + lookup_company
+    # 회사 식별 — 모호성 검출 + (가능 시) HITL clarification (PRD §7.5.6)
+    from .interrupts import (
+        InterruptUnavailable,
+        coerce_clarification_response,
+        is_ambiguous_company,
+        make_clarification_payload,
+        request_interrupt,
+    )
+
+    thread_id = state.get("thread_id") or ""
     targets: list[str] = []
-    # 간단한 후보 추출: 명사 형태소가 없으므로 흔한 회사명 패턴 시도. 후속 LLM 보강 여지.
-    for word in q.split():
-        if len(word) >= 2:
+    interrupt_response = state.get("interrupt_response")
+
+    # 사용자가 이미 clarification 답을 보냈으면 그것을 우선 적용 (재개 흐름)
+    if interrupt_response and (state.get("pending_interrupt") or {}).get("kind") == "company_clarification":
+        cands = (state.get("pending_interrupt") or {}).get("candidates") or []
+        chosen = coerce_clarification_response(interrupt_response, cands)
+        if chosen:
+            targets = [chosen]
+            state["interrupt_handled"] = True
+            state["pending_interrupt"] = {}
+            log.info("[triage] clarification 응답 적용: %s", chosen)
+
+    # 후보 추출 — word 단위로 lookup, 각 word 가 모호하면 첫 모호 지점에서 interrupt
+    if not targets:
+        for word in q.split():
+            if len(word) < 2:
+                continue
             try:
-                hits = lookup_pg(word, limit=1)
+                hits = lookup_pg(word, limit=5)
             except Exception:
                 hits = []
-            for h in hits:
-                if h.get("corp_code") and h["corp_code"] not in targets:
-                    targets.append(h["corp_code"])
-                    break
-        if len(targets) >= 5:
-            break
+            if not hits:
+                continue
+            # 모호성 — 후보 ≥ 2 + score margin 작음
+            if is_ambiguous_company(hits):
+                payload = make_clarification_payload(
+                    query=word, candidates=hits, thread_id=thread_id,
+                )
+                state["pending_interrupt"] = dict(payload)
+                try:
+                    resp = request_interrupt(payload)
+                    chosen = coerce_clarification_response(resp, hits)
+                    if chosen:
+                        targets.append(chosen)
+                        state["interrupt_handled"] = True
+                        state["pending_interrupt"] = {}
+                        continue
+                except InterruptUnavailable:
+                    # 폴백 체인 — 1순위 자동 선택 + 경고
+                    cc = str(hits[0].get("corp_code") or "")
+                    if cc:
+                        targets.append(cc)
+                        state.setdefault("safety_signals", []).append(
+                            f"ambiguous_company_auto_resolved:{word}->{cc}"
+                        )
+                        log.warning("[triage] interrupt 미지원 — '%s' 1순위(%s) 자동 선택", word, cc)
+                continue
+            # 모호 X → 1순위 채택
+            cc = str(hits[0].get("corp_code") or "")
+            if cc and cc not in targets:
+                targets.append(cc)
+            if len(targets) >= 5:
+                break
+
     # 세션 entity carry-over — 이번 turn 에 회사가 식별 안 되고 multi-turn 이면
     # 이전 세션의 target_companies/persons 를 borrow (PRD §7.6.2).
-    thread_id = state.get("thread_id") or ""
     prev = session.get(thread_id) if thread_id else None
     if not targets and prev and prev.target_companies:
         targets = list(prev.target_companies)

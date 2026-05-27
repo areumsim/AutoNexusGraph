@@ -124,6 +124,38 @@ def render_progress_chip(node: str, partial: dict | None = None) -> str:
     return " · ".join(bits)
 
 
+def render_clarification(payload: dict, *, key_prefix: str) -> int | None:
+    """모호한 회사명 후보 라디오 — PRD §7.5.6 / §7.6.5.
+
+    payload: agents.interrupts.make_clarification_payload 산출
+    반환: 사용자가 선택한 candidate index (또는 None — 아직 선택 안 함)
+    """
+    import streamlit as st
+    candidates = payload.get("candidates") or []
+    if not candidates:
+        return None
+    state_key = f"clarify_{key_prefix}"
+    if st.session_state.get(state_key) is not None:
+        return st.session_state[state_key]
+
+    st.warning(f"🤔 {payload.get('prompt') or '회사를 선택해주세요'}")
+    labels = [
+        f"{c.get('name') or c.get('corp_name','')}  "
+        f"(corp={c.get('corp_code')}, "
+        f"종목={c.get('stock_code') or '-'}, "
+        f"시장={c.get('market') or '-'})"
+        for c in candidates
+    ]
+    choice = st.radio("후보", labels, key=f"radio_{key_prefix}", index=None)
+    if choice is None:
+        return None
+    if st.button("선택 확정", key=f"submit_{key_prefix}"):
+        idx = labels.index(choice)
+        st.session_state[state_key] = idx
+        return idx
+    return None
+
+
 def render_feedback_buttons(message_id: int | None, *, key_prefix: str) -> None:
     """답변 아래 👍/👎/📝 — PRD §7.6.5. message_id 없으면 비활성.
 

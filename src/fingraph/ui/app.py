@@ -35,6 +35,7 @@ from fingraph.ui.components import (
     render_citations, render_grounding_warning, render_agent_trace,
     render_cost_badge, render_provider_info, render_sample_questions,
     render_feedback_buttons, render_progress_chip, node_label,
+    render_clarification,
 )
 
 
@@ -120,12 +121,13 @@ if user_input:
         except Exception:
             pass
 
-    # agent run — 노드별 진행 표시 (PRD §7.6.5)
+    # agent run — 노드별 진행 표시 (PRD §7.6.5) + HITL interrupt (PRD §7.5.6)
     with st.chat_message("assistant"):
         try:
-            from fingraph.agents import run_agent_stream
+            from fingraph.agents import run_agent_stream, run_agent_resume_stream
             with st.status("분석 중…", expanded=True) as status:
                 last_state = None
+                interrupted_payload = None
                 for node, state in run_agent_stream(
                     user_input, thread_id=thread_id,
                     history=st.session_state.messages[-10:],
@@ -137,6 +139,10 @@ if user_input:
                     if node == "__error__":
                         status.update(label="❌ 오류", state="error")
                         break
+                    if node == "__interrupt__":
+                        interrupted_payload = state.get("pending_interrupt")
+                        status.update(label="⏸️ 사용자 응답 대기", state="running")
+                        break
                     partial = {
                         "question_kind": state.get("question_kind"),
                         "target_companies": state.get("target_companies"),
@@ -145,6 +151,32 @@ if user_input:
                     }
                     st.write(render_progress_chip(node, partial))
                     status.update(label=node_label(node))
+
+            # HITL — 사용자 응답 받아 resume
+            if interrupted_payload:
+                idx = render_clarification(interrupted_payload,
+                                            key_prefix=f"{thread_id}_{len(st.session_state.messages)}")
+                if idx is None:
+                    # 미선택 — 다음 run 으로 미루고 페이지에 응답 UI 만 표시
+                    st.stop()
+                # resume
+                with st.status("응답 처리 중…", expanded=True) as status:
+                    for node, state in run_agent_resume_stream(thread_id, {"index": idx}):
+                        last_state = state
+                        if node == "__final__":
+                            status.update(label="✅ 완료", state="complete")
+                            break
+                        if node == "__error__":
+                            status.update(label="❌ resume 실패", state="error")
+                            break
+                        partial = {
+                            "question_kind": state.get("question_kind"),
+                            "target_companies": state.get("target_companies"),
+                            "n_tool_results": len(state.get("tool_results") or []),
+                            "cost_usd": float(state.get("llm_usage_usd") or 0.0),
+                        }
+                        st.write(render_progress_chip(node, partial))
+                        status.update(label=node_label(node))
 
             state = last_state or {}
             answer = state.get("answer") or "(빈 응답)"

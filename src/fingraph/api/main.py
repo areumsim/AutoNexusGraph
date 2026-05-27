@@ -22,7 +22,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..agents import run_agent, run_agent_stream
+from ..agents import (
+    run_agent,
+    run_agent_resume_stream,
+    run_agent_stream,
+)
 from ..db.postgres import get_pool
 
 
@@ -111,6 +115,13 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
                     "n_replans": st.get("n_replans"),
                     "validation_status": st.get("validation_status"),
                 }
+                if node == "__interrupt__":
+                    # HITL — UI 가 응답을 받아 /chat/resume 호출하도록 유도
+                    payload["pending_interrupt"] = st.get("pending_interrupt") or {}
+                    if not user_msg_logged:
+                        _persist_turn(req.thread_id, "user", req.message,
+                                       citations=None, trace=None)
+                        user_msg_logged = True
                 if node == "__final__":
                     payload["answer"] = st.get("answer", "")
                     payload["citations"] = st.get("citations") or []
@@ -133,6 +144,65 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
             yield "data: [DONE]\n\n"
         except Exception as exc:   # noqa: BLE001
             log.exception("[chat_stream] failed")
+            err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── chat resume (HITL — PRD §7.5.6) ─────────────────────────
+class ResumeRequest(BaseModel):
+    thread_id: str
+    response: Any   # corp_code 8자리 str / int(index) / dict({corp_code: ...})
+
+
+@app.post("/chat/resume")
+def chat_resume(req: ResumeRequest) -> StreamingResponse:
+    """interrupt 후 사용자가 응답한 값으로 graph 재개. SSE 스트림.
+
+    LangGraph + langgraph.types.Command 필요. 폴백 환경에서는 클라이언트가
+    응답을 새 /chat 호출에 합쳐 보내는 패턴 권장 (UI 가 처리).
+    """
+    def _gen():
+        try:
+            for node, st in run_agent_resume_stream(req.thread_id, req.response):
+                payload: dict[str, Any] = {
+                    "node": node,
+                    "question_kind": st.get("question_kind"),
+                    "target_companies": st.get("target_companies") or [],
+                    "n_tool_results": len(st.get("tool_results") or []),
+                    "cost_usd": float(st.get("llm_usage_usd") or 0.0),
+                    "n_replans": st.get("n_replans"),
+                    "validation_status": st.get("validation_status"),
+                }
+                if node == "__interrupt__":
+                    payload["pending_interrupt"] = st.get("pending_interrupt") or {}
+                if node == "__final__":
+                    payload["answer"] = st.get("answer", "")
+                    payload["citations"] = st.get("citations") or []
+                    payload["grounding"] = st.get("grounding") or {}
+                    payload["validation_issues"] = st.get("validation_issues") or []
+                    _persist_turn(req.thread_id, "assistant", payload["answer"],
+                                   citations=payload["citations"],
+                                   trace={"question_kind": payload["question_kind"],
+                                          "target_companies": payload["target_companies"],
+                                          "cost_usd": payload["cost_usd"],
+                                          "validation_status": payload["validation_status"],
+                                          "resumed_from": "interrupt"})
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except RuntimeError as exc:
+            err = {"node": "__error__",
+                   "error": f"resume_unavailable: {exc}"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:   # noqa: BLE001
+            log.exception("[chat_resume] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"

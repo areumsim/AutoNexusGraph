@@ -57,6 +57,11 @@ class AgentState(TypedDict, total=False):
     validation_issues: list[str]      # 검증 실패 사유들
     grounding: dict                   # verify_answer_grounding 결과
 
+    # Human-in-the-Loop (PRD §7.5.6)
+    pending_interrupt: dict           # 발동된 interrupt 페이로드 (UI/SSE 로 노출)
+    interrupt_response: Any           # client 가 보낸 resume 값
+    interrupt_handled: bool           # graph 가 응답 처리 완료 신호
+
     # 메타·비용
     llm_usage_usd: float
     n_replans: int
