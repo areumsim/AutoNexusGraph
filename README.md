@@ -6,7 +6,7 @@ Vector 단독 RAG가 풀지 못하는 멀티홉 추론(자회사 구조, 임원 
 
 상세 요구사항은 [PRD.md](./PRD.md) 참조.
 
-> **현재 단계:** Phase 4.5 완료. Multi-Agent + Send 병렬 + Validator/Replan + Human-in-the-Loop (clarification) + PG checkpoint + streaming + tracing. 다음 권장: Calculator Python sandbox.
+> **현재 단계:** Phase 4.6 완료. Multi-Agent + Send 병렬 + Validator/Replan + HITL(clarification + cost approval) + PG checkpoint + streaming + tracing. 다음 권장: Calculator Python sandbox.
 
 ---
 
@@ -178,6 +178,7 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 | 4.3 LangGraph 활성화 + Streaming + Tracing | ✅ | `[agent]` extra(langfuse + langsmith), DSN 우선순위 정합성, `chat` 스키마 search_path 주입, `run_agent_stream()` + FastAPI `/chat/stream` SSE, Streamlit `st.status` node progress, tracing fail-soft |
 | 4.4 Multi-Agent 분리 (Supervisor + 4 Worker) + Send API 병렬 | ✅ | Planner→DAG (PRD §7.5.3), Supervisor (의존성·순환검증·budget guard), Research/Graph/SQL/Calculator worker (PRD §7.5.2), langgraph Send 병렬 디스패치 (PRD §7.5.7), Calculator numexpr 안전 evaluator (sandbox 별도) |
 | 4.5 Human-in-the-Loop interrupt (Clarification) | ✅ | 모호한 회사명 자동 감지(margin<10%), `langgraph.interrupt`로 graph pause → `/chat/resume`로 재개, Streamlit clarification dialog, 폴백환경 1순위+경고 자동 다운그레이드 (PRD §7.5.6) |
+| 4.6 Cost approval interrupt + estimator | ✅ | Synthesizer 호출 비용 사전 추정 (`cost_estimator.py`, replan factor 포함). `LLM_COST_AUTO_APPROVE_USD` 초과 시 사용자 승인 받음. 거절 시 supervisor가 worker skip + synthesizer가 명시 답변. 폴백환경 자동 통과+경고 (PRD §7.5.6) |
 | 4.5 P3/P4 LLM 추출 | 🚧 | extractor engine (병렬+circuit breaker), selective filter (53% 호출 감소), embedding 완료 후 실행 |
 | 5. 평가 + 튜닝 | 🚧 | eval harness 완성 (6 metric × 4 어댑터), gold set 큐레이션 대기 |
 

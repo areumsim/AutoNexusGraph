@@ -29,6 +29,14 @@ def supervisor_node(state: AgentState) -> AgentState:
     같은 turn 내에서 반복 호출되며 (StateGraph 의 self-loop 와 동일 효과), 더
     이상 unblocked 가 없으면 noop. ``all_done`` 검사로 종결 시점 결정.
     """
+    # 사용자가 비용 승인을 거절했으면 worker 도 호출하지 않는다.
+    if state.get("aborted_reason") == "cost_rejected":
+        for t in state.get("tasks") or []:
+            if t.get("status") == "pending":
+                t["status"] = "skipped"
+                t["result"] = {"error": "cost_rejected"}
+        return state
+
     tasks: list[dict] = state.get("tasks") or []
     if not tasks:
         return state
@@ -84,6 +92,8 @@ def sup_send_directives(state: AgentState):
     if not tasks or not topologically_valid(tasks):
         return []
     if turn_budget_exceeded(state):
+        return []
+    if state.get("aborted_reason") == "cost_rejected":
         return []
 
     ready = unblocked_tasks(tasks)

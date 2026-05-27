@@ -35,7 +35,7 @@ from fingraph.ui.components import (
     render_citations, render_grounding_warning, render_agent_trace,
     render_cost_badge, render_provider_info, render_sample_questions,
     render_feedback_buttons, render_progress_chip, node_label,
-    render_clarification,
+    render_clarification, render_cost_approval,
 )
 
 
@@ -152,16 +152,27 @@ if user_input:
                     st.write(render_progress_chip(node, partial))
                     status.update(label=node_label(node))
 
-            # HITL — 사용자 응답 받아 resume
+            # HITL — interrupt 종류별 응답 dialog → resume
             if interrupted_payload:
-                idx = render_clarification(interrupted_payload,
-                                            key_prefix=f"{thread_id}_{len(st.session_state.messages)}")
-                if idx is None:
-                    # 미선택 — 다음 run 으로 미루고 페이지에 응답 UI 만 표시
+                kind = interrupted_payload.get("kind")
+                key_prefix = f"{thread_id}_{len(st.session_state.messages)}"
+                resume_value: any = None
+                if kind == "company_clarification":
+                    idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
+                    if idx is None:
+                        st.stop()
+                    resume_value = {"index": idx}
+                elif kind == "cost_approval":
+                    approved = render_cost_approval(interrupted_payload, key_prefix=key_prefix)
+                    if approved is None:
+                        st.stop()
+                    resume_value = approved
+                else:
+                    st.error(f"알 수 없는 interrupt 종류: {kind}")
                     st.stop()
                 # resume
                 with st.status("응답 처리 중…", expanded=True) as status:
-                    for node, state in run_agent_resume_stream(thread_id, {"index": idx}):
+                    for node, state in run_agent_resume_stream(thread_id, resume_value):
                         last_state = state
                         if node == "__final__":
                             status.update(label="✅ 완료", state="complete")

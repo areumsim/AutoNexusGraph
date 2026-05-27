@@ -124,6 +124,35 @@ def render_progress_chip(node: str, partial: dict | None = None) -> str:
     return " · ".join(bits)
 
 
+def render_cost_approval(payload: dict, *, key_prefix: str) -> bool | None:
+    """비용 승인 dialog — PRD §7.5.6 cost_approval.
+
+    payload: agents.interrupts.make_cost_approval_payload 산출
+    반환: True (승인) / False (거절) / None (아직 선택 안 함)
+    """
+    import streamlit as st
+    state_key = f"cost_{key_prefix}"
+    if st.session_state.get(state_key) is not None:
+        return st.session_state[state_key]
+
+    cost = float(payload.get("estimated_cost_usd") or 0.0)
+    st.warning(
+        f"💰 {payload.get('prompt') or '비용 승인 필요'}\n\n"
+        f"예상 비용: **${cost:.4f}**\n\n"
+        f"plan: {payload.get('plan_summary') or '-'}"
+    )
+    cols = st.columns([1, 1, 5])
+    with cols[0]:
+        if st.button("✅ 승인", key=f"approve_{key_prefix}"):
+            st.session_state[state_key] = True
+            return True
+    with cols[1]:
+        if st.button("❌ 거절", key=f"reject_{key_prefix}"):
+            st.session_state[state_key] = False
+            return False
+    return None
+
+
 def render_clarification(payload: dict, *, key_prefix: str) -> int | None:
     """모호한 회사명 후보 라디오 — PRD §7.5.6 / §7.6.5.
 

@@ -194,9 +194,20 @@ graph 가 멈추고 client (UI/SSE) 가 응답을 주면 같은 thread 의 check
 | 시점 | 조건 | 페이로드 kind | 응답 형식 |
 |---|---|---|---|
 | Triage 회사 식별 | `is_ambiguous_company(hits)` (후보 ≥ 2 + margin < 10%) | `company_clarification` | `{"index": N}` / `{"corp_code": "0012…"}` / 8자리 str / int |
+| Planner 산출 후 | `estimate_turn_cost > LLM_COST_AUTO_APPROVE_USD` (기본 $0.50) | `cost_approval` | `True/False` / `"yes"·"no"·"승인"·"거절"` / `{"approved": bool}` |
 
 폴백 (langgraph 미설치) — `request_interrupt` 가 `InterruptUnavailable` raise →
-triage 가 1순위 후보 자동 선택 + `state.safety_signals` 에 `ambiguous_company_auto_resolved:삼성->00126380` 기록.
+- clarification: triage 가 1순위 후보 자동 선택 + `safety_signals: ambiguous_company_auto_resolved:삼성->00126380`
+- cost_approval: planner 가 자동 통과 + `safety_signals: cost_approval_auto_passed:$0.7521`
+
+비용 추정 (`agents/cost_estimator.py`): Synthesizer LLM 호출 비용 = 시스템 프롬프트(200 tok) +
+질문 + 도구 결과(최대 1000자 × N) + evidence(최대 6×400자) + 출력(1200 tok 기본).
+모델 단가는 `llm/cost.py:PRICING`. `replan_factor = MAX_REPLANS + 1` 을 곱해 over-estimate.
+
+거절 처리:
+- `state.aborted_reason = "cost_rejected"`
+- Supervisor 가 pending tasks 모두 `skipped` 로 마킹 (worker 호출 안 함)
+- Synthesizer 가 LLM 없이 "사용자가 예상 비용을 승인하지 않아…" 명시적 답변
 
 진입점 / API:
 - `run_agent_stream` 이 interrupt 발생 시 `("__interrupt__", state)` yield 후 종료
@@ -318,7 +329,7 @@ Calculator 의 Python sandbox 격리는 인프라 후속.
 다음 단계 권장 순서:
 
 1. ~~Supervisor + Worker 4종 + Send API 병렬~~ — **✅ 완료** (PRD §7.5.2 / §7.5.7)
-2. ~~Human-in-the-Loop interrupt (Clarification)~~ — **✅ 완료** (PRD §7.5.6). cost_approval / sensitive_decision 은 동일 helper 로 후속
+2. ~~Human-in-the-Loop interrupt (Clarification + Cost approval)~~ — **✅ 완료** (PRD §7.5.6). sensitive_decision 은 동일 helper 로 후속
 3. **Calculator Python sandbox** — e2b / daytona / 자체 docker 격리 (PRD §7.5.11) — 다음 권장
 4. **Planner LLM 업그레이드** — 현재 룰 기반 DAG → LLM 이 JSON Schema 로 DAG 생성 (PRD §7.5.12)
 5. **Cypher 템플릿 레지스트리** — `tools/cypher_templates.py` + JSON Schema 파라미터 강제 (PRD §7.5.9)

@@ -135,6 +135,46 @@ def coerce_clarification_response(
     return None
 
 
+# ── Cost approval ─────────────────────────────────────────
+def make_cost_approval_payload(
+    *,
+    estimated_cost_usd: float,
+    plan_summary: str,
+    thread_id: str = "",
+) -> InterruptPayload:
+    """planner 비용 추정이 한도 초과 시 발동."""
+    return {
+        "kind": "cost_approval",
+        "prompt": f"이 질문 처리에 예상 ${estimated_cost_usd:.4f} 소요됩니다. 진행할까요?",
+        "estimated_cost_usd": float(estimated_cost_usd),
+        "plan_summary": plan_summary,
+        "thread_id": thread_id,
+    }
+
+
+def coerce_cost_response(response: Any) -> bool:
+    """resume 값을 승인/거절 boolean 으로 정규화.
+
+    True/False / "y"·"yes"·"ok"·"approve" / dict{"approved": bool}.
+    인식 불가 → False (보수적: 비용 발생 거부).
+    """
+    if response is True:
+        return True
+    if response is False or response is None:
+        return False
+    if isinstance(response, dict):
+        v = response.get("approved")
+        if isinstance(v, bool):
+            return v
+    if isinstance(response, str):
+        s = response.strip().lower()
+        if s in ("y", "yes", "ok", "approve", "approved", "true", "1", "승인"):
+            return True
+        if s in ("n", "no", "deny", "reject", "false", "0", "거절", "취소"):
+            return False
+    return False
+
+
 __all__ = [
     "InterruptKind",
     "InterruptPayload",
@@ -143,4 +183,6 @@ __all__ = [
     "is_ambiguous_company",
     "make_clarification_payload",
     "coerce_clarification_response",
+    "make_cost_approval_payload",
+    "coerce_cost_response",
 ]

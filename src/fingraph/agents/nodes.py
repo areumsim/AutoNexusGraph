@@ -268,6 +268,58 @@ def planner_node(state: AgentState) -> AgentState:
 
     log.info("[planner] kind=%s targets=%d tasks=%d (DAG)",
              kind, len(targets), len(tasks))
+
+    # ── Cost approval (PRD §7.5.6) ──────────────────────────
+    from .cost_estimator import needs_cost_approval
+    from .interrupts import (
+        InterruptUnavailable,
+        coerce_cost_response,
+        make_cost_approval_payload,
+        request_interrupt,
+    )
+
+    pi = state.get("pending_interrupt") or {}
+    resp = state.get("interrupt_response")
+
+    # (A) Resume 경로 — pending_interrupt=cost_approval + 응답이 이미 있음 → 적용
+    if pi.get("kind") == "cost_approval" and resp is not None and not state.get("interrupt_handled"):
+        approved = coerce_cost_response(resp)
+        state["interrupt_handled"] = True
+        state["pending_interrupt"] = {}
+        if not approved:
+            state["aborted_reason"] = "cost_rejected"
+            log.info("[planner] cost_approval 거절 — turn 종료")
+            return state
+        log.info("[planner] cost_approval 승인 (resume) — 진행")
+    # (B) 새 interrupt 발동 — replan 중에는 안 묻고, 이미 승인된 turn 도 skip
+    elif not state.get("n_replans") and not state.get("interrupt_handled"):
+        need, est = needs_cost_approval(state)
+        if need:
+            summary = (
+                f"질문 유형: {kind}, 회사 수: {len(targets)}, "
+                f"task: {len(tasks)}개, 모델: {est.model} "
+                f"(replan 최대 {est.replan_factor}회 포함)"
+            )
+            payload = make_cost_approval_payload(
+                estimated_cost_usd=est.estimated_cost_usd,
+                plan_summary=summary,
+                thread_id=state.get("thread_id") or "",
+            )
+            state["pending_interrupt"] = dict(payload)
+            try:
+                resp2 = request_interrupt(payload)
+                approved = coerce_cost_response(resp2)
+                state["interrupt_handled"] = True
+                state["pending_interrupt"] = {}
+                if not approved:
+                    state["aborted_reason"] = "cost_rejected"
+                    log.info("[planner] cost_approval 거절 — turn 종료")
+            except InterruptUnavailable:
+                state.setdefault("safety_signals", []).append(
+                    f"cost_approval_auto_passed:${est.estimated_cost_usd:.4f}"
+                )
+                log.warning("[planner] interrupt 미지원 — 추정 비용 $%.4f 자동 통과",
+                            est.estimated_cost_usd)
     return state
 
 
@@ -346,7 +398,8 @@ def synthesizer_node(state: AgentState,
     aborted_reason 이 있으면 fallback 답변 (LLM 비호출).
     """
     # 비용/예산 초과 → LLM 호출 안 하고 결정적 brief 로 fallback.
-    if state.get("aborted_reason") == "turn_budget":
+    abort = state.get("aborted_reason")
+    if abort == "turn_budget":
         from .answering import build_deterministic_brief
         state["answer"] = (
             "이번 응답에서 사전 정의된 LLM 비용 한도를 초과했습니다.\n"
@@ -355,6 +408,15 @@ def synthesizer_node(state: AgentState,
         )
         state["citations"] = []
         state["grounding"] = {"ok": False, "warnings": ["budget_exceeded"]}
+        return state
+    if abort == "cost_rejected":
+        # 사용자가 비용 승인을 거절 — LLM 호출 없이 명시적 응답
+        state["answer"] = (
+            "사용자가 예상 비용을 승인하지 않아 답변을 생성하지 않았습니다. "
+            "비용 한도를 조정하거나(.env: LLM_COST_AUTO_APPROVE_USD) 더 적은 컨텍스트로 다시 시도해주세요."
+        )
+        state["citations"] = []
+        state["grounding"] = {"ok": False, "warnings": ["cost_rejected"]}
         return state
 
     # 도구 결과 + evidence 를 요약해 LLM 입력으로
