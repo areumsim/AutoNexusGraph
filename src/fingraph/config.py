@@ -99,6 +99,12 @@ class Settings(BaseSettings):
     agent_max_answer_len: int = 5000
     agent_turn_budget_usd: float = 0.20    # 한 대화 turn 의 최대 LLM 비용
 
+    # === LangGraph checkpoint (PRD §7.5.8) ===
+    # auto = PG 시도 → memory 폴백, memory/in_memory = 강제 in-memory, none = 비활성
+    langgraph_checkpoint_backend: Literal["auto", "memory", "in_memory", "none"] = "auto"
+    langgraph_checkpoint_schema: str = "chat"     # PG schema (search_path 주입)
+    langgraph_checkpoint_dsn: str = ""             # 빈 값이면 postgres_dsn 사용
+
     # === LLM 비용 가드 (사용자 명시) ===
     # 모든 LLM 호출은 dry-run estimator + 누적 한도 + circuit breaker 통과해야 함.
     llm_cost_hard_limit_usd: float = 5.00    # 누적 이 한도 도달 시 즉시 abort

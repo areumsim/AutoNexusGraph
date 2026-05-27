@@ -55,13 +55,19 @@ Vector 단독 RAG가 풀지 못하는 멀티홉 추론(자회사 구조, 임원 
 
 [애플리케이션 계층]
 ├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS 클라이언트
-├─ Loaders            : PG/Neo4j 멱등 적재
+├─ Loaders            : PG/Neo4j 멱등 적재 (P1 deterministic / P2 deterministic / P3 LLM / P4 cross-validate)
 ├─ Tools              : 사전 정의 함수 풀 (financials/graph/retrieve) — 자유 SQL/Cypher 금지
-└─ Agents (LangGraph) : Triage·Planner·Workers — 후속 PR
+├─ Safety             : prompt_safety (XML escape + injection 감지) · cypher_guard (READ-ONLY) · language_guard
+├─ Agents (LangGraph) : Triage → Planner → Executor → Synthesizer → Validator (replan ≤ 2)
+│                       · 세션 메모리 (thread별 TTL/LRU) · checkpoint (chat.checkpoints)
+│                       · streaming (SSE / st.status) · tracing (Langfuse/LangSmith)
+└─ API / UI           : FastAPI /chat + /chat/stream, Streamlit 채팅 (node progress · 👍/👎/📝)
 
 [외부 의존성]
 └─ LLM Provider : OpenAI / Anthropic / 로컬 (환경변수 전환)
 ```
+
+상세는 [docs/operations/agents.md](./docs/operations/agents.md) 참조.
 
 ### 저장소 역할 분리 원칙
 
@@ -165,6 +171,9 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 | 3. 청킹·임베딩·그래프 1차 | ✅ | vec.chunks 748K, Neo4j 12K Company / 14K Person |
 | 3.5 데이터 통합·정합성 | ✅ | entity_map 1.9K, Wikidata/Wikipedia/GLEIF/SEC/뉴스/KCGS 통합, ER 마스터 |
 | 4. RAG 도구 + 에이전트 + UI | ✅ | tools/financials·graph·retrieve, agent 4-node + answering brief + grounding, FastAPI /chat, Streamlit UI |
+| 4.1 v1/v2 안전 자산 흡수 + Validator·Replan | ✅ | temporal_normalizer, prompt_safety, cypher_guard, language_guard, query_rewriter (coreference), validator + replan loop (max 2), UI title 자동 요약 + 피드백 버튼 |
+| 4.2 LangGraph StateGraph + 세션 메모리 + Fallback recovery | ✅ | 실제 StateGraph + PG/Memory checkpointer, thread별 entity TTL 메모리 (carry-over), executor 빈 결과 시 search_documents 자동 회복 |
+| 4.3 LangGraph 활성화 + Streaming + Tracing | ✅ | `[agent]` extra(langfuse + langsmith), DSN 우선순위 정합성, `chat` 스키마 search_path 주입, `run_agent_stream()` + FastAPI `/chat/stream` SSE, Streamlit `st.status` node progress, tracing fail-soft |
 | 4.5 P3/P4 LLM 추출 | 🚧 | extractor engine (병렬+circuit breaker), selective filter (53% 호출 감소), embedding 완료 후 실행 |
 | 5. 평가 + 튜닝 | 🚧 | eval harness 완성 (6 metric × 4 어댑터), gold set 큐레이션 대기 |
 
@@ -197,7 +206,8 @@ Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 
 
 - [PRD.md](./PRD.md) — 전체 요구사항·아키텍처 정의
 - [docs/operations/docker_setup.md](./docs/operations/docker_setup.md) — Docker 스택 가이드
-- [docs/operations/data_pipeline.md](./docs/operations/data_pipeline.md) — 3-tier 멱등 파이프라인 + Step DAG
+- [docs/operations/data_pipeline.md](./docs/operations/data_pipeline.md) — 3-tier 멱등 파이프라인 + Step DAG + 4-pass 추출 + LangGraph 활성화
+- [docs/operations/agents.md](./docs/operations/agents.md) — 에이전트 아키텍처 (LangGraph StateGraph, AgentState, replan/checkpoint/tracing/streaming, 세션 메모리, safety 가드)
 - [docs/operations/rag_tools.md](./docs/operations/rag_tools.md) — 도구 카탈로그 + 시나리오
 - [docs/operations/kcgs_esg_guide.md](./docs/operations/kcgs_esg_guide.md) — KCGS ESG 등급 수집 가이드
 - [eval/qa_gold/README.md](./eval/qa_gold/README.md) — 평가 gold set 스키마 + 큐레이션 가이드
@@ -246,8 +256,8 @@ make load-sec
 make ingest-gleif     # GLEIF LEI (한국 jurisdiction 2,700건)
 make load-gleif
 
-# 6. 그래프 스키마 정합성 마이그레이션 (1회)
-python scripts/migrate_neo4j_schema.py
+# 6. 그래프 스키마 정합성 마이그레이션 (1회, 멱등 — 변경 0 이면 이미 적용됨)
+make migrate-schema
 
 # 7. KCGS ESG (수동 CSV 다운로드 후)
 make ingest-kcgs                # 보도자료 모니터 — 등급 발표 알림
@@ -268,12 +278,17 @@ make p3-extract-dry       # 비용 추정 — LLM 호출 0
 make p3-extract           # 실제 추출 (HARD_LIMIT $1.0)
 make p4-load              # P4 검증 + Neo4j 적재
 
-# 11. API + UI 가동
-make serve-api            # FastAPI :31020 — POST /chat
-pip install streamlit     # (선택) UI 의존성
-make serve-ui             # Streamlit :31021 채팅 UI
+# 11. LangGraph 활성화 (PRD §7.5.8 — PG checkpoint + tracing)
+make install-agent        # pip install -e ".[agent]" — langgraph + langfuse + langsmith
+make enable-langgraph     # 헬스체크: _HAS_LANGGRAPH + checkpointer 타입 확인
+# (선택) tracing: .env 에 TRACE_BACKEND=langfuse + LANGFUSE_* 키 또는 TRACE_BACKEND=langsmith + LANGSMITH_API_KEY
 
-# 12. 평가 (gold 큐레이션 후)
+# 12. API + UI 가동
+make serve-api            # FastAPI :31020 — POST /chat (blocking) + /chat/stream (SSE)
+pip install streamlit     # (선택) UI 의존성
+make serve-ui             # Streamlit :31021 채팅 UI — st.status 노드 진행 표시
+
+# 13. 평가 (gold 큐레이션 후)
 make eval-smoke           # 3 row 빠른 검증
 make eval-full            # 100문항 4 어댑터 매트릭스
 ```

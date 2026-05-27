@@ -19,9 +19,10 @@ import uuid
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..agents import run_agent
+from ..agents import run_agent, run_agent_stream
 from ..db.postgres import get_pool
 
 
@@ -79,6 +80,67 @@ def chat(req: ChatRequest) -> ChatResponse:
         cost_usd=float(state.get("llm_usage_usd") or 0.0),
         aborted_reason=state.get("aborted_reason"),
         n_tool_results=len(state.get("tool_results") or []),
+    )
+
+
+# ── chat stream (SSE — PRD §7.6.5) ──────────────────────────
+@app.post("/chat/stream")
+def chat_stream(req: ChatRequest) -> StreamingResponse:
+    """SSE — 노드 진입마다 partial state 한 줄. 마지막에 data: [DONE].
+
+    이벤트 형태:
+        data: {"node": "triage", "question_kind": "factual", ...}\\n\\n
+        ...
+        data: {"node": "__final__", "answer": "...", "citations": [...], "cost_usd": ...}\\n\\n
+        data: [DONE]\\n\\n
+    """
+    history = _load_history(req.thread_id) if req.use_history else []
+
+    def _gen():
+        try:
+            user_msg_logged = False
+            for node, st in run_agent_stream(req.message,
+                                              thread_id=req.thread_id,
+                                              history=history):
+                payload: dict[str, Any] = {
+                    "node": node,
+                    "question_kind": st.get("question_kind"),
+                    "target_companies": st.get("target_companies") or [],
+                    "n_tool_results": len(st.get("tool_results") or []),
+                    "cost_usd": float(st.get("llm_usage_usd") or 0.0),
+                    "n_replans": st.get("n_replans"),
+                    "validation_status": st.get("validation_status"),
+                }
+                if node == "__final__":
+                    payload["answer"] = st.get("answer", "")
+                    payload["citations"] = st.get("citations") or []
+                    payload["grounding"] = st.get("grounding") or {}
+                    payload["validation_issues"] = st.get("validation_issues") or []
+                    # 최종 적재 — user + assistant 두 turn (user 는 처음 한 번만)
+                    if not user_msg_logged:
+                        _persist_turn(req.thread_id, "user", req.message,
+                                       citations=None, trace=None)
+                        user_msg_logged = True
+                    _persist_turn(req.thread_id, "assistant", payload["answer"],
+                                   citations=payload["citations"],
+                                   trace={"question_kind": payload["question_kind"],
+                                          "target_companies": payload["target_companies"],
+                                          "n_tool_results": payload["n_tool_results"],
+                                          "cost_usd": payload["cost_usd"],
+                                          "n_replans": payload["n_replans"],
+                                          "validation_status": payload["validation_status"]})
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:   # noqa: BLE001
+            log.exception("[chat_stream] failed")
+            err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

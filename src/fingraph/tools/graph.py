@@ -23,7 +23,13 @@ HARD_LIMIT = 500
 
 
 def _run(cypher: str, **params: Any) -> list[dict]:
-    """READ 단일 쿼리 실행 → list[dict] (record.data())."""
+    """READ 단일 쿼리 실행 → list[dict] (record.data()).
+
+    cypher_guard: 도구 내장 템플릿이라도 실행 직전 READ-ONLY 정적 검사. 누군가
+    실수로 CREATE/MERGE 가 섞인 템플릿을 추가해도 여기서 차단된다.
+    """
+    from ..safety.cypher_guard import assert_read_only
+    assert_read_only(cypher)
     driver = get_driver()
     with driver.session() as session:
         result = session.run(cypher, **params)

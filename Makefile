@@ -12,7 +12,8 @@
         load-entity-map load-persons load-graph-structural \
         load-wikidata load-wikipedia load-news load-graph-news \
         load-sec load-gleif load-kcgs \
-        build-wiki-chunks validate-quality
+        build-wiki-chunks validate-quality \
+        migrate-schema install-agent enable-langgraph trace-on trace-off
 
 # 호스트가 Ubuntu/Debian 계열이면 `python` 없이 `python3` 만 있을 수 있음 — auto-detect.
 # 명시 지정하려면: make PYTHON=python3.11 ...
@@ -56,6 +57,25 @@ help:
 
 install:
 	$(PIP) install -e ".[all]"
+
+install-agent:                                       # langgraph + tracing 의존성만
+	$(PIP) install -e ".[agent]"
+
+enable-langgraph:                                    # 활성화 헬스체크
+	@$(PYTHON) -c "from langgraph.graph import StateGraph; print('✓ langgraph import 성공')" || \
+	    (echo '✗ langgraph 미설치 — make install-agent 먼저 실행' && exit 1)
+	@$(PYTHON) -c "from fingraph.agents.graph import _HAS_LANGGRAPH; \
+	    print(f'✓ _HAS_LANGGRAPH = {_HAS_LANGGRAPH}')"
+	@$(PYTHON) -c "from fingraph.agents.checkpointer import get_checkpointer; \
+	    c = get_checkpointer(); \
+	    print(f'✓ checkpointer = {type(c).__name__ if c else None}')"
+
+trace-on:                                            # 환경변수로 tracing 활성 확인
+	@echo "TRACE_BACKEND=$${TRACE_BACKEND:-(unset)}"
+	@$(PYTHON) -c "from fingraph.agents.tracing import describe_backend; print(describe_backend())"
+
+trace-off:                                           # tracing 비활성 — 환경변수만 unset 안내
+	@echo "TRACE_BACKEND 을 빈 값으로 두거나 'none' 으로 설정하세요. (.env 또는 export TRACE_BACKEND=)"
 
 fmt:
 	ruff format src tests scripts
@@ -125,11 +145,14 @@ load-all:
 build-chunks:
 	$(PYTHON) scripts/load/build_chunks.py
 
-embed-chunks:
-	$(PYTHON) scripts/load/embed_chunks.py
+# NOTE: embed-chunks 의 실제 정의는 line ~183 (EMBEDDING_URL 주입 포함).
+# 여기서 중복 선언하면 GNU make 가 첫 정의로 shadow 하므로 별도 정의 두지 않는다.
 
 load-graph:
 	$(PYTHON) scripts/load/load_graph_companies.py
+
+migrate-schema:                                      # Neo4j 스키마 정합성 마이그레이션 (README §11.6)
+	$(PYTHON) scripts/migrate_neo4j_schema.py
 
 # ── Step별 묶음 target — 데이터 통합 고도화 (천천히 안 터지게) ───────────────
 ingest-structural:    ; $(PYTHON) scripts/ingest/bulk_dart_structural.py

@@ -88,6 +88,78 @@ def render_provider_info() -> None:
     st.caption(f"임베딩: `{s.embedding_url}` (dim {s.embedding_dim})")
 
 
+# ── 노드 진행 표시 (PRD §7.6.5) ─────────────────────────────
+_NODE_LABEL = {
+    "triage":       "🔍 Triage",
+    "planner":      "🧭 Planner",
+    "executor":     "🛠️ Executor",
+    "synthesizer":  "✍️ Synthesizer",
+    "validator":    "✅ Validator",
+    "replan":       "♻️ Replan",
+    "finalize":     "🏁 Finalize",
+    "__final__":    "🏁 완료",
+    "__error__":    "❌ 오류",
+}
+
+
+def node_label(node: str) -> str:
+    return _NODE_LABEL.get(node, f"⚙️ {node}")
+
+
+def render_progress_chip(node: str, partial: dict | None = None) -> str:
+    """st.status 내부에 보여줄 한 줄 — 노드 + 핵심 partial state."""
+    label = node_label(node)
+    if not partial:
+        return label
+    bits: list[str] = [label]
+    if partial.get("question_kind"):
+        bits.append(f"kind=`{partial['question_kind']}`")
+    if partial.get("target_companies"):
+        bits.append(f"회사={len(partial['target_companies'])}")
+    if partial.get("n_tool_results"):
+        bits.append(f"도구={partial['n_tool_results']}")
+    cost = partial.get("cost_usd")
+    if cost is not None and cost > 0:
+        bits.append(f"비용=${cost:.4f}")
+    return " · ".join(bits)
+
+
+def render_feedback_buttons(message_id: int | None, *, key_prefix: str) -> None:
+    """답변 아래 👍/👎/📝 — PRD §7.6.5. message_id 없으면 비활성.
+
+    record_feedback 호출은 storage.record_feedback 로 위임 (DB 실패 fail-soft).
+    """
+    import streamlit as st
+    from .storage import record_feedback
+
+    if not message_id:
+        return
+    cols = st.columns([1, 1, 6])
+    state_key = f"fb_{key_prefix}_{message_id}"
+    sent = st.session_state.get(state_key)
+
+    with cols[0]:
+        if st.button("👍", key=f"up_{key_prefix}_{message_id}",
+                     disabled=(sent == "up")):
+            if record_feedback(message_id, +1, None):
+                st.session_state[state_key] = "up"
+                st.toast("피드백 기록됨", icon="👍")
+    with cols[1]:
+        if st.button("👎", key=f"down_{key_prefix}_{message_id}",
+                     disabled=(sent == "down")):
+            if record_feedback(message_id, -1, None):
+                st.session_state[state_key] = "down"
+                st.toast("피드백 기록됨", icon="👎")
+    with cols[2]:
+        with st.popover("📝 의견"):
+            txt_key = f"fb_text_{key_prefix}_{message_id}"
+            comment = st.text_area("의견을 남겨주세요", key=txt_key, height=80)
+            if st.button("저장", key=f"fb_save_{key_prefix}_{message_id}"):
+                if comment and record_feedback(message_id, 0, comment.strip()):
+                    st.session_state[state_key] = "comment"
+                    st.toast("의견 저장됨", icon="📝")
+
+
 def render_sample_questions() -> str | None:
     """샘플 질문 클릭 시 그 텍스트 반환 (input 으로 전달)."""
     import streamlit as st

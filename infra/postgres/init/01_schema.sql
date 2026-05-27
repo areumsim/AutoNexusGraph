@@ -128,6 +128,17 @@ ALTER TABLE chat.messages
     GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
 CREATE INDEX IF NOT EXISTS idx_msg_tsv ON chat.messages USING GIN(content_tsv);
 
+-- 사용자 피드백 (PRD §7.6.5 — 👍/👎/📝 → 평가 데이터로 적재)
+CREATE TABLE IF NOT EXISTS chat.feedback (
+    id             BIGSERIAL       PRIMARY KEY,
+    message_id     BIGINT          NOT NULL REFERENCES chat.messages(id) ON DELETE CASCADE,
+    rating         SMALLINT        NOT NULL,                 -- +1 = up, -1 = down, 0 = comment-only
+    comment        TEXT,
+    created_at     TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    UNIQUE (message_id)                                       -- 한 message 당 1건 (덮어쓰기는 별도 UPDATE)
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_msg ON chat.feedback(message_id);
+
 -- ── 6. 평가 (PRD §8) ──────────────────────────────────────────────
 CREATE SCHEMA IF NOT EXISTS eval;
 

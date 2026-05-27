@@ -27,14 +27,14 @@ def reset_thread() -> None:
 
 
 def load_history(thread_id: str, limit: int = 20) -> list[dict]:
-    """이전 user/assistant turn (PG chat.messages 직접 조회)."""
+    """이전 user/assistant turn (PG chat.messages 직접 조회). message_id 도 반환."""
     from ..db.postgres import get_pool
 
     sql = """
     WITH conv AS (
       SELECT id FROM chat.conversations WHERE thread_id = %s
     )
-    SELECT role, content, citations, agent_trace, created_at
+    SELECT m.id, role, content, citations, agent_trace, created_at
       FROM chat.messages m
       JOIN conv c ON m.conversation_id = c.id
      WHERE m.role IN ('user', 'assistant')
@@ -45,8 +45,9 @@ def load_history(thread_id: str, limit: int = 20) -> list[dict]:
     try:
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, (thread_id, limit))
-            for role, content, citations, trace, created in cur.fetchall():
+            for mid, role, content, citations, trace, created in cur.fetchall():
                 out.append({
+                    "id": mid,
                     "role": role,
                     "content": content,
                     "citations": citations or [],
@@ -65,8 +66,8 @@ def persist_turn(
     *,
     citations: list[dict] | None = None,
     agent_trace: dict[str, Any] | None = None,
-) -> None:
-    """PG chat.conversations + chat.messages 멱등 적재."""
+) -> int | None:
+    """PG chat.conversations + chat.messages 멱등 적재. inserted message_id 반환 (없으면 None)."""
     from ..db.postgres import get_pool
 
     sql_conv = """
@@ -81,6 +82,7 @@ def persist_turn(
       (conversation_id, turn_idx, role, content, citations, agent_trace)
     VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
     ON CONFLICT (conversation_id, turn_idx, role) DO NOTHING
+    RETURNING id
     """
     try:
         with get_pool().connection() as conn, conn.cursor() as cur:
@@ -93,9 +95,104 @@ def persist_turn(
                 json.dumps(citations or [], ensure_ascii=False),
                 json.dumps(agent_trace or {}, ensure_ascii=False),
             ))
+            row = cur.fetchone()
+            return int(row[0]) if row else None
     except Exception:
         # UI 는 DB 적재 실패해도 화면은 보여야 함
+        return None
+
+
+def set_conversation_title(thread_id: str, title: str) -> None:
+    """conversation title 1회 갱신. 기본값('New conversation') 일 때만 덮어씀."""
+    from ..db.postgres import get_pool
+    sql = """
+    UPDATE chat.conversations
+       SET title = %s, updated_at = now()
+     WHERE thread_id = %s
+       AND (title IS NULL OR title = 'New conversation' OR title = '')
+    """
+    try:
+        with get_pool().connection() as conn, conn.cursor() as cur:
+            cur.execute(sql, (title[:200], thread_id))
+    except Exception:
         pass
+
+
+def get_conversation_title(thread_id: str) -> str | None:
+    from ..db.postgres import get_pool
+    try:
+        with get_pool().connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT title FROM chat.conversations WHERE thread_id = %s",
+                (thread_id,),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+    except Exception:
+        return None
+
+
+def generate_title_from_question(question: str) -> str:
+    """첫 질문에서 5단어 이내 한국어 title 생성. LLM 미가용시 룰 폴백.
+
+    PRD §7.6.3 — title 은 첫 user message 의 첫 LLM 호출로 자동 요약 생성.
+    LLM 호출 실패는 fail-soft (질문 첫 30자 사용).
+    """
+    fallback = (question or "").strip().splitlines()[0][:30] or "New conversation"
+    if not question or len(question) < 5:
+        return fallback
+    try:
+        from ..llm.base import get_llm_client
+        from ..llm.budget_aware import budget_aware_client
+        from ..llm.cost_tracker import BudgetExceeded
+
+        client = budget_aware_client(
+            get_llm_client(role="titler"),
+            caller="title_summary",
+            hard_limit=0.02,
+        )
+        resp = client.chat(
+            [
+                {"role": "system", "content": (
+                    "사용자 질문을 5단어 이내 한국어 제목으로 요약하라. "
+                    "따옴표·문장부호·번호 prefix 없이 한 줄."
+                )},
+                {"role": "user", "content": question},
+            ],
+            temperature=0.0,
+            max_tokens=30,
+            purpose="title",
+        )
+        title = (resp.content or "").strip().splitlines()[0].strip()
+        import re
+        title = re.sub(r'^[\'"\d\.\s\-]+', "", title)[:50]
+        return title or fallback
+    except BudgetExceeded:
+        return fallback
+    except Exception:
+        return fallback
+
+
+def record_feedback(message_id: int, rating: int, comment: str | None = None) -> bool:
+    """+1/-1/0(comment-only) 피드백 적재 — UPSERT.
+
+    chat.messages.id (BIGINT) 가 필요하다 → load_history 가 id 도 같이 반환하도록 확장.
+    """
+    from ..db.postgres import get_pool
+    sql = """
+    INSERT INTO chat.feedback (message_id, rating, comment)
+    VALUES (%s, %s, %s)
+    ON CONFLICT (message_id) DO UPDATE
+      SET rating = EXCLUDED.rating,
+          comment = EXCLUDED.comment,
+          created_at = now()
+    """
+    try:
+        with get_pool().connection() as conn, conn.cursor() as cur:
+            cur.execute(sql, (message_id, int(rating), comment))
+        return True
+    except Exception:
+        return False
 
 
 def list_recent_threads(limit: int = 10) -> list[dict]:

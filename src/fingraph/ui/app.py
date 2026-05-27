@@ -29,10 +29,12 @@ import streamlit as st
 from fingraph.ui.storage import (
     get_or_create_thread_id, reset_thread,
     load_history, persist_turn, list_recent_threads,
+    set_conversation_title, generate_title_from_question,
 )
 from fingraph.ui.components import (
     render_citations, render_grounding_warning, render_agent_trace,
     render_cost_badge, render_provider_info, render_sample_questions,
+    render_feedback_buttons, render_progress_chip, node_label,
 )
 
 
@@ -83,7 +85,7 @@ st.title("금융 GraphRAG 에이전트")
 st.caption("한국 상장사 공시·재무 데이터 기반 멀티홉 추론. PRD §2.1 의 예시 질문 참조.")
 
 # 이전 메시지 렌더
-for m in st.session_state.messages:
+for idx, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
         if m.get("citations"):
@@ -92,6 +94,8 @@ for m in st.session_state.messages:
             render_agent_trace(m["agent_trace"])
         if m.get("grounding"):
             render_grounding_warning(m["grounding"])
+        if m["role"] == "assistant" and m.get("id"):
+            render_feedback_buttons(m["id"], key_prefix=f"hist_{idx}")
 
 # 새 입력
 user_input = st.chat_input("질문을 입력하세요…")
@@ -99,36 +103,70 @@ if sample and not user_input:
     user_input = sample
 
 if user_input:
+    # 첫 turn 이면 title 생성 (LLM 1콜) → conversation title 갱신
+    is_first_turn = len(st.session_state.messages) == 0
+
     # user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
-    persist_turn(thread_id, "user", user_input)
+    user_msg_id = persist_turn(thread_id, "user", user_input)
 
-    # agent run
+    if is_first_turn:
+        try:
+            title = generate_title_from_question(user_input)
+            if title:
+                set_conversation_title(thread_id, title)
+        except Exception:
+            pass
+
+    # agent run — 노드별 진행 표시 (PRD §7.6.5)
     with st.chat_message("assistant"):
-        with st.spinner("분석 중…"):
-            try:
-                from fingraph.agents import run_agent
-                state = run_agent(user_input, thread_id=thread_id,
-                                   history=st.session_state.messages[-10:])
-                answer = state.get("answer") or "(빈 응답)"
-                citations = state.get("citations") or []
-                turn_cost = float(state.get("llm_usage_usd") or 0.0)
-                grounding = state.get("grounding") or {}
-                trace = {
-                    "question_kind": state.get("question_kind"),
-                    "target_companies": state.get("target_companies"),
-                    "n_tool_results": len(state.get("tool_results") or []),
-                    "cost_usd": turn_cost,
-                    "aborted_reason": state.get("aborted_reason"),
-                }
-            except Exception as e:
-                answer = f"❌ 에이전트 실행 실패: {type(e).__name__}: {e}"
-                citations = []
-                turn_cost = 0.0
-                grounding = {}
-                trace = {"aborted_reason": "exception"}
+        try:
+            from fingraph.agents import run_agent_stream
+            with st.status("분석 중…", expanded=True) as status:
+                last_state = None
+                for node, state in run_agent_stream(
+                    user_input, thread_id=thread_id,
+                    history=st.session_state.messages[-10:],
+                ):
+                    last_state = state
+                    if node == "__final__":
+                        status.update(label="✅ 완료", state="complete")
+                        break
+                    if node == "__error__":
+                        status.update(label="❌ 오류", state="error")
+                        break
+                    partial = {
+                        "question_kind": state.get("question_kind"),
+                        "target_companies": state.get("target_companies"),
+                        "n_tool_results": len(state.get("tool_results") or []),
+                        "cost_usd": float(state.get("llm_usage_usd") or 0.0),
+                    }
+                    st.write(render_progress_chip(node, partial))
+                    status.update(label=node_label(node))
+
+            state = last_state or {}
+            answer = state.get("answer") or "(빈 응답)"
+            citations = state.get("citations") or []
+            turn_cost = float(state.get("llm_usage_usd") or 0.0)
+            grounding = state.get("grounding") or {}
+            trace = {
+                "question_kind": state.get("question_kind"),
+                "target_companies": state.get("target_companies"),
+                "n_tool_results": len(state.get("tool_results") or []),
+                "cost_usd": turn_cost,
+                "aborted_reason": state.get("aborted_reason"),
+                "n_replans": state.get("n_replans"),
+                "validation_status": state.get("validation_status"),
+                "validation_issues": state.get("validation_issues"),
+            }
+        except Exception as e:
+            answer = f"❌ 에이전트 실행 실패: {type(e).__name__}: {e}"
+            citations = []
+            turn_cost = 0.0
+            grounding = {}
+            trace = {"aborted_reason": "exception"}
 
         st.markdown(answer)
         render_citations(citations)
@@ -136,9 +174,12 @@ if user_input:
         render_grounding_warning(grounding)
 
     # 적재 + state 갱신
-    persist_turn(thread_id, "assistant", answer,
-                  citations=citations, agent_trace=trace)
+    asst_msg_id = persist_turn(thread_id, "assistant", answer,
+                                citations=citations, agent_trace=trace)
+    if asst_msg_id:
+        render_feedback_buttons(asst_msg_id, key_prefix="new")
     st.session_state.messages.append({
+        "id": asst_msg_id,
         "role": "assistant", "content": answer,
         "citations": citations, "agent_trace": trace,
         "grounding": grounding,

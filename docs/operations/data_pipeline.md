@@ -44,6 +44,46 @@ data/
 
 각 ingest 스크립트는 `--resume` / `--retry-failed` / `--force` / `--limit N` / `--dry-run` 옵션을 표준화.
 
+## 추출 4-pass (PRD §6.5)
+
+수집·청크·임베딩이 끝나면 다음 4-pass 로 관계·수치를 추출한다. P1/P2 는 deterministic
+(0% LLM) — 항상 안전. P3 는 selective LLM — 비용 게이트 통과 후. P4 는 P3 결과를 P2 SSOT 로
+cross-validate.
+
+| Pass | 명령 | 입력 | 산출 | LLM |
+|---|---|---|---|---|
+| P1 | `make load-financials` | DART XBRL JSONL | `fin.financials` | 0% |
+| P2 | `make load-graph-structural` | DART 지배구조 JSON | Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF | 0% |
+| P3 | `make p3-extract-dry` → `make p3-extract` | 사업보고서 본문 청크 | `data/processed/extracted/<corp>/<rcept>.jsonl` | 100% (selective 53%↓) |
+| P4 | `make p4-load` | P3 JSONL | Neo4j PARTNER_OF / COMPETES_WITH / INVESTED_IN / PRODUCES (source=`p3_llm`) | 보조 (검증) |
+
+**P3 비용 가드 (`extract_business_report_relations.py`):**
+- `--dry-run` 이 비용 추정만 (LLM 호출 0)
+- `--max-cost <USD>` HARD limit (기본 1.0 — Makefile)
+- `--top-by-market-cap N` 으로 회사 수 제한 (기본 30)
+- 청크당 결과는 idempotent (`data/processed/extracted/.../jsonl` 이미 있으면 skip — `--force` 로 재추출)
+
+**P4 검증 분기 (`validator.py`):**
+- `confidence >= 0.70` + P2 충돌 없음 → Neo4j MERGE
+- `0.50 <= confidence < 0.70` → `data/reports/review_queue_<date>.jsonl` (사람 검토)
+- `< 0.50` 또는 P2 와 충돌 → 폐기 (`ops.quality_checks` audit trail)
+
+## LangGraph 활성화 — 에이전트 계층
+
+데이터 적재가 끝나면 에이전트가 그 위에서 추론한다. LangGraph StateGraph + PG checkpoint
+(`chat` 스키마) 가 표준. 상세는 [`agents.md`](./agents.md) 참조.
+
+```bash
+make install-agent      # pip install -e ".[agent]" — langgraph + langfuse + langsmith
+make enable-langgraph   # 헬스체크: _HAS_LANGGRAPH + checkpointer 타입 확인
+make serve-api          # FastAPI :31020 — POST /chat (blocking) + /chat/stream (SSE)
+make serve-ui           # Streamlit :31021 — st.status 노드 진행 표시
+```
+
+체크포인트 테이블은 자동 생성 (`chat.checkpoints`, `chat.checkpoint_writes`,
+`chat.checkpoint_blobs`, `chat.checkpoint_migrations`). 스키마 위치는
+`.env` 의 `LANGGRAPH_CHECKPOINT_SCHEMA` 로 변경 가능 (기본 `chat`).
+
 ## 적재 순서 — 의존성 (DAG)
 
 ```
@@ -62,8 +102,8 @@ ingest-news     → load-news, load-graph-news
 ingest-sec      → load-sec
 ingest-gleif    → load-gleif           — entity_map 보강 (LEI)
 
-migrate_neo4j_schema.py                — 1회 (Sector→Industry / Person birth_year)
-validate-quality                       — 마지막에 매번 실행
+make migrate-schema                    — 1회 (Sector→Industry / Person birth_year)
+make validate-quality                  — 마지막에 매번 실행
 ```
 
 ## 자주 쓰는 명령
@@ -108,7 +148,7 @@ make embed-chunks
 
 ### 3) 그래프 스키마 정합성 (라벨/관계명 충돌)
 ```bash
-python scripts/migrate_neo4j_schema.py    # 멱등. 변경 0 이면 이미 적용됨.
+make migrate-schema                   # 멱등. 변경 0 이면 이미 적용됨.
 ```
 
 ### 4) Entity Resolution 매핑 보강 (신규 외부 소스)

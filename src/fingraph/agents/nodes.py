@@ -19,8 +19,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from . import session
 from .policy import classify_question, select_tools, turn_budget_exceeded
 from .state import AgentState
+from .temporal import normalize_temporal_terms, extract_year_hint
 
 
 log = logging.getLogger(__name__)
@@ -28,10 +30,32 @@ log = logging.getLogger(__name__)
 
 # ── Triage ──────────────────────────────────────────────────
 def triage_node(state: AgentState) -> AgentState:
-    """질문 유형 분류 + 1차 회사 식별."""
+    """질문 유형 분류 + 1차 회사 식별 + 상대 시간 정규화."""
     from ..tools.financials import lookup_company as lookup_pg
 
-    q = state.get("question", "")
+    from ..safety import sanitize_user_input
+    from .rewriter import rewrite_query
+
+    raw_q = state.get("question", "")
+    # 1) 프롬프트 인젝션 신호 감지 + XML 경계 escape — 입력 → safety 통과 → 본 파이프라인
+    safe_q, signals = sanitize_user_input(raw_q, context="agent_input")
+    if signals:
+        state["safety_signals"] = signals
+    q = safe_q
+    # 2) 멀티턴 coreference 해소 — "그 중", "위 회사들" → 이전 turn 의 entity 풀어쓰기
+    history = state.get("history") or []
+    if history:
+        q_rew, rewrite_audit = rewrite_query(question=q, history=history)
+        if rewrite_audit.get("called"):
+            state["rewrite_audit"] = rewrite_audit
+            q = q_rew
+    # 3) 한국어 상대 시간 정규화 — '작년'/'최근 3년' → 절대 연도 (rewrite 후에 적용)
+    q_norm, temporal_audit = normalize_temporal_terms(q)
+    if temporal_audit.get("applied") or state.get("rewrite_audit"):
+        state["question_rewritten"] = q_norm
+    if temporal_audit.get("applied"):
+        state["temporal_audit"] = temporal_audit
+        q = q_norm
     kind = classify_question(q)
     state["question_kind"] = kind
 
@@ -50,7 +74,28 @@ def triage_node(state: AgentState) -> AgentState:
                     break
         if len(targets) >= 5:
             break
+    # 세션 entity carry-over — 이번 turn 에 회사가 식별 안 되고 multi-turn 이면
+    # 이전 세션의 target_companies/persons 를 borrow (PRD §7.6.2).
+    thread_id = state.get("thread_id") or ""
+    prev = session.get(thread_id) if thread_id else None
+    if not targets and prev and prev.target_companies:
+        targets = list(prev.target_companies)
+        state["session_carryover"] = True
+        log.info("[triage] carry-over targets from session: %s", targets)
+
     state["target_companies"] = targets
+
+    # 이번 turn 결과를 세션에 기록 (다음 turn 의 carry-over 재료)
+    if thread_id:
+        year_hint = extract_year_hint(state.get("question_rewritten") or q)
+        session.update(
+            thread_id,
+            target_companies=targets if targets else None,
+            last_year=year_hint,
+            last_question_kind=kind,
+            last_question=q,
+        )
+
     log.info(f"[triage] kind={kind} targets={targets}")
     return state
 
@@ -91,9 +136,10 @@ def planner_node(state: AgentState) -> AgentState:
                          "purpose": "최대주주"})
 
     if "get_revenue" in tools and targets:
+        year_hint = extract_year_hint(state.get("question_rewritten") or state.get("question", ""))
         for cc in targets:
             plan.append({"tool": "get_revenue",
-                         "args": {"corp_code": cc, "year": _extract_year(state.get("question", ""))},
+                         "args": {"corp_code": cc, "year": year_hint},
                          "purpose": "매출"})
 
     if "search_documents" in tools and state.get("question"):
@@ -110,12 +156,6 @@ def planner_node(state: AgentState) -> AgentState:
     state["plan"] = plan
     log.info(f"[planner] {len(plan)} 단계 plan")
     return state
-
-
-def _extract_year(q: str) -> int | None:
-    import re
-    m = re.search(r"(20\d{2})", q or "")
-    return int(m.group(1)) if m else None
 
 
 # ── Executor ────────────────────────────────────────────────
@@ -148,6 +188,36 @@ def executor_node(state: AgentState) -> AgentState:
         results.append(item)
         if tool_name == "search_documents":
             evidence.extend(out or [])
+
+    # ── Fallback recovery (흡수: _legacy/v1 similar_hints 핵심) ────────────
+    # 모든 도구가 빈 결과만 반환했고 search_documents 도 안 돌았으면, 일반 retrieve
+    # 시도 → 사용자에게 "정보 부족" 만 보내는 대신 회복 경로 제공.
+    if state.get("aborted_reason") != "turn_budget":
+        all_empty = all(not (r.get("result")) for r in results) if results else True
+        already_searched = any(r["tool"] == "search_documents" for r in results)
+        if all_empty and not already_searched and state.get("question"):
+            log.info("[executor] all empty → fallback search_documents")
+            try:
+                fn = getattr(toolbox, "search_documents", None)
+                if fn is not None:
+                    targets = state.get("target_companies") or []
+                    fb_args = {
+                        "query": state.get("question_rewritten") or state["question"],
+                        "top_k": 6,
+                        "corp_code": targets[0] if len(targets) == 1 else (targets or None),
+                    }
+                    fb_out = fn(**fb_args)
+                    if fb_out:
+                        results.append({
+                            "tool": "search_documents",
+                            "purpose": "fallback_recovery",
+                            "args": fb_args,
+                            "result": fb_out,
+                        })
+                        evidence.extend(fb_out)
+                        state["fallback_used"] = True
+            except Exception as e:
+                log.warning(f"[executor] fallback search failed: {e}")
 
     state["tool_results"] = results
     state["evidence_chunks"] = evidence

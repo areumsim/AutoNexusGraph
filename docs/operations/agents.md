@@ -1,0 +1,247 @@
+# 에이전트 운영 가이드
+
+본 문서는 FinGraph 의 LangGraph 기반 에이전트 계층 (PRD §7.5 / §7.6) 의 구조·진입점·
+운영 절차를 정리한다. 데이터 적재는 [`data_pipeline.md`](./data_pipeline.md), 도구 API
+스펙은 [`rag_tools.md`](./rag_tools.md) 참조.
+
+## 1. 계층 구조 (단방향 의존)
+
+```
+[UI / API 진입점]
+  Streamlit ui/app.py      — chat_message · st.status 노드 진행 · 👍/👎/📝
+  FastAPI api/main.py      — /chat (blocking) · /chat/stream (SSE)
+        │
+        ▼
+[에이전트 (LangGraph StateGraph)]
+  agents/graph.py          — StateGraph 빌드 + run_agent / run_agent_stream
+  agents/state.py          — AgentState TypedDict (대화 1 turn 의 누적 상태)
+  agents/nodes.py          — triage / planner / executor / synthesizer
+  agents/validator.py      — validation + replan (n<=2)
+  agents/policy.py         — 룰 기반 question_kind 분류, budget 가드
+  agents/answering.py      — LLM 비호출 결정적 brief (폴백)
+  agents/grounding.py      — 답변 ↔ evidence overlap, citation 검증
+  agents/temporal.py       — "작년"/"최근 N년" → 절대 연도
+  agents/rewriter.py       — 멀티턴 coreference 해소 (LLM)
+  agents/session.py        — thread 별 entity TTL 메모리 (in-memory, LRU)
+  agents/checkpointer.py   — PG (chat schema) / Memory 자동 선택
+  agents/tracing.py        — Langfuse / LangSmith fail-soft
+        │
+        ▼
+[안전 가드]
+  safety/prompt_safety.py  — XML escape + injection 시그널 감지
+  safety/cypher_guard.py   — Cypher 정적 READ-ONLY 검사 (tools/graph 가 호출)
+  safety/language_guard.py — 답변 한국어 비율 검사
+        │
+        ▼
+[사전 정의 도구 풀 — 자유 SQL/Cypher 금지 (PRD §7.5.9/10)]
+  tools/financials.py      — PG: lookup_company, get_revenue, …
+  tools/graph.py           — Neo4j: list_subsidiaries, find_paths, …
+  tools/retrieve.py        — pgvector + meta filter: search_documents
+        │
+        ▼
+[저장소]
+  Neo4j 5.18 + PostgreSQL 16 (pgvector) + (옵션) Qdrant
+```
+
+## 2. 한 turn 의 실행 흐름
+
+```
+User Query
+   ↓
+[Triage] (agents/nodes.py)
+   ├─ prompt_safety.sanitize_user_input — XML escape + injection 시그널
+   ├─ rewriter.rewrite_query — "그 중" / "위 회사들" 해소 (history 있을 때만)
+   ├─ temporal.normalize_temporal_terms — "작년" → "2025년"
+   ├─ policy.classify_question — factual / structural / narrative / multi_hop
+   ├─ tools.financials.lookup_company — 회사명 → corp_code
+   └─ session.update — 다음 turn carry-over 용 entity 저장
+   ↓
+[Planner] (agents/nodes.py)
+   policy.select_tools(kind) → [{tool, args, purpose}, …]
+   ↓
+[Executor] (agents/nodes.py)
+   ├─ 각 step 마다 turn_budget_exceeded 체크
+   ├─ tools.{financials,graph,retrieve} 호출 (Cypher 는 cypher_guard 통과)
+   └─ 결과 비었으면 fallback search_documents 자동 호출 (PRD §7.6.5 회복)
+   ↓
+[Synthesizer] (agents/nodes.py)
+   ├─ budget_aware_client + cost_tracker (circuit breaker)
+   ├─ LLM chat → 답변 + 인용 마커
+   └─ grounding.verify_answer_grounding — overlap / citation 검증
+   ↓
+[Validator] (agents/validator.py)
+   ├─ 길이 / 한국어 비율 / grounding / 재무 수치 환각 검사
+   ├─ self-reported "정보 부족" 은 통과
+   └─ failed + n_replans<2 → Planner 로 replan (mark_replan: 결과 리셋 + 카운터++)
+   ↓
+[Finalize]
+   replan 한도 도달 시 ⚠️ prefix + validation_issues 노출
+   ↓
+PG 적재 (chat.messages + chat.checkpoints) + UI 렌더 (citations, agent_trace, grounding, feedback)
+```
+
+## 3. AgentState (`agents/state.py`)
+
+| 필드 | 출처 | 용도 |
+|---|---|---|
+| `thread_id`, `question`, `history` | 진입점 | 입력 |
+| `question_rewritten` | rewriter / temporal | 정규화 후 query |
+| `temporal_audit` / `rewrite_audit` | rewriter / temporal | 정규화 trail |
+| `safety_signals` | prompt_safety | injection 시그널 (telemetry) |
+| `question_kind` | policy | factual / structural / narrative / multi_hop |
+| `target_companies` | triage | corp_code 목록 |
+| `session_carryover` | triage | 이전 turn entity borrow 여부 |
+| `plan` | planner | `[{tool, args, purpose}]` |
+| `tool_results`, `evidence_chunks` | executor | 도구 출력 |
+| `fallback_used` | executor | 빈 결과 회복 trigger |
+| `aborted_reason` | 어디서나 | `turn_budget` / `synth_budget` / `exception` |
+| `answer`, `citations` | synthesizer | LLM 결과 |
+| `grounding` | synthesizer/validator | overlap·citation 검증 결과 |
+| `validation_status`, `validation_issues` | validator | `passed` / `failed` + 사유 |
+| `n_replans`, `llm_usage_usd` | graph | replan 카운터, 누적 비용 |
+
+## 4. 노드 진입점
+
+| 함수 | 위치 | 호출자 |
+|---|---|---|
+| `run_agent(question, thread_id, history)` | `agents/graph.py` | `api/main.py:/chat`, 기타 동기 호출 |
+| `run_agent_stream(...)` → `Iterator[(node, partial_state)]` | `agents/graph.py` | `api/main.py:/chat/stream`, `ui/app.py` |
+| `_run_with_langgraph` ↔ `_run_with_fallback_chain` | `agents/graph.py` | `_HAS_LANGGRAPH` 분기 자동 |
+
+`_HAS_LANGGRAPH` 가 False (langgraph 미설치) 면 Python 함수 체인이 동일 흐름·동일 state
+포맷으로 동작. 테스트 환경에서 의존성 없이 검증 가능.
+
+## 5. Replan 루프 (PRD §7.5.5)
+
+```
+synthesizer ─→ validator ─┬─ passed → finalize → END
+                         └─ failed + n_replans<MAX_REPLANS(2)
+                                ↓ mark_replan (state 리셋 + n_replans++)
+                                ↓
+                            planner ↑ (반복)
+```
+
+MAX_REPLANS 도달 시 `answer = "⚠️ 검증 실패 (replan 2/2): ..." + 마지막 답변`.
+사용자는 신뢰도 판단 가능.
+
+## 6. 체크포인트 (PRD §7.5.8)
+
+`agents/checkpointer.py` 의 우선순위:
+1. `LANGGRAPH_CHECKPOINT_DSN` env (전용 PG 풀)
+2. `FINGRAPH_PG_DSN` env
+3. `POSTGRES_DSN` env
+4. `config.postgres_dsn`
+
+성공 시 `chat` 스키마에 4개 테이블 (`checkpoints`, `checkpoint_writes`,
+`checkpoint_blobs`, `checkpoint_migrations`) 자동 생성. search_path 주입 방식으로
+스키마 격리. backend env (`LANGGRAPH_CHECKPOINT_BACKEND`):
+
+- `auto` (기본) — PG 시도 → memory 폴백
+- `memory` / `in_memory` — 강제 in-memory
+- `none` — checkpoint 비활성
+
+## 7. Tracing (PRD §7.5.11)
+
+`.env` 의 `TRACE_BACKEND`:
+
+| 값 | 동작 |
+|---|---|
+| `langfuse` | `LANGFUSE_HOST`/`PUBLIC_KEY`/`SECRET_KEY` 필요. CallbackHandler 가 노드별 span 전송 |
+| `langsmith` | `LANGSMITH_API_KEY`/`LANGSMITH_PROJECT` 필요. langgraph 가 환경변수로 자동 전송 |
+| 빈 값 / `none` | tracing OFF |
+
+`make trace-on` 으로 현재 활성 상태 확인. SDK 미설치 / 키 누락은 silent skip.
+
+## 8. Streaming (PRD §7.6.5)
+
+`run_agent_stream` 이 `(node_name, partial_state)` yield. 마지막은 항상 `('__final__', ...)`.
+
+- FastAPI `/chat/stream` 이 이를 SSE 로 직렬화 (`data: {...}\n\n`), 마지막에 `data: [DONE]`
+- Streamlit `ui/app.py` 가 `st.status` + `render_progress_chip` 으로 chip 갱신
+- 노드 라벨: `🔍 Triage / 🧭 Planner / 🛠️ Executor / ✍️ Synthesizer / ✅ Validator / ♻️ Replan / 🏁 Finalize`
+
+폴백 체인 (langgraph 미설치) 도 동일 시퀀스로 yield 하므로 UI 코드는 분기 불필요.
+
+## 9. 비용 가드 (사용자 명시 — 늘 적용)
+
+| 가드 | 위치 | 동작 |
+|---|---|---|
+| 누적 hard limit | `llm/cost_tracker.py` | `LLM_COST_HARD_LIMIT_USD` 도달 시 `BudgetExceeded` 즉시 abort |
+| 자동 승인 한도 | `llm/cost_tracker.py` | `LLM_COST_AUTO_APPROVE_USD` 이하면 자동 진행. 초과 시 `--approve-cost` 필요 |
+| Turn budget | `agents/policy.py:turn_budget_exceeded` | `AGENT_TURN_BUDGET_USD` (기본 $0.20) 초과 시 executor·synthesizer 즉시 fallback |
+| Circuit breaker | `extractors/engine.py`, `llm/budget_aware.py` | 누적 실패 N회 → 단기 차단 |
+| Cost 누적 표시 | `ui/components.py:render_cost_badge` | 세션 / turn 비용 사이드바 노출 |
+
+## 10. 세션 entity carry-over (`agents/session.py`)
+
+```
+turn N:
+  triage 가 회사 식별 실패 + thread_id 의 prev_session 존재
+    → state["target_companies"] = prev_session.target_companies
+    → state["session_carryover"] = True
+  답변 후 session.update(thread_id, target_companies=..., last_year=...)
+turn N+1:
+  rewriter 가 LLM 으로 "그 중" 풀어줌 + session 이 entity 백업.
+  rewriter LLM 실패해도 session 으로 fallback.
+```
+
+TTL 3600s, LRU 256 (env `FINGRAPH_SESSION_TTL` / `_MAX` 로 조정).
+
+## 11. 테스트 매트릭스
+
+| 모듈 | 테스트 | 케이스 |
+|---|---|---|
+| temporal | `tests/test_temporal.py` | 단일·범위·미정규화·explicit·range bound |
+| safety | `tests/test_safety.py` | escape / injection / cypher guard 4종 / korean ratio |
+| rewriter | `tests/test_rewriter.py` | history 게이트, env disable, short follow-up |
+| validator | `tests/test_validator.py` | 환각 숫자 / 한국어 / replan max / mark_replan 리셋 |
+| session | `tests/test_session.py` | TTL / LRU / snapshot 격리 / clear |
+| executor fallback | `tests/test_executor_fallback.py` | 빈 결과 회복 / 이미 search / 예산 초과 시 skip |
+| graph | `tests/test_graph_smoke.py` | clean / replan / max 도달 ⚠️ |
+| checkpointer | `tests/test_checkpointer.py` | DSN 우선순위 / search_path 인코딩 / redact |
+| tracing | `tests/test_tracing.py` | backend 결정 / fail-soft / 캐시 무효화 |
+| stream | `tests/test_stream.py` | 노드 시퀀스 / replan event / partial state 누적 |
+
+`make test` (integration 제외) — **128 passed**.
+
+## 12. 운영 체크리스트
+
+```bash
+# 1) langgraph 활성 확인
+make enable-langgraph
+#   ✓ langgraph import 성공
+#   ✓ _HAS_LANGGRAPH = True
+#   ✓ checkpointer = PostgresSaver
+
+# 2) checkpoint 테이블 점검
+psql $POSTGRES_DSN -c "\dt chat.checkpoint*"
+#   chat.checkpoints / .checkpoint_writes / .checkpoint_blobs / .checkpoint_migrations
+
+# 3) tracing 활성 확인 (옵션)
+make trace-on
+#   tracing: langsmith project=fingraph key=set
+#     또는 tracing: langfuse host=... keys=set
+
+# 4) 스트리밍 end-to-end (SSE)
+make serve-api &
+curl -N -H "Accept: text/event-stream" \
+     -X POST http://localhost:31020/chat/stream \
+     -d '{"thread_id":"smoke","message":"삼성전자 작년 매출은?"}'
+#   → triage / planner / executor / synthesizer / validator / __final__ event
+
+# 5) UI 가동
+make serve-ui
+#   → http://localhost:31021 — 노드별 chip + 출처 + 👍/👎/📝
+```
+
+## 13. 확장 포인트 (다음 PR 후보)
+
+PRD §7.5 9 agents 중 현재 4 (+ Validator) 구현. 다음 단계 권장 순서:
+
+1. **Supervisor + Worker 4종** (Research / Graph / SQL / Calculator) + Send API 병렬
+2. **Human-in-the-Loop interrupt** — Clarification / 고비용 승인 / 민감 결정 (`langgraph.interrupt`)
+3. **Cypher 템플릿 레지스트리** — `tools/cypher_templates.py` + JSON Schema 파라미터 강제
+4. **Pre-synth number guard** — synthesizer 입력에서 미검증 숫자 strip (validator 보강)
+5. **API rate limit** (slowapi) + **audit logging default-on** + **per-agent system prompts 버전 관리**
+
+각 항목은 별도 PR. 상세는 README §7 로드맵 + PRD §7.5 참조.

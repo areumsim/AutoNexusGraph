@@ -52,9 +52,13 @@ db = [
 # 에이전트 (LangGraph + FastAPI)
 agent = [
     "langgraph>=0.2",
+    "langgraph-checkpoint-postgres>=2.0",  # PG checkpointer (PRD §7.5.8)
     "langchain-core>=0.3",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
+    # Tracing (PRD §7.5.11) — Langfuse self-host 또는 LangSmith 양쪽 지원
+    "langfuse>=2.0",
+    "langsmith>=0.1",
 ]
 
 # UI
