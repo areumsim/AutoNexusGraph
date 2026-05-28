@@ -59,6 +59,7 @@ _legacy/
 # === 임시 / 메모 ===
 _tmp*
 _ref*
+_api_tmp*
 *.tmp
 
 # === IDE ===

@@ -1,8 +1,18 @@
-﻿# PRD: 금융 도메인 GraphRAG 에이전트 시스템 v2.0
+﻿# PRD: 자동차 제품·부품·리콜·공급망 GraphRAG 에이전트 시스템 v2.1
 
-**문서 버전:** 1.2
-**작성일:** 2026-05-26
-**작성 목적:** 기존 시스템(WSL + 원격 Neo4j + Azure OpenAI 전용 + 일반 도메인)을 → Linux 컨테이너 기반의 멀티 LLM 지원 금융 도메인 GraphRAG 에이전트로 전면 재구축하기 위한 방향성과 요구사항 정의
+**문서 버전:** 2.1
+**작성일:** 2026-05-27
+**개정 사유:** v2.0 리뷰 피드백 반영 — (1) 포지셔닝 정밀화 ("제조" → "제품·부품·리콜·공급망"), (2) MVP 범위 현실화 (Level 6 → Level 3~4), (3) Bridge 일반화 (`corp_manufacturer` → `corp_entity`), (4) 관계 confidence/provenance 필수화, (5) Cross-Domain QA 4단계 층화
+
+**v2.0 대비 주요 변경:**
+- 제목·포지셔닝 변경 (§1.2)
+- ER 마스터 키 구조 재설계 (§4.5 신설, §6.1 수정)
+- Bridge 스키마 일반화 (§4.6 신설)
+- BOM 깊이별 가용성 매트릭스 (§3.4 신설)
+- 출처별 신뢰도 등급 (§3.5 신설)
+- 관계 엣지 필수 메타데이터 정의 (§6.7 신설)
+- Cross-Domain QA 4단계 층화 (§8.1 수정)
+- MVP 수집 범위 축소 (§3.3 수정)
 
 ---
 
@@ -10,34 +20,48 @@
 
 ### 1.1 배경
 
-기존 시스템은 다음과 같은 제약을 가지고 운영되어 왔다:
+FinGraph(금융 GraphRAG)는 다음을 입증했다:
 
-- **개발 환경:** Windows + WSL에서 직접 실행 — 재현성·배포·협업에 한계
-- **데이터베이스:** 원격 Neo4j 의존 — 네트워크 지연, 단일 장애점, 비용 부담
-- **LLM 종속성:** Azure OpenAI에 강하게 결합 — 비용 협상력 약화, 멀티 클라우드 전략 불가, 모델 선택 제약
-- **도메인:** 일반 RAG 예제 수준 — 실무적 가치 입증이 어려움
-- **임베딩:** 외부 API 의존 — 단가 부담 + 한국어 성능 한계
+- **3-Store 하이브리드**(Neo4j + PostgreSQL + pgvector)가 단일 Vector RAG로 풀 수 없는 멀티홉 질문을 해결
+- **Multi-Agent + Planning(LangGraph)** 구조가 재현 가능·디버깅 가능한 추론을 만든다
+- **Deterministic-first 추출**(정형 직매핑 + 선택적 LLM)이 환각을 원천 차단한다
+- **LLM 어댑터 패턴**으로 벤더 종속 없이 운영 가능
 
-이 PRD는 위 제약을 해소하면서, 동시에 **GraphRAG가 진가를 발휘할 수 있는 도메인(금융)** 으로 재정의하여, 단순 검색 RAG가 풀지 못하는 멀티홉 추론 문제를 정량적으로 입증하는 시스템을 구축하는 것을 목표로 한다.
+그러나 FinGraph는 다음 한계를 가진다:
 
-### 1.2 프로젝트 한 줄 정의
+- **도메인 단일성:** 금융 한 영역에만 한정 — 시스템 일반성을 입증하지 못함
+- **관계 평면성:** 자회사/임원/주주 관계가 모두 동일 평면. "메인 홉"과 "사이드 홉"의 구분이 없음
+- **이벤트 빈도 낮음:** 공시·뉴스는 분기/월 단위
+- **물리적 계층 부재:** 모든 엔티티가 법인. 제품·소재·공정 같은 물리적 계층이 없음
 
-> **"한국 상장사 공시·재무 데이터를 기반으로, 기업 간 복잡한 관계를 그래프로 추론하여 답변하는 금융 분석 GraphRAG 에이전트"**
+이 PRD는 FinGraph의 검증된 코어 엔진을 그대로 재사용하면서, **자동차 제품·부품·리콜·공급망 도메인**으로 도메인 어댑터만 교체하여:
+1. 시스템의 도메인 일반성을 입증하고
+2. 명시적 계층 구조(완성차 → 시스템 → 모듈 → 부품)를 통해 "메인 홉" 개념을 도입하며
+3. FinGraph와 Bridge로 연결하여 **Cross-Domain 멀티홉 추론**이라는 GraphRAG-Only 가치 영역을 개척한다.
 
-### 1.3 핵심 변경사항 (AS-IS → TO-BE)
+### 1.2 프로젝트 한 줄 정의 [v2.1 수정]
 
-| 영역 | AS-IS | TO-BE | 변경 이유 |
+> **"자동차 제품·부품·리콜·공급망 공개 데이터를 기반으로, 완성차–시스템–모듈–부품의 계층 관계와 리콜·공급망 이벤트를 그래프로 추론하여 답변하는 GraphRAG 에이전트. 선택적으로 FinGraph와 Wikidata QID 기반 Bridge로 연결해 Cross-Domain 추론(제품/품질 ↔ 재무) 수행"**
+
+**v2.0의 "자동차 제조 도메인"이라는 표현은 공정·라인·설비·원가·생산량을 기대하게 한다. 본 시스템의 실제 데이터 가용 범위는 공개 차량 제원·리콜·결함·NCAP·공급망이므로 "제품·부품·리콜·공급망"으로 포지셔닝한다.** Material/Process Level 6은 장기 확장 영역으로 분리.
+
+### 1.3 핵심 변경사항 (FinGraph → AutoGraph)
+
+| 영역 | FinGraph (AS-IS) | AutoGraph (TO-BE) | 변경 이유 |
 |---|---|---|---|
-| OS 환경 | Windows + WSL | Linux 서버 (Native) | 운영 환경 일관성 |
-| 실행 방식 | WSL에서 직접 실행 | Docker Compose 멀티 컨테이너 | 재현성·이식성·격리 |
-| Neo4j | 원격 서버 연결 | 로컬 컨테이너 | 지연 최소화, 비용 절감, 데이터 주권 |
-| RDBMS | 없음 | PostgreSQL 컨테이너 추가 | 정형 데이터(재무수치) 신뢰성 보장 |
-| 벡터 DB | 코드 내장/임시 | Qdrant 컨테이너 | 영속성, 성능, 운영 안정성 |
-| 임베딩 | 외부 API | **BGE-M3 자체 호스팅 (GPU)** | 한국어 성능, 비용, 프라이버시 |
-| **LLM** | **Azure OpenAI 전용** | **OpenAI GPT / Anthropic Claude / 로컬 LLM 어댑터 패턴** | 벤더 종속 해소, 비용·성능 최적화 |
-| **데이터 정책** | **외부 데이터 접근 제한** | **공개 오픈 데이터 적극 활용** | 금융 공공 데이터 기반 시스템 구축 |
-| 도메인 | 일반 예제 | **한국 금융 (DART/KRX/ECOS)** | 실용성, 차별성, 평가 명확성 |
-| 그래프 스키마 | 일반 엔티티 | 금융 특화 (Company/Person/Financial 등) | 도메인 추론 정확도 |
+| 인프라(Docker/Neo4j/PG/pgvector) | 그대로 | **그대로** | 코어 엔진 재사용 |
+| LangGraph Multi-Agent | 그대로 | **그대로** | 노드 구조 동일, Tool만 교체 |
+| Safety guards | 그대로 | **그대로** | 도메인 무관 |
+| BGE-M3 임베딩 | 그대로 | **그대로** | 다국어 지원 |
+| LLM 어댑터 | 그대로 | **그대로** | Provider 전환 환경변수 1줄 |
+| **Entity Resolution 마스터** | **`corp_code` 단일 중심키** | **`entity_id` + `entity_type` 다형 키** | **법인·차량·부품 분리 [v2.1]** |
+| **Bridge 테이블** | 없음 | **`bridge.corp_entity` (manufacturer + supplier 통합)** | **확장성 [v2.1]** |
+| 데이터 소스 | DART/KRX/ECOS | NHTSA / car.go.kr / KATRI / Wikidata | 도메인 교체 |
+| 핵심 엔티티 | Company / Person | **Manufacturer / Vehicle / Component / Supplier / Recall** | 도메인 교체 |
+| 핵심 관계 | SUBSIDIARY_OF / EXECUTIVE_OF (평면) | PART_OF / SUPPLIED_BY / AFFECTED_BY (계층 + 시점) | 메인 홉 명시 |
+| 정량 수치 | 재무제표 | 제원·NCAP·결함률 | 도메인 교체 |
+| 이벤트 | 뉴스·공시 | 리콜·결함신고·NCAP 평가 | 도메인 교체 |
+| **관계 엣지 메타** | snapshot_year + source | **confidence + provenance + valid_from/to 필수 [v2.1]** | **공급 관계 신뢰도 통제** |
 
 ---
 
@@ -45,78 +69,121 @@
 
 ### 2.1 비즈니스 목적
 
-1. **단순 RAG로 풀 수 없는 질문을 푼다**
-   - "삼성전자 자회사 중 반도체 의존도가 높은 곳은?"
-   - "이재용 회장이 등기임원인 회사들의 매출 합계는?"
-   - 이런 질문은 의미 검색만으로는 불가능하며, 관계 그래프 탐색이 필수
+1. **단일 도메인 GraphRAG의 한계를 넘는다**
+   - 도메인 내: "현대 쏘나타의 에어백 리콜과 관련된 공급사는?" (멀티홉 + 시점)
+   - Cross-Domain: "삼성SDI 배터리를 쓰는 OEM의 모회사 영업이익은?" (Vector RAG로 절대 불가)
 
-2. **벤더 종속을 끊는다**
-   - Azure 외에 OpenAI/Anthropic/로컬 LLM 어느 것으로든 즉시 전환 가능
-   - 동일한 평가셋에서 LLM별 성능·비용 비교 가능
+2. **시스템의 도메인 일반성을 입증한다**
+   - 동일 코어 엔진이 금융·자동차 양쪽에서 작동
+   - 도메인 어댑터 레이어 교체만으로 새 도메인 진입 가능
 
-3. **재현 가능한 시스템을 만든다**
-   - `docker compose up` 한 줄로 전체 스택 재현
-   - 데이터 수집부터 평가까지 자동화
+3. **명시적 계층(메인 홉)으로 그래프 폭발을 통제한다**
+   - 자연스러운 BOM 계층 (Manufacturer → Vehicle → System → Module → Part)
+   - Planner가 계층 인지 깊이 우선 탐색 → 토큰·latency 절감
 
-### 2.2 기술 목표
+### 2.2 기술 목표 [v2.1 — Cross-Domain 층화 반영]
 
 | 목표 | 측정 지표 | 목표치 |
 |---|---|---|
-| 한국어 금융 RAG 정확도 | Answer Accuracy (LLM-as-judge) | 85%+ |
-| Multi-hop 추론 성공률 | 2-hop 이상 질문 정답률 | 75%+ |
-| Hybrid 우위 입증 | Vector 단독 대비 Multi-hop 정답률 향상 | +30%p 이상 |
-| LLM 교체 비용 | Provider 변경 시 코드 수정량 | 환경변수 1줄 |
-| 시스템 응답 시간 | 평균 응답 latency | < 8초 |
+| 한국어 자동차 RAG 정확도 | Answer Accuracy (LLM-as-judge) | 85%+ |
+| Multi-hop 추론 성공률 (도메인 내) | 2-hop 이상 정답률 | 75%+ |
+| **Cross-Domain L1 (제조사 ↔ 상장사 직접 Bridge)** | 정답률 | **80%+** |
+| **Cross-Domain L2 (모델 ↔ 제조사 ↔ 재무)** | 정답률 | **70%+** |
+| **Cross-Domain L3 (부품/공급사 ↔ OEM ↔ 재무)** | 정답률 | **50~60%** |
+| **Cross-Domain L4 (시점 포함 공급망 ↔ 재무/ESG)** | 정답률 | **40~50%** |
+| Hybrid 우위 입증 | Vector 단독 대비 Multi-hop 격차 | +30%p 이상 |
+| 도메인 어댑터 교체 비용 | 코어 엔진 코드 변경량 | < 5% |
+| 메인 홉 효율 | 평균 노드 탐색 수 (vs 평면 그래프) | 30% 감소 |
+| 평균 응답 latency | 도메인 내 | < 8초 |
+| Cross-Domain latency | Bridge join 포함 | < 12초 |
 | 환각률 | Faithfulness (Ragas) | 90%+ |
 
-### 2.3 비목표 (Non-Goals)
+**v2.0의 "Cross-Domain 60%+ 일률 목표"는 질문 난이도에 따라 너무 쉽거나 너무 어렵다. L1~L4 층화로 평가 신뢰도 확보.**
 
-- 실시간 주가 예측 / 매매 신호 생성 (책임 이슈)
-- 비상장사 데이터 (DART 미제공)
-- 영문 글로벌 기업 지원 (1차 범위는 한국 상장사)
-- 투자 자문 (정보 제공 한정)
+### 2.3 비목표 (Non-Goals) [v2.1 명시화]
+
+- 차량 가격 예측 / 중고차 시세
+- **공정·라인·설비·원가·생산량 데이터** ("제조"라는 표현이 기대하게 하나, 공개 데이터 없음)
+- 비공개 OEM 내부 BOM
+- 자율주행 안전성 인증 대체
+- 정비 매뉴얼 기반 DIY 가이드
+- 실시간 텔레매틱스
+- **Level 6 (소재·공법) MVP 포함** — 장기 확장으로 분리
 
 ---
 
-## 3. 데이터 정책 (변경 핵심)
+## 3. 데이터 정책
 
 ### 3.1 오픈 데이터 활용 원칙
 
-기존의 "외부 데이터 접근 제한" 정책을 해제하고, **공개된 정부·공공·오픈소스 데이터를 적극 수집·활용** 한다. 모든 데이터는 다음 기준을 충족해야 한다:
-
-- ✅ 공공기관·공식 API 또는 라이선스 명시된 오픈 데이터
-- ✅ 상업적·연구 목적 사용 허용 라이선스
-- ✅ 출처 명시 가능
-- ❌ 무단 크롤링, 약관 위반 수집 금지
-- ❌ 개인정보·민감정보 포함 데이터 금지
+FinGraph와 동일 원칙. 공공·라이선스 명시 데이터만 수집. 코드 레벨 라이선스 강제(`src/autograph/ingestion/_license.py`).
 
 ### 3.2 데이터 소스
 
 #### 구축용 (Knowledge Source)
 
-| 데이터 | 출처 | 형태 | 용도 |
+| 데이터 | 출처 | 라이선스 | 용도 |
 |---|---|---|---|
-| **사업보고서/공시** | DART Open API | XML/PDF | 본문 임베딩 + 관계 추출 |
-| **재무제표 (XBRL)** | DART | 정형 데이터 | PostgreSQL 정량 노드 |
-| **상장사 마스터** | KRX 정보데이터시스템 | CSV | 종목·업종 분류 |
-| **거시지표** | 한국은행 ECOS API | 시계열 | 거시 컨텍스트 노드 |
-| **기업 지배구조** | DART 지배구조보고서 | 정형 | 임원·자회사 관계 |
+| 차량 마스터 (제원·VIN 디코드) | NHTSA vPIC API | 공공(US) | `master.vehicles` |
+| 리콜 (한국) | 자동차리콜센터 car.go.kr Open API | 공공 | `events.recalls` |
+| 리콜 (글로벌) | NHTSA Recalls API | 공공 | `events.recalls` |
+| 결함 신고 | NHTSA Complaints | 공공 | `vec.chunks` |
+| 안전 평가 | KNCAP, NCAP, Euro NCAP | 공공 | `spec.measurements` |
+| 자기인증·형식승인 | 국토부 KATRI | 공공 | `events.certifications` |
+| 차량/제조사 글로벌 매핑 | Wikidata SPARQL | CC0 | `master.entity_map` + `wiki.wikidata_facts` |
+| 차량/부품 위키 본문 | Wikipedia (ko/en) | CC BY-SA | `wiki.wikipedia_pages` + `vec.chunks` |
+| 공급사 마스터 | KATECH, KAMA 공개자료 | 공공 | `master.suppliers` |
+| 부품사 IR 자료 | 전자공시 + 공식 IR 사이트 | 공공 | `doc.manuals` + `vec.chunks` |
 
-#### 평가용 (Benchmark)
+### 3.3 수집 범위 (MVP 1차) [v2.1 — 대폭 축소]
 
-| 데이터셋 | 출처 | 용도 |
-|---|---|---|
-| Allganize RAG-Evaluation-Dataset-KO (금융) | Hugging Face | 한국어 금융 RAG 표준 벤치마크 |
-| KorFin-MRC / 금융 MRC | AI Hub | 금융 기계독해 평가 |
-| 자체 구축 Multi-hop QA (100문항) | 직접 생성 + LLM 보조 | GraphRAG 핵심 검증 |
-| FinanceBench (영문 참고) | 공개 | 글로벌 비교용 (선택) |
+| 항목 | v2.0 (원안) | **v2.1 MVP** | 확장(post-MVP) |
+|---|---|---|---|
+| OEM | 20사 | **5~8사** (현대·기아·제네시스·KGM·르노코리아 + 토요타·BMW·테슬라) | 20사 |
+| 모델 | 300종 | **30~50종** (대표 베스트셀러) | 300종 |
+| 연식 | 2020~2024 | **2022~2024** | 2020~2024 |
+| BOM 깊이 | Level 0~6 | **Level 0~4** | Level 5~6 |
+| 리콜 | 한국+미국 5년 전수 | **NHTSA + 한국 주요 OEM 우선** | 5년 전수 |
+| Cross-Domain QA | 30문항 | **10문항 seed → 30문항** | 50+ 문항 |
+| Bridge 대상 | 30사 | **10~15사** (한국 OEM + 주요 부품사) | 30사+ |
 
-### 3.3 수집 범위 (1차)
+**MVP는 5주 로드맵 내 실제 작동하는 시스템을 우선한다. 정합성 작업이 데이터 양에 묻히는 것을 방지.**
 
-- **대상:** 코스피 200 + 코스닥 100 = 약 300개사
-- **기간:** 최근 3개 회계연도
-- **문서 유형:** 사업보고서, 분기/반기보고서, 주요사항보고서
-- **거시지표:** 기준금리, 환율, 주요 산업지표
+### 3.4 BOM 깊이별 데이터 가용성 매트릭스 [v2.1 신설]
+
+| 계층 | 가용성 | MVP 포함 여부 | 권장 데이터 출처 |
+|---|---|---|---|
+| Level 0: Manufacturer | **높음** | ✅ 필수 | Wikidata + NHTSA + KAMA |
+| Level 1: Vehicle Model | **높음** | ✅ 필수 | NHTSA vPIC + 리콜 + Wikipedia |
+| Level 2: Trim/Year | **중간** | ✅ 필수 | NHTSA + 국내 매핑 수동 보강 |
+| Level 3: System | **중간** | ✅ 포함 | KS/SAE 표준 분류 사전 + 리콜 분류 |
+| Level 4: Module | **낮음~중간** | ⚠️ 부분 포함 (coverage 명시) | 공개 매뉴얼 + IR + 리콜 본문 LLM 추출 |
+| Level 5: Part | **낮음** | ❌ MVP 제외 | 리콜/결함 중심으로만 진입 (post-MVP) |
+| Level 6: Material/Process | **낮음** | ❌ MVP 제외 | 부품사 공개자료 / 일반 공법 지식 (장기) |
+
+**MVP 성공 기준은 Level 0~4 안정 구축. Level 5는 리콜에 등장한 부품만 부분 포함. Level 6은 장기 로드맵.** 사용자에게도 UI에서 BOM 트리 표시 시 "Level 4까지 신뢰도 높음, 그 이하는 부분 데이터" 명시.
+
+### 3.5 출처별 신뢰도 등급 [v2.1 신설]
+
+PRD v2.0의 "출처 명시" 원칙을 정량화. 모든 그래프 엣지는 출처 등급에 따라 `confidence` 기본값이 결정된다.
+
+| 출처 | 신뢰도 등급 | 기본 confidence | 적용 관계 |
+|---|---|---|---|
+| NHTSA / 자동차리콜센터 공식 리콜 | **A (높음)** | 0.95 | `AFFECTED_BY`, `RECALL_OF` |
+| NHTSA vPIC | **A** | 0.95 | `MANUFACTURES`, `HAS_VARIANT` |
+| KNCAP / NCAP / Euro NCAP | **A** | 0.95 | `SAFETY_RATED_BY` |
+| Wikidata | **B (중간)** | 0.80 | 글로벌 ID 매핑, `MANUFACTURES` (보조) |
+| Wikipedia | **B~C** | 0.70 | 설명 문서, 보조 근거 |
+| 부품사 IR (공식 공시) | **B** | 0.75 | `SUPPLIED_BY` (후보) |
+| 매뉴얼 / 브로셔 | **B** | 0.75 | `CONTAINS_*` (시스템·모듈) |
+| LLM 추출 (P3) | **C** | 0.50 | P4 cross-validate 필수 |
+| 커뮤니티 / 분해 자료 | **C (낮음)** | 0.40 | 후보 추출만, 확정 관계 금지 |
+| 수동 검토 확정 | **A+** | 1.00 | 모든 관계 |
+
+**`validated=true` 승급 정책:**
+- `SUPPLIED_BY` 등 공급 관계는 **A 또는 B 출처 + P4 cross-validate 통과** 시에만 `validated=true`
+- 그 외는 `candidate` 또는 `needs_review`
+- C 등급 단독 출처는 절대 `validated=true` 금지
 
 ---
 
@@ -124,541 +191,461 @@
 
 ### 4.1 컨테이너 토폴로지
 
-전체 시스템은 단일 Linux 호스트 위에서 Docker Compose로 오케스트레이션되며, 모든 컴포넌트가 격리된 컨테이너로 구동된다.
+FinGraph와 동일 인프라. 컨테이너는 그대로, 데이터만 다름.
 
 ```
-[데이터 계층] (minimal — 2 DBs)
-├─ Neo4j 5.18    : 기업·인물·관계 그래프
-└─ PostgreSQL 16 : 재무 수치 / 회사 마스터 / 평가 QA / 채팅 히스토리 /
-                   LangGraph checkpoint / **문서 청크 벡터(pgvector 확장)**
-
-  └─ (옵션) Qdrant      : 청크 수 100만 넘을 때 분리 — 현 규모(~45K)는 pgvector 충분
-  └─ (옵션) Redis       : 분산/다중 worker 단계에서 캐시·queue
+[데이터 계층]
+├─ Neo4j 5.18    : 차량·부품·공급사·리콜 그래프 (계층 + 시점 + confidence)
+└─ PostgreSQL 16 : 제원 수치 / 차량·법인 마스터 / 평가 QA / 채팅 히스토리 /
+                   LangGraph checkpoint / 문서 청크 벡터(pgvector) /
+                   master.entities (다형 ER) / bridge.corp_entity
 
 [모델 계층]
-├─ BGE-M3        : 한국어 임베딩 (GPU)
-└─ BGE-Reranker  : 한국어 재랭킹 (GPU)
+├─ BGE-M3        : 임베딩 (GPU) — FinGraph와 공유
+└─ BGE-Reranker  : 재랭킹 (GPU) — 공유
 
 [애플리케이션 계층]
-├─ Ingestion Worker : 데이터 수집·전처리·그래프 추출 배치
-├─ API (FastAPI)    : 에이전트 오케스트레이션
-└─ Web (Streamlit)  : 사용자 인터페이스
+├─ Ingestion Worker : NHTSA / car.go.kr / KATRI / Wikidata / Wikipedia / IR
+├─ API (FastAPI)    : 에이전트 + 도메인 모드 라우팅
+└─ Web (Streamlit)  : 도메인 토글 UI
+
+[Bridge 계층]
+└─ bridge.corp_entity : Wikidata QID + LEI + 사업자등록번호 기반 다형 join
 
 [외부 의존성]
-└─ LLM Provider : OpenAI / Anthropic / 로컬 (택1, 환경변수 전환)
+└─ LLM Provider : OpenAI / Anthropic / 로컬
 ```
 
-### 4.2 데이터 흐름 방향성
+### 4.2 데이터 흐름
 
-1. **수집 단계:** DART/KRX/ECOS API → Raw 데이터 저장 → PostgreSQL 정형 적재
-2. **전처리 단계:** 문서 청킹 → BGE-M3 임베딩 → Qdrant 저장
-3. **그래프 구축 단계:** LLM 기반 엔티티/관계 추출 + 정형 데이터 직접 매핑 → Neo4j 적재
-4. **질의 단계:** 사용자 질문 → 에이전트 라우팅 → Vector/Graph/SQL 도구 선택 → LLM 답변 합성
-5. **평가 단계:** 평가 QA 실행 → 결과 PostgreSQL 적재 → 대시보드 표시
+FinGraph와 동일 5단계 + Bridge:
+1. 수집 → PG 정형
+2. 청킹 → pgvector
+3. 그래프 구축 (계층 + confidence + provenance)
+4. **Bridge: `master.entities.wikidata_qid` ↔ FinGraph `master.entity_map.wikidata_qid` 자동 매칭**
+5. 질의 → 에이전트 → 답변
+6. 평가 → 대시보드
 
 ### 4.3 그래프 vs 정형 DB 역할 분담
 
-GraphRAG의 흔한 실패 원인은 **정량 데이터를 그래프에 욱여넣는 것**이다. 본 시스템은 다음과 같이 명확히 분리한다:
+FinGraph 원칙 그대로:
+- **Neo4j (관계 + 시점 + confidence):** BOM 계층, 공급 관계, 리콜 영향 범위
+- **PostgreSQL (수치 + 의미):** 제원·NCAP 수치 + 매뉴얼/리콜 본문 청크 + 벡터
+- **`master.entities` (신규):** 다형 ER 마스터 — 법인·차량·부품·리콜 통합 식별
 
-- **Neo4j (관계 중심):** 누가 누구의 자회사인가, 누가 어느 회사의 임원인가, 어떤 산업에 속하는가 등 **관계 탐색이 필요한 정보**
-- **PostgreSQL (수치 + 의미 중심):** 매출액·영업이익·자산 등 **정확한 숫자** + 사업개요·위험요인·경영전략 등 **자연어 본문 청크 + 벡터(pgvector HNSW 인덱스)**
-- (옵션) **Qdrant**: 청크 수 100만 넘으면 분리. 현 단계는 PG 통합으로 운영 단순화.
+**핵심 원칙:** 제원 수치는 절대 LLM이 생성하지 않는다.
 
-질의 시 에이전트는 두 저장소(필요 시 Qdrant 까지)를 **상황에 따라 조합 호출**한다.
+### 4.4 메인 홉 계층 [v2.1 수정 — Level 4까지 안정, Level 5~6 분리]
+
+```
+[Level 0] Manufacturer       예: 현대자동차, 토요타       ← MVP 안정
+   │ MANUFACTURES (class='main_hop')
+   ▼
+[Level 1] Vehicle Model      예: 쏘나타 DN8, 캠리 XV70    ← MVP 안정
+   │ HAS_VARIANT (class='main_hop')
+   ▼
+[Level 2] Trim/Year          예: 쏘나타 1.6T 2024         ← MVP 안정
+   │ CONTAINS_SYSTEM (class='main_hop')
+   ▼
+[Level 3] System             예: 파워트레인, ADAS         ← MVP 포함
+   │ CONTAINS_MODULE (class='main_hop')
+   ▼
+[Level 4] Module             예: 가솔린 엔진, 배터리팩    ← MVP 부분 (coverage 명시)
+   │ CONTAINS_PART (class='main_hop')
+   ▼
+[Level 5] Part               예: 인젝터, BMS              ← Post-MVP (리콜 등장만)
+   │ MADE_OF / USES_PROCESS
+   ▼
+[Level 6] Material + Process 예: 알루미늄 합금 + 다이캐스팅 ← 장기 (확장 영역)
+
+[사이드 홉]
+- SUPPLIED_BY → Supplier      (Level 3~5, class='side_hop')
+- MANUFACTURED_AT → Plant     (Level 1~2)
+- COMPLIES_WITH → Standard    (Level 1~5)
+- AFFECTED_BY → Recall        (Level 1~5, 시점 필수)
+- COMPETES_WITH → Vehicle     (Level 1)
+```
+
+### 4.5 Entity Resolution 마스터 재설계 [v2.1 신설]
+
+v2.0의 `vehicle_id` 단일 중심은 자동차 도메인에 부적합. 법인·차량·부품·리콜은 서로 다른 식별 체계가 필요.
+
+```sql
+CREATE TABLE master.entities (
+    entity_id        VARCHAR PRIMARY KEY,        -- 내부 통합 ID (UUID 또는 prefix+seq)
+    entity_type      VARCHAR NOT NULL,           -- manufacturer | supplier | vehicle_model
+                                                  -- | vehicle_variant | component | recall | standard | plant
+    canonical_name   VARCHAR NOT NULL,
+    canonical_name_en VARCHAR,
+    -- 외부 식별자 (entity_type에 따라 일부만 채워짐)
+    wikidata_qid     VARCHAR,
+    lei              VARCHAR,                    -- 법인만
+    corp_code        VARCHAR,                    -- 한국 상장사만 (FinGraph 연동 키)
+    business_no      VARCHAR,                    -- 한국 법인만
+    cik              VARCHAR,                    -- SEC 등록 법인만
+    nhtsa_model_id   VARCHAR,                    -- 차량 모델만
+    nhtsa_campaign_id VARCHAR,                   -- 리콜만
+    car_go_kr_id     VARCHAR,                    -- 한국 리콜만
+    -- 메타
+    source_priority  INT,                        -- 1=primary, 2=alias, ...
+    confidence_score NUMERIC,
+    valid_from       DATE,
+    valid_to         DATE,
+    schema_version   VARCHAR,
+    created_at       TIMESTAMP DEFAULT NOW(),
+    updated_at       TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_entities_type ON master.entities(entity_type);
+CREATE INDEX idx_entities_qid ON master.entities(wikidata_qid) WHERE wikidata_qid IS NOT NULL;
+CREATE INDEX idx_entities_corp ON master.entities(corp_code) WHERE corp_code IS NOT NULL;
+CREATE INDEX idx_entities_lei ON master.entities(lei) WHERE lei IS NOT NULL;
+```
+
+**엔티티 타입별 Primary Key 매핑:**
+
+| 엔티티 타입 | 권장 식별자 (entities 행에서 활용) |
+|---|---|
+| Manufacturer | `entity_id`, `wikidata_qid`, `lei`, `corp_code` |
+| Vehicle Model | `entity_id`, `wikidata_qid`, `nhtsa_model_id` |
+| Vehicle Variant (Trim/Year) | `entity_id` (내부 생성) |
+| Component | `entity_id` (내부 생성) |
+| Supplier | `entity_id`, `wikidata_qid`, `lei`, `corp_code` |
+| Recall | `entity_id`, `nhtsa_campaign_id`, `car_go_kr_id` |
+
+**FinGraph와의 자연스러운 연결:** `entities.corp_code`가 채워진 행이 곧 Bridge 대상.
+
+### 4.6 Bridge 일반화: `corp_entity` [v2.1 신설]
+
+v2.0의 `bridge.corp_manufacturer`는 완성차 OEM만 다룬다. 실제 Cross-Domain 가치는 배터리사·반도체사·타이어사·ADAS 공급사까지 확장될 때 발현.
+
+```sql
+CREATE TABLE bridge.corp_entity (
+    bridge_id         BIGSERIAL PRIMARY KEY,
+    corp_code         VARCHAR NOT NULL,         -- FinGraph 키
+    entity_id         VARCHAR NOT NULL,         -- AutoGraph master.entities.entity_id
+    entity_type       VARCHAR NOT NULL,         -- manufacturer | supplier
+                                                 --   (sub: battery_supplier | component_supplier
+                                                 --    | semiconductor_supplier | tire_supplier | adas_supplier)
+    -- 매칭에 사용된 식별자들 (감사·재현용)
+    wikidata_qid      VARCHAR,
+    lei               VARCHAR,
+    cik               VARCHAR,
+    business_no       VARCHAR,
+    -- 매칭 메타
+    match_method      VARCHAR NOT NULL,         -- qid_exact | lei_exact | business_no_exact
+                                                 --   | corp_code_exact | fuzzy_name | manual
+    confidence_score  NUMERIC NOT NULL,         -- 0.0 ~ 1.0
+    -- 시점
+    valid_from        DATE,
+    valid_to          DATE,
+    -- 거버넌스
+    source            VARCHAR,                  -- wikidata | gleif | manual | derived
+    reviewed_status   VARCHAR DEFAULT 'auto',   -- auto | reviewed | rejected
+    reviewed_by       VARCHAR,
+    reviewed_at       TIMESTAMP,
+    schema_version    VARCHAR,
+    created_at        TIMESTAMP DEFAULT NOW(),
+    UNIQUE(corp_code, entity_id, valid_from)
+);
+
+CREATE INDEX idx_bridge_corp ON bridge.corp_entity(corp_code);
+CREATE INDEX idx_bridge_entity ON bridge.corp_entity(entity_id);
+CREATE INDEX idx_bridge_type ON bridge.corp_entity(entity_type);
+```
+
+**매칭 우선순위 (Confidence 산정):**
+1. `wikidata_qid` exact match → 0.95
+2. `lei` exact match → 0.93
+3. `business_no` exact match → 0.90
+4. `corp_code` direct (FinGraph entity_map → AutoGraph 직접) → 0.95
+5. Fuzzy name match (한글·영문 normalize 후) → 0.60~0.75
+6. Manual → 1.00
+
+**Confidence < 0.7은 자동 `needs_review` 큐로.**
+
+이렇게 하면 "한온시스템 부품을 쓰는 차종의 한온시스템 재무 리스크"도 자연스럽게 풀린다.
 
 ---
 
-## 5. LLM 추상화 전략 (Azure 종속 제거)
+## 5. LLM 추상화 전략
 
-### 5.1 방향성
+FinGraph와 100% 동일. 같은 `LLMClient`, 같은 어댑터, 같은 환경변수.
 
-기존 코드 전반에 산재한 `AzureOpenAI`, `AzureChatOpenAI` 직접 호출을 **모두 제거**하고, 단일 추상 인터페이스 `LLMClient`를 통해서만 LLM에 접근하도록 강제한다.
+---
 
-### 5.2 어댑터 패턴 원칙
+## 6. 도메인 변경에 따른 코드 재구성
 
-- **하나의 인터페이스, 다수의 구현체**
-  - OpenAI 어댑터: GPT-4o, GPT-4o-mini 등
-  - Anthropic 어댑터: Claude Sonnet/Opus 등
-  - Local 어댑터: vLLM/Ollama 기반 오픈 모델
+### 6.1 마이그레이션 1:1 매핑 [v2.1 수정 — entities 통합 반영]
 
-- **전환 비용 최소화**
-  - 환경변수 `LLM_PROVIDER` 한 줄 변경으로 백엔드 교체
-  - 비즈니스 로직 코드는 LLM 종류를 알 필요 없음
-
-- **공통 기능 표준화**
-  - 일반 채팅, 스트리밍 응답, JSON 구조화 출력 — 3가지 기본 메서드로 통일
-  - 토큰 사용량·비용 로깅 표준화
-
-### 5.3 LLM 용도별 권장 매핑
-
-| 용도 | 권장 모델 | 이유 |
+| FinGraph 자산 | AutoGraph 매핑 | 변경 정도 |
 |---|---|---|
-| 엔티티/관계 추출 (배치) | GPT-4o-mini 또는 로컬 LLM | 대량 처리, 비용 우선 |
-| Cypher 쿼리 생성 | Claude Sonnet 또는 GPT-4o | 구조화 추론 강점 |
-| 최종 답변 합성 | Claude Sonnet 또는 GPT-4o | 한국어 품질, 추론력 |
-| 평가 (LLM-as-judge) | GPT-4o 고정 | 평가 일관성 |
+| `master.companies` | `master.entities` (entity_type='manufacturer') | **통합 ER로 일반화** |
+| `master.persons` | `master.entities` (entity_type='supplier') 또는 별도 `master.persons` 유지 | 도메인 선택 |
+| `master.entity_map` | `master.entities` 안에 흡수 | **단일 테이블로 통합** |
+| `fin.financials` | `spec.measurements` | 시계열 구조 동일 |
+| `fin.filings` | `doc.manuals` | 메타 구조 동일 |
+| `news.articles` | `events.recalls` + `events.complaints` | 시점·멘션 구조 동일 |
+| `wiki.*` | `wiki.*` | **완전히 동일** |
+| `vec.chunks` | `vec.chunks` | **완전히 동일** (메타에 entity_id) |
+| Neo4j `Company` 노드 | `Manufacturer` + `Vehicle` + `VehicleVariant` + `Component` + `Supplier` + `Recall` | 라벨 다양화 |
+| `SUBSIDIARY_OF` | `MANUFACTURES` / `CONTAINS_*` (계층 main_hop) | 메인 홉 등급 부여 |
+| `EXECUTIVE_OF` | `SUPPLIED_BY` / `MANUFACTURED_AT` | 인적 → 공급망 |
 
-→ 운영자가 각 용도에 다른 모델을 매핑할 수 있도록 설정 분리
+### 6.2~6.5 v1/v2/web/공통 재구성
 
----
+v2.0과 동일 (생략).
 
-## 6. 도메인 변경에 따른 코드 재구성 방향
-
-기존 v1, v2, web 코드는 다음 방향으로 전면 재구성된다:
-
-### 6.1 v1 (기본 RAG) → 금융 Vector RAG
-- 일반 문서 → DART 사업보고서로 데이터 소스 교체
-- 단순 임베딩 → BGE-M3 + Reranker 2단계 검색
-- 단일 검색 → 회사·연도·섹션 필터링 메타데이터 강화
-
-### 6.2 v2 (GraphRAG) → 금융 GraphRAG
-- 일반 엔티티 추출 → 금융 특화 스키마(Company/Person/Industry/Financial)로 제한
-- 자유 관계 → 사전 정의된 관계 타입(SUBSIDIARY_OF, EXECUTIVE_OF 등)으로 제약
-- 자유 Cypher 생성 → 스키마 인지(Schema-aware) Cypher 생성으로 정확도 향상
-- 정형 데이터(재무 수치)는 그래프가 아닌 PostgreSQL 직접 조회로 분리
-
-### 6.3 web (UI) → 금융 에이전트 UI (채팅형)
-- **단발 검색창 → 채팅형 대화 인터페이스 (Multi-Turn, thread 기반 히스토리)** — 상세 §7.6
-- 평문 응답 → 출처 인용, 그래프 시각화(서브그래프), 재무 차트 동반
-- Azure 연결 설정 화면 → LLM Provider 선택 UI (또는 운영 환경변수로 위임)
-- 평가 모드 추가 → 벤치마크 일괄 실행 및 비교 대시보드
-- 진행 중인 에이전트(Planner/Graph/Validator…) 실시간 표시, 비용 누적 표시
-
-### 6.4 공통 변경
-- 모든 `AzureOpenAI`/`AzureChatOpenAI` 호출 제거 → `LLMClient` 인터페이스 사용
-- 모든 외부 API 키·엔드포인트 → `.env` 중앙 관리
-- 모든 DB 연결 → 컨테이너 서비스명 기반 (`neo4j:7687`, `postgres:5432`)
-- 모든 임베딩 호출 → BGE-M3 자체 호스팅 엔드포인트로 변경
-
-### 6.5 추출 전략: v1/v2 혼합 (Deterministic-first + Selective LLM)
-
-기존 BNT_ONTOLOGY 시스템의 두 트랙 (v1=LLM 4-pass 전수 추출, v2=deterministic-first + selective LLM) 의 학습을 흡수하여, FinGraph 는 **결정론 우선 + LLM 보조** 의 4단계 파이프라인으로 통일한다.
+### 6.6 추출 전략: FinGraph 4-Pass + Bridge Pass
 
 | Pass | 입력 | 방식 | 산출물 | LLM 비중 |
 |---|---|---|---|---|
-| **P1 (Det)** | DART XBRL 재무제표 | 직접 매핑 (Spec 기반) | PG 테이블 (`financials`) | 0% |
-| **P2 (Det)** | DART 지배구조 보고서 (정형 JSON/XML) | 직접 매핑 | Neo4j 노드/관계 (`Person`, `Company`, `EXECUTIVE_OF`, `SUBSIDIARY_OF`, ownership_pct) | 0% |
-| **P3 (LLM)** | 사업보고서 본문 (자연어) | Schema-aware LLM 추출 (Company/Person/Industry 한정) | Neo4j 관계 후보 (`PARTNER_OF`, `COMPETES_WITH`, `INVESTED_IN`) | 100% |
-| **P4 (LLM-aug)** | P3 산출 + P1/P2 결과 | 정형 cross-check, 충돌 시 정형 우선 | Neo4j 확정 관계 (validated) | 보조 (검증만) |
+| **P1 (Det)** | NHTSA vPIC / KNCAP / NCAP | 직접 매핑 | `spec.measurements` | 0% |
+| **P2 (Det)** | 자동차리콜센터 정형, OEM 공개 BOM | 직접 매핑 | Neo4j 계층 + AFFECTED_BY | 0% |
+| **P3 (LLM)** | 매뉴얼·결함신고·IR 본문 | Schema-aware LLM 추출 | 관계 후보 (SUPPLIED_BY 등) | 100% |
+| **P4 (Validate)** | P3 산출 + P1/P2 + 출처 등급 | confidence 산정 + cross-validate | validated 관계 (§3.5 정책) | 보조 |
+| **P5 (Bridge)** | `entities.wikidata_qid` ↔ FinGraph | 직접 매핑 + fuzzy fallback | `bridge.corp_entity` | 0% |
 
-**원칙:**
-- 정량 수치(매출/영업이익)는 P1 으로 100% 결정론. LLM 추출 금지.
-- 지배구조(임원/자회사/지분율)는 P2 로 정형 매핑. LLM 보조도 불필요.
-- "왜 협업?" "어떤 위험?" 같은 서술형 관계만 P3 LLM 추출 → 비용 절감
-- P4 가 P3 의 LLM 환각을 P1/P2 정형 데이터로 cross-validate (예: "A 가 B 의 자회사라고 LLM 이 추출했는데 P2 에 없음 → 폐기 또는 review_inbox 로")
+### 6.7 관계 엣지 필수 메타데이터 [v2.1 신설]
 
-**LLM 비용 가드:**
-- 배치 P3 는 경량 모델 (GPT-4o-mini / 로컬) — PRD §5.3 매핑 따름
-- 청크 단위 호출 병렬도 조절 (`INGEST_PASS3_PARALLEL`, 기본 2)
-- 회사·연도·섹션별 캐시 (`processed/extracted/<corp_code>/<rcept_no>.jsonl`)
+모든 관계 엣지(특히 `SUPPLIED_BY`, `USES_PROCESS`, `MADE_OF`, `MANUFACTURED_AT`, `AFFECTED_BY`, `COMPLIES_WITH`)는 다음 속성을 **필수**로 가진다:
+
+```cypher
+CREATE (a)-[r:SUPPLIED_BY {
+    // 출처 정보 (provenance)
+    source_type:        'recall' | 'ir_disclosure' | 'manual' | 'wikidata'
+                        | 'wikipedia' | 'llm_extraction' | 'manual_curation',
+    source_id:          'NHTSA-25V-001' | 'DART-20240315-...' | 'chunk_id:...',
+    source_url:         'https://...' (optional),
+    -- 추출 방식
+    extraction_method:  'deterministic' | 'llm' | 'wikidata' | 'manual',
+    extractor_version:  'p2-v1' | 'p3-llm-v2' | ...,
+    -- 신뢰도
+    confidence_score:   0.0 ~ 1.0,
+    validated_status:   'candidate' | 'validated' | 'rejected' | 'needs_review',
+    -- 시점 (시간 그래프)
+    snapshot_year:      2024,
+    valid_from:         date('2024-01-01'),
+    valid_to:           date('2024-12-31') | null,
+    -- 거버넌스
+    created_at:         datetime(),
+    reviewed_by:        'user_id' | null
+}]->(b)
+```
+
+**Validator Agent 강제 규칙:**
+- `validated_status='candidate'` 엣지는 답변 인용 시 "후보 정보" 명시
+- `validated_status='rejected'` 엣지는 쿼리 시 자동 제외
+- `confidence_score < 0.5` 엣지는 단독 근거 금지 (다른 A/B 출처와 결합 필요)
 
 ---
 
 ## 7. 에이전트 동작 방향성
 
-### 7.0 설계 채택: Multi-Agent + Planning (LangGraph)
+### 7.0~7.6
 
-본 시스템은 단일 ReAct 에이전트가 아닌 **역할 분리된 다중 에이전트 + 명시적 계획 수립** 구조를 채택한다. 상세는 §7.5 참조.
+v2.0의 §7 구조 그대로 + 다음 두 가지 신규 반영:
 
-- **왜 단일 LLM이 부족한가:** 도구 선택 실패, 컨텍스트 오염, 추론 깊이 부족
-- **왜 LangGraph인가:** 명시적 StateGraph, 분기·병렬·재시도·체크포인트 내장, Human-in-loop 네이티브 지원
-- **핵심 가치:** 디버깅 가능성, 재현성, 검증 분리 — 금융 도메인의 정확성·감사 가능성 요구에 부합
+1. **Validator의 confidence 게이트:** §6.7 규칙을 Validator 단계에서 강제. confidence < 0.5인 엣지가 답변 근거에 포함되면 자동 fail → Replan.
+2. **Bridge Tool의 confidence 표시:** `bridge_corp_to_manufacturer()` 호출 시 반환에 `bridge_confidence` 포함. UI는 0.7 이상은 ✓, 0.7 미만은 ⚠ 아이콘으로 표시.
 
-### 7.1 라우팅 원칙
+### 7.2 도구 추상화 [v2.1 — entities 기반 시그니처]
 
-사용자 질문을 받으면 에이전트는 다음 판단을 한다:
+#### `tools/spec.py`
+- `lookup_entity(query, entity_type=None, limit=10)` — 통합 식별 (manufacturer/vehicle/supplier)
+- `get_vehicle_info(entity_id)` / `get_spec(entity_id, year, metric)`
+- `get_safety_rating(entity_id, year, agency)`
+- `compare_vehicles(entity_ids, year, metric)`
 
-1. **단순 사실 질문** (예: "삼성전자 2023년 매출은?")
-   → PostgreSQL 직접 조회 (가장 빠르고 정확)
+#### `tools/graph.py`
+- `lookup_entity(query, entity_type=None)` — Wikidata QID 포함 반환
+- `list_components(vehicle_entity_id, level=None, max_depth=4, min_confidence=0.7, snapshot_year=None)` — **min_confidence 신규**
+- `get_suppliers_of_component(component_entity_id, snapshot_year=None, min_confidence=0.7)`
+- `get_vehicles_using_supplier(supplier_entity_id, snapshot_year=None)` — Cross-Domain의 핵심 진입점
+- `list_recalls_affecting(vehicle_entity_id, year_range=None)`
+- `find_paths(start_entity_id, end_entity_id, max_hops=3, only_main_hop=False)`
 
-2. **의미·서술형 질문** (예: "삼성전자의 주요 사업 위험 요인은?")
-   → Vector RAG (Qdrant + Reranker)
+#### `tools/retrieve.py`
+- v2.0과 동일 (메타 키만 `entity_id`)
 
-3. **관계·구조 질문** (예: "현대차 자회사 중 매출 1조 이상은?")
-   → Graph RAG (Neo4j) + PostgreSQL 조합
-
-4. **복합 멀티홉 질문** (예: "이재용이 임원인 회사들의 합산 영업이익은?")
-   → Graph 탐색 + PostgreSQL 집계 + Vector 보완
-
-### 7.2 도구(Tool) 추상화
-
-에이전트는 다음 도구들을 보유하며, LLM이 판단해 호출한다:
-
-- `search_documents(query, filters)` — 벡터 검색
-- `query_graph(cypher_intent)` — 그래프 탐색
-- `query_financials(company, year, metric)` — 재무 정확값 조회
-- `lookup_company(name_or_ticker)` — 회사 식별
-- `get_subgraph(entity, depth)` — 시각화용 서브그래프
-
-### 7.3 답변 신뢰성 보장 원칙
-
-- **재무 수치는 절대 LLM이 생성하지 않는다** — 반드시 PostgreSQL 조회 결과만 사용
-- **모든 답변은 출처 명시** — 문서 ID, 페이지, 그래프 노드 ID
-- **불확실한 경우 "정보 부족"으로 응답** — 환각 방지
-- **시점 정보 필수** — "2023년 기준" 등 항상 회계연도 명시
-
----
-
-## 7.5 Multi-Agent + Planning 상세 설계 (LangGraph)
-
-§7의 라우팅·도구·신뢰성 원칙을 구현하는 실제 아키텍처. "하나의 똑똑한 에이전트보다, 역할이 분명한 여러 전문가 + 명시적 계획"이 본 시스템의 설계 철학이다.
-
-### 7.5.1 설계 원칙
-
-- **역할 분리 (Single Responsibility):** 각 에이전트는 한 가지만 한다. 디버깅·평가·교체가 명확.
-- **명시적 계획 (Plan-and-Execute):** LLM이 즉흥적으로 도구를 호출하지 않는다. Planner가 먼저 DAG를 만들고, 그 뒤에 실행한다.
-- **검증 분리:** Validator가 독립적으로 결과를 검증한다 → 신뢰성·환각 방지.
-- **재계획 가능:** 실패 시 Planner로 되돌아간다. 무한 루프 방지를 위해 `replan_count ≤ 2`.
-- **상태 명시 (StateGraph):** 모든 단계가 LangGraph State에 기록 → 완전한 추적성, 체크포인트, 재개.
-- **재무 수치는 결정론적:** LLM 환각 원천 차단. SQL/Graph 조회 결과만 사용.
-
-### 7.5.2 에이전트 구성 (7~9종)
-
-| 에이전트 | 책임 | LLM 권장 | 도구 |
-|---|---|---|---|
-| **Triage** | 의도 분류, 모호성 감지, 회사 식별, 시점 추출 | 경량 (Haiku / GPT-4o-mini) | `lookup_company` |
-| **Planner** | 태스크 분해 → DAG 생성, 워커 지정, 의존성 정의 | 고급 (Sonnet / GPT-4o) | 없음 (순수 추론) |
-| **Supervisor** | 의존성 충족된 다음 태스크 선택, 병렬 디스패치, 상태 추적 | 경량 | 없음 (라우팅만) |
-| **Research** | 벡터 검색 + 재정렬, 문서 인용 | 경량 | `vector_search`, `rerank` |
-| **Graph** | Cypher 템플릿 + 파라미터 채우기, 관계 탐색 | 고급 | `cypher_query`, `get_subgraph` |
-| **SQL** | 사전 정의 함수 풀 호출 (자유 SQL 금지) | 경량 | `get_financials`, `compare_companies` |
-| **Calculator** | 재무 계산·통계, Python sandbox | 경량 + 코드 실행 | `python_exec` (격리) |
-| **Validator** | Citation 체크, 수치 일치성, 논리 일관성, 완전성 | 경량 | `check_citation`, `verify_number` |
-| **Synthesizer** | 최종 답변 작성, 출처 태깅, 시각화 결정 | 고급 | `generate_chart` |
-
-### 7.5.3 LangGraph State 스키마
-
-모든 노드가 공유하는 단일 `AgentState` (TypedDict). 핵심 필드:
-
-```
-AgentState:
-  messages              : list[Message]            # 대화 히스토리 (append-only)
-  user_query            : str                      # 원본 질문
-  clarified_query       : str                      # Triage 산출
-  identified_entities   : dict                     # companies/persons/time_range
-  plan                  : dict                     # Planner 산출
-    └─ tasks: list[{id, agent, intent, depends_on, status}]
-  current_task_id       : str
-  task_results          : dict[task_id, result]    # append-only
-  retrieved_documents   : list
-  graph_results         : dict
-  sql_results           : dict
-  calculations          : dict
-  validation_status     : "pending" | "passed" | "failed"
-  validation_issues     : list
-  replan_count          : int                      # max 2
-  final_answer          : str
-  citations             : list
-  visualizations        : list
-  metadata              : {tokens, cost, latency}
-  trace_id              : str
-```
-
-**원칙:** 불변성(노드는 변경하지 않고 새 값 반환), 점진적 누적(리스트는 append-only), 체크포인트(각 단계 PostgreSQL 저장).
-
-### 7.5.4 흐름
-
-```
-User Query
-   ↓
-[1] Triage (intake & clarify)
-   ↓
-[2] Planner (task DAG 생성)
-   ↓
-[3] Supervisor (router) ──┬─→ Research ─┐
-                          ├─→ Graph    ─┤
-                          ├─→ SQL      ─┤  (의존성 없는 워커는 병렬, Send API)
-                          └─→ Calc     ─┘
-                                    ↓
-                          [4] Validator
-                                    ↓
-                          ┌─ failed → [Replan] (count<2)
-                          └─ passed → [5] Synthesizer
-                                              ↓
-                                       Final Answer + Citations + Viz
-```
-
-### 7.5.5 Replan & 무한 루프 방지
-
-다음 경우 Planner로 되돌아감:
-- Validator가 `failed` 반환
-- Worker가 "데이터 없음" 보고
-- 중간 결과가 예상과 크게 다름
-
-`replan_count` 최대 2회. 초과 시 부분 답변 + "정보 부족" 명시 반환.
-
-### 7.5.6 Human-in-the-Loop
-
-LangGraph `interrupt` 활용 시점:
-- **Clarification 필요:** 모호한 회사명 ("삼성" → 삼성전자/SDS/...) — Triage 단계
-- **고비용 작업 전:** "이 작업은 OpenAI API $0.50 소요됩니다" — Planner 산출 후
-- **민감 결정:** "이 답변을 외부 보고서로 사용하시겠습니까?" — Synthesizer 직전
-
-### 7.5.7 병렬 실행
-
-Planner DAG에서 의존성 없는 태스크는 LangGraph `Send` API로 동시 디스패치. 예시:
-```
-질문: "삼성전자와 LG전자의 최근 5년 매출 비교"
-T1: 삼성전자 매출 ──┐
-                  ├─→ T3: 비교·차트
-T2: LG전자 매출   ──┘
-```
-T1·T2 병렬 실행 → latency 단축.
-
-### 7.5.8 Checkpoint & Resume
-
-모든 State는 PostgreSQL에 체크포인트 저장:
-- 시스템 중단 시 마지막 노드부터 재개
-- 사용자가 "다시 계산" 요청 시 처음부터 재실행
-- 평가·디버깅 시 시점별 State 추출
-
-### 7.5.9 Cypher 안전성: 템플릿 + 파라미터
-
-자유 Cypher 생성은 환각·SQL Injection 유사 위험. 대신 **사전 정의된 템플릿**에 LLM이 파라미터만 채움:
-
-```cypher
--- 템플릿
-MATCH (c:Company {name: $name})-[:SUBSIDIARY_OF*1..2]->(p:Company)
-WHERE r.ownership_pct >= $threshold
-RETURN p.name, p.corp_code
-```
-LLM 출력: `{name: "현대자동차", threshold: 50}` (JSON Schema 강제).
-
-### 7.5.10 SQL 안전성: 함수 풀
-
-자유 SQL 금지. 사전 정의된 함수만 호출 가능:
-- `get_revenue(company_id, year)`
-- `get_operating_income(company_id, year)`
-- `compare_companies(company_ids, metric, years)`
-- `aggregate_by_industry(industry_code, metric, year)`
-
-READ-ONLY DB 사용자로 연결. SQL Injection 원천 차단.
-
-### 7.5.11 Tracing & 보안
-
-- **Tracing:** Langfuse 또는 LangSmith 통합 필수. 모든 노드 진입/종료 span, State 변화 시각화, 실패 케이스 자동 수집.
-- **Prompt Injection 방어:** 사용자 입력과 시스템 프롬프트 분리, 검색 문서는 명확한 구분자(`<document>` 등) 사용, 의심 패턴 사전 차단.
-- **도구 권한:** 각 에이전트는 자기 도구만 호출 가능 (LangGraph 노드 단위 제한).
-- **Python sandbox:** Calculator는 네트워크·파일시스템 격리 (e2b / daytona / 자체 Docker).
-
-### 7.5.12 프롬프트 엔지니어링
-
-- 에이전트별 분리된 System Prompt (역할 + 능력 + 제약 + Few-shot + JSON Schema)
-- 각 에이전트는 **자기 일에 필요한 State만** 받음 (전체 messages 전달 X → 토큰 절약·혼란 방지)
-- 모든 의사결정 노드는 JSON 출력 강제 (OpenAI Structured Outputs / Anthropic Tool use / 로컬 Outlines)
-
----
-
-## 7.6 Web UI: 채팅형 + 대화 히스토리 (Multi-Turn)
-
-§6.3 의 web 재구성 방향을 구체화. 단발 검색창이 아니라 **연속 대화(채팅)** 가 기본 인터랙션.
-
-### 7.6.1 인터랙션 모델
-
-- 좌측: 대화 목록 (`thread_id` 단위) — 새 대화 / 기존 대화 선택 / 삭제
-- 중앙: 채팅 메시지 스트림 (`st.chat_message` / `st.chat_input`)
-- 우측 (또는 메시지 하단 아코디언): 출처 패널 — 인용 문서, 그래프 서브뷰, SQL 결과 표, 시각화
-
-### 7.6.2 Multi-Turn 동작
-
-LangGraph `thread_id` 기반 대화 격리. 각 turn 은 다음 흐름:
-
-```
-turn N:
-  user message + 이전 turn 의 final State (entities, recent_tasks, citations 미니 요약)
-  → Triage (이번 turn 의 query 명확화, "이 회사들" 같은 대명사 해소)
-  → Planner (이전 결과 reuse 우선; 변경된 부분만 재실행)
-  → ... (이후 §7.5 흐름과 동일)
-  → Synthesizer (이번 turn 답변 + 이전 turn 과의 연결 명시)
-```
-
-핵심 패턴:
-- "위에서 답한 회사 중 매출 1조 이상은?" → Planner 가 이전 turn 의 `task_results` 를 P2 로 reuse
-- "방금 그 차트를 산업별로 다시" → Synthesizer 가 동일 데이터 + 새 그루핑으로 재생성
-- "처음부터 다시" → 명시 시 새 `thread_id` 또는 State reset
-
-### 7.6.3 히스토리 저장
-
-- LangGraph `CheckpointSaver` → PostgreSQL (`langgraph_checkpoints` 테이블 자동 생성)
-- 별도 `conversations` / `messages` 테이블 (UI 표시·검색용 정규화 view):
-  ```sql
-  conversations(id, thread_id, title, created_at, updated_at, user_id)
-  messages(id, conversation_id, turn_idx, role, content, citations_json, viz_json, created_at)
-  ```
-- `title` 은 첫 user message 의 첫 LLM 호출로 자동 요약 생성 (5단어 이내)
-- 검색: `messages.content` 전문 검색 (PG `tsvector` 인덱스)
-
-### 7.6.4 컨텍스트 윈도우 관리
-
-장기 대화에서 토큰 폭증 방지:
-- Triage 단계에서 **이번 turn 에 실제 필요한 prior context 만 추출** (최근 N개 turn + 관련된 entities/tasks)
-- 8 turn 초과 시 자동 요약 (sliding window summary 를 별도 메시지로 주입)
-- 사용자가 명시적으로 "위 내용 잊어" 요청 시 thread fork 또는 reset
-
-### 7.6.5 사용자 경험
-
-- 토큰 사용량 / 비용 실시간 표시 (turn 당 + 누적)
-- 진행 중인 에이전트 표시 (Planner → Graph → Validator ...) — LangGraph stream 으로 노드 진입 시 chip 업데이트
-- 답변 중 "출처 부족" / "재계획" 발생 시 명시 (사용자가 신뢰도 판단)
-- 답변 후 피드백 버튼 (👍/👎/📝 의견) → 평가 데이터 적재
-
-### 7.6.6 구현 스택
-
-- **Streamlit** (`streamlit>=1.35`): chat_message/chat_input 네이티브 지원
-- **PostgreSQL**: LangGraph checkpoint + conversations/messages 테이블
-- **FastAPI** (선택): UI 와 에이전트 분리 시 SSE/WebSocket streaming 엔드포인트
-- 차트: Plotly (인터랙티브 재무 시계열), pyvis (서브그래프 시각화)
+#### `tools/bridge.py` [v2.1 — corp_entity 기반]
+- `bridge_corp_to_entity(corp_code, entity_type=None)` — corp_code → 가능한 모든 AutoGraph 엔티티
+- `bridge_entity_to_corp(entity_id)` — entity_id → corp_code (있다면)
+- `cross_query_supplier_chain(supplier_corp_code)` — 한 줄로 "이 회사가 공급하는 차종 + OEM + OEM 재무" 패키지
 
 ---
 
 ## 8. 평가 및 검증 전략
 
-### 8.1 평가 데이터셋 구성
+### 8.1 평가 데이터셋 구성 [v2.1 — 4단계 층화]
 
-- **공개 벤치마크:** Allganize 금융 도메인 → 기본 성능 baseline
-- **자체 구축 QA 100문항:**
-  - Level 1 (단순 사실, 30개): 단일 회사·단일 수치
-  - Level 2 (2-hop, 40개): 회사-회사, 회사-인물 관계
-  - Level 3 (3-hop+, 30개): 다중 관계 + 집계
-- **각 QA는 정답·정답 출처·필요 hop 수 메타데이터 포함**
+#### 도메인 내 QA (총 100문항)
+- Level 1 (단순 사실, 30): 단일 차량·단일 제원
+- Level 2 (2-hop, 40): 차량↔부품, 부품↔공급사
+- Level 3 (3-hop+, 30): 차량↔모듈↔부품↔공급사, 리콜 영향 범위
 
-### 8.2 비교 실험 매트릭스
+#### Cross-Domain QA (총 30문항, 4단계 층화) [v2.1 신설]
 
-다음 조합을 모두 평가하여 GraphRAG의 우위를 정량 입증한다:
+| 난이도 | 정의 | 문항 수 | 목표 정답률 | 예시 |
+|---|---|---:|---:|---|
+| **CD-L1** | 제조사 ↔ 상장사 직접 Bridge | 10 | **80%+** | "현대차가 제조한 모델의 리콜 건수와 현대차 영업이익을 같이 보여줘" |
+| **CD-L2** | 차량 모델 ↔ 제조사 ↔ 재무 | 8 | **70%+** | "쏘나타 DN8을 만드는 회사의 최근 3년 영업이익 추이는?" |
+| **CD-L3** | 부품/공급사 ↔ OEM ↔ 재무 | 8 | **50~60%** | "LG에너지솔루션 배터리를 쓰는 차종을 가진 OEM의 최근 영업이익은?" |
+| **CD-L4** | 시점 포함 공급망 ↔ 재무/ESG | 4 | **40~50%** | "2023년 한온시스템에 공급계약 갱신한 OEM 중 KCGS ESG 등급이 B+ 이상인 회사는?" |
 
-| 시스템 | Level 1 | Level 2 | Level 3 | 종합 |
-|---|---|---|---|---|
-| Vector RAG only | 측정 | 측정 | 측정 | - |
-| Graph RAG only | 측정 | 측정 | 측정 | - |
-| **Hybrid Agent** | 측정 | 측정 | 측정 | - |
-| SQL+Vector (No Graph) | 측정 | 측정 | 측정 | - |
+**각 QA 메타데이터:**
+```json
+{
+  "id": "CD-L3-001",
+  "question": "...",
+  "answer": "...",
+  "required_stores": ["AutoGraph.Graph", "Bridge", "FinGraph.SQL"],
+  "required_confidence_min": 0.7,
+  "hop_count": 4,
+  "main_hop_path": ["Supplier", "Vehicle", "Manufacturer", "Financials"],
+  "side_hops": [],
+  "source_citations": ["..."]
+}
+```
 
-→ **Hybrid가 모든 레벨에서 우월하거나, 최소 Level 2/3에서 큰 폭 우위**를 보여야 함
+### 8.2 비교 실험 매트릭스 [v2.1 — 저장소 명시]
+
+각 질문이 어느 저장소를 써야 풀리는지 명시하여 Hybrid 필요성을 정량 입증:
+
+| 유형 | 예시 | 필요한 저장소 | 측정 시스템 |
+|---|---|---|---|
+| SQL-only | "2024 쏘나타 1.6T 출력은?" | PostgreSQL | 4종 |
+| Vector-only | "NHTSA 불만에서 자주 언급된 증상은?" | pgvector | 4종 |
+| Graph-only | "이 부품을 쓰는 차종은?" | Neo4j | 4종 |
+| Graph + SQL | "리콜된 차종의 안전등급 평균은?" | Neo4j + PG | 4종 |
+| Graph + Vector | "리콜 사유와 관련된 시스템 설명은?" | Neo4j + pgvector | 4종 |
+| **Cross-Domain** | "공급사를 쓰는 OEM의 영업이익은?" | AutoGraph + Bridge + FinGraph | **Bridge 시스템만** |
+
+| 시스템 | L1 | L2 | L3 | CD-L1 | CD-L2 | CD-L3 | CD-L4 |
+|---|---|---|---|---|---|---|---|
+| Vector RAG only | 측정 | 측정 | 측정 | ~0% | ~0% | ~0% | ~0% |
+| Graph RAG only | 측정 | 측정 | 측정 | N/A | N/A | N/A | N/A |
+| Hybrid Agent (AutoGraph 단독) | 측정 | 측정 | 측정 | N/A | N/A | N/A | N/A |
+| **Hybrid + Bridge (Cross-Domain)** | 측정 | 측정 | 측정 | **80%+** | **70%+** | **50~60%** | **40~50%** |
 
 ### 8.3 평가 지표
 
-- **Retrieval:** Recall@k, MRR
-- **Answer:** Accuracy (LLM-as-judge), Exact Match (수치 질문)
-- **Faithfulness:** Ragas 기반 환각 측정
-- **Operational:** Latency, 토큰 비용, LLM별 비용 비교
-- **Multi-hop Specific:** Hop-level Success Rate
+FinGraph 6개 지표 + 신규:
+- Cross-Domain Bridge Hit Rate
+- Main-Hop Efficiency
+- **Confidence-Weighted Accuracy [v2.1]** — 답변 근거 엣지의 confidence 가중 평균 정확도
 
 ### 8.4 LLM 비교 평가
 
-동일 평가셋을 GPT-4o, Claude Sonnet, 로컬 LLM에서 각각 실행하여 다음을 보고:
-
-- 정확도 차이
-- 비용 차이 (질문당 평균 토큰·USD)
-- 응답 시간 차이
-- 한국어 자연스러움 정성평가
-
-→ **어떤 LLM이 어떤 용도에 적합한지 가이드라인 도출**
+FinGraph와 동일 (GPT-4o / Claude / 로컬 3종).
 
 ---
 
-## 9. 단계별 로드맵
+## 9. 단계별 로드맵 [v2.1 — MVP 우선]
 
-### Phase 1: 인프라 구축 (1주차)
-- Docker Compose 전체 스택 구성
-- Neo4j / PostgreSQL / Qdrant 부트스트랩
-- BGE-M3 GPU 컨테이너 구동 확인
-- LLM 어댑터 3종 구현 및 단위 테스트
+### Phase A1: 인프라 공유 + 스키마 (1주차)
+- FinGraph Docker에 `master.entities`, `bridge.corp_entity`, `spec.*`, `events.*`, `doc.*` 추가
+- BGE-M3 / LLM 공유 검증
+- `.env` 추가 변수
 
-### Phase 2: 데이터 파이프라인 (2주차)
-- DART API 수집 모듈
-- KRX/ECOS 수집 모듈
-- PostgreSQL 스키마 적재
-- 문서 청킹 + 임베딩 + Qdrant 적재
-- LLM 기반 엔티티/관계 추출 + Neo4j 적재
+### Phase A2: 데이터 파이프라인 MVP (2~3주차)
+- **NHTSA vPIC + Recalls + Complaints** (글로벌 우선, 안정적 API)
+- **자동차리콜센터 car.go.kr Open API** (한국)
+- KNCAP/NCAP (스크래핑 가능 공개 자료만)
+- Wikidata SPARQL (5~8 OEM + 주요 부품사)
+- Wikipedia (해당 모델 30~50종)
 
-### Phase 3: RAG 파이프라인 (3주차)
-- Vector RAG (v1 재구성)
-- Graph RAG (v2 재구성, 스키마 인지 Cypher)
-- 정형 SQL 조회 도구
-- 도구 단위 동작 검증
+### Phase A3: 그래프 구축 (3~4주차)
+- P1: 제원 정형 (Level 0~2 완성)
+- P2: 리콜/인증 정형 + BOM 계층 (Level 3 시스템 분류 사전 구축, Level 4 부분)
+- P3: 매뉴얼/IR LLM 추출 (Level 4 Module 보강) — `confidence` 0.5 기본
+- P4: cross-validate + 출처 등급에 따른 `validated_status` 갱신 (§3.5)
+- **P5: Bridge 자동 매칭 + Confidence 산정**
 
-### Phase 4: 에이전트 + UI (4주차) — Multi-Agent 단계적 도입
-- **Phase 4A:** Triage + Supervisor + 3 Worker(Research/Graph/SQL) 선형 흐름
-- **Phase 4B:** Planner Agent 도입 — DAG 기반 태스크 디스패치, 의존성 관리
-- **Phase 4C:** Validator + Replan 루프 — Citation 강제, 환각 검증
-- **Phase 4D:** Send API 병렬 실행, Calculator + Python sandbox, Checkpoint/Resume
-- **Phase 4E:** Streamlit UI + 그래프 시각화, Tracing(Langfuse/LangSmith), Human-in-loop
-- 상세 설계는 §7.5 참조
+### Phase A4: RAG + 에이전트 (4주차)
+- Tools 4종 구현 (`spec`, `graph`, `retrieve`, `bridge`)
+- Domain Router (UI 토글)
+- Validator에 confidence 게이트 추가
+- Cypher 계층 템플릿
 
-### Phase 5: 평가 및 튜닝 (5주차)
-- 자체 평가 QA 100문항 구축
-- 시스템 4종 × LLM 3종 = 12조합 평가 실행
-- 결과 대시보드 + 분석 리포트
-- 프롬프트·청킹·검색 파라미터 튜닝
+### Phase A5: UI + 평가 (5주차)
+- Streamlit 도메인 토글 + BOM 트리 (Level 표시)
+- Cross-Domain QA 10문항 seed → 30문항 확장
+- 5종 시스템 × 3 LLM 평가 매트릭스
+- Confidence-가중 정확도 측정
 
 ---
 
-## 10. 성공 기준 (Definition of Done)
+## 10. 성공 기준 (Definition of Done) [v2.1 수정]
 
-본 프로젝트는 다음 조건을 모두 충족할 때 성공으로 간주한다:
-
-1. ✅ `docker compose up` 한 줄로 전체 시스템 기동 가능
-2. ✅ LLM Provider를 환경변수만으로 OpenAI/Anthropic/로컬 간 전환 가능
-3. ✅ 코스피200+코스닥100 기업의 최근 3년 데이터가 그래프·정형·벡터 3개 저장소에 적재됨
-4. ✅ 자체 평가 QA 100문항에서 Hybrid Agent가 Vector 단독 대비 Multi-hop에서 +30%p 이상 우위
-5. ✅ 재무 수치 답변의 정확도(Exact Match) 95% 이상
-6. ✅ Faithfulness(환각률 역지표) 90% 이상
-7. ✅ Azure OpenAI 의존 코드 0건
-8. ✅ 외부 데이터는 모두 공개·합법 출처
-9. ✅ Streamlit UI에서 질문 → 답변 + 출처 + 그래프 시각화 동시 표출
-10. ✅ LLM 3종 비교 평가 리포트 산출
-11. ✅ Planner 정확도 (LLM-as-judge) 85%+
-12. ✅ Replan 발생률 20% 이하
-13. ✅ 평균 노드 호출 수 < 8
-14. ✅ 병렬 활성화 시 E2E 응답 < 8초 (순차 < 12초)
+1. ✅ FinGraph `docker compose up` 그대로 AutoGraph까지 기동
+2. ✅ Streamlit UI 도메인 토글 3종 동작
+3. ✅ LLM Provider 환경변수 전환
+4. ✅ **MVP 범위 (OEM 5~8사 × 모델 30~50종 × 2022~2024 연식)** 데이터 3저장소 적재
+5. ✅ **BOM Level 0~3 안정, Level 4 coverage ≥ 60%** (Level 5~6은 post-MVP)
+6. ✅ `bridge.corp_entity` 자동 생성 — Wikidata QID + LEI 매칭 confidence ≥ 0.9 비율 80%+
+7. ✅ AutoGraph 단독 QA에서 Hybrid가 Vector 단독 대비 Multi-hop +30%p
+8. ✅ **Cross-Domain QA 4단계 층화 목표 모두 달성** (CD-L1 80%+ / CD-L2 70%+ / CD-L3 50%+ / CD-L4 40%+)
+9. ✅ 제원 수치 Exact Match 95%+
+10. ✅ Faithfulness 90%+
+11. ✅ **모든 `SUPPLIED_BY` 엣지에 confidence + provenance + snapshot_year 100% 채움**
+12. ✅ FinGraph 코어 코드 변경 < 5%
+13. ✅ 메인 홉 효율: 평균 노드 탐색 수 30% 감소
+14. ✅ 평균 latency: 도메인 내 < 8초, Cross-Domain < 12초
 
 ---
 
-## 11. 리스크와 대응
+## 11. 리스크와 대응 [v2.1 확장]
 
 | 리스크 | 영향 | 대응 |
 |---|---|---|
-| DART API 호출 제한 (1만건/일) | 데이터 수집 지연 | 점진 수집 + 캐싱 + 우선순위 큐 |
-| LLM 그래프 추출 노이즈 | 그래프 품질 저하 | 정형 데이터(지배구조·재무) 직접 매핑 우선, LLM 추출은 보조 |
-| 한국어 LLM 비용 폭증 | 운영 부담 | 배치 작업은 로컬/저가 모델, 최종 합성만 고급 모델 |
-| 시점 불일치 (분기/연도) | 답변 신뢰성 | 모든 데이터에 회계연도/분기 메타데이터 필수화 |
-| 그래프 스키마 변경 부담 | 마이그레이션 비용 | 스키마 버전 관리 + 마이그레이션 스크립트 도입 |
-| LLM Provider 장애 | 서비스 중단 | 어댑터 폴백 체인 (예: Claude 실패 시 GPT로 자동 전환) |
+| 공개 데이터로 Level 5~6 BOM 채우기 어려움 | 깊은 부품 그래프 희소 | **MVP에서 Level 5~6 제외**, UI에 "Level 4까지 신뢰" 명시, post-MVP 분리 |
+| `vehicle_id` 단일 키로 부족 | 법인·차량·부품 식별 혼란 | **`master.entities` 다형 키 구조 채택 (§4.5)** |
+| Bridge 매칭 정확도 | Cross-Domain 환각 | Wikidata QID + LEI + 사업자번호 3중, confidence 표시, < 0.7은 needs_review |
+| LLM 환각 공급 관계 | 그래프 오염 | **§3.5 출처 등급 + §6.7 confidence 필수 + Validator 게이트** |
+| 시점 모호성 | 공급 관계 정확도 저하 | `snapshot_year` + `valid_from/to` 필수, 미상 시 명시 |
+| OEM 비공개 BOM | Level 4 이하 한계 | Wikipedia + IR + 리콜 본문 + coverage 명시 |
+| "제조" 표현이 공정·원가 기대 | 사용자 실망 | **§1.2 포지셔닝 "제품·부품·리콜·공급망"으로 변경** |
+| Cross-Domain 목표치 불일치 | 평가 신뢰도 저하 | **§8.1 4단계 층화로 난이도별 목표 분리** |
+| FinGraph 스키마 변경 시 Bridge 깨짐 | Cross-Domain 장애 | `schema_version` 명시, 마이그레이션 스크립트 |
+| MVP 일정 압박 | 5주에 너무 큼 | **§3.3 범위 대폭 축소 (OEM 5~8사, 모델 30~50종)** |
 
 ---
 
 ## 12. 향후 확장 가능성
 
-본 시스템 완성 이후 다음 방향으로 확장 가능하다:
-
-- **시계열 그래프(Temporal KG):** 시점별 지배구조 변화 추적
-- **뉴스/공시 이벤트 노드:** 실시간 이벤트 반영
-- **산업 분석 모드:** 산업 단위 비교·요약
-- **포트폴리오 분석:** 사용자 보유 종목 기반 인사이트
-- **다국어 확장:** 영문 글로벌 기업 데이터 (EDGAR 등)
-- **자체 임베딩 파인튜닝:** 금융 도메인 특화 BGE-M3 fine-tuning
+- **Level 5~6 부품·소재·공법 확장** (장기): 부품사 공개자료 + 분해 자료 정제 파이프라인
+- **시계열 BOM:** 모델 연식별 부품 변경 추적 (Bridge `valid_from/to` 활용)
+- **공급망 위험 분석:** Bridge로 공급사 집중도 + FinGraph 재무·신용도 결합
+- **세 번째 도메인:** 동일 패턴으로 의약품/전자제품 확장 — N-Domain Bridge로 일반화
+- **ESG ↔ 제품 Bridge:** FinGraph KCGS ESG와 차량 친환경성 결합
+- **리콜 전파 분석:** 동일 부품 사용 차종 자동 영향 평가
 
 ---
 
-## 13. 부록: 핵심 의사결정 로그
+## 13. 부록: 핵심 의사결정 로그 [v2.1 추가 항목]
 
 | 결정 사항 | 선택 | 대안 | 사유 |
 |---|---|---|---|
-| 그래프 DB | Neo4j | Memgraph, ArangoDB | 생태계, Cypher 표준, GDS 플러그인 |
-| 벡터 DB | Qdrant | Chroma, Weaviate, Milvus | 성능, 운영 안정성, 메타데이터 필터링 |
-| 임베딩 | BGE-M3 | KURE, multilingual-e5 | 한국어 성능 + 멀티벡터 지원 |
-| 정형 DB | PostgreSQL | MySQL, SQLite | JSONB, 확장성, 시계열 |
-| 에이전트 프레임워크 | LangGraph | LangChain Agents, LlamaIndex | 명시적 상태 관리, 디버깅 용이 |
-| LLM 추상화 | 자체 어댑터 | LiteLLM, LangChain LLM | 의존성 최소화, 도메인 제어 |
-| UI | Streamlit | Gradio, Next.js | 빠른 프로토타이핑 |
+| 포지셔닝 | "제품·부품·리콜·공급망" | "자동차 제조" | 공개 데이터 가용 범위와 일치 |
+| ER 마스터 키 | `entity_id` + `entity_type` 다형 | `vehicle_id` 단일 | 법인·차량·부품 식별 체계가 본질적으로 다름 |
+| Bridge 대상 | `corp_entity` (manufacturer + supplier) | `corp_manufacturer` (OEM만) | 부품사 Cross-Domain 가치 흡수 |
+| BOM MVP 깊이 | Level 0~4 | Level 0~6 | 공개 데이터 가용성 정직 반영 |
+| 출처 신뢰도 | A/B/C 등급 + confidence 수치 | "출처 명시"만 | 그래프 오염 정량 통제 |
+| Cross-Domain 평가 | 4단계 층화 (L1~L4) | 일률 60%+ | 난이도별 가치 명확화 |
+| 도메인 라우팅 | UI 명시적 토글 | LLM 자동 분류 | 오분류 차단 |
+| Bridge 키 | Wikidata QID 1차 + LEI + 사업자번호 | QID 단일 | 매칭 실패 완충 |
+| 그래프 계층 | 엣지 속성 (`class`, `level`) | 노드 라벨 다양화 | 쿼리 단순성 |
+| 인프라 공유 | FinGraph와 동일 컨테이너 | 별도 스택 | 운영 단순성 |
 
 ---
 
 **문서 끝.**
 
-이 PRD를 기반으로 다음 단계는:
-1. 팀 리뷰 및 합의
-2. Phase 1 (인프라) 착수 — `docker-compose.yml` 및 LLM 어댑터 인터페이스 설계 확정
-3. 각 Phase별 상세 기술 설계서 작성
+## 다음 단계
 
-추가로 보완하고 싶은 영역(예: 특정 데이터셋 상세 사양, 에이전트 라우팅 알고리즘 상세, 평가 QA 생성 방법론)이 있으면 별도 문서로 분리해서 작성 가능합니다.
+1. **`master.entities` 마이그레이션 스크립트 설계** — FinGraph `master.entity_map`의 기존 데이터를 entities 다형 구조로 무손실 이전
+2. **Bridge 자동 매칭 알고리즘 상세** — QID/LEI/business_no/fuzzy 우선순위 + confidence 산정 공식
+3. **Cross-Domain QA 10문항 seed 큐레이션** — CD-L1 4문항 + CD-L2 3문항 + CD-L3 2문항 + CD-L4 1문항
+4. **출처 신뢰도 → confidence 매핑 코드** — `src/autograph/ingestion/_confidence.py`
+5. **Validator confidence 게이트 프롬프트** — 답변 근거 엣지의 confidence 자동 점검 로직

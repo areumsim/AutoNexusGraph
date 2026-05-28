@@ -13,7 +13,11 @@
         load-wikidata load-wikipedia load-news load-graph-news \
         load-sec load-gleif load-kcgs \
         build-wiki-chunks validate-quality \
-        migrate-schema install-agent enable-langgraph trace-on trace-off
+        migrate-schema install-agent enable-langgraph trace-on trace-off \
+        ingest-auto-vpic ingest-auto-recalls ingest-auto-complaints \
+        ingest-auto-wikidata ingest-auto-all \
+        load-auto-pg load-auto-neo4j load-auto-bridge \
+        build-chunks-auto neo4j-init-auto load-auto-all eval-auto
 
 # 호스트가 Ubuntu/Debian 계열이면 `python` 없이 `python3` 만 있을 수 있음 — auto-detect.
 # 명시 지정하려면: make PYTHON=python3.11 ...
@@ -235,3 +239,56 @@ validate-quality:
 clean:
 	find . -type d -name __pycache__ -not -path './_legacy/*' -exec rm -rf {} + 2>/dev/null || true
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build dist *.egg-info
+
+
+# ──────────────────────────────────────────────────────────────
+# AutoGraph (자동차 도메인 — PRD v2.0)
+# ──────────────────────────────────────────────────────────────
+# 변수 (override 가능):
+#   MAKE   ?= HYUNDAI
+#   YEAR   ?= 2024
+#   MAKES  ?= HYUNDAI,KIA
+#   YEARS  ?= 2022-2024
+MAKE  ?= HYUNDAI
+YEAR  ?= 2024
+MAKES ?= HYUNDAI,KIA,GENESIS
+YEARS ?= 2022-2024
+
+ingest-auto-vpic:
+	$(PYTHON) -m autograph.ingestion.nhtsa_vpic --makes $(MAKES) --years $(YEARS)
+
+ingest-auto-recalls:
+	$(PYTHON) -m autograph.ingestion.nhtsa_recalls --make $(MAKE) --year $(YEAR)
+
+ingest-auto-complaints:
+	$(PYTHON) -m autograph.ingestion.nhtsa_complaints --make $(MAKE) --year $(YEAR)
+
+ingest-auto-wikidata:
+	$(PYTHON) -m autograph.ingestion.wikidata_auto --all
+
+ingest-auto-all: ingest-auto-vpic ingest-auto-wikidata ingest-auto-recalls ingest-auto-complaints
+	@echo "[autograph] ingest-auto-all done."
+
+neo4j-init-auto:
+	$(PYTHON) -m autograph.loaders.neo4j_init
+
+load-auto-pg:
+	$(PYTHON) -m autograph.loaders.load_auto_pg --source all
+
+load-auto-neo4j:
+	$(PYTHON) -m autograph.loaders.load_auto_neo4j
+
+load-auto-bridge:
+	$(PYTHON) -m autograph.loaders.load_bridge
+
+build-chunks-auto:
+	$(PYTHON) -m autograph.loaders.build_chunks_auto --source all
+
+load-auto-all: neo4j-init-auto load-auto-pg load-auto-neo4j load-auto-bridge build-chunks-auto
+	@echo "[autograph] load-auto-all done."
+
+eval-auto:
+	$(PYTHON) -m eval.runners.run_qa_eval \
+	    --gold eval/qa_gold/gold_qa_auto_v0.jsonl \
+	    --adapters hybrid \
+	    --run-id "auto_$$(date +%Y%m%d_%H%M%S)"
