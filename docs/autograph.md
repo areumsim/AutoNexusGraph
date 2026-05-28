@@ -152,6 +152,14 @@ make eval-auto
 
 ## 5. 알려진 제약 / TODO
 
+스키마는 정의돼 있지만 **MVP 적재 경로가 없는 테이블** (PRD post-MVP 항목):
+
+- `auto.spec_measurements` — `load_auto_pg.py` 가 의도적으로 비어 있음 (vPIC variants 의 unit·key 매핑 후속). 결과적으로 `get_spec / compare_vehicles / get_safety_rating` 은 현재 모두 빈 결과 반환. 에이전트가 spec 질문을 plan 해도 비어있는 응답.
+- `auto.components` — schema (`07_autograph.sql:124`) 정의는 있되 loader 없음. `list_components`, `get_suppliers_of_component`, `get_vehicles_using_component` 등 그래프 쿼리도 자연히 빈 결과. 공개 BOM 데이터 부재로 post-MVP.
+- supplier 관계 — `wikidata_auto.py --kind suppliers` 를 명시적으로 호출해야 `data/raw/auto/wikidata/suppliers.jsonl` 가 생기고 `load_bridge` 가 후보 적재. 기본 `make ingest-auto-all` 은 manufacturers 만 받음.
+
+데이터 소스 외부 의존 (코드는 있되 키/수동 단계 필요):
+
 - **NCAP / IIHS 안전 등급** — 별도 수집 미구현. `spec_measurements` 에 `safety.*` 키로 들어
   오면 `get_safety_rating()` 이 반환. (MVP 에선 비어 있을 수 있음)
 - **한국 자동차리콜센터 (car.go.kr)** — 공식 OpenAPI 미정. `data/raw/auto/car_go_kr/*.csv`
@@ -162,6 +170,11 @@ make eval-auto
   사람 검토 후 `reviewed_status='reviewed'` 로 승급해야 운영용 그래프에 사용.
 - **임베딩** — 자동차 청크의 embedding 채우기는 finance 와 동일하게 별도 `embed-chunks`
   과정 필요 (BGE-M3 서버).
+
+향후 개선 (성능):
+
+- `load_recalls / load_complaints` 가 row 마다 manufacturer/model/variant 3 단 SELECT 를 수행 (N+1). 대량 적재 시 single LEFT JOIN 로 통합 권장.
+- `nhtsa_vpic/recalls/complaints` 의 `_http_get` 이 3회 거의 동일 — `_common_nhtsa.py` 로 합칠 만함.
 
 ## 6. 회귀 안전
 

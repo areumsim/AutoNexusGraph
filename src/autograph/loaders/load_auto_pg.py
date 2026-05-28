@@ -190,19 +190,23 @@ def load_vpic(*, dry_run: bool = False) -> LoadStats:
         if all_makes.exists():
             data = json.loads(all_makes.read_text(encoding="utf-8"))
             for m in data.get("Results") or []:
+                cur.execute("SAVEPOINT sp_vpic_mfr")
                 try:
                     _ensure_manufacturer(cur,
                         manufacturer_id=int(m["Make_ID"]),
                         name=m["Make_Name"],
                         source="nhtsa_vpic",
                         source_ref=str(m["Make_ID"]))
+                    cur.execute("RELEASE SAVEPOINT sp_vpic_mfr")
                     stats.inserted += 1
                 except Exception as e:  # noqa: BLE001
+                    cur.execute("ROLLBACK TO SAVEPOINT sp_vpic_mfr")
                     stats.errors.append(f"vpic make {m.get('Make_ID')}: {e}")
 
         # 2) {make}/{year}/variants.jsonl → models + variants
         for variants_file in root.glob("*/*/variants.jsonl"):
             for row in _iter_jsonl(variants_file):
+                cur.execute("SAVEPOINT sp_vpic_var")
                 try:
                     make_id = int(row["make_id"])
                     make_name = row["make"]
@@ -229,8 +233,10 @@ def load_vpic(*, dry_run: bool = False) -> LoadStats:
                         source="nhtsa_vpic",
                         source_ref=f"{make_id}/{row.get('model_id_vpic')}/{model_year}",
                         raw=row.get("raw") or {})
+                    cur.execute("RELEASE SAVEPOINT sp_vpic_var")
                     stats.inserted += 1
                 except Exception as e:  # noqa: BLE001
+                    cur.execute("ROLLBACK TO SAVEPOINT sp_vpic_var")
                     stats.errors.append(f"vpic variant {variants_file}: {e}")
     if dry_run:
         conn.rollback()
@@ -350,6 +356,7 @@ def load_complaints(*, dry_run: bool = False) -> LoadStats:
                 stats.errors.append(f"complaints bad json {f}: {e}")
                 continue
             for r in data.get("results") or []:
+                cur.execute("SAVEPOINT sp_complaint")
                 try:
                     make_name = r.get("make") or ""
                     model_name = r.get("model") or ""
@@ -411,8 +418,10 @@ def load_complaints(*, dry_run: bool = False) -> LoadStats:
                         json.dumps(r, ensure_ascii=False, default=str),
                         model_year,
                     ))
+                    cur.execute("RELEASE SAVEPOINT sp_complaint")
                     stats.inserted += 1
                 except Exception as e:  # noqa: BLE001
+                    cur.execute("ROLLBACK TO SAVEPOINT sp_complaint")
                     stats.errors.append(f"complaint {f}: {e}")
     if dry_run:
         conn.rollback()
@@ -434,10 +443,12 @@ def load_wikidata(*, dry_run: bool = False) -> LoadStats:
     with conn.cursor() as cur:
         # manufacturers — 이름 매칭으로 QID 보강 (manufacturer_id 신규 발급 가능).
         for row in _iter_jsonl(root / "manufacturers.jsonl"):
+            cur.execute("SAVEPOINT sp_wd_mfr")
             try:
                 qid = row.get("mfr_qid")
                 name = row.get("mfrLabel")
                 if not (qid and name):
+                    cur.execute("RELEASE SAVEPOINT sp_wd_mfr")
                     continue
                 country = row.get("countryLabel")
                 cur.execute("""
@@ -460,16 +471,20 @@ def load_wikidata(*, dry_run: bool = False) -> LoadStats:
                         name=name, source="wikidata", source_ref=qid,
                         country=country, wikidata_qid=qid)
                     stats.inserted += 1
+                cur.execute("RELEASE SAVEPOINT sp_wd_mfr")
             except Exception as e:  # noqa: BLE001
+                cur.execute("ROLLBACK TO SAVEPOINT sp_wd_mfr")
                 stats.errors.append(f"wikidata mfr {row.get('mfr_qid')}: {e}")
 
         # models — manufacturer 가 매칭돼야 model 도 추가/보강.
         for row in _iter_jsonl(root / "models.jsonl"):
+            cur.execute("SAVEPOINT sp_wd_model")
             try:
                 qid = row.get("model_qid")
                 name = row.get("modelLabel")
                 mfr_name = row.get("mfrLabel")
                 if not (qid and name and mfr_name):
+                    cur.execute("RELEASE SAVEPOINT sp_wd_model")
                     continue
                 cur.execute("""
                     SELECT manufacturer_id FROM auto.master_manufacturers
@@ -486,8 +501,10 @@ def load_wikidata(*, dry_run: bool = False) -> LoadStats:
                 _ensure_model(cur,
                     manufacturer_id=mfr_id, name=name, market="GLOBAL",
                     source="wikidata", source_ref=qid, wikidata_qid=qid)
+                cur.execute("RELEASE SAVEPOINT sp_wd_model")
                 stats.inserted += 1
             except Exception as e:  # noqa: BLE001
+                cur.execute("ROLLBACK TO SAVEPOINT sp_wd_model")
                 stats.errors.append(f"wikidata model {row.get('model_qid')}: {e}")
 
         # suppliers — auto.* 에는 supplier 테이블이 없으므로 bridge.corp_entity 에 candidate 로 적재.
