@@ -509,3 +509,22 @@ load-kncap:
 
 load-manufactured-at:
 	$(PYTHON) -m autograph.loaders.load_manufactured_at
+
+# ─── 제조 공정 / 생산 — 사용자 명시 P0 ─────────────────────────
+# 산단공 합성 공정데이터 (15151075) — 수동 CSV 다운로드 → :Process 사전.
+load-sandang-processes:
+	$(PYTHON) -m autograph.loaders.load_sandang_processes
+
+load-sandang-processes-dry:
+	$(PYTHON) -m autograph.loaders.load_sandang_processes --dry-run
+
+# 팩토리온 공장등록정보 (15087611) — DATA_GO_KR_API_KEY 필요, graceful skip.
+#   make ingest-factoryon-company NAME=현대자동차
+ingest-factoryon-company:
+	$(PYTHON) -m autograph.ingestion.factoryon_registry --by-company "$(NAME)"
+
+ingest-factoryon-factory-no:
+	$(PYTHON) -m autograph.ingestion.factoryon_registry --by-factory-no "$(FNO)"
+
+ingest-factoryon-complex:
+	$(PYTHON) -m autograph.ingestion.factoryon_registry --by-industrial-complex "$(COMPLEX)"
