@@ -475,7 +475,9 @@ audit-edge-meta:
 	$(PYTHON) scripts/audit/edge_meta_invariants.py --strict
 
 audit-dod:
-	PYTHONPATH=src $(PYTHON) scripts/audit/dod_audit.py
+	# baseline 은 strategy/plugin 리팩터 commit 이후 (PRD §10.12 의도가 AST 로
+	# 영구 강제된 시점). 운영자가 별도 commit 으로 baseline 이동 원하면 env override.
+	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-4049caf} $(PYTHON) scripts/audit/dod_audit.py
 
 validate-gold-qa:
 	$(PYTHON) scripts/audit/validate_gold_qa.py eval/qa_gold/*.jsonl
