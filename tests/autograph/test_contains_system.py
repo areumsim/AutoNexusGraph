@@ -51,7 +51,7 @@ def test_list_systems_of_model_function_exists():
 
 
 def test_contains_system_in_auto_graph_whitelist():
-    """workers 의 _AUTO_GRAPH_ALLOWED 에 새 intent 등록 확인."""
-    from autonexusgraph.agents.workers import _AUTO_GRAPH_ALLOWED
-    assert "list_systems_of_model" in _AUTO_GRAPH_ALLOWED
-    assert "list_models_with_system" in _AUTO_GRAPH_ALLOWED
+    """autograph handler 의 AUTO_GRAPH_ALLOWED 에 새 intent 등록 확인."""
+    from autograph.agent_handler import AUTO_GRAPH_ALLOWED
+    assert "list_systems_of_model" in AUTO_GRAPH_ALLOWED
+    assert "list_models_with_system" in AUTO_GRAPH_ALLOWED

@@ -378,23 +378,22 @@ def _stream_with_fallback_chain(state: AgentState) -> Iterator[tuple[str, AgentS
 
 def _init_state(question: str, thread_id: str, history: list[dict] | None,
                 *, domain: str | None = None) -> AgentState:
-    """초기 state. domain 미지정 시 자동 라우터로 결정 ('finance' 기본).
+    """초기 state. domain 미지정 시 등록 라우터 검색 → 모두 None 이면 finance.
 
-    domain 라우팅 흐름 (PRD §7.5.11):
+    domain 라우팅 흐름 (PRD §7.5.11 + §10.12):
         UI/streamlit (또는 eval adapter) — domain 명시 또는 None
-            ↓ _init_state — autograph.policy.route_domain 호출 (None 일 때)
-        state["domain"] = "finance" | "auto" | "cross_domain"
-            ↓ agents/workers._toolbox_for(state)
-        해당 도메인의 tool 함수 풀 (autonexusgraph.tools / autograph.tools)
-            ↓ agents/nodes — planner/executor 가 state["domain"] 별 분기
+            ↓ _init_state — _domain_handler.auto_detect_domain 호출 (None 일 때)
+        state["domain"] = "finance" | "auto" | "cross_domain" (등록된 도메인 한정)
+            ↓ agents/workers._toolbox_for — handler.toolbox_modules() 또는 finance tools
+            ↓ agents/nodes — handler.identify_targets / plan_tasks / fallback_search
         cypher / SQL 호출
+
+    core 는 외부 도메인 패키지 (예: autograph) 를 import 하지 않는다. 외부 패키지가
+    register_handler + register_router 로 자기 자신을 등록.
     """
     if not domain:
-        try:
-            from autograph.policy import route_domain
-            domain = route_domain(question, hint=None)
-        except Exception:  # noqa: BLE001
-            domain = "finance"
+        from ._domain_handler import auto_detect_domain
+        domain = auto_detect_domain(question, hint=None)
     return {
         "thread_id": thread_id,
         "question": question,

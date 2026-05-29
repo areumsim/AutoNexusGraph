@@ -257,9 +257,9 @@ def test_cypher_templates_registered():
 
 # ── workers / planner 통합 ────────────────────────────────
 def test_investigations_in_workers_whitelist():
-    from autonexusgraph.agents.workers import _AUTO_GRAPH_ALLOWED
-    assert "list_investigations_affecting" in _AUTO_GRAPH_ALLOWED
-    assert "get_investigation_recall_chain" in _AUTO_GRAPH_ALLOWED
+    from autograph.agent_handler import AUTO_GRAPH_ALLOWED
+    assert "list_investigations_affecting" in AUTO_GRAPH_ALLOWED
+    assert "get_investigation_recall_chain" in AUTO_GRAPH_ALLOWED
 
 
 def test_planner_vehicle_recall_includes_investigations():

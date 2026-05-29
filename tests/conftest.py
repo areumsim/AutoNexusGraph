@@ -22,7 +22,9 @@ def _force_fallback_chain_for_graph_tests(request, monkeypatch):
     2. ``@pytest.mark.integration`` 마커 — 실제 LangGraph round-trip 검증 의도.
     """
     mod = request.module.__name__
-    if not any(key in mod for key in ("test_graph_smoke", "test_stream")):
+    if not any(key in mod for key in (
+        "test_graph_smoke", "test_stream", "test_domain_handler",
+    )):
         return
     if request.node.name == "test_runtime_branch_is_either_langgraph_or_fallback":
         return

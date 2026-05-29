@@ -360,11 +360,17 @@ def test_triage_multi_turn_carries_over_auto_targets(monkeypatch):
 
     1 turn: "현대 그랜저 변속기" → lookup_vehicle 이 hit → target_vehicles=[10] 저장.
     2 turn: "그 차의 리콜은?" → lookup_vehicle 매칭 0 → carry-over 로 [10] 복원.
+
+    Note: rewriter 가 "그 차" → "현대 그랜저" 로 해소하면 carry-over 가 발화하지
+    않아 본 테스트의 의도(carry-over 검증)가 무력화된다. rewriter 격리.
     """
     from autonexusgraph.agents import nodes as N
     from autonexusgraph.tools import financials as fin
     from autograph.tools import spec
     from autonexusgraph.agents import session
+
+    # rewriter 격리 — carry-over 메커니즘 단독 검증.
+    monkeypatch.setenv("FINGRAPH_QUERY_REWRITE_ENABLED", "false")
 
     monkeypatch.setattr(fin, "lookup_company", lambda *a, **kw: [])
 

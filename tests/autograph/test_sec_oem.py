@@ -362,10 +362,10 @@ def test_bridge_sec_cik_rejects_invalid_entity_type():
 
 # ── workers / planner 통합 ────────────────────────────────
 def test_workers_whitelist_includes_sec_tools():
-    from autonexusgraph.agents.workers import _AUTO_SQL_ALLOWED
-    assert "bridge_sec_cik_to_entity" in _AUTO_SQL_ALLOWED
-    assert "bridge_entity_to_sec_cik" in _AUTO_SQL_ALLOWED
-    assert "get_oem_financials_sec" in _AUTO_SQL_ALLOWED
+    from autograph.agent_handler import AUTO_SQL_ALLOWED
+    assert "bridge_sec_cik_to_entity" in AUTO_SQL_ALLOWED
+    assert "bridge_entity_to_sec_cik" in AUTO_SQL_ALLOWED
+    assert "get_oem_financials_sec" in AUTO_SQL_ALLOWED
 
 
 def test_cross_domain_planner_uses_sec_when_models_present():

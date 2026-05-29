@@ -25,41 +25,25 @@ log = logging.getLogger(__name__)
 
 
 # ── Domain-aware allowed intent + toolbox ────────────────────
-# finance 도메인 화이트리스트 (기존 그대로).
-_FIN_GRAPH_ALLOWED = {
+# finance 도메인 화이트리스트 — core 의 SSOT. auto 화이트리스트는 외부 패키지
+# (autograph) 가 자기 handler 에 보유. core 는 인지하지 않음 (PRD §10.12).
+FIN_GRAPH_ALLOWED = {
     "list_subsidiaries", "list_parents", "get_executives",
     "get_companies_of_person", "get_major_shareholders",
     "find_paths", "get_subgraph", "list_mentioning_news",
     "list_cooccurring", "list_group_members", "lookup_person",
 }
-_FIN_SQL_ALLOWED = {
+FIN_SQL_ALLOWED = {
     "lookup_company", "get_company_info", "get_revenue",
     "get_operating_income", "get_balance_sheet_item",
     "compare_companies", "list_companies_by_market",
 }
-_FIN_RESEARCH_INTENTS = {"search_documents", "search_by_metadata", "get_chunk"}
+FIN_RESEARCH_INTENTS = {"search_documents", "search_by_metadata", "get_chunk"}
 
-# auto 도메인 화이트리스트 (autograph.tools 함수명).
-_AUTO_GRAPH_ALLOWED = {
-    "lookup_vehicle_graph", "lookup_supplier",
-    "list_components", "list_systems_of_model", "list_models_with_system",
-    "list_recalls_affecting",
-    "list_investigations_affecting", "get_investigation_recall_chain",
-    "get_suppliers_of_component", "get_vehicles_using_component",
-    "find_vehicle_component_paths",
-}
-_AUTO_SQL_ALLOWED = {
-    "lookup_vehicle", "get_vehicle_info", "get_spec",
-    "compare_vehicles", "get_safety_rating",
-    # bridge 도 SQL 워커가 호출 (PG 단일 호출)
-    "bridge_corp_to_entity", "bridge_entity_to_corp",
-    "bridge_sec_cik_to_entity", "bridge_entity_to_sec_cik",
-    "get_oem_financials_sec",
-    "cross_query",
-}
-_AUTO_RESEARCH_INTENTS = {
-    "search_documents_auto", "search_by_metadata_auto", "get_chunk_auto",
-}
+# 하위호환 alias — 외부 코드가 import 하는 경우 대비.
+_FIN_GRAPH_ALLOWED = FIN_GRAPH_ALLOWED
+_FIN_SQL_ALLOWED = FIN_SQL_ALLOWED
+_FIN_RESEARCH_INTENTS = FIN_RESEARCH_INTENTS
 
 
 def _domain(state: AgentState) -> str:
@@ -67,15 +51,16 @@ def _domain(state: AgentState) -> str:
 
 
 def _toolbox_for(state: AgentState):
-    """도메인별 tool 함수 풀. cross_domain 은 finance + auto 모두 검색."""
+    """도메인별 tool 함수 풀. handler 등록 도메인은 handler.toolbox_modules,
+    그 외 (또는 finance) 는 core 의 tools 패키지만."""
+    from ._domain_handler import get_handler
     d = _domain(state)
-    if d == "auto":
-        from autograph import tools as auto_tb
-        return [auto_tb]
-    if d == "cross_domain":
-        from .. import tools as fin_tb
-        from autograph import tools as auto_tb
-        return [auto_tb, fin_tb]
+    handler = get_handler(d)
+    if handler is not None and hasattr(handler, "toolbox_modules"):
+        try:
+            return handler.toolbox_modules()
+        except Exception:   # noqa: BLE001 — handler 실패는 finance 폴백.
+            pass
     from .. import tools as fin_tb
     return [fin_tb]
 
@@ -90,25 +75,22 @@ def _resolve_tool(state: AgentState, intent: str):
 
 
 def _allowed_intents(state: AgentState, kind: str) -> set[str]:
+    """kind 별 (graph|sql|research) 화이트리스트 — handler 가 자기 분량 보유."""
+    from ._domain_handler import get_handler
     d = _domain(state)
+    handler = get_handler(d)
+    if handler is not None and hasattr(handler, "allowed_intents"):
+        try:
+            return handler.allowed_intents(kind)
+        except Exception:   # noqa: BLE001
+            pass
+    # finance 기본 화이트리스트.
     if kind == "graph":
-        if d == "auto":
-            return _AUTO_GRAPH_ALLOWED
-        if d == "cross_domain":
-            return _FIN_GRAPH_ALLOWED | _AUTO_GRAPH_ALLOWED
-        return _FIN_GRAPH_ALLOWED
+        return FIN_GRAPH_ALLOWED
     if kind == "sql":
-        if d == "auto":
-            return _AUTO_SQL_ALLOWED
-        if d == "cross_domain":
-            return _FIN_SQL_ALLOWED | _AUTO_SQL_ALLOWED
-        return _FIN_SQL_ALLOWED
+        return FIN_SQL_ALLOWED
     if kind == "research":
-        if d == "auto":
-            return _AUTO_RESEARCH_INTENTS
-        if d == "cross_domain":
-            return _FIN_RESEARCH_INTENTS | _AUTO_RESEARCH_INTENTS
-        return _FIN_RESEARCH_INTENTS
+        return FIN_RESEARCH_INTENTS
     return set()
 
 
@@ -125,29 +107,27 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
     args = dict(task.get("args") or {})
     domain = _domain(state)
 
-    # auto / cross_domain 에서 search_documents_auto 류 인텐트 호출.
-    if intent in ("search_documents_auto", "search_by_metadata_auto", "get_chunk_auto"):
+    # 도메인 handler 의 retrieve 모듈에 해당 intent 가 있으면 그쪽 위임.
+    # (autograph 의 search_documents_auto / search_by_metadata_auto / get_chunk_auto 등)
+    from ._domain_handler import get_handler
+    handler = get_handler(domain)
+    if handler is not None and hasattr(handler, "retrieve_module"):
         try:
-            from autograph.tools import retrieve as auto_retrieve
-        except ImportError as e:
-            _record(state, task, status="failed",
-                    result={"error": f"autograph.tools unavailable: {e}"})
+            retrieve_mod = handler.retrieve_module()
+        except Exception:   # noqa: BLE001
+            retrieve_mod = None
+        fn = getattr(retrieve_mod, intent, None) if retrieve_mod else None
+        if fn is not None:
+            args.setdefault("query", state.get("question_rewritten") or state.get("question", ""))
+            try:
+                out = fn(**args)
+                _record(state, task, status="done", result=out)
+                if isinstance(out, list):
+                    state.setdefault("evidence_chunks", []).extend(out)
+            except Exception as exc:   # noqa: BLE001
+                log.warning("[research:%s] %s failed: %s", domain, intent, exc)
+                _record(state, task, status="failed", result={"error": str(exc)})
             return state
-        fn = getattr(auto_retrieve, intent, None)
-        if fn is None:
-            _record(state, task, status="failed",
-                    result={"error": f"no such tool: {intent}"})
-            return state
-        args.setdefault("query", state.get("question_rewritten") or state.get("question", ""))
-        try:
-            out = fn(**args)
-            _record(state, task, status="done", result=out)
-            if isinstance(out, list):
-                state.setdefault("evidence_chunks", []).extend(out)
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[research:auto] %s failed: %s", intent, exc)
-            _record(state, task, status="failed", result={"error": str(exc)})
-        return state
 
     # finance (또는 unknown intent) — 기존 동작 보존.
     try:

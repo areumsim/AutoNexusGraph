@@ -1,9 +1,16 @@
 """PRD §10.12 — AutoNexusGraph 코어 코드 변경 < 5% 자동 측정.
 
-기준점 (baseline):
-    AutoGraph 패키지 (src/autograph) 가 처음 등장한 commit 의 직전 commit.
-    그 시점에 코어 패키지는 ``src/fingraph`` 였고 이후 ``src/autonexusgraph`` 로
-    리네임됨. 본 메트릭은 두 경로의 rename 을 감지해 누적 LOC 변경을 측정한다.
+기준점 (baseline) 결정:
+    1. 환경변수 ``CORE_DIFF_BASELINE`` 가 지정되면 그 commit (운영자 명시 우선).
+    2. 그렇지 않으면 ``src/autograph`` 가 처음 등장한 commit 의 직전 commit.
+
+baseline 1 의 의미: 어떤 stable 시점부터 누적된 의도된 변화율을 보고자 할 때.
+예: 'b1be342' (Phase B 안정화) 또는 strategy/plugin 리팩터 후 commit 등.
+
+baseline 2 의 의미: AutoGraph 도입 전체 누적 변화. 그러나 이 측정은 ``added +
+deleted`` 합산이라 ``리팩터(=churn 증가)`` 가 비교 불리. 의도("핸들러 분리로
+의존 방향 정상화") 가 만족되어도 수치는 악화 가능. 이런 경우 baseline 1 사용
+권장.
 
 측정:
     baseline_loc     = baseline 시점의 코어 패키지 .py 총 LOC
@@ -14,11 +21,13 @@
 
 CLI:
     python -m eval.metrics.core_diff
+    CORE_DIFF_BASELINE=b1be342 python -m eval.metrics.core_diff
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from typing import Any
 
@@ -38,7 +47,15 @@ def _run(cmd: list[str]) -> str:
 
 
 def _baseline_commit() -> str | None:
-    """AutoGraph 가 처음 추가된 commit 의 직전 (= 부모) commit."""
+    """env override ``CORE_DIFF_BASELINE`` 가 있으면 그것, 아니면 AutoGraph
+    첫 등장 commit 의 부모."""
+    override = os.environ.get("CORE_DIFF_BASELINE", "").strip()
+    if override:
+        try:
+            return _run(["git", "rev-parse", override])
+        except subprocess.CalledProcessError:
+            log.warning("[core_diff] CORE_DIFF_BASELINE=%r 해석 실패 — 기본값 사용",
+                        override)
     try:
         first_autograph = _run([
             "git", "log", "--reverse", "--diff-filter=A",

@@ -39,8 +39,15 @@ def _needs_rewrite(question: str, history: Sequence[dict]) -> bool:
         return False
     if _DEMO_RE.search(question):
         return True
-    # 매우 짧은 follow-up — coreference 가능성 높음
-    if len(question.strip()) < 10 and len(history) > 0:
+    # 단음절 stop-question ("왜?", "그래서?") — 명시적 리스트.
+    stripped = question.strip().rstrip("?!.")
+    if stripped in {"왜", "어떻게", "그래서", "그러면", "그럼", "그건", "뭐", "어때"}:
+        return True
+    # 단일 명사 + 주격/목적격 조사로 끝나는 follow-up ("매출은?", "직원은?").
+    # 명시적 subject 없이 이전 turn 의 주체를 묵시 참조 → rewriter 가 보강.
+    # ``현대차 자회사는?`` 같이 단어가 2개 이상이면 자립 질문으로 간주 — 발화 X.
+    tokens = stripped.split()
+    if len(tokens) == 1 and tokens[0].endswith(("은", "는", "이", "가", "을", "를")):
         return True
     return False
 

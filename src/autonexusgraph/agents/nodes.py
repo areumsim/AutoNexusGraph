@@ -134,35 +134,31 @@ def triage_node(state: AgentState) -> AgentState:
 
     state["target_companies"] = targets
 
-    # ── AutoGraph 도메인 entity 식별 (B17 fix) ────────────────
-    # auto / cross_domain 일 때 question 단어 단위 lookup_vehicle 로 target_vehicles /
-    # target_models / target_makes 를 채운다. 이게 없으면 plan_auto_tasks 의
-    # vehicle_spec/recall/supply_chain/compare 분기가 빈 루프로 끝남.
+    # ── 도메인 entity 식별 — 등록된 handler 에 위임 (PRD §10.12) ──
+    # finance 외 도메인 (auto/cross_domain) 의 entity 식별은 외부 패키지(autograph)
+    # 가 _domain_handler 에 등록한 handler.identify_targets 가 처리. core 는 외부
+    # 패키지를 알지 못함. 미등록 도메인은 finance 만 진행.
+    from ._domain_handler import get_handler
     domain = str(state.get("domain") or "finance").lower()
-    if domain in ("auto", "cross_domain"):
+    handler = get_handler(domain)
+    if handler is not None and hasattr(handler, "identify_targets"):
         try:
-            from autograph.policy import identify_auto_targets
-            identify_auto_targets(state, question=q)
-        except ImportError as exc:
-            log.warning("[triage:auto] autograph 패키지 미설치 — auto 도메인 fallback 으로 finance 처리됨: %s", exc)
-            state.setdefault("safety_signals", []).append(
-                f"autograph_import_failed:{type(exc).__name__}"
-            )
+            handler.identify_targets(state, question=q)
         except Exception as exc:   # noqa: BLE001
-            log.warning("[triage:auto] identify failed: %s", exc)
+            log.warning("[triage:%s] handler.identify_targets failed: %s",
+                        domain, exc)
             state.setdefault("safety_signals", []).append(
-                f"auto_identify_failed:{type(exc).__name__}"
+                f"{domain}_identify_failed:{type(exc).__name__}"
             )
 
-        # auto 도메인 session carry-over — 이번 turn 에서 매칭 0 인데 이전 turn 에
-        # 차종이 있었으면 borrow (PRD §7.6.2 multi-turn 보존).
-        # prev 는 finance 분기에서 이미 session.get 으로 한 번 가져왔음 (재호출 불필요).
+        # 도메인 entity (vehicle/model/make) session carry-over — handler 가
+        # 채우지 못한 경우 이전 turn 의 값을 빌림 (PRD §7.6.2).
         if prev:
             if not (state.get("target_vehicles") or []) and prev.target_vehicles:
                 state["target_vehicles"] = list(prev.target_vehicles)
                 state["session_carryover"] = True
-                log.info("[triage:auto] carry-over target_vehicles: %s",
-                         state["target_vehicles"])
+                log.info("[triage:%s] carry-over target_vehicles: %s",
+                         domain, state["target_vehicles"])
             if not (state.get("target_models") or []) and prev.target_models:
                 state["target_models"] = list(prev.target_models)
                 state["session_carryover"] = True
@@ -208,67 +204,31 @@ def planner_node(state: AgentState) -> AgentState:
     year_hint = extract_year_hint(state.get("question_rewritten") or state.get("question", ""))
     q = state.get("question_rewritten") or state.get("question", "")
 
-    # ── 도메인 분기 — auto / cross_domain 은 autograph.policy 로 위임 ──
+    # ── 도메인 분기 — 등록 handler 에 plan 위임 (PRD §10.12) ─────────
+    # finance 외 도메인은 외부 패키지가 등록한 handler.plan_tasks 가 task list 반환.
+    # core 는 어떤 도메인이 있는지 알지 못함. autograph 미설치 시 등록 0건 → 아래
+    # finance 룰 기반 planner 로 자연 폴백.
+    from ._domain_handler import get_handler
     domain = str(state.get("domain") or "finance").lower()
-    if domain == "auto":
+    handler = get_handler(domain)
+    if handler is not None and hasattr(handler, "plan_tasks"):
         try:
-            from autograph.policy import plan_auto_tasks
-            tasks = plan_auto_tasks(
-                question=q,
-                target_vehicles=state.get("target_vehicles") or [],
-                target_models=state.get("target_models") or [],
-                target_makes=state.get("target_makes") or [],
-            )
-            state["tasks"] = tasks
-            state["task_results"] = {}
-            state["plan"] = [{"tool": t["intent"], "args": t["args"],
-                              "purpose": f"{t['agent']}:{t['intent']}"} for t in tasks]
-            log.info("[planner:auto] tasks=%d", len(tasks))
-        except ImportError as exc:
-            log.warning("[planner:auto] autograph 패키지 미설치: %s", exc)
+            tasks = handler.plan_tasks(state, question=q)
+        except Exception as exc:   # noqa: BLE001
+            log.warning("[planner:%s] handler.plan_tasks failed: %s", domain, exc)
             state.setdefault("safety_signals", []).append(
-                f"autograph_import_failed:{type(exc).__name__}"
+                f"{domain}_plan_failed:{type(exc).__name__}"
             )
-            state["tasks"] = []
-            state["plan"] = []
-        except Exception as exc:  # noqa: BLE001
-            log.warning("[planner:auto] failed — fallback to research: %s", exc)
-            state.setdefault("safety_signals", []).append(
-                f"auto_plan_failed:{type(exc).__name__}"
-            )
-            state["tasks"] = []
-            state["plan"] = []
-        return _planner_cost_gate(state, kind, targets, len(state.get("tasks") or []))
-    if domain == "cross_domain":
-        try:
-            from autograph.policy import plan_cross_domain_tasks
-            tasks = plan_cross_domain_tasks(
-                question=q,
-                target_companies=targets,
-                target_makes=state.get("target_makes") or [],
-                target_models=state.get("target_models") or [],
-                target_vehicles=state.get("target_vehicles") or [],
-            )
-            state["tasks"] = tasks
-            state["task_results"] = {}
-            state["plan"] = [{"tool": t["intent"], "args": t["args"],
-                              "purpose": f"{t['agent']}:{t['intent']}"} for t in tasks]
-            log.info("[planner:cross_domain] tasks=%d", len(tasks))
-        except ImportError as exc:
-            log.warning("[planner:cross_domain] autograph 패키지 미설치: %s", exc)
-            state.setdefault("safety_signals", []).append(
-                f"autograph_import_failed:{type(exc).__name__}"
-            )
-            state["tasks"] = []
-            state["plan"] = []
-        except Exception as exc:  # noqa: BLE001
-            log.warning("[planner:cross_domain] failed: %s", exc)
-            state.setdefault("safety_signals", []).append(
-                f"cross_domain_plan_failed:{type(exc).__name__}"
-            )
-            state["tasks"] = []
-            state["plan"] = []
-        return _planner_cost_gate(state, kind, targets, len(state.get("tasks") or []))
+            tasks = []
+        state["tasks"] = tasks or []
+        state["task_results"] = {}
+        state["plan"] = [
+            {"tool": t["intent"], "args": t["args"],
+             "purpose": f"{t['agent']}:{t['intent']}"}
+            for t in (tasks or [])
+        ]
+        log.info("[planner:%s] tasks=%d", domain, len(state["tasks"]))
+        return _planner_cost_gate(state, kind, targets, len(state["tasks"]))
 
     tasks: list[dict] = []
     tid = 0
@@ -490,44 +450,33 @@ def executor_node(state: AgentState) -> AgentState:
 
     # ── Fallback recovery (흡수: _legacy/v1 similar_hints 핵심) ────────────
     # 모든 도구가 빈 결과만 반환했고 검색이 안 돌았으면, 일반 retrieve 시도 → 사용자에게
-    # "정보 부족" 만 보내는 대신 회복 경로 제공. 도메인 인식 (B20 fix):
-    #   - auto / cross_domain → autograph.tools.search_documents_auto
-    #     (manufacturer_id 메타로 finance 청크 제외 + nhtsa_* sources 한정)
-    #   - finance (default) → autonexusgraph.tools.search_documents (corp_code 키)
+    # "정보 부족" 만 보내는 대신 회복 경로 제공. 도메인 인식:
+    #   - 등록된 handler 가 있으면 handler.fallback_search 로 (tool, fn, args) 제공
+    #   - 그렇지 않으면 (또는 handler 가 None 반환) finance 기본 search_documents
     if state.get("aborted_reason") != "turn_budget":
         all_empty = all(not (r.get("result")) for r in results) if results else True
         searched_tools = {"search_documents", "search_documents_auto"}
         already_searched = any(r["tool"] in searched_tools for r in results)
         if all_empty and not already_searched and state.get("question"):
+            from ._domain_handler import get_handler
             domain = str(state.get("domain") or "finance").lower()
             q_text = state.get("question_rewritten") or state["question"]
             fb_tool: str | None = None
             fb_fn = None
             fb_args: dict = {}
-            if domain in ("auto", "cross_domain"):
+            handler = get_handler(domain)
+            if handler is not None and hasattr(handler, "fallback_search"):
                 try:
-                    from autograph.tools import search_documents_auto as _auto_search
-                    fb_tool = "search_documents_auto"
-                    fb_fn = _auto_search
-                    mids = state.get("target_makes") or []
-                    fb_args = {
-                        "query": q_text,
-                        "top_k": 6,
-                        # manufacturer_id 는 정수 list 필요 — target_models 의
-                        # 모델 id 보다 manufacturer 단위가 더 fallback-friendly.
-                        # state 에 manufacturer_id 가 따로 없으니 안전하게 미지정.
-                    }
-                    # 좁혀줄 수 있는 model_id 가 있으면 활용.
-                    if state.get("target_models"):
-                        fb_args["model_id"] = state["target_models"][0] if \
-                            len(state["target_models"]) == 1 else state["target_models"]
-                    log.info("[executor] all empty → fallback search_documents_auto "
-                             "(domain=%s, models=%s)", domain,
-                             state.get("target_models") or [])
+                    fb = handler.fallback_search(state, query=q_text)
                 except Exception as e:   # noqa: BLE001
-                    log.warning("[executor] auto fallback unavailable: %s", e)
-                    fb_fn = None
-            if fb_fn is None:   # finance 또는 auto import 실패 시 finance retrieve
+                    log.warning("[executor:%s] handler.fallback_search 실패: %s",
+                                domain, e)
+                    fb = None
+                if fb is not None:
+                    fb_tool, fb_fn, fb_args = fb
+                    log.info("[executor:%s] fallback via handler — tool=%s",
+                             domain, fb_tool)
+            if fb_fn is None:   # handler 미등록 or None 반환 → finance 기본
                 fb_tool = "search_documents"
                 fb_fn = getattr(toolbox, "search_documents", None)
                 targets = state.get("target_companies") or []
@@ -615,6 +564,14 @@ def synthesizer_node(state: AgentState,
         {"role": "user", "content": context},
     ]
 
+    # synth 호출 상태를 state["synth_status"] 에 구조화 보존 — adapter / eval
+    # 이 LLM 실패 여부를 즉시 알 수 있게 한다 (silent skip 방지). status 형식:
+    #   {"ok": bool, "error_type": str|None, "error": str|None, "llm_called": bool,
+    #    "fallback_used": "budget"|"exception"|None}
+    state["synth_status"] = {
+        "ok": False, "error_type": None, "error": None,
+        "llm_called": False, "fallback_used": None,
+    }
     try:
         from ..llm.base import get_llm_client
         from ..llm.budget_aware import budget_aware_client
@@ -632,7 +589,17 @@ def synthesizer_node(state: AgentState,
                            purpose="synthesize")
         state["answer"] = resp.content
         state["llm_usage_usd"] = float(state.get("llm_usage_usd") or 0.0) + resp.usage.cost_usd
-    except BudgetExceeded:
+        # 토큰 사용량도 누적 — eval adapter 의 tokens_used 측정용.
+        try:
+            tok = int(getattr(resp.usage, "total_tokens", 0) or 0)
+            state["llm_tokens_used"] = int(state.get("llm_tokens_used") or 0) + tok
+        except (TypeError, ValueError):
+            pass
+        state["synth_status"] = {
+            "ok": True, "error_type": None, "error": None,
+            "llm_called": True, "fallback_used": None,
+        }
+    except BudgetExceeded as e:
         # 비용 한도 도달 — 결정적 brief 로 fallback (LLM 안 부름)
         from .answering import build_deterministic_brief
         state["answer"] = (
@@ -640,13 +607,22 @@ def synthesizer_node(state: AgentState,
             + build_deterministic_brief(state)
         )
         state["aborted_reason"] = "synth_budget"
-    except Exception as e:
-        log.warning(f"[synth] LLM failed: {e}")
+        state["synth_status"] = {
+            "ok": False, "error_type": "BudgetExceeded", "error": str(e),
+            "llm_called": False, "fallback_used": "budget",
+        }
+    except Exception as e:    # noqa: BLE001
+        # fail-soft 유지 (eval 진행 보장) — 단, 실패 정보를 state 에 명시.
+        log.warning("[synth] LLM failed: %s: %s", type(e).__name__, e)
         from .answering import build_deterministic_brief
         state["answer"] = (
             f"[LLM 합성 실패: {type(e).__name__} — 결정적 brief]\n\n"
             + build_deterministic_brief(state)
         )
+        state["synth_status"] = {
+            "ok": False, "error_type": type(e).__name__, "error": str(e),
+            "llm_called": False, "fallback_used": "exception",
+        }
 
     # citations 추출
     cits: list[dict] = []
