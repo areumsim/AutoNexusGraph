@@ -55,7 +55,7 @@
 
 ## 2. 핵심 특징
 
-- **멀티도메인** — `finance` + `auto` + `cross_domain` 3 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain`). 단일 에이전트가 두 도메인 + 둘의 교차 추론을 한 turn 안에 처리
+- **멀티도메인** — `finance` + `auto` + `cross_domain` 3 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain`). 단일 에이전트가 두 도메인 + 둘의 교차 추론을 한 turn 안에 처리. core 는 외부 도메인 패키지를 직접 import 하지 않고 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`) 를 기반으로 첫 호출 시 1회 soft-import — finance-only 환경에서는 ENV 를 빈 값으로 두면 됨
 - **금융 도메인** — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100 대상
 - **자동차 도메인** — NHTSA vPIC/Recalls/Complaints / Wikidata (manufacturers/models/suppliers) / (옵션) car.go.kr / KATRI / KNCAP / 한국교통안전공단 수리검사. BOM Level 0~5 — Manufacturer → Model → Variant → System(L3) → Module(L4) → Part(L5, 리콜·LLM 출처에서 부분 커버). Level 6(소재·공법)은 PRD non-goal
 - **3-Store 하이브리드** — Neo4j(관계) + PostgreSQL(수치·메타·벡터) + (옵션) Qdrant — 청크 100만 이하는 pgvector 통합 운영
@@ -85,7 +85,7 @@
 ├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS 클라이언트
 ├─ Loaders            : PG/Neo4j 멱등 적재 (P1 deterministic / P2 deterministic / P3 LLM / P4 cross-validate)
 ├─ Tools              : 사전 정의 함수 풀 (financials/graph/retrieve) — 자유 SQL/Cypher 금지
-├─ Safety             : prompt_safety (XML escape + injection 감지) · cypher_guard (READ-ONLY) · language_guard
+├─ Safety             : prompt_safety (XML escape + injection 감지 + high-risk 단발 차단) · cypher_guard (READ-ONLY + APOC write/dynamic-cypher procedure 블록) · language_guard
 ├─ Agents (LangGraph) : Triage → Planner(DAG) → Supervisor ↔ Workers(병렬: research/graph/sql/calculator)
 │                       → Synthesizer → Validator (replan ≤ 2, tasks/result 자동 리셋)
 │                       · Send API 병렬 디스패치 · 세션 메모리 (thread별 TTL/LRU)
@@ -245,7 +245,7 @@ make audit-dod            # 14항 트래픽라이트 종합 리포트
 | 3. 청킹·임베딩·그래프 1차 | ✅ | vec.chunks 748K, Neo4j 12K Company / 14K Person |
 | 3.5 데이터 통합·정합성 | ✅ | entity_map 1.9K, Wikidata/Wikipedia/GLEIF/SEC/뉴스/KCGS 통합, ER 마스터 |
 | 4. RAG 도구 + 에이전트 + UI | ✅ | tools/financials·graph·retrieve, agent 4-node + answering brief + grounding, FastAPI /chat, Streamlit UI |
-| 4.1 v1/v2 안전 자산 흡수 + Validator·Replan | ✅ | temporal_normalizer, prompt_safety, cypher_guard, language_guard, query_rewriter (coreference), validator + replan loop (max 2), UI title 자동 요약 + 피드백 버튼 |
+| 4.1 v1/v2 안전 자산 흡수 + Validator·Replan | ✅ | temporal_normalizer, prompt_safety (high-risk injection 단발 차단 + 저신뢰 신호 텔레메트리; `tests/test_safety.py::test_high_risk_injection_*` + `tests/test_triage_interrupt.py::test_prompt_injection_short_circuits_triage`), cypher_guard (READ-ONLY + APOC write/dynamic-cypher procedure 블록; `tests/test_safety.py::test_assert_read_only_blocks_write_procedures`), language_guard, query_rewriter (coreference), validator + replan loop (max 2), UI title 자동 요약 + 피드백 버튼 |
 | 4.2 LangGraph StateGraph + 세션 메모리 + Fallback recovery | ✅ | 실제 StateGraph + PG/Memory checkpointer, thread별 entity TTL 메모리 (carry-over), executor 빈 결과 시 search_documents 자동 회복 |
 | 4.3 LangGraph 활성화 + Streaming + Tracing | ✅ | `[agent]` extra(langfuse + langsmith), DSN 우선순위 정합성, `chat` 스키마 search_path 주입, `run_agent_stream()` + FastAPI `/chat/stream` SSE, Streamlit `st.status` node progress, tracing fail-soft |
 | 4.4 Multi-Agent 분리 (Supervisor + 4 Worker) + Send API 병렬 | ✅ | Planner→DAG (PRD §7.5.3), Supervisor (의존성·순환검증·budget guard), Research/Graph/SQL/Calculator worker (PRD §7.5.2), langgraph Send 병렬 디스패치 (PRD §7.5.7), Calculator numexpr 안전 evaluator (sandbox 별도) |
@@ -285,6 +285,8 @@ make audit-dod            # 14항 트래픽라이트 종합 리포트
 ## 10. 문서
 
 - [PRD.md](./PRD.md) — 전체 요구사항·아키텍처 정의 (AutoGraph v2.1 통합)
+- [docs/mental_model.md](./docs/mental_model.md) — **멘탈 모델 / 아키텍처 / 트레이드오프 / 열린 질문** (확정·잠정·미정 라벨, 새 합류자 진입 지도)
+- [docs/learning_guide.md](./docs/learning_guide.md) — **학습 가이드 (Day 0~7)** — 단계별 실습·자가점검·졸업 시험
 - [docs/autograph.md](./docs/autograph.md) — **AutoGraph 도메인 전용** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약)
 - [docs/operations/docker_setup.md](./docs/operations/docker_setup.md) — Docker 스택 가이드
 - [docs/operations/data_pipeline.md](./docs/operations/data_pipeline.md) — 3-tier 멱등 파이프라인 + Step DAG + 4-pass 추출 + LangGraph 활성화

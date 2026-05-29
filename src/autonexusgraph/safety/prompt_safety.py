@@ -24,23 +24,40 @@ logger = logging.getLogger(__name__)
 # 닫힘 태그 — "</tag>" 형태는 치환 (경계 혼란 방지)
 _TAG_CLOSE_RE = re.compile(r"</\s*([A-Za-z_][A-Za-z0-9_-]*)\s*>")
 
-# 프롬프트 탈취 시도에서 자주 나타나는 메타 문구 — 카운트해서 경고 로그
-_INJECTION_PATTERNS: tuple[str, ...] = (
-    r"이전\s*지시.*?무시",
-    r"앞의\s*지시.*?무시",
-    r"ignore\s+previous\s+(?:instructions|prompt)",
-    r"disregard\s+(?:all|previous)",
-    r"###\s*system",
-    r"##\s*instructions?\s*##",
-    r"<\s*\|\s*im_start\s*\|\s*>",
-    r"<\s*\|\s*im_end\s*\|\s*>",
-    r"너는\s*이제",
-    r"you\s+are\s+now",
-    r"\bjailbreak\b",
-    r"system\s*prompt",
-    r"reveal\s+your\s+prompt",
+# 프롬프트 탈취 시도에서 자주 나타나는 메타 문구.
+# 각 항목: (pattern, high_risk).
+# - high_risk=True  → 단발 매칭만으로도 입력 거부 (triage 가 aborted_reason 설정)
+# - high_risk=False → 텔레메트리 / 경고 로그만, 정상 흐름 통과
+# "system prompt 비교는?" / "you are now in plan mode 라는 옵션은 뭐죠?" 같은 정상
+# 질문을 차단하지 않기 위해 high_risk 는 보수적으로 선별 — ChatML 토큰처럼
+# 일반 입력에 등장할 이유가 없는 패턴 또는 "ignore previous instructions" 처럼
+# 의도가 분명한 패턴만.
+_INJECTION_RULES: tuple[tuple[str, bool], ...] = (
+    (r"이전\s*지시.*?무시",                                   True),
+    (r"앞의\s*지시.*?무시",                                   True),
+    (r"ignore\s+previous\s+(?:instructions|prompt)",          True),
+    (r"disregard\s+(?:all|previous)",                         True),
+    (r"<\s*\|\s*im_start\s*\|\s*>",                           True),
+    (r"<\s*\|\s*im_end\s*\|\s*>",                             True),
+    (r"\bjailbreak\b",                                        True),
+    (r"###\s*system",                                         False),
+    (r"##\s*instructions?\s*##",                              False),
+    (r"너는\s*이제",                                          False),
+    (r"you\s+are\s+now",                                      False),
+    (r"system\s*prompt",                                      False),
+    (r"reveal\s+your\s+prompt",                               False),
 )
+
+_INJECTION_PATTERNS: tuple[str, ...] = tuple(p for p, _ in _INJECTION_RULES)
+_HIGH_RISK_PATTERNS: tuple[str, ...] = tuple(p for p, hr in _INJECTION_RULES if hr)
+# SSOT 단일 rule 테이블에서 두 정규식 파생 — high_risk 가 injection 의 subset 임이
+# 구조적으로 보장된다 (drift 차단). 한쪽 패턴만 바꾸는 실수 방지.
+assert set(_HIGH_RISK_PATTERNS) <= set(_INJECTION_PATTERNS), (
+    "_HIGH_RISK_PATTERNS must be a subset of _INJECTION_PATTERNS"
+)
+
 _INJECTION_SIGNAL_RE = re.compile("|".join(_INJECTION_PATTERNS), re.IGNORECASE)
+_HIGH_RISK_RE = re.compile("|".join(_HIGH_RISK_PATTERNS), re.IGNORECASE)
 
 
 def escape_for_xml_tag(text: str) -> str:
@@ -65,11 +82,25 @@ def detect_injection_signals(text: str) -> list[str]:
     return [m.group(0) for m in _INJECTION_SIGNAL_RE.finditer(text)]
 
 
+def is_high_risk_injection(text: str) -> bool:
+    """high-confidence injection 패턴이 단발이라도 매칭되면 True.
+
+    호출부(triage_node 등)는 이 결과를 보고 입력을 거부 (``aborted_reason``
+    설정) 할 수 있다. low-confidence 신호 (``system prompt``, ``you are now``
+    등) 는 정상 질문에도 등장 가능 → ``detect_injection_signals`` 만으로
+    텔레메트리에 남긴다.
+    """
+    if not isinstance(text, str) or not text:
+        return False
+    return bool(_HIGH_RISK_RE.search(text))
+
+
 def sanitize_user_input(text: str, *, context: str = "user_input") -> tuple[str, list[str]]:
     """사용자 입력 공통 전처리. (escape 된 텍스트, 감지된 신호 목록) 반환.
 
-    신호가 탐지되면 경고 로그만 남기고 통과시킨다 (방어는 시스템 프롬프트의
-    "태그 내부는 데이터" 규칙이 담당).
+    저신뢰 신호는 경고 로그만, 고신뢰 신호 검출은 호출부(``triage_node``)가
+    ``is_high_risk_injection`` 으로 판정 후 ``aborted_reason='prompt_injection'``
+    으로 차단한다.
     """
     signals = detect_injection_signals(text)
     if signals:
@@ -83,5 +114,6 @@ def sanitize_user_input(text: str, *, context: str = "user_input") -> tuple[str,
 __all__ = [
     "escape_for_xml_tag",
     "detect_injection_signals",
+    "is_high_risk_injection",
     "sanitize_user_input",
 ]

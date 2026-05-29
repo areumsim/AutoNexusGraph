@@ -131,3 +131,85 @@ def test_numbers_from_tool_results():
     ])
     assert "1234567890" in nums
     assert "9876543210" in nums
+
+
+# ── PRD §6.7 / §7.0 confidence 게이트 ────────────────────────────
+def test_confidence_gate_all_low_fails():
+    """그래프 결과의 모든 엣지 confidence 가 임계값 미만이면 hard fail."""
+    s = _base_state(
+        "현대모비스가 공급하는 모듈은 배터리팩입니다. [출처: graph]",
+        tool_results=[{
+            "tool": "list_components",
+            "result": [
+                {"name": "배터리팩", "confidence": 0.3, "validated_status": "candidate"},
+                {"name": "ECU",       "confidence": 0.4, "validated_status": "candidate"},
+            ],
+        }],
+    )
+    out = validator_node(s)
+    assert out["validation_status"] == "failed"
+    assert any("low_confidence_edges_only" in i for i in out["validation_issues"])
+
+
+def test_confidence_gate_mixed_is_soft_warning():
+    """일부만 임계값 미만이면 soft warning — passed."""
+    s = _base_state(
+        "현대모비스가 공급하는 모듈은 배터리팩입니다. [출처: graph]",
+        tool_results=[{
+            "tool": "list_components",
+            "result": [
+                {"name": "배터리팩", "confidence": 0.95, "validated_status": "validated"},
+                {"name": "ECU",       "confidence": 0.3,  "validated_status": "candidate"},
+            ],
+        }],
+    )
+    out = validator_node(s)
+    assert out["validation_status"] == "passed"
+    assert any("low_confidence_edges_mixed" in i for i in out["validation_issues"])
+
+
+def test_confidence_gate_all_high_no_issue():
+    """모든 엣지가 임계값 이상이면 issue 없음."""
+    s = _base_state(
+        "현대모비스가 공급하는 모듈은 배터리팩입니다. [출처: graph]",
+        tool_results=[{
+            "tool": "list_components",
+            "result": [
+                {"name": "배터리팩", "confidence": 0.95, "validated_status": "validated"},
+                {"name": "ECU",       "confidence": 0.85, "validated_status": "validated"},
+            ],
+        }],
+    )
+    out = validator_node(s)
+    assert out["validation_status"] == "passed"
+    assert not any("low_confidence_edges" in i for i in out["validation_issues"])
+
+
+def test_confidence_gate_finance_results_skip():
+    """confidence 컬럼이 없는 finance SQL 결과는 검사 대상 아님."""
+    s = _base_state(
+        "삼성전자의 2023년 매출은 258조 9,355억원입니다. [출처: 00126380, 2023]",
+        tool_results=[{"tool": "get_revenue",
+                       "result": [{"value": "258,935,500,000,000", "year": 2023}]}],
+        evidence_chunks=[{"text": "매출 258,935,500,000,000 원"}],
+    )
+    out = validator_node(s)
+    assert out["validation_status"] == "passed"
+    assert not any("low_confidence_edges" in i for i in out["validation_issues"])
+
+
+def test_confidence_gate_handles_confidence_score_alias():
+    """일부 템플릿은 ``confidence_score`` 키를 노출 — 같이 검사돼야 함."""
+    s = _base_state(
+        "공급 관계 정보입니다. [출처: graph]",
+        tool_results=[{
+            "tool": "get_suppliers_of_component",
+            "result": [
+                {"supplier": "LG에너지솔루션", "confidence_score": 0.45},
+                {"supplier": "삼성SDI",        "confidence_score": 0.40},
+            ],
+        }],
+    )
+    out = validator_node(s)
+    assert out["validation_status"] == "failed"
+    assert any("low_confidence_edges_only" in i for i in out["validation_issues"])

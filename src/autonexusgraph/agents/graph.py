@@ -389,7 +389,9 @@ def _init_state(question: str, thread_id: str, history: list[dict] | None,
         cypher / SQL 호출
 
     core 는 외부 도메인 패키지 (예: autograph) 를 import 하지 않는다. 외부 패키지가
-    register_handler + register_router 로 자기 자신을 등록.
+    register_handler + register_router 로 자기 자신을 등록. 외부 패키지의 자동
+    적재는 ``_domain_handler.discover_plugins()`` 가 ENV
+    ``AUTONEXUSGRAPH_DOMAIN_PLUGINS`` (csv, 기본 'autograph') 를 기반으로 처리.
     """
     if not domain:
         from ._domain_handler import auto_detect_domain

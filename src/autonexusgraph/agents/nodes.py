@@ -33,7 +33,7 @@ def triage_node(state: AgentState) -> AgentState:
     """질문 유형 분류 + 1차 회사 식별 + 상대 시간 정규화."""
     from ..tools.financials import lookup_company as lookup_pg
 
-    from ..safety import sanitize_user_input
+    from ..safety import is_high_risk_injection, sanitize_user_input
     from .rewriter import rewrite_query
 
     raw_q = state.get("question", "")
@@ -41,6 +41,18 @@ def triage_node(state: AgentState) -> AgentState:
     safe_q, signals = sanitize_user_input(raw_q, context="agent_input")
     if signals:
         state["safety_signals"] = signals
+    # 1-a) high-confidence 신호 (jailbreak / ignore previous / <|im_start|> 등) 가 단발이라도
+    #      매칭되면 입력 거부 — planner/lookup/handler 호출 전에 short-circuit. synthesizer
+    #      가 ``aborted_reason='prompt_injection'`` 분기로 결정적 거부 답변 생성.
+    if is_high_risk_injection(raw_q):
+        state["aborted_reason"] = "prompt_injection"
+        state["question_kind"] = "unknown"
+        state["target_companies"] = []
+        state["tasks"] = []
+        state["plan"] = []
+        log.warning("[triage] prompt-injection 차단 — high-risk 신호: %s",
+                    sorted({s.lower()[:40] for s in signals})[:3])
+        return state
     q = safe_q
     # 2) 멀티턴 coreference 해소 — "그 중", "위 회사들" → 이전 turn 의 entity 풀어쓰기
     history = state.get("history") or []
@@ -198,6 +210,14 @@ def planner_node(state: AgentState) -> AgentState:
     여전히 ``state["plan"]`` (flat list) 도 채워서 executor 폴백 호환.
     """
     from .dag import make_task
+
+    # triage 가 입력 거부를 결정 (prompt_injection 등) — task 생성 건너뛰고
+    # synthesizer 가 결정적 거부 답변을 생성하도록 위임.
+    if state.get("aborted_reason") == "prompt_injection":
+        state["tasks"] = []
+        state["task_results"] = {}
+        state["plan"] = []
+        return state
 
     kind = state.get("question_kind") or "unknown"
     targets = state.get("target_companies") or []
@@ -534,6 +554,15 @@ def synthesizer_node(state: AgentState,
         )
         state["citations"] = []
         state["grounding"] = {"ok": False, "warnings": ["cost_rejected"]}
+        return state
+    if abort == "prompt_injection":
+        # triage 가 high-risk 인젝션 패턴을 감지 — LLM 비호출, 결정적 거부 답변.
+        state["answer"] = (
+            "입력에서 프롬프트 탈취 시도 패턴이 감지되어 답변을 거부했습니다. "
+            "질문을 정상 형식으로 다시 작성해주세요."
+        )
+        state["citations"] = []
+        state["grounding"] = {"ok": False, "warnings": ["prompt_injection"]}
         return state
 
     # Pre-synth number guard (PRD §7.3) — 화이트리스트 + evidence 라벨링

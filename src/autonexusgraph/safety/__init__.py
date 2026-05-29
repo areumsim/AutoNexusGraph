@@ -14,6 +14,7 @@ PRD §7.5.11 (보안):
 from .prompt_safety import (
     detect_injection_signals,
     escape_for_xml_tag,
+    is_high_risk_injection,
     sanitize_user_input,
 )
 from .cypher_guard import (
@@ -27,6 +28,7 @@ from .language_guard import check_korean, korean_char_ratio
 __all__ = [
     "detect_injection_signals",
     "escape_for_xml_tag",
+    "is_high_risk_injection",
     "sanitize_user_input",
     "CypherGuardError",
     "assert_read_only",

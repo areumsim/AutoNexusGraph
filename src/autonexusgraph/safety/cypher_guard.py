@@ -4,9 +4,23 @@ PRD §7.5.9 — 자유 Cypher 생성 금지, 템플릿 + 파라미터만 허용.
 LLM 이 만든 Cypher 라도 실행 직전 정적 검사로 쓰기/위험 CALL 차단.
 
 가드 정책 (READ-ONLY 강제):
-    * 쓰기 키워드: CREATE / MERGE / DELETE / DETACH / SET / REMOVE / LOAD CSV
-    * 위험 CALL: apoc.periodic.*, apoc.trigger.*, dbms.security.*, gds.graph.*,
-      db.index.fulltext.createNodeIndex (write-only)
+    * 쓰기 키워드: CREATE / MERGE / DELETE / DETACH / SET / REMOVE / LOAD CSV / DROP
+    * 위험 CALL — 쓰기/스키마/관리 procedure:
+      - apoc.periodic.*, apoc.trigger.*, apoc.export.*, apoc.import.*, apoc.load.*
+      - apoc.refactor.*  (관계/노드 재배치 — 실제 write)
+      - apoc.merge.*     (노드/관계 생성)
+      - apoc.create.*    (createUUIDs 같은 read-only 도 있으나 보수적으로 차단)
+      - apoc.atomic.*    (atomic.add / subtract — 속성 in-place 갱신)
+      - apoc.cypher.*    (run / runWrite / doIt — 임의 Cypher 동적 실행 = 가드 우회)
+      - apoc.lock.*      (트랜잭션 lock 획득 — read 흐름과 무관)
+      - apoc.schema.*    (assert / drop — 스키마 변경)
+      - apoc.nodes.link / connect / delete / collapse
+      - apoc.do.*        (절차 안에서 쓰기 호출 가능)
+      - dbms.security.*, gds.graph.* (관리/스키마)
+      - db.index.fulltext.{createNodeIndex|createRelationshipIndex|drop}
+      - db.create{Label|Index|Property|RelationshipType}
+      camelCase procedure (mergeNodes 등) 는 word boundary 가 쓰기 키워드 정규식을
+      비활성화하므로 procedure 패턴 매칭이 마지막 방어선이다.
     * 라인/블록 주석 안에 숨긴 키워드도 검사 (주석 제거 후 탐색)
 """
 
@@ -24,13 +38,17 @@ _WRITE_KEYWORDS_RE = re.compile(
 )
 
 # read-only CALL (CALL db.index.fulltext.queryNodes 등) 은 허용.
+# camelCase procedure 이름은 \b(CREATE|MERGE|...) 키워드 정규식이 잡지 못하므로
+# 여기서 procedure namespace 별로 명시 차단해야 한다 (예: apoc.refactor.mergeNodes).
 _DANGEROUS_CALL_RE = re.compile(
     r"\bCALL\s+("
-    r"apoc\.(?:periodic|trigger|export|import|load)\."
+    r"apoc\.(?:periodic|trigger|export|import|load|refactor|merge|create|do"
+    r"|atomic|cypher|lock|schema)\."
+    r"|apoc\.nodes\.(?:link|connect|delete|collapse)\b"
     r"|dbms\.security\."
     r"|gds\.graph\."
     r"|db\.index\.fulltext\.(?:createNodeIndex|createRelationshipIndex|createRelationshipTypeIndex|drop)"
-    r"|db\.createLabel"
+    r"|db\.create(?:Label|Index|Property|RelationshipType)\b"
     r")",
     re.IGNORECASE,
 )

@@ -25,9 +25,16 @@ autograph 측에선 자기 자신을 등록:
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
+import logging
+import os
+import threading
 from typing import Any, Callable, Protocol, runtime_checkable
 
 from .state import AgentState
+
+log = logging.getLogger(__name__)
 
 
 # ── DomainHandler Protocol ─────────────────────────────────────────
@@ -81,6 +88,72 @@ DomainRouter = Callable[[str, "str | None"], "str | None"]
 _HANDLERS: dict[str, DomainHandler] = {}
 _ROUTERS: list[DomainRouter] = []
 
+# ── Plugin auto-discovery ──────────────────────────────────────────
+# core 는 ``from autograph`` 0건 (§10.12) 을 유지하지만, 런타임에 정작 아무도
+# autograph 를 import 하지 않으면 AutoHandler 가 등록되지 않아 도메인 라우팅이
+# finance 로만 떨어지는 결손이 있었다 (API/eval/UI 어디서도 explicit import 없음).
+#
+# 절충: 문자열 모듈명 list 를 ENV (`AUTONEXUSGRAPH_DOMAIN_PLUGINS`, csv) 로 받아
+# importlib 로 soft-import. 모듈이 존재하지 않으면 graceful skip — autograph 가
+# 설치되지 않은 finance-only 환경도 그대로 작동.
+#
+# core 의 import graph 에는 여전히 `from autograph` 가 0건 — `find_spec` /
+# `import_module` 는 동적 lookup 이라 정적 분석 도구가 의존성으로 잡지 않는다.
+_DISCOVERY_DONE = False
+_DISCOVERY_LOCK = threading.Lock()
+
+DEFAULT_DOMAIN_PLUGINS = "autograph"
+
+
+def discover_plugins(*, force: bool = False) -> list[str]:
+    """ENV 기반 도메인 플러그인 자동 import — idempotent (한 번만 실행).
+
+    Returns:
+        실제 import 성공한 모듈 이름 목록.
+
+    동작:
+        1. ``AUTONEXUSGRAPH_DOMAIN_PLUGINS`` (csv) 또는 ``DEFAULT_DOMAIN_PLUGINS`` 파싱
+        2. 각 모듈에 대해 ``importlib.util.find_spec`` 으로 존재 확인
+        3. 존재하면 ``importlib.import_module`` — 모듈 import 시점에 자기
+           ``register_handler`` / ``register_router`` 가 실행됨 (autograph
+           는 ``src/autograph/__init__.py`` 가 ``agent_handler`` 를 import 함)
+        4. 실패는 warn 로그만 — 호출자 정상 진행
+
+    ``force=True`` 이면 idempotent 가드 무시 (테스트용).
+    """
+    global _DISCOVERY_DONE
+    with _DISCOVERY_LOCK:
+        if _DISCOVERY_DONE and not force:
+            return []
+        _DISCOVERY_DONE = True
+
+        names = os.getenv("AUTONEXUSGRAPH_DOMAIN_PLUGINS", DEFAULT_DOMAIN_PLUGINS)
+        loaded: list[str] = []
+        for raw in names.split(","):
+            name = raw.strip()
+            if not name:
+                continue
+            try:
+                if importlib.util.find_spec(name) is None:
+                    log.debug("[domain] plugin %r not installed — skip", name)
+                    continue
+            except (ImportError, ValueError):
+                continue
+            try:
+                importlib.import_module(name)
+                loaded.append(name)
+                log.info("[domain] plugin %r loaded", name)
+            except Exception as exc:   # noqa: BLE001
+                log.warning("[domain] plugin %r import failed: %s", name, exc)
+        return loaded
+
+
+def _reset_discovery_for_test() -> None:
+    """테스트 픽스처 전용 — discovery 게이트 리셋."""
+    global _DISCOVERY_DONE
+    with _DISCOVERY_LOCK:
+        _DISCOVERY_DONE = False
+
 
 def register_handler(handler: DomainHandler) -> None:
     """handler.domain 키로 등록. 이미 있으면 덮어쓰기 (테스트·재로드 용이).
@@ -100,7 +173,13 @@ def unregister_handler(domain: str) -> None:
 
 
 def get_handler(domain: str) -> DomainHandler | None:
-    """domain 키로 핸들러 조회. 미등록 시 None (→ 호출자가 finance 기본 동작 사용)."""
+    """domain 키로 핸들러 조회. 미등록 시 None (→ 호출자가 finance 기본 동작 사용).
+
+    첫 호출 시 ``discover_plugins()`` 가 실행돼 ENV/기본 플러그인을 자동 로드한다.
+    이후 호출은 idempotent (no-op).
+    """
+    if not _DISCOVERY_DONE:
+        discover_plugins()
     return _HANDLERS.get(domain)
 
 
@@ -119,7 +198,11 @@ def auto_detect_domain(question: str, hint: str | None = None) -> str:
 
     autograph 가 import 되어 있으면 자기 라우터 (route_domain) 등록 → auto/
     cross_domain 자동 판정. 미설치 환경에선 모든 질문이 finance 로 처리.
+
+    첫 호출 시 ``discover_plugins()`` 가 실행돼 ENV/기본 플러그인을 자동 로드한다.
     """
+    if not _DISCOVERY_DONE:
+        discover_plugins()
     for fn in _ROUTERS:
         try:
             result = fn(question, hint)
@@ -133,10 +216,12 @@ def auto_detect_domain(question: str, hint: str | None = None) -> str:
 __all__ = [
     "DomainHandler",
     "DomainRouter",
+    "DEFAULT_DOMAIN_PLUGINS",
     "register_handler",
     "unregister_handler",
     "get_handler",
     "list_handlers",
     "register_router",
     "auto_detect_domain",
+    "discover_plugins",
 ]
