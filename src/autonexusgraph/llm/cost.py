@@ -33,6 +33,15 @@ PRICING: dict[str, tuple[float, float]] = {
     "claude-haiku-4-5":    (1.00,   5.00),
     "claude-haiku-4-5-20251001": (1.00, 5.00),
 
+    # Google Gemini (≤200K input tokens 기본 가격; 그 이상은 별 가격, 본 표는
+    # MVP 트래픽 가정으로 lower tier 사용. 공식: ai.google.dev/pricing)
+    "gemini-2.5-pro":       (1.25,  5.00),
+    "gemini-2.5-flash":     (0.30,  2.50),
+    "gemini-2.5-flash-lite":(0.10,  0.40),
+    "gemini-1.5-pro":       (1.25,  5.00),
+    "gemini-1.5-flash":     (0.075, 0.30),
+    "gemini-1.5-flash-8b":  (0.0375, 0.15),
+
     # Local — 비용 0 (자체 GPU)
     "local":               (0.00, 0.00),
 }

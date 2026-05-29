@@ -31,6 +31,8 @@ def test_get_llm_client_role_mapping(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("LLM_API_KEY", "sk-test")
+    # provider-specific 키도 동기화 — 본 테스트는 dispatch 가 아닌 role 매핑 검증.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("LLM_MODEL", "gpt-4o")
     monkeypatch.setenv("LLM_MODEL_PLANNER", "claude-sonnet-4-5")
 
@@ -48,6 +50,7 @@ def test_get_llm_client_default_model(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("LLM_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("LLM_MODEL", "gpt-4o-mini")
 
     with patch("openai.OpenAI"):

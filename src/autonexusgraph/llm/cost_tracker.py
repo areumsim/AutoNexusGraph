@@ -92,7 +92,14 @@ class CostTracker:
             self._persist_call(m, input_tokens, output_tokens, c,
                                purpose=purpose, latency_ms=latency_ms)
 
-        if n % self._report_every == 0 or cum >= limit * 0.9:
+        # warn 임계 — 세션 한도의 settings.llm_session_warn_at_usd 또는 90%.
+        warn_at = limit * 0.9
+        try:
+            from ..config import get_settings
+            warn_at = max(0.0, float(get_settings().llm_session_warn_at_usd))
+        except Exception:   # noqa: BLE001
+            pass
+        if n % self._report_every == 0 or cum >= warn_at:
             log.info(f"[COST] {self.state.caller} n_calls={n} cum=${cum:.4f} "
                      f"(limit ${limit:.4f}, {100*cum/max(limit,1e-9):.1f}%)")
 
@@ -212,4 +219,38 @@ def reset_tracker() -> None:
         _singleton = None
 
 
-__all__ = ["CostTracker", "BudgetExceeded", "get_tracker", "reset_tracker"]
+def get_session_tracker(caller: str | None = None,
+                        model: str | None = None) -> CostTracker:
+    """프로세스 단위 글로벌 세션 트래커 — settings 의 한도를 자동 적용.
+
+    모든 LLM 호출이 본 트래커를 공유 → 누적 비용이 ``llm_session_hard_limit_usd``
+    도달 시 다음 호출에서 ``BudgetExceeded`` raise.
+
+    Args:
+        caller: 디버그용 — 첫 호출자만 트래커 ``caller`` 필드에 저장. 이후 호출은
+                기존 트래커 재사용.
+        model: 첫 호출 시 디폴트 모델명. 실제 호출당 모델은 record() 에서 별도 전달.
+
+    Returns: 공유 CostTracker.
+    """
+    # 지연 import 로 순환 회피 (cost_tracker → config → cost_tracker 가능성).
+    from ..config import get_settings
+    s = get_settings()
+    # env override (LLM_COST_HARD_LIMIT_USD) 가 있으면 그것 — get_hard_limit_usd
+    # 가 이미 처리. 없으면 settings 값.
+    env_limit = os.environ.get("LLM_COST_HARD_LIMIT_USD")
+    hard_limit = (
+        get_hard_limit_usd(s.llm_session_hard_limit_usd) if env_limit is None
+        else get_hard_limit_usd(s.llm_session_hard_limit_usd)
+    )
+    return get_tracker(
+        caller=caller or "session",
+        model=model or "mixed",
+        hard_limit=hard_limit,
+    )
+
+
+__all__ = [
+    "CostTracker", "BudgetExceeded",
+    "get_tracker", "reset_tracker", "get_session_tracker",
+]

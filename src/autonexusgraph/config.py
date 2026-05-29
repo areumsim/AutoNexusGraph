@@ -22,10 +22,18 @@ class Settings(BaseSettings):
     )
 
     # === LLM Provider ===
-    llm_provider: Literal["openai", "anthropic", "local"] = "openai"
+    # 'auto' — 모델명 prefix 로 provider 자동 결정 (gpt-* / claude-* / gemini-* / local-).
+    # 명시 ('openai' 등) 는 그 provider 만 사용. 권장: 'auto' 로 두고 모델만 갈아끼우기.
+    llm_provider: Literal["auto", "openai", "anthropic", "google", "local"] = "auto"
     llm_model: str = "gpt-4o"
-    llm_api_key: str = ""
+    llm_api_key: str = ""              # provider-specific 키 미설정 시 fallback
     llm_timeout: float = 120.0
+
+    # Provider-specific 키 — 'auto' dispatch 시 모델에 맞는 키를 자동 선택.
+    # 미설정이면 llm_api_key 로 폴백 (단일 provider 환경 호환).
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    google_api_key: str = ""           # Gemini (ai.google.dev)
 
     llm_model_triage: str = "gpt-4o-mini"
     llm_model_planner: str = "claude-sonnet-4-5"
@@ -37,8 +45,16 @@ class Settings(BaseSettings):
     llm_model_validator: str = "gpt-4o-mini"
     llm_model_synthesizer: str = "claude-sonnet-4-5"
     llm_model_judge: str = "gpt-4o"
+    # Titler 는 ui/storage 의 1회 호출 — 비용 최소화.
+    llm_model_titler: str = "gpt-4o-mini"
 
     local_llm_base_url: str = "http://localhost:8000/v1"
+
+    # === 세션 비용 한도 (전역 가드 — 모든 LLM 호출 합산 한도) ===
+    # 도달 시 BudgetExceeded 로 모든 후속 호출 차단. 코드 기본값을 안전선으로,
+    # env 로 상향/하향 조정 가능.
+    llm_session_hard_limit_usd: float = 5.00
+    llm_session_warn_at_usd: float = 2.50
 
     # === 임베딩 ===
     embedding_url: str = "http://localhost:8080"
