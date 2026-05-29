@@ -7,14 +7,17 @@
 상세 요구사항은 [PRD.md](./PRD.md) (v2.1) · AutoGraph(자동차) 전용 가이드는 [docs/autograph.md](./docs/autograph.md) 참조.
 
 > **구성 요약:**
-> - **Core** (`src/autonexusgraph/`) — LangGraph multi-agent, LLM 어댑터, safety guard, DB/embedding/평가 harness 공유 인프라. Phase 4.7 완료 (Send 병렬 / Validator·Replan / HITL clarification·cost approval / Cypher 템플릿 레지스트리 / Pre-synth number guard / PG checkpoint / streaming / tracing).
+> - **Core** (`src/autonexusgraph/`) — LangGraph multi-agent (StateGraph 11 노드 + 함수 체인 fallback), LLM 어댑터 (OpenAI/Anthropic/Google/local 자동 dispatch), 4 가드 (prompt_safety / cypher_guard / number_guard / language_guard), 비용 가드 3 tier (세션 hard limit + 도메인별 turn budget + auto-approve), DB·embedding·평가 harness 공유 인프라.
+> - **현재 구현 범위:** Send API 병렬 worker · Validator + Replan loop (max 2) · HITL clarification + cost approval · 22 Cypher 템플릿 레지스트리 · Pre-synth number guard + post-synth validator cross-check · PG checkpointer · streaming (SSE) · tracing (Langfuse/LangSmith). 미구현 / wired-but-disabled 항목은 §7.
 > - **Finance 도메인** (`src/autonexusgraph/tools/financials,graph,retrieve`) — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100.
 > - **Auto 도메인** (`src/autograph/`) — NHTSA(vPIC/Recalls/Complaints) + Wikidata(manufacturers/models/suppliers) + AI Hub(부품 결함 / 자율주행 진단) + KOTSA 수리검사 등.
-> - **Cross-Domain Bridge** — `bridge.corp_entity` 가 두 도메인을 wikidata_qid / LEI / 사업자번호 / 이름으로 매칭. 현대자동차·현대모비스·현대위아·한국타이어 등 4 개 한국 OEM/부품사가 corp_code 와 직접 연결됨.
+> - **Cross-Domain Bridge** — `bridge.corp_entity` 가 두 도메인을 wikidata_qid / LEI / 사업자번호 / 이름으로 매칭. 현대자동차·현대모비스·현대위아·한국타이어 등 4 개 한국 OEM/부품사가 corp_code 와 직접 연결됨 [2026-05-29 측정].
 
 ---
 
 ## 1. 한눈에 보는 현황
+
+> 이하 수치는 **2026-05-29 측정 시점** 기준. 갱신은 `data_inventory.md` + `eval/reports/prd_dashboard_latest.md` 참조. 모든 정량 수치는 ingestion 재실행 후 변동 가능 — SSOT 는 PG / Neo4j 직접 조회.
 
 ### Finance 도메인 (코스피200 + 코스닥100)
 
