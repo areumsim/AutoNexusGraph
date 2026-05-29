@@ -68,6 +68,20 @@ class Settings(BaseSettings):
     embedding_url: str = "http://localhost:8080"
     reranker_url: str = "http://localhost:8081"
     embedding_dim: int = 1024
+    # ↑ pydantic 파싱이 실패하는 dirty env 값 ("1024ll" 등) 도 숫자만 추출해 복구.
+
+    @field_validator("embedding_dim", mode="before")
+    @classmethod
+    def _coerce_embedding_dim(cls, v):
+        """dirty env 값에서 앞쪽 숫자만 추출 — 잘못된 문자가 섞여도 robust."""
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            import re
+            m = re.match(r"^\s*(\d+)", v)
+            if m:
+                return int(m.group(1))
+        return 1024
 
     # === DB ===
     neo4j_uri: str = "bolt://localhost:7687"
@@ -124,8 +138,12 @@ class Settings(BaseSettings):
     agent_turn_budget_usd: float = 0.20    # 한 대화 turn 의 최대 LLM 비용 (도메인 기본값)
     # 도메인별 override — 0.0 이면 agent_turn_budget_usd 상속.
     # auto 도메인은 LLM 추출 (P3) 이 cross 분야 보다 무거울 수 있어 별도 한도 권장.
+    agent_turn_budget_finance_usd: float = 0.0
     agent_turn_budget_auto_usd: float = 0.0
     agent_turn_budget_cross_domain_usd: float = 0.0
+    # 임의 도메인 (legal/safety 등) 의 turn 한도는 env 로 직접 지정:
+    #   AGENT_TURN_BUDGET_<DOMAIN>_USD=0.30
+    # → turn_budget_for_domain("legal") 가 동적으로 그것을 읽음.
 
     # === LangGraph checkpoint (PRD §7.5.8) ===
     # auto = PG 시도 → memory 폴백, memory/in_memory = 강제 in-memory, none = 비활성
@@ -139,6 +157,11 @@ class Settings(BaseSettings):
     llm_cost_auto_approve_usd: float = 0.50  # 추정 이 이하면 자동 통과, 초과면 --approve-cost 필요
     llm_cost_report_every: int = 10          # 매 N 호출마다 누적 로그
     llm_cost_log_calls: bool = False          # True 면 ops.llm_calls 에 호출별 상세 적재
+    # 영속 JSONL 로그 — 모든 LLM 호출 1줄씩 append. 누락 없는 누계 추적용.
+    # cost_history CLI 가 본 파일을 읽어 일/caller/모델 별 집계.
+    llm_cost_log_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "cost_log.jsonl",
+    )
 
     # === Tracing ===
     trace_backend: Literal["langfuse", "langsmith", ""] = ""
@@ -199,18 +222,37 @@ def get_settings() -> Settings:
 
 
 def turn_budget_for_domain(domain: str | None) -> float:
-    """state["domain"] 에 맞는 turn budget — 0.0 override 면 기본값 상속.
+    """state["domain"] 에 맞는 turn budget — 3 단계 우선순위로 결정.
 
-    finance / 미지정 → agent_turn_budget_usd
-    auto              → agent_turn_budget_auto_usd or agent_turn_budget_usd
-    cross_domain      → agent_turn_budget_cross_domain_usd or agent_turn_budget_usd
+    1. Settings 의 declared field ``agent_turn_budget_<domain>_usd`` (auto/
+       cross_domain/finance) 가 > 0 이면 그것.
+    2. env 의 ``AGENT_TURN_BUDGET_<DOMAIN>_USD`` (임의 도메인 동적 지원 —
+       legal/safety 등 새 도메인도 코드 수정 없이 한도 설정 가능).
+    3. 위 둘 다 없으면 ``agent_turn_budget_usd`` 도메인 무관 기본값.
+
+    예시 — legal 도메인에 0.30 USD/turn 한도:
+        AGENT_TURN_BUDGET_LEGAL_USD=0.30 python -m ...
     """
+    import os
     s = get_settings()
     d = str(domain or "finance").lower()
-    if d == "auto":
-        v = float(s.agent_turn_budget_auto_usd or 0.0)
-        return v if v > 0 else float(s.agent_turn_budget_usd)
-    if d == "cross_domain":
-        v = float(s.agent_turn_budget_cross_domain_usd or 0.0)
-        return v if v > 0 else float(s.agent_turn_budget_usd)
+
+    # 1. declared field 우선
+    attr = f"agent_turn_budget_{d}_usd"
+    declared = float(getattr(s, attr, 0.0) or 0.0)
+    if declared > 0:
+        return declared
+
+    # 2. env 동적 lookup — 임의 도메인 지원
+    env_key = f"AGENT_TURN_BUDGET_{d.upper()}_USD"
+    raw = os.environ.get(env_key, "").strip()
+    if raw:
+        try:
+            v = float(raw)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+
+    # 3. 도메인 무관 기본값
     return float(s.agent_turn_budget_usd)

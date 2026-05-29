@@ -180,22 +180,31 @@ def get_llm_client(
 
     if final_provider == "openai":
         from .openai_adapter import OpenAIClient
-        return OpenAIClient(model=final_model, api_key=key, timeout=s.llm_timeout)
-    if final_provider == "anthropic":
+        inner: LLMClient = OpenAIClient(model=final_model, api_key=key, timeout=s.llm_timeout)
+    elif final_provider == "anthropic":
         from .anthropic_adapter import AnthropicClient
-        return AnthropicClient(model=final_model, api_key=key, timeout=s.llm_timeout)
-    if final_provider == "google":
+        inner = AnthropicClient(model=final_model, api_key=key, timeout=s.llm_timeout)
+    elif final_provider == "google":
         from .gemini_adapter import GeminiClient
-        return GeminiClient(model=final_model, api_key=key, timeout=s.llm_timeout)
-    if final_provider == "local":
+        inner = GeminiClient(model=final_model, api_key=key, timeout=s.llm_timeout)
+    elif final_provider == "local":
         from .local_adapter import LocalLLMClient
-        return LocalLLMClient(
+        inner = LocalLLMClient(
             model=final_model,
             base_url=s.local_llm_base_url,
             api_key=key or "EMPTY",
             timeout=s.llm_timeout,
         )
-    raise LLMError(f"unknown LLM provider: {final_provider!r} (model={final_model!r})")
+    else:
+        raise LLMError(
+            f"unknown LLM provider: {final_provider!r} (model={final_model!r})"
+        )
+
+    # 모든 LLM 호출이 누락 없이 cost_log.jsonl 에 기록되도록 wrap.
+    # provider/메서드/budget_aware wrap 여부 무관 — 본 wrapper 가 항상 마지막에.
+    from .cost_log import LoggingLLMClient
+    caller_name = role or "anon"
+    return LoggingLLMClient(inner, caller=caller_name)
 
 
 def _resolve_model(settings: Any, role: str | None) -> str:

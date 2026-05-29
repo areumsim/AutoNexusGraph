@@ -32,6 +32,7 @@ data/processed/**
 data/interim/**
 data/state/**
 data/reports/**
+data/cost_log.jsonl
 !data/README.md
 !data/**/.gitkeep
 
