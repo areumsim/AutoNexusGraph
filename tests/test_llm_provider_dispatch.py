@@ -3,7 +3,7 @@
 검증:
 1. 모델명 prefix 로 provider 자동 결정 (gpt-* / claude-* / gemini-* / local-).
 2. settings.llm_provider='auto' 일 때 모델별 dispatch.
-3. provider-specific API key 가 llm_api_key 보다 우선.
+3. provider-specific API key 가 모델에 맞게 자동 선택.
 4. 글로벌 세션 트래커 — 한도 도달 시 모든 후속 호출 차단.
 5. PRICING 표에 Gemini 모델 가격 등록 + cost_of_call 정확도.
 """
@@ -54,7 +54,7 @@ def test_detect_provider_unknown_fallback_openai():
 # ── 2) get_llm_client — dispatch 검증 (실제 SDK 호출 안 함) ─────────
 def test_get_llm_client_explicit_provider_overrides_model(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "auto")
-    monkeypatch.setenv("LLM_API_KEY", "dummy")
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy")
     from autonexusgraph import config
     config.get_settings.cache_clear()                    # type: ignore[attr-defined]
 
@@ -94,10 +94,11 @@ def test_get_llm_client_auto_dispatch_by_model(monkeypatch):
     assert m_ge.call_args.kwargs.get("api_key") == "ggl-key"
 
 
-def test_get_llm_client_provider_specific_key_overrides_llm_api_key(monkeypatch):
+def test_get_llm_client_uses_provider_specific_key(monkeypatch):
+    """auto dispatch 시 모델에 맞는 provider 키 선택."""
     monkeypatch.setenv("LLM_PROVIDER", "auto")
-    monkeypatch.setenv("LLM_API_KEY", "legacy-key")
-    monkeypatch.setenv("OPENAI_API_KEY", "specific-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "oa-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "an-key")
     from autonexusgraph import config
     config.get_settings.cache_clear()                    # type: ignore[attr-defined]
 
@@ -106,28 +107,26 @@ def test_get_llm_client_provider_specific_key_overrides_llm_api_key(monkeypatch)
                 return_value=fake) as m_oa:
         from autonexusgraph.llm.base import get_llm_client
         get_llm_client(model="gpt-4o-mini")
-    assert m_oa.call_args.kwargs.get("api_key") == "specific-key"
+    assert m_oa.call_args.kwargs.get("api_key") == "oa-key"
 
 
-def test_get_llm_client_falls_back_to_llm_api_key(monkeypatch):
+def test_get_llm_client_empty_key_when_provider_unset(monkeypatch):
+    """provider-specific 키 미설정(빈 문자열) 시 _select_api_key 가 ''."""
     monkeypatch.setenv("LLM_PROVIDER", "auto")
-    monkeypatch.setenv("LLM_API_KEY", "legacy-key")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # pydantic settings 가 .env 의 값을 먼저 로드 — env var 로 명시 override.
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     from autonexusgraph import config
     config.get_settings.cache_clear()                    # type: ignore[attr-defined]
 
-    fake = MagicMock()
-    with patch("autonexusgraph.llm.openai_adapter.OpenAIClient",
-                return_value=fake) as m_oa:
-        from autonexusgraph.llm.base import get_llm_client
-        get_llm_client(model="gpt-4o-mini")
-    assert m_oa.call_args.kwargs.get("api_key") == "legacy-key"
+    from autonexusgraph.llm.base import _select_api_key
+    s = config.get_settings()
+    assert _select_api_key(s, "openai") == ""
 
 
 # ── 3) settings.llm_provider 가 'auto' 아니면 강제 적용 ────────────
 def test_get_llm_client_explicit_provider_setting_overrides_model_detection(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "openai")
-    monkeypatch.setenv("LLM_API_KEY", "key")
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
     from autonexusgraph import config
     config.get_settings.cache_clear()                    # type: ignore[attr-defined]
 

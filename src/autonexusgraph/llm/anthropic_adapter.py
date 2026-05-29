@@ -32,7 +32,7 @@ class AnthropicClient(LLMClient):
 
     def __init__(self, model: str, api_key: str, timeout: float = 120.0) -> None:
         if not api_key:
-            raise LLMError("Anthropic api key 미설정 (.env: LLM_API_KEY)")
+            raise LLMError("Anthropic API key 미설정 (.env: ANTHROPIC_API_KEY)")
         from anthropic import Anthropic  # lazy import
 
         self.model = model

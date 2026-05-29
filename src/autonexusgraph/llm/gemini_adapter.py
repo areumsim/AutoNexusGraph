@@ -34,9 +34,7 @@ class GeminiClient(LLMClient):
 
     def __init__(self, model: str, api_key: str, timeout: float = 120.0) -> None:
         if not api_key:
-            raise LLMError(
-                "Google API key 미설정 (.env: GOOGLE_API_KEY 또는 LLM_API_KEY)"
-            )
+            raise LLMError("Google API key 미설정 (.env: GOOGLE_API_KEY)")
         try:
             from google import genai  # lazy — pip install google-genai
         except ImportError as e:

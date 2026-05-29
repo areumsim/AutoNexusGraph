@@ -130,14 +130,16 @@ def detect_provider(model: str) -> str:
 
 
 def _select_api_key(settings: Any, provider: str) -> str:
-    """provider 별 API 키 — provider-specific 우선, 없으면 llm_api_key 폴백."""
+    """provider 별 API 키 선택 — 모델명 prefix 로 결정된 provider 의 키 반환.
+
+    local provider 는 키 불필요 (빈 문자열 반환).
+    """
     by_provider = {
         "openai":    getattr(settings, "openai_api_key", "") or "",
         "anthropic": getattr(settings, "anthropic_api_key", "") or "",
         "google":    getattr(settings, "google_api_key", "") or "",
     }
-    specific = by_provider.get(provider, "")
-    return specific or (getattr(settings, "llm_api_key", "") or "")
+    return by_provider.get(provider, "")
 
 
 def get_llm_client(
@@ -160,9 +162,8 @@ def get_llm_client(
         2. settings.llm_provider 가 'auto' 가 아니면 그 값
         3. 모델명 prefix 기반 자동 감지 (detect_provider)
 
-    API 키 결정 우선순위:
-        1. provider-specific 키 (settings.{openai,anthropic,google}_api_key)
-        2. settings.llm_api_key (legacy fallback — 단일 provider 환경)
+    API 키 결정:
+        provider 별 settings.{openai,anthropic,google}_api_key. local 은 키 불필요.
     """
     from ..config import get_settings
 

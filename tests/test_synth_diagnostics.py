@@ -1,7 +1,7 @@
 """synthesizer_node 의 LLM 실패 진단 — silent skip 방지 회귀 테스트.
 
-배경: 이전엔 LLM_API_KEY 가 빈 값이면 synthesizer 의 ``except Exception`` 이
-LLMError 를 swallow 하고 결정적 brief 로 답을 만들어 silent fallback. cost=$0,
+배경: 이전엔 provider-specific 키가 빈 값이면 synthesizer 의 ``except Exception``
+이 LLMError 를 swallow 하고 결정적 brief 로 답을 만들어 silent fallback. cost=$0,
 tokens=0 으로 보고되지만 그 원인이 어디에도 명시 안 됨 → eval/QA 측정 결과의
 신뢰성 문제.
 
@@ -37,7 +37,10 @@ def _state_with_evidence():
 
 # ── 1. LLM client 가 LLMError 면 synth_status.ok=False + error_type 명시 ──
 def test_synth_records_llm_failure_in_status(monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", "")          # 빈 키 — provider 가 raise
+    # 모든 provider 키 비움 — adapter 가 LLMError raise.
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
     monkeypatch.setenv("LLM_COST_AUTO_APPROVE_USD", "100.00")
     from autonexusgraph import config
     config.get_settings.cache_clear()              # type: ignore[attr-defined]

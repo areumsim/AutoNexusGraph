@@ -30,7 +30,7 @@ class OpenAIClient(LLMClient):
 
     def __init__(self, model: str, api_key: str, timeout: float = 120.0) -> None:
         if not api_key:
-            raise LLMError("OPENAI api key 미설정 (.env: LLM_API_KEY)")
+            raise LLMError("OpenAI API key 미설정 (.env: OPENAI_API_KEY)")
         from openai import OpenAI  # lazy import
 
         self.model = model

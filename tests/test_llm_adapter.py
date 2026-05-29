@@ -30,8 +30,6 @@ def test_get_llm_client_role_mapping(monkeypatch):
 
     get_settings.cache_clear()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
-    monkeypatch.setenv("LLM_API_KEY", "sk-test")
-    # provider-specific 키도 동기화 — 본 테스트는 dispatch 가 아닌 role 매핑 검증.
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("LLM_MODEL", "gpt-4o")
     monkeypatch.setenv("LLM_MODEL_PLANNER", "claude-sonnet-4-5")
@@ -49,7 +47,6 @@ def test_get_llm_client_default_model(monkeypatch):
 
     get_settings.cache_clear()
     monkeypatch.setenv("LLM_PROVIDER", "openai")
-    monkeypatch.setenv("LLM_API_KEY", "sk-test")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("LLM_MODEL", "gpt-4o-mini")
 
@@ -111,5 +108,6 @@ def test_anthropic_split_messages():
 def test_openai_missing_key_raises(monkeypatch):
     from autonexusgraph.llm.openai_adapter import OpenAIClient
 
-    with pytest.raises(LLMError, match="api key"):
+    # 메시지에 "API key" 또는 "OPENAI_API_KEY" 가 포함되어야.
+    with pytest.raises(LLMError, match=r"API key|OPENAI_API_KEY"):
         OpenAIClient(model="gpt-4o", api_key="")

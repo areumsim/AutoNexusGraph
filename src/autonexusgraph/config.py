@@ -26,14 +26,15 @@ class Settings(BaseSettings):
     # 명시 ('openai' 등) 는 그 provider 만 사용. 권장: 'auto' 로 두고 모델만 갈아끼우기.
     llm_provider: Literal["auto", "openai", "anthropic", "google", "local"] = "auto"
     llm_model: str = "gpt-4o"
-    llm_api_key: str = ""              # provider-specific 키 미설정 시 fallback
     llm_timeout: float = 120.0
 
-    # Provider-specific 키 — 'auto' dispatch 시 모델에 맞는 키를 자동 선택.
-    # 미설정이면 llm_api_key 로 폴백 (단일 provider 환경 호환).
+    # Provider-specific 키 — 모델명 prefix 로 알맞은 키 자동 선택.
+    # OPENAI    : gpt-* 모델
+    # ANTHROPIC : claude-* 모델
+    # GOOGLE    : gemini-* 모델 (ai.google.dev/apikey)
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    google_api_key: str = ""           # Gemini (ai.google.dev)
+    google_api_key: str = ""
 
     # Tier 단축 — 모든 role 의 기본 모델을 2개 변수로 일괄 제어.
     # provider 변경 시 LLM_MODEL_FAST/SMART 2개만 바꾸면 모든 role 동시 전환.
