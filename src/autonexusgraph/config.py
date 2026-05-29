@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,18 +35,25 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_api_key: str = ""           # Gemini (ai.google.dev)
 
-    llm_model_triage: str = "gpt-4o-mini"
-    llm_model_planner: str = "claude-sonnet-4-5"
-    llm_model_supervisor: str = "gpt-4o-mini"
-    llm_model_research: str = "gpt-4o-mini"
-    llm_model_graph: str = "claude-sonnet-4-5"
-    llm_model_sql: str = "gpt-4o-mini"
-    llm_model_calculator: str = "gpt-4o-mini"
-    llm_model_validator: str = "gpt-4o-mini"
-    llm_model_synthesizer: str = "claude-sonnet-4-5"
-    llm_model_judge: str = "gpt-4o"
-    # Titler 는 ui/storage 의 1회 호출 — 비용 최소화.
-    llm_model_titler: str = "gpt-4o-mini"
+    # Tier 단축 — 모든 role 의 기본 모델을 2개 변수로 일괄 제어.
+    # provider 변경 시 LLM_MODEL_FAST/SMART 2개만 바꾸면 모든 role 동시 전환.
+    # 개별 LLM_MODEL_<role> 명시 시 그것이 우선.
+    llm_model_fast: str = "gemini-2.5-flash"     # triage/research/sql 등 가벼운 호출
+    llm_model_smart: str = "gemini-2.5-pro"      # planner/synthesizer 등 추론·생성
+
+    # 개별 role override — 비워두면 tier 기본값 자동 적용 (model_validator 가 보강).
+    llm_model_triage: str = ""
+    llm_model_planner: str = ""
+    llm_model_supervisor: str = ""
+    llm_model_research: str = ""
+    llm_model_graph: str = ""
+    llm_model_sql: str = ""
+    llm_model_calculator: str = ""
+    llm_model_validator: str = ""
+    llm_model_synthesizer: str = ""
+    llm_model_judge: str = ""
+    # Titler 는 ui/storage 의 1회 호출 — 비용 최소화 → 항상 FAST.
+    llm_model_titler: str = ""
 
     local_llm_base_url: str = "http://localhost:8000/v1"
 
@@ -149,6 +156,39 @@ class Settings(BaseSettings):
     def _resolve_path(cls, v: str | Path) -> Path:
         p = Path(v)
         return p if p.is_absolute() else PROJECT_ROOT / p
+
+    # 각 role 의 tier 분류 — FAST 는 가벼운 호출, SMART 는 추론·생성 무게 있음.
+    # 새 role 추가 시 본 dict 에만 등록하면 자동 fill 동작. ClassVar 로 명시해
+    # pydantic 이 model field 가 아닌 클래스 속성으로 인식하게 한다.
+    _ROLE_TIER: ClassVar[dict[str, str]] = {
+        "triage":      "fast",
+        "supervisor":  "fast",
+        "research":    "fast",
+        "sql":         "fast",
+        "calculator":  "fast",
+        "validator":   "fast",
+        "titler":      "fast",
+        "planner":     "smart",
+        "graph":       "smart",
+        "synthesizer": "smart",
+        "judge":       "smart",
+    }
+
+    @model_validator(mode="after")
+    def _fill_role_models(self):
+        """비어있는 llm_model_<role> 을 tier 기본값으로 자동 보강.
+
+        provider 전환 = LLM_MODEL_FAST/SMART 2개만 바꾸면 모든 role 동시 전환.
+        개별 override 는 그대로 우선.
+        """
+        for role, tier in self._ROLE_TIER.items():
+            attr = f"llm_model_{role}"
+            current = (getattr(self, attr, "") or "").strip()
+            if current:
+                continue
+            fallback = self.llm_model_smart if tier == "smart" else self.llm_model_fast
+            object.__setattr__(self, attr, fallback)
+        return self
 
 
 @lru_cache(maxsize=1)
