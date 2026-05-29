@@ -9,6 +9,37 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+# ── make_http_client 팩토리 ─────────────────────────────────────────
+def test_make_http_client_default_user_agent():
+    from autonexusgraph.ingestion._common import (
+        DEFAULT_USER_AGENT,
+        make_http_client,
+    )
+    c = make_http_client()
+    assert c.headers.get("User-Agent") == DEFAULT_USER_AGENT
+
+
+def test_make_http_client_custom_user_agent():
+    from autonexusgraph.ingestion._common import make_http_client
+    c = make_http_client(user_agent="X-Spec/1.0")
+    assert c.headers.get("User-Agent") == "X-Spec/1.0"
+
+
+def test_make_http_client_headers_override_user_agent_arg():
+    """headers 의 User-Agent 가 user_agent 인자보다 우선 — SEC 등 엄격 정책 호환."""
+    from autonexusgraph.ingestion._common import make_http_client
+    c = make_http_client(user_agent="From-Arg",
+                          headers={"User-Agent": "From-Headers"})
+    assert c.headers.get("User-Agent") == "From-Headers"
+
+
+def test_make_http_client_timeout_applied():
+    from autonexusgraph.ingestion._common import make_http_client
+    c = make_http_client(timeout=7.5)
+    # httpx 의 Timeout 객체는 float 와 == 비교 가능.
+    assert float(c.timeout.read) == 7.5
+
+
 def test_dart_parse_corp_codes():
     """zip → CorpCode iterator (HTTP 호출 X)."""
     from autonexusgraph.ingestion.dart_client import DartClient

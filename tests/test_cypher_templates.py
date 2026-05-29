@@ -8,7 +8,9 @@ from autonexusgraph.tools.cypher_templates import (
     TEMPLATES,
     TemplateError,
     list_templates,
+    register_templates,
     render_template,
+    validate_template_spec,
 )
 
 
@@ -18,6 +20,47 @@ def test_registry_non_empty():
     assert "lookup_company" in names
     assert "find_paths_3hops" in names
     assert "get_subgraph_d1" in names
+
+
+# ── 외부 도메인 (AUTO_TEMPLATES) 스펙 무결성 — drift 방지 ──
+def test_auto_templates_pass_spec_validation():
+    """autograph 의 AUTO_TEMPLATES 가 finance 와 동일 스키마를 따르는지 정적 검증."""
+    from autograph.cypher_templates_auto import AUTO_TEMPLATES
+    for name, spec in AUTO_TEMPLATES.items():
+        # 잘못된 스펙은 import 가 아닌 본 시점에서 잡힘.
+        validate_template_spec(name, spec)
+
+
+def test_validate_template_spec_rejects_bad_shapes():
+    # cypher 누락
+    with pytest.raises(TemplateError):
+        validate_template_spec("x", {"required_params": []})
+    # cypher 빈 문자열
+    with pytest.raises(TemplateError):
+        validate_template_spec("x", {"cypher": "   "})
+    # required_params 잘못된 타입
+    with pytest.raises(TemplateError):
+        validate_template_spec("x", {"cypher": "MATCH (n) RETURN n",
+                                      "required_params": "abc"})
+    # param_schema 의 spec 이 tuple 아님
+    with pytest.raises(TemplateError):
+        validate_template_spec("x", {"cypher": "MATCH (n) RETURN n",
+                                      "param_schema": {"a": "wrong"}})
+
+
+def test_register_templates_blocks_name_collision():
+    reg = {"foo": {"cypher": "MATCH (n) RETURN n"}}
+    new = {"foo": {"cypher": "MATCH (m) RETURN m"}}
+    with pytest.raises(TemplateError, match="이름 충돌"):
+        register_templates(reg, new)
+
+
+def test_register_templates_validates_each_spec():
+    reg: dict = {}
+    bad = {"x": {"required_params": []}}  # cypher 없음
+    with pytest.raises(TemplateError):
+        register_templates(reg, bad)
+    assert reg == {}  # 실패 시 등록 X
 
 
 def test_every_template_has_required_keys():

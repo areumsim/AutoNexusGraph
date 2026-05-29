@@ -160,6 +160,33 @@ make load-gleif               # LEI 보강
 make validate-quality         # 매핑 커버리지 점검
 ```
 
+## 수동 자료 적재 — car.go.kr / KNCAP (by design)
+
+두 source 모두 **공식 Open API 미공개** (2026-05 기준). PRD §3.2 가 자동 수집을 명시
+했으나 실제 채널이 없어 **수동 CSV 모드를 정식 운영 방식으로 채택**.
+
+### car.go.kr (KR 리콜)
+
+1. https://www.car.go.kr/ 의 리콜 검색에서 기간/제조사 필터로 CSV 다운로드.
+2. 파일을 `data/raw/auto/car_go_kr/` 하위에 저장 (UTF-8 권장, BOM 자동 처리).
+3. `python -m autograph.ingestion.car_go_kr_recalls` 실행 — `_normalized.jsonl` 생성.
+4. 이후 표준 적재: `make load-auto-recalls`.
+
+대체안: 한국 OEM 의 미국 출시 모델 리콜은 NHTSA 자동수집(`make ingest-nhtsa-recalls`)
+이 KR-only 리콜을 보강하므로, MVP 범위에선 NHTSA 만으로도 80% 커버.
+
+### KNCAP (KR 안전등급)
+
+1. KNCAP 사무국에서 받은 자료를 `data/raw/auto/kncap/` 하위에 CSV 또는 JSON 으로 저장.
+2. `python -m autograph.ingestion.kncap` — 표준화된 jsonl 생성.
+3. 이후 적재: `make load-auto-kncap` (Standard 노드 + SAFETY_RATED_BY 엣지).
+
+`KNCAP_API_KEY` 환경변수는 향후 API 공개 시를 위해 자리만 잡아둠 — 현재 어떤 path
+도 키를 읽지 않는다 (warning 로그만 출력하고 수동 모드로 폴백).
+
+대체안: NHTSA SafetyRatings 가 5 star 등급 자동 수집. 한국 출시 동일 모델 다수가
+NHTSA 에 등재되어 있어 KNCAP 의존도 낮음.
+
 ## 라이선스 정책 (자동 강제)
 
 `src/autonexusgraph/ingestion/_license.py` 의 `LICENSE_POLICY` 가 source 키별 본문 저장 여부를 강제.

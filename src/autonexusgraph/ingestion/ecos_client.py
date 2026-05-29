@@ -63,7 +63,8 @@ class EcosClient:
             )
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(timeout=timeout)
+        from ._common import make_http_client
+        self._client = make_http_client(timeout=timeout)
 
     def __enter__(self) -> "EcosClient":
         return self

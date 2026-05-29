@@ -50,6 +50,7 @@ ON CREATE SET r.source_type      = 'nhtsa_complaint',
               r.validated_status = 'candidate',
               r.snapshot_year    = row.snapshot_year,
               r.extraction_method = 'exact_match_taxonomy',
+              r.schema_version   = coalesce(row.schema_version, 'v2.1'),
               r.created_at       = datetime()
 """
 

@@ -1,13 +1,17 @@
-"""한국 자동차리콜센터 (car.go.kr) — 리콜 정보 수집 스텁.
+"""한국 자동차리콜센터 (car.go.kr) — 리콜 정보 수집.
 
-상태: TODO
-- 공식 OpenAPI 가 공개되어 있으면 API 키 발급(.env CAR_GO_KR_API_KEY) 후 본 모듈 채움.
-- 그렇지 않으면 사용자가 직접 다운로드한 CSV 를 data/raw/auto/car_go_kr/ 에 두고
-  본 모듈의 ``ingest_from_csv_dir()`` 가 표준화된 jsonl 로 정규화한다.
+**운영 모드**: **수동 CSV (by design)**.
+- car.go.kr 공식 Open API 는 2026-05 기준 미공개. 키 발급 채널 없음.
+- 사용자가 car.go.kr 웹사이트에서 CSV/Excel 을 받아 `data/raw/auto/car_go_kr/`
+  하위에 두면 본 모듈의 ``ingest_from_csv_dir()`` 가 jsonl 로 정규화.
+- 환경변수 ``CAR_GO_KR_API_KEY`` 는 향후 API 공개 시를 위해 자리만 잡아둠 —
+  현재 어떤 path 도 키를 읽지 않음.
 
-본 MVP PR 에서는:
-- 키가 없으면 graceful skip + warning.
-- data/raw/auto/car_go_kr/*.csv 가 있으면 그대로 normalize 시도 (best-effort).
+대체안: NHTSA 리콜은 ``nhtsa_recalls`` 모듈이 자동 수집 (FDA-style API).
+US 시장 출시 한국 OEM 의 리콜은 사실상 NHTSA 와 중복되므로 KR-only 리콜만
+manual CSV 로 보강하면 충분.
+
+운영 절차는 ``docs/operations/data_pipeline.md`` 의 "car.go.kr 수동 CSV" 절 참조.
 """
 
 from __future__ import annotations
@@ -55,7 +59,11 @@ def ingest_from_csv_dir() -> dict:
     src = raw_dir(_SOURCE)
     files = sorted(src.glob("*.csv"))
     if not files:
-        log.warning("[car_go_kr] CSV 없음 — TODO: API 발급 후 자동 수집. 현재는 manual.")
+        log.warning(
+            "[car_go_kr] CSV 없음 — by design 수동 모드. "
+            "car.go.kr 에서 받은 CSV 를 %s 에 두세요. "
+            "(공식 API 미공개)", src,
+        )
         return {"files": 0}
 
     out_path = src / "_normalized.jsonl"

@@ -276,6 +276,9 @@ def compute_per_question_metrics(
             "question_kind": p.get("question_kind", ""),
             "complexity": g.get("complexity", ""),
             "requires_multi_hop": bool(g.get("requires_multi_hop")),
+            # Cross-Domain QA 4단계 층화 라벨 (CD-L1~L4) — PRD §10.8 측정용.
+            # 비-cross gold 에는 없으므로 빈 문자열로 표기.
+            "difficulty": g.get("difficulty", ""),
 
             "em":           exact_match(p.get("answer", ""), golds_text),
             "f1":           token_f1(p.get("answer", ""), golds_text),
@@ -335,6 +338,42 @@ def summarize_by_adapter(per_q: list[dict]) -> dict[str, dict]:
             out[adapter]["multi_hop_em"] = _safe_mean([r["em"] for r in mh])
             out[adapter]["multi_hop_f1"] = _safe_mean([r["f1"] for r in mh])
     return out
+
+
+# ─── Cross-Domain 4단계 층화 (PRD §10.8 — CD-L1/L2/L3/L4 80/70/50/40%) ────
+# 각 어댑터 내에서 difficulty 별로 EM/F1 평균 + n 산출.
+# PRD 목표 비교를 위해 임계점 dict 도 같이 반환.
+_PRD_10_8_TARGETS = {"CD-L1": 0.80, "CD-L2": 0.70, "CD-L3": 0.50, "CD-L4": 0.40}
+
+
+def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
+    """어댑터 × difficulty 집계. EM 평균 + n + 목표 도달 여부.
+
+    Returns:
+        {adapter: {difficulty: {n, em, f1, em_target, em_target_met}}}.
+        difficulty 가 비어있는 row 는 제외 (auto / finance gold).
+    """
+    out: dict[str, dict[str, dict]] = {}
+    for r in per_q:
+        diff = r.get("difficulty") or ""
+        if not diff:
+            continue
+        out.setdefault(r["adapter"], {}).setdefault(diff, []).append(r)
+
+    rendered: dict[str, dict[str, dict]] = {}
+    for adapter, by_diff in out.items():
+        rendered[adapter] = {}
+        for diff, rows in by_diff.items():
+            em = _safe_mean([r["em"] for r in rows])
+            target = _PRD_10_8_TARGETS.get(diff)
+            rendered[adapter][diff] = {
+                "n":               len(rows),
+                "em":              em,
+                "f1":              _safe_mean([r["f1"] for r in rows]),
+                "em_target":       target,
+                "em_target_met":   (target is not None and em >= target),
+            }
+    return rendered
 
 
 # ─── multi-hop 어댑터 간 차이 (PRD §10.7 — hybrid vs vector +30%p 자동 측정) ────
@@ -427,6 +466,26 @@ def write_summary_md(summary: dict, manifest: dict, out_path: Path) -> None:
             f"**{hvv['f1_diff_pp']:+.1f}%p**"
         )
         lines.append(f"- 목표 +{hvv['target_diff_pp']:.0f}%p {met}")
+        lines.append("")
+
+    # Cross-Domain 4단계 층화 — PRD §10.8 (CD-L1~L4 80/70/50/40%).
+    diff_summary = manifest.get("by_difficulty") or {}
+    if diff_summary:
+        lines.append("## Cross-Domain 4단계 층화 (PRD §10.8)")
+        lines.append("| adapter | difficulty | n | em | em_target | met |")
+        lines.append("|---|---|---|---|---|---|")
+        # difficulty 순서 강제 — 사용자 가독성.
+        order = ["CD-L1", "CD-L2", "CD-L3", "CD-L4"]
+        for adapter, by_diff in diff_summary.items():
+            for diff in order:
+                if diff not in by_diff:
+                    continue
+                d = by_diff[diff]
+                met = "✅" if d["em_target_met"] else "❌"
+                target = f"{d['em_target']:.2f}" if d["em_target"] is not None else "—"
+                lines.append(
+                    f"| {adapter} | {diff} | {d['n']} | {d['em']:.3f} | {target} | {met} |"
+                )
         lines.append("")
 
     # Bridge 데이터 품질 — PRD §10.6 (어댑터 무관, DB 한 번 스냅샷).
@@ -562,6 +621,9 @@ def main() -> int:
     summary = summarize_by_adapter(all_per_q)
     write_per_question_csv(all_per_q, out_dir / "per_question.csv")
 
+    # PRD §10.8 Cross-Domain 4단계 층화 — gold 에 difficulty 라벨이 있을 때만.
+    by_difficulty = summarize_by_difficulty(all_per_q)
+
     # PRD §10.7 hybrid vs vector +30%p 자동 측정.
     hvv = compute_hybrid_vs_vector(summary)
 
@@ -614,6 +676,7 @@ def main() -> int:
         "git": git_info(),
         "budgets": budgets,
         "hybrid_vs_vector": hvv,
+        "by_difficulty": by_difficulty,
         "bridge_quality": bq,
         "main_hop_efficiency": mhe,
         "confidence_weighted": cwa,

@@ -66,7 +66,10 @@ def _upsert_chunk(cur, *, source: str, section: str, text: str,
             """, (manufacturer_id, model_id, variant_id, cid))
         return
 
-    token_est = max(1, len(text) // 4)
+    # 통합 estimator — extraction/chunker.estimate_tokens 가 단일 진실. 과거 //4
+    # 휴리스틱은 finance loaders/chunks 의 //2 와 불일치 → 동일 값으로 정렬.
+    from autonexusgraph.extraction.chunker import estimate_tokens
+    token_est = estimate_tokens(text)
     cur.execute("""
         INSERT INTO vec.chunks
           (corp_code, rcept_no, section, chunk_idx, text, token_count,

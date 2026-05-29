@@ -40,7 +40,8 @@ class KiprisClient:
                 "KIPRIS_API_KEY 미설정 — plus.kipris.or.kr 에서 무료 키 발급 후 .env 추가"
             )
         self.api_key = api_key
-        self._client = httpx.Client(timeout=timeout)
+        from ._common import make_http_client
+        self._client = make_http_client(timeout=timeout)
 
     def __enter__(self) -> "KiprisClient":
         return self

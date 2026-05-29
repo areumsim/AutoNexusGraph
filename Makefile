@@ -475,7 +475,7 @@ audit-edge-meta:
 	$(PYTHON) scripts/audit/edge_meta_invariants.py --strict
 
 audit-dod:
-	$(PYTHON) scripts/audit/dod_audit.py
+	PYTHONPATH=src $(PYTHON) scripts/audit/dod_audit.py
 
 validate-gold-qa:
 	$(PYTHON) scripts/audit/validate_gold_qa.py eval/qa_gold/*.jsonl

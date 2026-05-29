@@ -34,6 +34,51 @@ class TemplateError(ValueError):
 _BasicType = type   # int / str / float / bool
 
 
+# 스펙 dict 가 가져야 할 키와 타입 — 등록 시점 eager 검증으로 drift 방지.
+# 도메인 별 외부 dict (예: autograph.cypher_templates_auto.AUTO_TEMPLATES) 가
+# 본 스키마를 따르지 않으면 import 시점에 즉시 실패한다.
+def validate_template_spec(name: str, spec: dict) -> None:
+    """단일 템플릿 spec 의 shape 검증.
+
+    필수 키: ``cypher`` (str). 선택 키: ``required_params`` (list[str]),
+    ``param_schema`` (dict[str, tuple]).
+    """
+    if not isinstance(spec, dict):
+        raise TemplateError(f"{name}: spec 은 dict 여야 — 실제 {type(spec).__name__}")
+    cypher = spec.get("cypher")
+    if not isinstance(cypher, str) or not cypher.strip():
+        raise TemplateError(f"{name}: 'cypher' 키 누락 또는 빈 문자열")
+    rp = spec.get("required_params", [])
+    if not isinstance(rp, (list, tuple)) or not all(isinstance(x, str) for x in rp):
+        raise TemplateError(f"{name}: 'required_params' 는 list[str] — 실제 {rp!r}")
+    schema = spec.get("param_schema", {})
+    if not isinstance(schema, dict):
+        raise TemplateError(f"{name}: 'param_schema' 는 dict — 실제 {type(schema).__name__}")
+    for pname, psch in schema.items():
+        if not isinstance(pname, str):
+            raise TemplateError(f"{name}: param_schema 키는 str — 실제 {pname!r}")
+        # tuple 형식: (type,) 또는 (type, (kind, ...))
+        if not isinstance(psch, tuple) or len(psch) not in (1, 2):
+            raise TemplateError(
+                f"{name}: param_schema[{pname!r}] 는 (type[, constraint]) tuple — 실제 {psch!r}"
+            )
+
+
+def register_templates(registry: dict, new: dict) -> None:
+    """외부 도메인 (autograph 등) 이 본 registry 에 템플릿 추가.
+
+    - 각 spec 을 eager 검증 → drift 발견 즉시 실패.
+    - 이름 충돌 시 TemplateError (의도하지 않은 덮어쓰기 방지).
+    """
+    for name, spec in new.items():
+        validate_template_spec(name, spec)
+        if name in registry:
+            raise TemplateError(
+                f"템플릿 이름 충돌: {name!r} 이 이미 등록됨. 도메인별 접두사 사용 권장."
+            )
+        registry[name] = spec
+
+
 # ── 템플릿 레지스트리 ──────────────────────────────────────
 TEMPLATES: dict[str, dict] = {
     # ── 회사 식별 ──
@@ -429,4 +474,11 @@ def list_templates() -> list[str]:
     return sorted(TEMPLATES.keys())
 
 
-__all__ = ["TEMPLATES", "TemplateError", "render_template", "list_templates"]
+__all__ = [
+    "TEMPLATES",
+    "TemplateError",
+    "render_template",
+    "list_templates",
+    "validate_template_spec",
+    "register_templates",
+]

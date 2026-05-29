@@ -50,7 +50,8 @@ SET   rel.source_type      = 'pg.auto.events_complaints',
       rel.extraction_method= 'deterministic',
       rel.confidence_score = 1.0,
       rel.validated_status = 'verified',
-      rel.snapshot_year    = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year    = coalesce(r.snapshot_year, date().year),
+      rel.schema_version   = coalesce(r.schema_version, 'v2.1')
 """
 
 

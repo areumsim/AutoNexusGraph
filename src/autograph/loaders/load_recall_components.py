@@ -146,6 +146,7 @@ SET   rel.source_type      = r.source_type,
       rel.confidence_score = r.confidence_score,
       rel.validated_status = r.validated_status,
       rel.snapshot_year    = coalesce(r.snapshot_year, date().year),
+      rel.schema_version   = coalesce(r.schema_version, 'v2.1'),
       rel.match_kind       = r.match_kind
 """
 

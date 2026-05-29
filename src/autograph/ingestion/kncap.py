@@ -1,11 +1,16 @@
 """KNCAP (한국 자동차안전도평가) — 안전등급 수집.
 
-공식 API 채널은 지정 통신 (car.go.kr / KNCAP 사무국). 본 모듈은 두 경로 지원:
+**운영 모드**: **수동 CSV/JSON (by design)**.
+- KNCAP 공식 Open API 는 2026-05 기준 미공개. 자료 요청은 KNCAP 사무국 별도 채널.
+- 사용자가 자료를 받아 `data/raw/auto/kncap/` 하위에 CSV/JSON 으로 두면
+  본 모듈이 표준화된 형식으로 normalize.
+- 환경변수 ``KNCAP_API_KEY`` 는 향후 API 공개 시를 위해 자리만 잡아둠 —
+  현재 ``_api_mode()`` 는 endpoint 미확정으로 즉시 0 반환.
 
-1. **API 키 모드** — `KNCAP_API_KEY` 설정 시 HTTP 호출 (endpoint 는 확정 후 채움).
-2. **수동 모드** — `data/raw/auto/kncap/*.csv` 또는 `*.json` 가 있으면 normalize.
+대체안: NHTSA SafetyRatings 는 ``nhtsa_safety_ratings`` 가 자동 수집. KR-only
+신차 평가만 KNCAP manual 로 보강.
 
-둘 다 부재 시 graceful skip — exit 0.
+운영 절차는 ``docs/operations/data_pipeline.md`` 의 "KNCAP 수동 자료" 절 참조.
 
 CLI:
     python -m autograph.ingestion.kncap
@@ -50,8 +55,11 @@ def _api_mode() -> int:
     s = get_auto_settings()
     if not s.kncap_api_key:
         return 0
-    # KNCAP 공식 endpoint 가 발급되면 여기에 채움.
-    log.warning("[kncap] API endpoint 미확정 — 본 PR 에서는 graceful skip 만 유지")
+    # KNCAP 공식 endpoint 가 발급되면 여기에 채움. 현재는 by-design no-op.
+    log.warning(
+        "[kncap] KNCAP_API_KEY 설정됐으나 공식 endpoint 미공개 — "
+        "수동 CSV 모드로 폴백. KNCAP 공식 API 공개 시 본 함수 채울 것."
+    )
     return 0
 
 

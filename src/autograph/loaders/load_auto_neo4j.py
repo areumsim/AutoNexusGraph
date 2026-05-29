@@ -81,7 +81,8 @@ SET   rel.source_id = r.source,
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
-      rel.snapshot_year = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year = coalesce(r.snapshot_year, date().year),
+      rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
 MERGE_VARIANT = """
@@ -101,7 +102,8 @@ SET   rel.source_id = r.source,
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
-      rel.snapshot_year = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year = coalesce(r.snapshot_year, date().year),
+      rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
 MERGE_RECALL = """
@@ -134,7 +136,8 @@ SET   rel.source_id = r.source_recall_no,
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
-      rel.snapshot_year = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year = coalesce(r.snapshot_year, date().year),
+      rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
 # (VehicleModel)-[:AFFECTED_BY]->(Recall) — variant 매핑이 실패했을 때의 fallback.
@@ -150,7 +153,8 @@ SET   rel.source_id = r.source_recall_no,
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
-      rel.snapshot_year = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year = coalesce(r.snapshot_year, date().year),
+      rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
 # Level 3 (System): 노드 + name + description. system_taxonomy 시드로 보강.
@@ -181,7 +185,8 @@ SET   rel.source_id = 'auto.components',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = 1.0,
       rel.validated_status = 'verified',
-      rel.snapshot_year = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year = coalesce(r.snapshot_year, date().year),
+      rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
 # Level 5 (Part): :Part 라벨 + parent_component_id 가 있으면 (Part)-[:CONTAINED_IN]->(Module).
@@ -203,7 +208,8 @@ SET   rel.source_id = 'auto.components',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = 1.0,
       rel.validated_status = 'verified',
-      rel.snapshot_year = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year = coalesce(r.snapshot_year, date().year),
+      rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
 # auto.master_suppliers + bridge.corp_entity 의 supplier 행 → :Supplier 노드.

@@ -94,7 +94,8 @@ class DartClient:
         self.base_url = base_url.rstrip("/")
         self._min_interval = 1.0 / rate_limit_per_sec if rate_limit_per_sec > 0 else 0
         self._last_call_at: float = 0.0
-        self._client = httpx.Client(timeout=timeout)
+        from ._common import make_http_client
+        self._client = make_http_client(timeout=timeout)
 
     def __enter__(self) -> "DartClient":
         return self

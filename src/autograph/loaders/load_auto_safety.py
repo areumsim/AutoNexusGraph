@@ -158,6 +158,7 @@ SET   rel.source_type      = 'pg.auto.spec_measurements/nhtsa',
       rel.confidence_score = r.confidence,
       rel.validated_status = 'verified',
       rel.snapshot_year    = coalesce(r.snapshot_year, date().year),
+      rel.schema_version   = coalesce(r.schema_version, 'v2.1'),
       rel.overall_rating   = r.overall_rating
 """
 

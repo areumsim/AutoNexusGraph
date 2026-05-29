@@ -11,16 +11,15 @@ render_template / _run / cypher_guard 파이프라인을 그대로 통과.
 """
 
 # ── Cypher 템플릿 자동 병합 (import 1회) ─────────────────────
-from autonexusgraph.tools.cypher_templates import TEMPLATES as _FIN_TEMPLATES
+# register_templates() 가 spec shape 도 eager 검증 → AUTO_TEMPLATES 가 finance
+# 와 동일 스키마를 따르지 않으면 import 시점에 즉시 실패 (drift 방지).
+from autonexusgraph.tools.cypher_templates import (
+    TEMPLATES as _FIN_TEMPLATES,
+    register_templates as _register_templates,
+)
 from ..cypher_templates_auto import AUTO_TEMPLATES as _AUTO_TEMPLATES
 
-# finance 키와 충돌하면 자동 거부 (autograph 측 키는 'auto_' 접두사 규약).
-for _k in _AUTO_TEMPLATES:
-    if _k in _FIN_TEMPLATES:
-        raise RuntimeError(
-            f"AutoGraph cypher template key conflicts with finance: {_k!r}"
-        )
-_FIN_TEMPLATES.update(_AUTO_TEMPLATES)
+_register_templates(_FIN_TEMPLATES, _AUTO_TEMPLATES)
 
 
 from .spec import (

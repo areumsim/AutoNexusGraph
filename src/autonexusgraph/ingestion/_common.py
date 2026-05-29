@@ -103,6 +103,44 @@ def get_rate_limiter(source: str) -> RateLimiter:
     return RateLimiter(DEFAULT_RATE_LIMITS.get(source, 5.0))
 
 
+# ─── HTTP Client 팩토리 ──────────────────────────────────────────
+# 14+ ingestion 클라이언트가 각자 httpx.Client(timeout=...) 를 생성하던 패턴 단일화.
+# - User-Agent 기본값을 자동 부여 (소스가 명시하면 그대로 유지)
+# - timeout 정책 일원화
+# - 향후 옵저버빌리티 (요청 로깅·circuit breaker) 추가 시 한 곳만 수정
+
+DEFAULT_USER_AGENT = "AutoNexusGraph-Research/0.1 (research)"
+DEFAULT_TIMEOUT = 30.0
+
+
+def make_http_client(
+    *,
+    timeout: float | None = None,
+    user_agent: str | None = None,
+    headers: dict[str, str] | None = None,
+    **httpx_kwargs: Any,
+) -> "httpx.Client":  # type: ignore[name-defined]
+    """공유 httpx.Client 팩토리.
+
+    Args:
+        timeout: 초. None 이면 DEFAULT_TIMEOUT (30s).
+        user_agent: ``User-Agent`` 헤더. None 이면 DEFAULT_USER_AGENT.
+            **단, ``headers`` 에 'User-Agent' 가 명시되면 그것이 우선** (SEC 처럼
+            정책상 contact 가 필수인 경우 호출자가 정확한 UA 를 보장).
+        headers: 추가 헤더 (User-Agent 덮어쓰기 가능).
+        **httpx_kwargs: httpx.Client 의 나머지 인자 (transport, mounts 등) 그대로 전달.
+    """
+    import httpx as _httpx
+    merged_headers: dict[str, str] = {"User-Agent": user_agent or DEFAULT_USER_AGENT}
+    if headers:
+        merged_headers.update(headers)  # 호출자가 UA 덮어쓰면 그것이 정답.
+    return _httpx.Client(
+        timeout=timeout if timeout is not None else DEFAULT_TIMEOUT,
+        headers=merged_headers,
+        **httpx_kwargs,
+    )
+
+
 # ─── Retry ────────────────────────────────────────────────────────
 def _retry_env(name: str, default: float) -> float:
     """INGEST_RETRY_{MAX,BASE,JITTER} env override — parsing 실패 시 default + log."""

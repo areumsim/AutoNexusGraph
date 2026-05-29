@@ -77,7 +77,8 @@ SET   rel.source_type      = 'plants_seed',
       rel.extraction_method= 'manual',
       rel.confidence_score = 0.95,
       rel.validated_status = 'validated',
-      rel.snapshot_year    = coalesce(r.snapshot_year, date().year)
+      rel.snapshot_year    = coalesce(r.snapshot_year, date().year),
+      rel.schema_version   = coalesce(r.schema_version, 'v2.1')
 """
 
 

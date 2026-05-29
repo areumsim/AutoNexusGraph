@@ -37,12 +37,13 @@ _CHECKS: list[tuple[str, str, int, str]] = [
             OR r.source_type IS NULL
             OR r.snapshot_year IS NULL
             OR r.validated_status IS NULL
-            OR r.extraction_method IS NULL)
+            OR r.extraction_method IS NULL
+            OR r.schema_version IS NULL)
        AND any(l IN labels(a) WHERE l IN
             ['Manufacturer','VehicleModel','VehicleVariant',
              'Module','Part','Supplier','Recall','Complaint','Plant','Standard','System'])
      RETURN count(*) AS n
-     """, 0, "PRD §6.7 — auto 엣지 6대 의무 메타 결손 row 수"),
+     """, 0, "PRD §6.7 — auto 엣지 7대 의무 메타 결손 row 수 (schema_version 포함)"),
 
     # SUPPLIED_BY 엣지 메타 100% — DoD #11.
     ("supplied_by_missing_meta",
@@ -51,8 +52,9 @@ _CHECKS: list[tuple[str, str, int, str]] = [
      WHERE r.confidence_score IS NULL
         OR r.source_type IS NULL
         OR r.snapshot_year IS NULL
+        OR r.schema_version IS NULL
      RETURN count(*) AS n
-     """, 0, "DoD #11 — SUPPLIED_BY 의 confidence/source/snapshot_year 결손"),
+     """, 0, "DoD #11 — SUPPLIED_BY 의 confidence/source/snapshot_year/schema_version 결손"),
 
     # Supplier 식별 — docs/autograph.md §7.5 #0.1.
     ("supplier_no_entity_id",

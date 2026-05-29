@@ -23,6 +23,7 @@ edge_required_meta:
   - validated_status       # 'verified' | 'validated' | 'candidate' | 'needs_review' | 'rejected'
   - snapshot_year          # 기준 연도 (없으면 적재 연도)
   - extraction_method      # 'deterministic' | 'llm' | 'wikidata' | 'manual'
+  - schema_version         # 'v2.0' | 'v2.1' — 적재 시점 PRD 버전 (helper 가 'v2.1' 로 기본값 부여)
 
 relations:
 
