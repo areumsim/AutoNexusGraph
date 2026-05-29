@@ -1,6 +1,6 @@
 """AutoGraph — 자동차 제품·부품·리콜·공급망 GraphRAG 도메인 (PRD v2.0).
 
-FinGraph 코어(LangGraph multi-agent, PG/Neo4j/pgvector, cost/number/cypher guard)를
+AutoNexusGraph 코어(LangGraph multi-agent, PG/Neo4j/pgvector, cost/number/cypher guard)를
 재사용하면서 자동차 도메인 어댑터·tool·ingestion·loader 만 본 패키지에 둔다.
 
 코어 라우팅 결정:

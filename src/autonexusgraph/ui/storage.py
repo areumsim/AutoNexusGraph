@@ -138,7 +138,9 @@ def generate_title_from_question(question: str) -> str:
     PRD §7.6.3 — title 은 첫 user message 의 첫 LLM 호출로 자동 요약 생성.
     LLM 호출 실패는 fail-soft (질문 첫 30자 사용).
     """
-    fallback = (question or "").strip().splitlines()[0][:30] or "New conversation"
+    # 빈 문자열 / 공백만 입력 시 splitlines()[0] 가 IndexError 나지 않도록 가드.
+    lines = (question or "").strip().splitlines()
+    fallback = (lines[0][:30] if lines else "") or "New conversation"
     if not question or len(question) < 5:
         return fallback
     try:

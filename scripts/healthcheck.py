@@ -136,7 +136,7 @@ CHECKS = {
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="FinGraph 인프라 헬스체크")
+    parser = argparse.ArgumentParser(description="AutoNexusGraph 인프라 헬스체크")
     parser.add_argument("--only", type=str, default=None,
                         help=f"검사할 항목 (쉼표). 가능: {','.join(CHECKS)}")
     args = parser.parse_args()

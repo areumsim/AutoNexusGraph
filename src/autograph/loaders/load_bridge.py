@@ -1,4 +1,4 @@
-"""bridge.corp_entity 적재 — FinGraph corp_code ↔ AutoGraph entity 매핑.
+"""bridge.corp_entity 적재 — finance 도메인 corp_code ↔ AutoGraph entity 매핑.
 
 매칭 전략 (순차, 각 단계는 confidence 차등):
 1) wikidata_qid 매칭   — master.entity_map(id_type='wikidata_qid') ↔
@@ -195,7 +195,7 @@ def match_suppliers_from_wikidata(cur) -> int:
             if lei and len(lei) > 20:
                 lei = None
 
-            # FinGraph 측과의 corp_code 매핑 — 가능한 단서 순으로 시도.
+            # finance 도메인(autonexusgraph) 측과의 corp_code 매핑 — 가능한 단서 순으로 시도.
             corp_code = None
             method = "name_exact"
             conf = 0.55

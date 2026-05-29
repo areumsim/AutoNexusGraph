@@ -40,7 +40,7 @@ PIP ?= $(shell command -v pip3 || command -v pip || echo pip3)
 DOCKER_COMPOSE ?= docker compose
 
 help:
-	@echo "FinGraph — 개발/운영 타깃"
+	@echo "AutoNexusGraph — 개발/운영 타깃"
 	@echo ""
 	@echo "  install         pip install -e \".[all]\" (개발용 전체 설치)"
 	@echo "  fmt             ruff format"

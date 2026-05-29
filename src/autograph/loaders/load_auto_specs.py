@@ -128,7 +128,6 @@ def _resolve_variant(cur, *, make: str, model_raw: str, model_year: int
     if not (make and model_raw and model_year):
         return None
     # canspec model 첫 1~2 토큰만 keep — "IONIQ 6 4DR SEDAN" → "IONIQ 6" 또는 "IONIQ"
-    tokens = [t for t in model_raw.split() if t and not t[0].isdigit() or len(t) <= 2]
     candidates = [" ".join(model_raw.split()[:2]),
                   " ".join(model_raw.split()[:1])]
     for cand in candidates:

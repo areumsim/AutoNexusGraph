@@ -1,4 +1,4 @@
--- Entity Resolution 마스터 ID 매핑 (FinGraph 통합 키 체계)
+-- Entity Resolution 마스터 ID 매핑 (AutoNexusGraph 통합 키 체계)
 -- 모든 외부 소스(Wikidata/Wikipedia/KRX/SEC/GLEIF/KIPRIS …) 는
 -- corp_code 를 마스터 키로 묶는다. mapping 은 별도 테이블로 분리.
 
@@ -25,7 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_em_id      ON master.entity_map(id_type, id_value
 CREATE INDEX IF NOT EXISTS idx_em_source  ON master.entity_map(source);
 
 COMMENT ON TABLE master.entity_map IS
-  'FinGraph 마스터 키(corp_code) 와 외부 ID 의 매핑. 한 회사가 여러 외부 ID 보유 가능.';
+  'AutoNexusGraph 마스터 키(corp_code) 와 외부 ID 의 매핑. 한 회사가 여러 외부 ID 보유 가능.';
 
 
 -- 회사명 별칭 사전 (정규화·fuzzy 매칭 보조)

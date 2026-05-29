@@ -51,7 +51,7 @@ def _make_embed_app(model_name: str, device: str):
     model = SentenceTransformer(model_name, device=device)
     log.info(f"loaded embed model. dim={model.get_sentence_embedding_dimension()}")
 
-    app = FastAPI(title=f"FinGraph embed ({model_name})")
+    app = FastAPI(title=f"AutoNexusGraph embed ({model_name})")
 
     @app.get("/health")
     def health():
@@ -84,7 +84,7 @@ def _make_rerank_app(model_name: str, device: str):
     model = CrossEncoder(model_name, device=device)
     log.info("loaded rerank model")
 
-    app = FastAPI(title=f"FinGraph rerank ({model_name})")
+    app = FastAPI(title=f"AutoNexusGraph rerank ({model_name})")
 
     @app.get("/health")
     def health():
@@ -116,7 +116,7 @@ def _serve(app: Any, host: str, port: int) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="FinGraph 임베딩/재정렬 서버 (TEI 호환 HTTP)")
+    parser = argparse.ArgumentParser(description="AutoNexusGraph 임베딩/재정렬 서버 (TEI 호환 HTTP)")
     parser.add_argument("--embed-model", default="BAAI/bge-m3")
     parser.add_argument("--rerank-model", default="BAAI/bge-reranker-v2-m3")
     parser.add_argument("--embed-port", type=int, default=8080)

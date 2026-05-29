@@ -161,7 +161,7 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
-    print(f"FinGraph data 인벤토리 — root = {root}")
+    print(f"AutoNexusGraph data 인벤토리 — root = {root}")
 
     _section("DART 마스터 (corp_codes)")
     dm = report["dart_master"]

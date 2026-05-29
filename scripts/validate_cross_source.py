@@ -51,7 +51,7 @@ def main() -> int:
         checks.append((name, target, sev, msg, json.dumps(details or {}, ensure_ascii=False)))
 
     today = date.today().isoformat()
-    report_lines.append(f"# FinGraph Data Quality Report — {today}\n")
+    report_lines.append(f"# AutoNexusGraph Data Quality Report — {today}\n")
 
     # ── 1) ID 매핑 커버리지 ────────────────────────────────────
     with pool.connection() as conn, conn.cursor() as cur:

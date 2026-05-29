@@ -31,7 +31,7 @@ import httpx
 PRESS_BASE = "https://www.cgs.or.kr/news/press_list.jsp"
 PRESS_VIEW = "https://www.cgs.or.kr/news/press_view.jsp"
 
-USER_AGENT = "Mozilla/5.0 (FinGraph-Research)"
+USER_AGENT = "Mozilla/5.0 (AutoNexusGraph-Research)"
 ESG_KEYWORDS = ("등급", "ESG", "지배구조", "평가")
 
 

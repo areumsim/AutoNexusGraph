@@ -375,7 +375,7 @@ def compute_hybrid_vs_vector(summary: dict[str, dict]) -> dict[str, Any]:
 def write_summary_md(summary: dict, manifest: dict, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
-    lines.append(f"# FinGraph QA Evaluation — {manifest.get('run_id', '')}")
+    lines.append(f"# AutoNexusGraph QA Evaluation — {manifest.get('run_id', '')}")
     lines.append("")
     lines.append(f"- gold: `{manifest.get('gold', '')}`")
     lines.append(f"- git:  `{manifest['git']['sha'][:10]}` ({manifest['git']['branch']}, dirty={manifest['git']['dirty']})")

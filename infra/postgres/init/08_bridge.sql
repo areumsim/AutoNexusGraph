@@ -1,4 +1,4 @@
--- Cross-Domain Bridge — FinGraph corp_code ↔ AutoGraph entity (PRD v2.0 §4.6).
+-- Cross-Domain Bridge — finance 도메인 corp_code ↔ AutoGraph entity (PRD v2.0 §4.6).
 -- entity_type 은 도메인 객체 유형 (manufacturer, supplier, vehicle_model, variant 등).
 -- 자동 매칭 (Wikidata QID / LEI / 사업자번호 / 정규화 이름) 결과는 reviewed_status='candidate' 로
 -- 적재. 사람이 검토하면 'reviewed' / 'rejected' 로 승급/거부.
@@ -43,6 +43,6 @@ CREATE INDEX IF NOT EXISTS idx_bridge_entity   ON bridge.corp_entity(entity_id, 
 CREATE INDEX IF NOT EXISTS idx_bridge_qid      ON bridge.corp_entity(wikidata_qid);
 CREATE INDEX IF NOT EXISTS idx_bridge_reviewed ON bridge.corp_entity(reviewed_status);
 
-COMMENT ON SCHEMA bridge IS 'Cross-Domain Bridge — FinGraph corp_code ↔ AutoGraph/기타 도메인 entity 매핑.';
+COMMENT ON SCHEMA bridge IS 'Cross-Domain Bridge — finance 도메인 corp_code ↔ AutoGraph/기타 도메인 entity 매핑.';
 COMMENT ON TABLE  bridge.corp_entity IS
   'corp_code ↔ entity_id 매핑. 자동 매칭은 candidate, 사람 검토 후 reviewed 로 승급.';

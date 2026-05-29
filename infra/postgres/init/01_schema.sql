@@ -1,4 +1,4 @@
--- FinGraph PostgreSQL 초기 스키마
+-- AutoNexusGraph PostgreSQL 초기 스키마
 -- docker compose up 시 /docker-entrypoint-initdb.d/ 가 자동 실행.
 --
 -- 구획:

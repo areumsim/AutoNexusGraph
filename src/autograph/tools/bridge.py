@@ -1,4 +1,4 @@
-"""Cross-Domain bridge tool — FinGraph corp_code ↔ AutoGraph entity_id.
+"""Cross-Domain bridge tool — finance 도메인 corp_code ↔ AutoGraph entity_id.
 
 자유 SQL 금지. 사전 정의 함수만.
 
@@ -140,7 +140,7 @@ def cross_query(*, corp_code: str | None = None,
     """Cross-domain helper — corp_code ↔ AutoGraph entity (모든 entity_type).
 
     인자:
-      corp_code     : FinGraph corp_code → 해당 corp 가 매핑된 자동차 entity 들
+      corp_code     : finance 도메인 corp_code → 해당 corp 가 매핑된 자동차 entity 들
       entity_id     : AutoGraph 측 식별자 (variant_id/supplier_id/manufacturer_id …) →
                        매핑된 corp_code(s). 정수도 자동 stringify.
       entity_type   : 'manufacturer' | 'supplier' | 'vehicle_model' | 'variant'

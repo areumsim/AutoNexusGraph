@@ -1,4 +1,4 @@
-"""Hybrid 어댑터 — FinGraph 의 본 agent (Triage/Planner/Executor/Synthesizer).
+"""Hybrid 어댑터 — AutoNexusGraph 의 본 agent (Triage/Planner/Executor/Synthesizer).
 
 PRD §2.2 의 목표: vector-only 대비 multi-hop +30%p 우위 입증.
 """

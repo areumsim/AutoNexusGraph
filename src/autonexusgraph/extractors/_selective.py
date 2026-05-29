@@ -8,7 +8,7 @@ P3 LLM 호출 비용 50%+ 절감을 위한 사전 필터.
 2. coverage estimate — 청크 안 signal 대비 이미 매칭된 회사 개수 충분하면 스킵
 3. 다중 회사 후보 — 한 청크 안에 회사명 2+ 등장해야 관계 추출 가능성 있음
 
-도메인: **금융 (FinGraph)** — 한국 상장사·DART 사업보고서. 코오롱그룹·BNT_ONTOLOGY
+도메인: **금융** — 한국 상장사·DART 사업보고서. 코오롱그룹·BNT_ONTOLOGY
 도메인의 키워드는 사용하지 않음.
 
 설계는 v2/pipeline/selective_llm.py 의 알고리즘을 그대로 차용하되, signal token 만

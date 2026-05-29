@@ -2,7 +2,7 @@
 
 목적:
 - AutoGraph manufacturer/model 의 정식 명칭·국가·QID 확보.
-- FinGraph corp_code 와 매핑 가능한 외부 식별자 (LEI, ISIN, P3320 한국사업자번호 등) 동시 적재.
+- finance 도메인 corp_code 와 매핑 가능한 외부 식별자 (LEI, ISIN, P3320 한국사업자번호 등) 동시 적재.
 
 SPARQL 쿼리 (3종):
 1) manufacturers : ?mfr wdt:P31 wd:Q786820 (자동차 제조 회사).
