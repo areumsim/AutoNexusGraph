@@ -50,6 +50,10 @@ AUTO_GRAPH_ALLOWED = {
 AUTO_SQL_ALLOWED = {
     "lookup_vehicle", "get_vehicle_info", "get_spec",
     "compare_vehicles", "get_safety_rating",
+    # 생산 & 공정 (DART + 산단공 + KAMA) — 2026-06-01 신규
+    "get_plant_capacity", "get_oem_production", "list_plants_by_oem",
+    "search_processes",
+    "get_macro_industry", "get_macro_production",
     # bridge 도 SQL 워커가 호출 (PG 단일 호출)
     "bridge_corp_to_entity", "bridge_entity_to_corp",
     "bridge_sec_cik_to_entity", "bridge_entity_to_sec_cik",

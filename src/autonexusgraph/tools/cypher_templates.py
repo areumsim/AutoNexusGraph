@@ -68,13 +68,19 @@ def register_templates(registry: dict, new: dict) -> None:
     """외부 도메인 (autograph 등) 이 본 registry 에 템플릿 추가.
 
     - 각 spec 을 eager 검증 → drift 발견 즉시 실패.
-    - 이름 충돌 시 TemplateError (의도하지 않은 덮어쓰기 방지).
+    - 이름 충돌 시: 같은 spec 이면 idempotent no-op (모듈 재import 안전),
+      다른 spec 이면 TemplateError (의도하지 않은 덮어쓰기 방지).
     """
     for name, spec in new.items():
         validate_template_spec(name, spec)
-        if name in registry:
+        existing = registry.get(name)
+        if existing is not None:
+            if existing is spec or existing == spec:
+                # 동일 spec 재등록 — idempotent (sys.modules 클리어 후 재import 등)
+                continue
             raise TemplateError(
-                f"템플릿 이름 충돌: {name!r} 이 이미 등록됨. 도메인별 접두사 사용 권장."
+                f"템플릿 이름 충돌: {name!r} 이 다른 spec 으로 이미 등록됨. "
+                "도메인별 접두사 사용 권장."
             )
         registry[name] = spec
 

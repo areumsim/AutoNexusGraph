@@ -24,10 +24,16 @@ _register_templates(_FIN_TEMPLATES, _AUTO_TEMPLATES)
 
 from .spec import (
     compare_vehicles,
+    get_macro_industry,
+    get_macro_production,
+    get_oem_production,
+    get_plant_capacity,
     get_safety_rating,
     get_spec,
     get_vehicle_info,
+    list_plants_by_oem,
     lookup_vehicle,
+    search_processes,
 )
 from .graph import (
     find_vehicle_component_paths,
@@ -63,6 +69,13 @@ __all__ = [
     "get_spec",
     "compare_vehicles",
     "get_safety_rating",
+    # 생산 & 공정 (DART + 산단공 + KAMA)
+    "get_plant_capacity",
+    "get_oem_production",
+    "list_plants_by_oem",
+    "search_processes",
+    "get_macro_industry",
+    "get_macro_production",
     # graph
     "lookup_vehicle_graph",
     "lookup_supplier",
