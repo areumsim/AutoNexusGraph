@@ -16,7 +16,9 @@ DEFAULT_TOPK = 8
 HARD_TOPK = 50
 
 # 자동차 청크의 source 컨벤션 (build_chunks_auto 와 일치).
-AUTO_SOURCES = ("nhtsa_recall", "nhtsa_complaint", "nhtsa_tsb", "wikipedia_auto")
+# 2026-06-01 확장: oem_ir (IR/뉴스룸 본문) + dart_narrative (supplier OEM DART)
+AUTO_SOURCES = ("nhtsa_recall", "nhtsa_complaint", "nhtsa_tsb",
+                "wikipedia_auto", "oem_ir", "dart_narrative")
 
 
 def _cap(k: int | None) -> int:
@@ -35,8 +37,12 @@ def _build_where(*,
     params: dict[str, Any] = {}
     if require_embedding:
         clauses.append("embedding IS NOT NULL")
-    # 자동차 도메인 한정 — manufacturer_id IS NOT NULL (finance 청크 제외).
-    clauses.append("manufacturer_id IS NOT NULL")
+    # 자동차 도메인 한정 — finance 청크 (corp_code 있고 자동차 메타 없음) 제외.
+    # 2026-06-01: oem_ir / dart_narrative 는 manufacturer_id=NULL 이지만
+    # metadata->>'oem' 로 자동차 도메인 식별.
+    clauses.append(
+        "(manufacturer_id IS NOT NULL OR metadata->>'oem' IS NOT NULL)"
+    )
 
     if manufacturer_id is not None:
         if isinstance(manufacturer_id, (list, tuple)):
@@ -114,6 +120,11 @@ def search_documents_auto(query: str, *,
     with pool.connection() as conn:
         register_vector(conn)
         with conn.cursor() as cur:
+            # pgvector HNSW 의 ef_search 증가 (기본 40) — auto 청크가 finance 748k
+            # 가운데 소수 (16k) 라 기본 ef 로는 source 필터 후 0 rows 발생.
+            # 400 ef_search 면 충분 (실측 nhtsa+wiki+ir+narrative 합 ~16.5k 청크
+            # 중 가장 유사한 top-K 선별).
+            cur.execute("SET LOCAL hnsw.ef_search = 400")
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]

@@ -613,3 +613,12 @@ extract-ir-p3:
 	$(PYTHON) -m autograph.extractors.run_p3_ir \
 	    --oems hyundai \
 	    --hard-limit-usd $(IR_P3_HARD_LIMIT)
+
+# Plant 노드 wiki 속성 보강 — Wikipedia plant 청크 → :Plant attributes.
+load-plant-wiki-enrichment:
+	$(PYTHON) -m autograph.loaders.load_plant_wiki_enrichment
+
+# Korean OEM alias backfill — auto.master_manufacturers 의 aliases 배열에
+# 한국어 변형 + KGM/RENAULT KOREA 신규 entry.
+load-master-korean-aliases:
+	$(PYTHON) -m autograph.loaders.load_master_korean_aliases
