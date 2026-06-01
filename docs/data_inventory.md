@@ -1,9 +1,9 @@
 # AutoGraph — 실제 수집·적재 데이터 인벤토리
 
-측정 일자: **2026-05-29 01:15 KST** (FORD OEM 확장 + NHTSA taxonomy 적재 + complaint→component 매핑 + SEC bridge 보강 후)
-측정 도구: `find`, `wc`, `psql via psycopg`, `cypher-shell via neo4j driver`, `eval/metrics/prd_dashboard`
+측정 일자: **2026-06-01** (산단공 공정 + KAMA macro + DART production 신규 채널 추가)
+측정 도구: `find`, `wc`, `psql via psycopg`, `cypher-shell via neo4j driver`, `eval/metrics/prd_dashboard`, `make audit-data-channels`
 
-본 문서는 `data/raw/auto/**` (raw files), PG `auto/bridge/vec` 스키마, Neo4j 라벨/관계의 **실시간 측정값**. `docs/data_sources.md` 가 후보 카탈로그라면, 이건 **현재 디스크·DB 에 들어와 있는 사실**.
+본 문서는 `data/raw/auto/**` (raw files), PG `auto/bridge/vec` 스키마, Neo4j 라벨/관계의 **실시간 측정값**. `docs/data_sources.md` 가 후보 카탈로그, `docs/data_catalog.md` 가 구현된 채널 운영 가이드라면, 이건 **현재 디스크·DB 에 들어와 있는 사실**.
 
 PRD §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/5 measurable pass, §10.4/§10.6/§10.11/§10.12 ✅).
 
@@ -26,9 +26,26 @@ PRD §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/
 | AI-Hub 71347 (모터·배터리) | 3.0 GB | 616,898 라벨 | 4 components (L4) | 통합 |
 | AI-Hub 578 (부품 품질) | 703 MB | 22 tar | 22 components | 통합 |
 | supplier_seed (manual) | — | 1 yaml | 18 components + 19 suppliers | 30 SUPPLIED_BY |
-| **합계** | **~3.8 GB** | **~618k files** | **~52k auto rows** | **48k 노드 / 28k 관계** |
+| **산단공 공정 합성 (15151075)** ⭐ 신규 6/1 | 256 KB | 1 CSV | 550 row (적재 대기) | — (후속 PR) |
+| **DART production (6 OEM)** ⭐ 신규 6/1 | (DART zip 재사용) | 98 zip | (적재 대기) capacity ~50 / production ~70 | MANUFACTURED_AT (적재 후) |
+| **KAMA macro yearly (15051116)** ⭐ 신규 6/1 | 397 B | 1 CSV | (적재 대기) 21 row | — |
+| **KAMA macro monthly (15051118)** ⭐ 신규 6/1 | 6.3 KB | 1 CSV | (적재 대기) 204 row | — |
+| 팩토리온 (15087611) | 0 | 0 | 0 | 키 발급 대기 |
+| **합계** | **~3.8 GB** | **~618k files + 4 신규 CSV** | **~52k 적재 / +825 row 적재 대기** | **48k 노드 / 28k 관계** |
 
-진행 단계: **데이터 충분 + 자동 측정 인프라 완성**. PRD §3.3 MVP 범위 OEM **5사** (HYUNDAI/KIA/GENESIS/TESLA/FORD) × 5 year (2020-24) 채워짐. KGM/르노코리아 + 한국 시장 리콜 데이터 부족 (data.go.kr 키 발급 필요).
+진행 단계 (2026-06-01 갱신):
+- ✅ PRD §3.3 MVP 범위 OEM 5사 (HYUNDAI/KIA/GENESIS/TESLA/FORD) × 5 year (2020-24) NHTSA 채워짐.
+- ✅ 제조 공정·생산 신규 채널 3 종 raw 보유 — Phase A 코드 인프라 완성 (parser + loader + agent tool + Neo4j sync + chain). 적재 대기 명령:
+  ```
+  make migrate-auto-production
+  make migrate-auto-kama
+  make load-sandang-processes
+  make load-kama-macro
+  make load-dart-production
+  ```
+- ⚠️ KGM/르노코리아 NHTSA 데이터 부족 + 한국 시장 리콜 미적재 (DATA_GO_KR_API_KEY 발급 대기).
+- ⚠️ 팩토리온 (15087611) plant↔생산품 매핑 미활성 — DATA_GO_KR_API_KEY 발급 대기.
+- 📋 `make audit-data-channels` 로 채널별 트래픽라이트 자동 측정 가능.
 
 ---
 

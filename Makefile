@@ -572,3 +572,7 @@ load-dart-production-dry:
 
 load-dart-production-no-neo4j:
 	$(PYTHON) -m autograph.loaders.load_dart_production --no-neo4j
+
+# 데이터 채널 트래픽라이트 — 산단공/DART/KAMA/팩토리온/리콜 상태 한눈에.
+audit-data-channels:
+	$(PYTHON) scripts/audit/data_channels.py
