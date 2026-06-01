@@ -344,15 +344,36 @@ def _collect_ontology_audit() -> dict[str, Any]:
     if payload.get("passed"):
         n_pass = payload.get("n_pass", 0)
         n_total = payload.get("n_total", 0)
+        # cypher↔yaml cross-check 결과의 정보성 마커 (cross_domain_refs / unused_in_cypher)
+        # 도 detail 에 노출 — DoD #17 (c) 'pass' 이지만 도메인 간 참조 패턴은 가시화.
+        results = payload.get("results", [])
+        cross_info: list[str] = []
+        for r in results:
+            if not r.get("label", "").endswith(".cypher-vs-yaml"):
+                continue
+            label = r["label"]
+            cd_refs = r.get("cross_domain_refs") or []
+            unused = r.get("unused_in_cypher") or []
+            if cd_refs:
+                cross_info.append(f"{label} cross-domain={len(cd_refs)}")
+            if unused:
+                cross_info.append(f"{label} unused yaml={len(unused)}")
+        cross_str = f" · {' · '.join(cross_info)}" if cross_info else ""
         return {
             "id": "10.17.c", "status": "pass",
-            "detail": f"{n_pass}/{n_total} ontology files validated ({latest.name})",
+            "detail": f"{n_pass}/{n_total} ontology files validated{cross_str} ({latest.name})",
         }
+    # FAIL 분기 — cypher cross-check 의 true_missing 정보가 있으면 그것을 우선 노출.
     failed = [r for r in payload.get("results", []) if not r.get("passed")]
-    reasons = "; ".join(f"{r['label']}: {r['reason']}" for r in failed[:3])
+    reasons: list[str] = []
+    for r in failed[:5]:
+        if r.get("true_missing"):
+            reasons.append(f"{r['label']}: cypher uses but yaml missing={r['true_missing']}")
+        else:
+            reasons.append(f"{r['label']}: {r['reason']}")
     return {
         "id": "10.17.c", "status": "fail",
-        "detail": f"FAIL — {reasons} ({latest.name})",
+        "detail": f"FAIL — {'; '.join(reasons)} ({latest.name})",
     }
 
 

@@ -18,6 +18,8 @@ from __future__ import annotations
 from statistics import fmean
 from typing import Any, Iterable
 
+from ._thresholds import MAIN_HOP_TARGET_RATIO
+
 
 def _evidence_count(pred_row: dict) -> int:
     ev = pred_row.get("evidence")
@@ -62,7 +64,7 @@ def main_hop_efficiency(pred_rows: Iterable[dict],
                 correct_by_adapter.setdefault(a, []).append(_evidence_count(r))
 
     out: dict[str, Any] = {
-        "target_efficiency_ratio": 0.7,   # vector adapter 대비 30% 감소
+        "target_efficiency_ratio": MAIN_HOP_TARGET_RATIO,   # PRD §10.13 — vector 대비 30% 감소
     }
     for a, counts in by_adapter.items():
         avg = fmean(counts) if counts else 0.0
@@ -85,14 +87,14 @@ def main_hop_efficiency(pred_rows: Iterable[dict],
             "vector_ev_avg": v["ev_avg"],
             "hybrid_ev_avg": h["ev_avg"],
             "ratio":         round(ratio, 3),
-            "target_met":    ratio > 0.0 and ratio <= 0.7,
+            "target_met":    ratio > 0.0 and ratio <= MAIN_HOP_TARGET_RATIO,
         }
     return out
 
 
 def format_summary_md(quality: dict[str, Any]) -> str:
     lines: list[str] = ["## Main-Hop Efficiency (PRD §10.13 목표: 평면 대비 −30%)"]
-    target = quality.get("target_efficiency_ratio", 0.7)
+    target = quality.get("target_efficiency_ratio", MAIN_HOP_TARGET_RATIO)
     hvv = quality.get("hybrid_vs_vector")
     if not hvv:
         lines.append("- (vector/hybrid 어댑터가 모두 있을 때만 비교 가능)")

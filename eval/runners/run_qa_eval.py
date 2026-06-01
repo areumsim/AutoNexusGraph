@@ -342,8 +342,11 @@ def summarize_by_adapter(per_q: list[dict]) -> dict[str, dict]:
 
 # ─── Cross-Domain 4단계 층화 (PRD §10.8 — CD-L1/L2/L3/L4 80/70/50/40%) ────
 # 각 어댑터 내에서 difficulty 별로 EM/F1 평균 + n 산출.
-# PRD 목표 비교를 위해 임계점 dict 도 같이 반환.
-_PRD_10_8_TARGETS = {"CD-L1": 0.80, "CD-L2": 0.70, "CD-L3": 0.50, "CD-L4": 0.40}
+# PRD 목표 비교를 위해 임계점 dict 도 같이 반환. SSOT = _thresholds.py.
+from eval.metrics._thresholds import (
+    CD_DIFFICULTY_TARGETS as _PRD_10_8_TARGETS,
+    THESIS_DIFF_PP_TARGET,
+)
 
 
 def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
@@ -385,7 +388,7 @@ def compute_hybrid_vs_vector(summary: dict[str, dict]) -> dict[str, Any]:
     """
     out: dict[str, Any] = {
         "available": False,
-        "target_diff_pp": 30.0,
+        "target_diff_pp": THESIS_DIFF_PP_TARGET,
         "target_met": False,
     }
     h = summary.get("hybrid") or {}
@@ -404,8 +407,8 @@ def compute_hybrid_vs_vector(summary: dict[str, dict]) -> dict[str, Any]:
         "hybrid_f1":            h["multi_hop_f1"],
         "vector_f1":            v["multi_hop_f1"],
         "f1_diff_pp":           round(f1_diff, 2),
-        # 둘 중 하나라도 30%p 이상이면 PRD 목표 met.
-        "target_met":           (em_diff >= 30.0) or (f1_diff >= 30.0),
+        # 둘 중 하나라도 +30%p 이상이면 PRD §10.7 목표 met.
+        "target_met":           (em_diff >= THESIS_DIFF_PP_TARGET) or (f1_diff >= THESIS_DIFF_PP_TARGET),
     })
     return out
 

@@ -12,9 +12,11 @@ import statistics
 from typing import Any, Iterable
 
 
-# PRD §10.14 임계.
-THRESHOLD_DOMAIN_INTERNAL_SEC = 8.0
-THRESHOLD_CROSS_DOMAIN_SEC    = 12.0
+# PRD §10.14 임계 — SSOT 은 _thresholds.py. 본 모듈은 backward compat 위해 re-export.
+from ._thresholds import (
+    THRESHOLD_DOMAIN_INTERNAL_SEC,
+    THRESHOLD_CROSS_DOMAIN_SEC,
+)
 
 
 def _percentile(xs: list[float], p: float) -> float:
