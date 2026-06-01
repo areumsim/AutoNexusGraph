@@ -30,6 +30,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
+from eval.metrics._thresholds import (   # noqa: E402  PRD §10 임계 SSOT
+    THESIS_DIFF_PP_TARGET,
+    MAIN_HOP_TARGET_RATIO,
+)
+from eval.metrics._thesis import compute_diff_pp   # noqa: E402  §10.7 격차 helper
+
 log = logging.getLogger(__name__)
 
 
@@ -169,14 +175,16 @@ def compute_thesis_headline(cells_with_metrics: list[dict[str, Any]]
             "hybrid":     hybrid_best["label"],
             "vector":     vector_baseline["label"],
         }
-    diff_pp = (hybrid_best["multi_hop_em"] - vector_baseline["multi_hop_em"]) * 100.0
+    diff_pp, target_met = compute_diff_pp(
+        hybrid_best["multi_hop_em"], vector_baseline["multi_hop_em"],
+    )
     return {
         "available":   True,
         "hybrid_em":   hybrid_best["multi_hop_em"],
         "vector_em":   vector_baseline["multi_hop_em"],
-        "diff_pp":     round(diff_pp, 2),
-        "target_pp":   30.0,
-        "target_met":  diff_pp >= 30.0,
+        "diff_pp":     diff_pp,
+        "target_pp":   THESIS_DIFF_PP_TARGET,
+        "target_met":  target_met,
     }
 
 
@@ -210,8 +218,8 @@ def compute_dod_13_14(cells_with_metrics: list[dict[str, Any]]) -> dict[str, Any
             "hybrid_ev":  hybrid_best["ev_avg_correct"],
             "vector_ev":  vector_baseline["ev_avg_correct"],
             "ratio":      round(ratio, 3),
-            "target":     0.7,
-            "target_met": ratio <= 0.7,   # 30% 이상 감소
+            "target":     MAIN_HOP_TARGET_RATIO,
+            "target_met": ratio <= MAIN_HOP_TARGET_RATIO,   # PRD §10.13 — 30%+ 감소
         }
 
     # DoD #14 — hybrid_rerank1 셀의 internal/cross latency pass rate.
@@ -258,10 +266,17 @@ def main() -> int:
                    default=ROOT / "data" / "reports",
                    help="JSON 리포트 저장 디렉토리")
     p.add_argument("--limit", type=int, default=None,
-                   help="(full 모드) gold 첫 N row 만")
+                   help="(full 모드) gold 첫 N row 만. --full + 미지정 시 "
+                        "기본 30 (multi-hop subset 포함 → §10.7 thesis 측정 가능).")
     p.add_argument("--log-level", default="INFO")
     args = p.parse_args()
     logging.basicConfig(level=args.log_level, format="%(levelname)s %(message)s")
+
+    # --full 모드 + --limit 미지정 시 default = 30 (gold_qa_v0.jsonl 의 multi-hop
+    # 16 row 가 11~30 번에 있어 §10.7 thesis multi_hop_em 산정 가능). limit 10 시
+    # FIN-L1 (단일홉) 만 → multi_hop_em 미산정 → thesis "simulation" 표기.
+    if args.full and args.limit is None:
+        args.limit = 30
 
     adapters = tuple(a.strip() for a in args.adapters.split(",") if a.strip())
     tiers = tuple(t.strip() for t in args.tiers.split(",") if t.strip())

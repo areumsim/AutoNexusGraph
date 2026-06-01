@@ -80,15 +80,16 @@
 
 ### IPGraph 도메인 (도메인3 — 코드 구현 완료 (working tree, uncommitted), 데이터 부분 적재)
 
-> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 PRD §10.12 "코어 변경 < 5%" 재측정 — `make audit-dod` 2026-06-01 baseline `bab9411` 기준 **0/14,091 LOC = 0.00%** ✅. baseline reset 정책은 §10.12 본문 + §11.1 참조. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 코드: `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/{bridge,graph,patents,retrieve}.py + loaders/{load_cpc,load_openalex}.py + ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. 데이터 적재: CPC bulk 10,695 + OpenAlex works 629 (line 89, 92-96). 특허/assignee/citations 는 KIPRIS_API_KEY 발급 + USPTO ODP bulk + PG 스키마 마이그레이션 (`18_ipgraph.sql` 부분 미적용) 대기.
+> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 PRD §10.12 "코어 변경 < 5%" 재측정 — `make audit-dod` 2026-06-01 baseline `bab9411` 기준 **0/14,091 LOC = 0.00%** ✅. baseline reset 정책은 §10.12 본문 + §11.1 참조. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 코드: `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/{bridge,graph,patents,retrieve}.py + loaders/{load_cpc,load_openalex}.py + ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. 데이터 적재: CPC bulk 10,695 + OpenAlex works 629 (line 89, 92-96). **PG schema 12 ip.* 테이블 적용 완료 (2026-06-01 — 18/19_ipgraph.sql, schema drift 해소)** — patents/assignees/citations row 적재는 KIPRIS_API_KEY 발급 + USPTO ODP bulk download 대기.
 
 | 영역 | 적재량 | 비고 |
 |---|---:|---|
-| `ip.patents` (KIPRIS + USPTO ODP) | 0 | (예정) — KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset 채택 후 활성 |
-| `ip.assignees` (Wikidata QID·LEI·business_no 매칭) | 0 | (예정) — Assignee → corp_entity 브리지 (M-3) |
+| `ip.patents` (KIPRIS + USPTO ODP) | 0 | ⭐ 6/1 PG schema 적용 완료 (pub_no/jurisdiction/source). KIPRIS_API_KEY 발급 + USPTO ODP bulk download 후 데이터 적재 |
+| `ip.assignees` (Wikidata QID·LEI·business_no 매칭) | 0 | ⭐ 6/1 PG schema 적용 완료. Assignee → corp_entity 브리지 (M-3), USPTO ODP / KIPRIS 적재 후 |
 | `ip.cpc_scheme` (CPC 분류 계층 depth ≥ 4) ⭐ 6/1 | **10,695** (section 9 + class 137 + subclass 681 + main_group 9,868) | ✅ USPTO+EPO 공동 CPC bulk (CPCTitleList202605.zip, 무인증). subgroup 250K 는 별도 cron |
-| `ip.citations` (PatentsView) | 0 | (예정) — 인용 네트워크, `get_citation_network(depth≤2)` cap 강제 |
-| `ip.assignee_corp_map` (신규 join 테이블) | 0 | (예정) — `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
+| `ip.citations` (PatentsView 후속 USPTO ODP) | 0 | ⭐ 6/1 PG schema 적용 완료. 인용 네트워크, `get_citation_network(depth≤2)` cap 강제 |
+| `ip.assignee_corp_map` (신규 join 테이블) | 0 | ⭐ 6/1 PG schema 적용 완료 (19_ipgraph_bridge.sql). `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
+| `ip.inventors / ip.patent_inventors / ip.patent_assignees / ip.patent_cpc` ⭐ 6/1 | 0 / 0 / 0 / 0 | PG schema 적용 완료 (18_ipgraph.sql). Patent 적재 후 FK ON DELETE CASCADE 로 자동 채워짐 |
 | `ip.works` (OpenAlex 논문) / `ip.institution` / `ip.work_institution` ⭐ 6/1 | **629 / 38 / 638** | ✅ KR 38 corp_code 매칭 (현대차/모비스/기아/만도/LG/네이버/효성/금호석유/한미약품/Hyundai Steel …) × 상위 인용 work 20씩, 2020~. abstract 423건 → vec.chunks (embedding NULL = BGE-M3 backfill 대상). 특허×논문×재무 3중 cross 진입점 |
 | Neo4j Work / Institution / AUTHORED_AT / IS_ENTITY ⭐ 6/1 | 629 / 38 / **638** / 38 | AUTHORED_AT 7-key 100% / IS_ENTITY (Institution→Company) cross-domain bridge |
 | Neo4j Patent / Assignee / Inventor / CPCCode ⭐ 6/1 | 0 / 0 / 0 / **10,695** | CPCCode 적재 완료. Patent/Assignee/Inventor 는 KIPRIS/USPTO ODP 데이터 적재 후 |
@@ -427,7 +428,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | USES_PROCESS / MADE_OF (L6) | wired (ontology 정의) | `:Process` 노드 사전 산단공 적재 / `:Material` 노드 미구현. 엣지 적재 routine 미구현 |
 | DART 사업보고서 가동률 표 | 코드 TODO (`extractors/dart_production_parser.py:316`) | capacity 만 추출. 가동률은 컬럼 구성이 다양해 별도 경로 필요 |
 | **IPGraph 도메인 어댑터** | **코드 구현 완료 (working tree, uncommitted)** — 도메인3 | `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/* + loaders/* + ingestion/*` + `ontology/ip/*` (audit-ontology 4/4 PASS) + tool pool 4종 + cypher `ip_*` 25 templates + gold seed 30 + cross_ip 8. `make audit-ipgraph` PASS. core 변경 0 LOC = 0.00% (§10.12). 상세 SSOT [docs/ipgraph.md](./docs/ipgraph.md) |
-| **`ip.assignee_corp_map`** | **(예정)** — PG 테이블 부재 | `19_ipgraph_bridge.sql` DDL 정의됨, **PG 마이그레이션 미적용 → 테이블 부재**. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
+| **`ip.assignee_corp_map`** | **(예정)** — 테이블 생성, mapping 데이터 0 | `19_ipgraph_bridge.sql` **적용 완료 (2026-06-01)** — assignee 적재 + auto/reviewed 매핑 SOP 대기. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
 | **KIPRIS / USPTO ODP (PatentsView 후속) / CPC bulk / OpenAlex** | **CPC bulk 10,695 + OpenAlex works 629 ✅ / KIPRIS·USPTO ODP (예정)** | `loaders/load_cpc.py` + `loaders/load_openalex.py` 적재 완료. PatentsView 는 **2026-03-20 USPTO Open Data Portal (data.uspto.gov) 로 이관 완료** — REST API 종료, **bulk dataset 채택**. `ingestion/{kipris,uspto_odp}.py` 구현됨, 키 발급 + bulk 적재 대기 |
 | **배터리·소재 (auto L5/L6)** | **(예정)** — ontology 정의만, 데이터 0 | Wikidata cell chem + USGS minerals + 무역통계. 회사단위 셀 ↔ OEM 소싱은 grade C candidate 정직 표기 |
 | **MCP 래퍼** | **(wired, partial)** — `src/autonexusgraph/mcp/`. typed tool pool (52 tools) + 자동 JSON Schema 변환 + stdio server. `make audit-mcp` SDK 미설치 fail-soft | typed tool pool 위에 얇은 MCP server. 2026 상호운용 표준 신호 (Claude/OpenAI Agents SDK 양쪽 MCP 채택). `pip install -e ".[mcp]"` 후 `python -m autonexusgraph.mcp` |

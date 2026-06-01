@@ -120,7 +120,12 @@ def _validate_cypher_relations(domain: str, import_path: str, dict_name: str,
                 "reason": f"relations.yaml 없음: {relations_yaml}"}
     try:
         ont = load_and_validate(relations_yaml)
-        yaml_rels = set((ont.relations or {}).keys())
+        # enabled: false 인 rel 은 cypher 의 의도적 미사용 (ablation 후 활성, OpenAlex
+        # 적재 대기 등) → unused_in_cypher 에서 제외하여 진짜 결손만 노출.
+        yaml_rels = {
+            name for name, rel in (ont.relations or {}).items()
+            if getattr(rel, "enabled", True)
+        }
     except OntologyValidationError as e:
         return {"label": label, "passed": False,
                 "reason": f"relations.yaml validation 실패: {e.cause}"}

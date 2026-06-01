@@ -9,7 +9,7 @@
 >
 > **현재 구현 상태 (2026-06-01, working tree, uncommitted)**
 > - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (25 templates) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS (handler+router+ontology+25 cypher+gold ip=30/cross_ip=8).
-> - **데이터**: 부분 적재 — `ip.cpc_scheme` **10,695 row** + `ip.works` (OpenAlex) **629 row** + Neo4j `:CPCCode` **10,695 노드**. `ip.patents` 0 row (테이블만 존재). `ip.assignees / ip.citations / ip.patent_cpc / ip.patent_assignees / ip.institutions / ip.inventors / ip.assignee_corp_map` 7 테이블은 **PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) 부분 미적용** → KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset 채택 + DDL 적용이 후속 작업.
+> - **데이터**: 부분 적재 — `ip.cpc_scheme` **10,695 row** + `ip.works` (OpenAlex) **629 row** + `ip.institution` 38 + `ip.work_institution` 638 + Neo4j `:CPCCode` **10,695 노드**. PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) **적용 완료 (2026-06-01)** — `ip.patents / ip.assignees / ip.inventors / ip.patent_assignees / ip.patent_inventors / ip.patent_cpc / ip.citations / ip.assignee_corp_map` 8 테이블 생성됨 (row=0). 후속: KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset → `ingestion/{kipris,uspto_odp}.py` 실행 + assignee → corp_entity 매핑.
 >
 > **선택 근거:** OpenAlex / **USPTO ODP (data.uspto.gov, PatentsView 후속 — 2026-03-20 이관 완료, REST 종료 → bulk dataset)** / CPC bulk 완전 무료, KIPRIS 로 한국 특허 커버, 거의 전부 정형이라 LLM 예산 거의 무소비.
 > CPC 분류는 정식 계층 온톨로지. assignee → 기업 매핑이 cross-domain 진입점.

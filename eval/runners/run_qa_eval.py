@@ -347,6 +347,7 @@ from eval.metrics._thresholds import (
     CD_DIFFICULTY_TARGETS as _PRD_10_8_TARGETS,
     THESIS_DIFF_PP_TARGET,
 )
+from eval.metrics._thesis import compute_diff_pp
 
 
 def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
@@ -396,19 +397,19 @@ def compute_hybrid_vs_vector(summary: dict[str, dict]) -> dict[str, Any]:
     if "multi_hop_n" not in h or "multi_hop_n" not in v:
         return out
 
-    em_diff = (h["multi_hop_em"] - v["multi_hop_em"]) * 100.0
-    f1_diff = (h["multi_hop_f1"] - v["multi_hop_f1"]) * 100.0
+    em_diff_pp, em_met = compute_diff_pp(h["multi_hop_em"], v["multi_hop_em"])
+    f1_diff_pp, f1_met = compute_diff_pp(h["multi_hop_f1"], v["multi_hop_f1"])
     out.update({
         "available": True,
         "multi_hop_n":          {"hybrid": h["multi_hop_n"], "vector": v["multi_hop_n"]},
         "hybrid_em":            h["multi_hop_em"],
         "vector_em":            v["multi_hop_em"],
-        "em_diff_pp":           round(em_diff, 2),
+        "em_diff_pp":           em_diff_pp,
         "hybrid_f1":            h["multi_hop_f1"],
         "vector_f1":            v["multi_hop_f1"],
-        "f1_diff_pp":           round(f1_diff, 2),
+        "f1_diff_pp":           f1_diff_pp,
         # 둘 중 하나라도 +30%p 이상이면 PRD §10.7 목표 met.
-        "target_met":           (em_diff >= THESIS_DIFF_PP_TARGET) or (f1_diff >= THESIS_DIFF_PP_TARGET),
+        "target_met":           em_met or f1_met,
     })
     return out
 

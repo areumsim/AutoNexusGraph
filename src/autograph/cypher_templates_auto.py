@@ -327,6 +327,20 @@ AUTO_TEMPLATES: dict[str, dict] = {
         "param_schema": {"model_id": _INT_PK, "limit": _LIMIT_500},
     },
 
+    "auto_plants_of_manufacturer": {        # OEM 이 운영하는 공장 (OWNS_PLANT).
+        "cypher": """
+        MATCH (mm:Manufacturer {id: $manufacturer_id})-[rel:OWNS_PLANT]->(p:Plant)
+        RETURN p.code AS plant_code, p.name AS plant_name,
+               p.country AS country, p.city AS city,
+               rel.confidence_score AS confidence,
+               rel.snapshot_year AS snapshot_year
+        ORDER BY p.country, p.city
+        LIMIT $limit
+        """,
+        "required_params": ["manufacturer_id", "limit"],
+        "param_schema": {"manufacturer_id": _INT_PK, "limit": _LIMIT_500},
+    },
+
     # ── 조사 (NHTSA ODI Investigations) ────────────────────
     # multi-variant 가 같은 inv 노드를 가리킬 때 (inv, rel) 페어 distinct 는 중복 살려둠
     # → inv 만 distinct 한 뒤 rel 의 메타는 첫 한 건만 추출 (B2 fix).

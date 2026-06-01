@@ -29,7 +29,7 @@
         load-auto-investigations load-auto-oem-sec load-auto-mfrcomm \
         derive-auto-contains-system load-wikidata-part-supplies \
         extract-auto-p3 extract-auto-p3-cost validate-auto-p4 extract-validate-auto \
-        audit-bom-coverage audit-edge-meta audit-trace audit-ontology audit-eval-matrix audit-mcp audit-ipgraph audit-dod \
+        audit-bom-coverage audit-edge-meta audit-trace audit-ontology audit-eval-matrix audit-eval-matrix-full audit-mcp audit-ipgraph audit-dod \
         validate-gold-qa eval-cross eval-ip \
         ingest-datagokr-recalls ingest-datagokr-inspections \
         ingest-car-go-kr ingest-katri ingest-kncap \
@@ -114,7 +114,8 @@ help:
 	@echo "  audit-edge-meta                   PRD §6.7 의무 메타 invariant (strict)"
 	@echo "  audit-trace                       PRD §10 DoD #17 (b) Langfuse 실측 (turn별 token/cost/replan)"
 	@echo "  audit-ontology                    PRD §10 DoD #17 (c) 온톨로지 pydantic strict 검증"
-	@echo "  audit-eval-matrix                 PRD §10 DoD #17 (d) 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation)"
+	@echo "  audit-eval-matrix                 PRD §10 DoD #17 (d) 축소 매트릭스 simulation (ARGS=\"--full --limit N\" 전달 가능)"
+	@echo "  audit-eval-matrix-full            동일 매트릭스 --full 모드 (limit 30 default, §10.7 thesis 측정)"
 	@echo "  audit-mcp                         PRD §10 DoD #17 (a) MCP 래퍼 wire-up (mcp SDK 미설치 시 SKIPPED)"
 	@echo "  audit-ipgraph                     PRD §10 DoD #15/#16 IPGraph (도메인3) plug-in wire-up"
 	@echo "  audit-dod                         17 항목 트래픽라이트 리포트 (v2.2 — IPGraph + 상용신호 4종 포함)"
@@ -570,7 +571,13 @@ audit-ontology:
 audit-eval-matrix:
 	# PRD §10 DoD #17 (d) — 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation).
 	# 기본 = simulation (LLM 비용 0). --full 옵션으로 실제 LLM 호출.
-	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py
+	# 사용자 ARGS 전달 가능: make audit-eval-matrix ARGS="--full --limit 30"
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py $(ARGS)
+
+audit-eval-matrix-full:
+	# PRD §10.7 thesis 측정 — --full + multi-hop 16 row 포함 위해 limit 30 (default).
+	# 비용 추정: 8 cells × 30 row ≈ $3 (gpt-4o-mini, hybrid 비중 큼).
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py --full
 
 audit-mcp:
 	# PRD §10 DoD #17 (a) — MCP 래퍼 wire-up.
@@ -605,10 +612,13 @@ ingest-wikidata-cell-chem:
 audit-dod:
 	# CORE_DIFF_BASELINE 이력 (PRD §10.12 / §11.1):
 	#   - 4049caf  : 2026-05 Phase B 안정화 (도메인1+2 finance+auto 완료) — 본 PR 이전 anchor.
-	#   - bab9411  : 2026-06-01 도메인3 (ipgraph) 통합 직전 reset (current default).
+	#   - bab9411  : 2026-06-01 도메인3 (ipgraph) 통합 직전 reset.
+	#   - 414bc1b  : 2026-06-01 도메인3 (ipgraph) 통합 + audit/MCP/ontology 인프라 일괄 PR
+	#                완료 anchor (current default). bab9411 → 414bc1b: +1,877 LOC = 13.32%
+	#                (의도된 통합 변경 — MCP wire-up / ontology schema / plugin registration).
 	# 도메인 추가/대형 리팩터 마다 reset → 누적 ratio 가 5% 위협 시 의도된 변경
 	# 인지 식별. 운영자가 별도 commit 으로 baseline 이동 원하면 env override.
-	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-bab9411} $(PYTHON) scripts/audit/dod_audit.py
+	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-414bc1b} $(PYTHON) scripts/audit/dod_audit.py
 
 validate-gold-qa:
 	$(PYTHON) scripts/audit/validate_gold_qa.py eval/qa_gold/*.jsonl
