@@ -162,6 +162,29 @@ def _fetch_entity_pages(
     return stats
 
 
+def _load_plants_from_yaml(limit: int | None) -> list[tuple]:
+    """``ontology/auto/plants.yaml`` 의 plant 목록 → (code, name, wikidata_qid).
+
+    plants.yaml 의 schema:
+        plants:
+          - code: HYU_ULSAN
+            name: 현대자동차 울산공장
+            manufacturer_name: HYUNDAI
+            country: KR
+            city: Ulsan
+            wikidata_qid: Q5928430   # optional
+    """
+    from ..ontology import load_plants
+    plants = load_plants() or []
+    rows: list[tuple] = []
+    for p in plants:
+        # plants.yaml 의 name 은 한국어 또는 영문 — name 자체로 wiki 검색
+        rows.append((p.get("code"), p.get("name"), p.get("wikidata_qid")))
+    if limit:
+        rows = rows[:limit]
+    return rows
+
+
 def _load_models_from_pg(limit: int | None) -> list[tuple]:
     conn = get_connection()
     with conn.cursor() as cur:
@@ -205,8 +228,12 @@ def ingest(
     """
     out: dict[str, dict[str, int]] = {}
     for tgt in targets:
-        rows = (_load_models_from_pg(limit) if tgt == "models"
-                else _load_manufacturers_from_pg(limit))
+        if tgt == "plants":
+            rows = _load_plants_from_yaml(limit)
+        elif tgt == "models":
+            rows = _load_models_from_pg(limit)
+        else:
+            rows = _load_manufacturers_from_pg(limit)
         if not rows:
             log.warning("[wiki] %s PG 비어있음 — vpic/wikidata 적재 선행 필요", tgt)
             out[f"{lang}/{tgt}"] = {"fetched": 0, "skipped": 0,
@@ -239,8 +266,10 @@ def main() -> None:
                       help="auto.master_vehicle_models 본문 수집")
     grp.add_argument("--manufacturers", action="store_true",
                       help="auto.master_manufacturers 본문 수집")
+    grp.add_argument("--plants", action="store_true",
+                      help="ontology/auto/plants.yaml 의 plant 본문 수집 (2026-06-01 신규)")
     grp.add_argument("--all", action="store_true",
-                      help="models + manufacturers 모두")
+                      help="models + manufacturers + plants 모두")
     ap.add_argument("--lang", default="ko", choices=["ko", "en"])
     ap.add_argument("--fallback-lang", default="en",
                     help="1차 미발견 시 재시도 언어. 'none' 으로 비활성.")
@@ -256,13 +285,15 @@ def main() -> None:
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
     if args.all:
-        targets: tuple[str, ...] = ("models", "manufacturers")
+        targets: tuple[str, ...] = ("models", "manufacturers", "plants")
     elif args.models:
         targets = ("models",)
     elif args.manufacturers:
         targets = ("manufacturers",)
+    elif args.plants:
+        targets = ("plants",)
     else:
-        ap.error("--models / --manufacturers / --all 중 하나 필요")
+        ap.error("--models / --manufacturers / --plants / --all 중 하나 필요")
 
     fb = None if args.fallback_lang.lower() == "none" else args.fallback_lang
     stats = ingest(
