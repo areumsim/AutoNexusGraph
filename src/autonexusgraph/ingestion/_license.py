@@ -64,9 +64,10 @@ LICENSE_POLICY: dict[str, LicenseTier] = {
     # ── 제조사 IR / 뉴스룸 (회사 운영, 공개 IR — 출처표기 의무) ──
     # robots.txt 확인 일자 2026-06-01. 변경 시 본 파일 + ``OEM_NEWSROOM_POLICY``
     # 양쪽 갱신 필요. 정책 결정 근거는 ``OEM_NEWSROOM_POLICY`` 의 notes 참조.
-    "hyundai_ir":       "public_partial",  # robots.txt allows; ToS — 본문 저장 가능, 출처 필수
-    "mobis_ir":         "public_partial",  # robots.txt Allow: /. 본문 저장 가능, 출처 필수
-    "kia_ir":           "metadata_only",   # /kr/discover-kia/news/ Disallow — 본문 저장 금지
+    "hyundai_ir":         "public_partial",  # robots.txt allows; ToS — 본문 저장 가능, 출처 필수
+    "mobis_ir":           "public_partial",  # robots.txt Allow: /. 본문 저장 가능, 출처 필수
+    "kia_ir":             "metadata_only",   # www.kia.com/kr Disallow — 본문 저장 금지
+    "kia_worldwide_ir":   "public_partial",  # worldwide.kia.com 별도 도메인, 본문 저장 가능
 }
 
 
@@ -82,6 +83,11 @@ OEM_NEWSROOM_POLICY: dict[str, dict] = {
     "hyundai": {
         "active": True,
         "allowed_hosts": ["www.hyundai.com"],
+        # ★ 직접 seed — root sitemap.xml 의 50+ 지역 재귀를 피해 worldwide-ko/en 만.
+        "sitemap_seeds": [
+            "https://www.hyundai.com/worldwide/ko/sitemap.xml",
+            "https://www.hyundai.com/worldwide/en/sitemap.xml",
+        ],
         "allowed_path_prefixes": [
             "/worldwide/ko/company/ir/",
             "/worldwide/en/company/ir/",
@@ -96,9 +102,12 @@ OEM_NEWSROOM_POLICY: dict[str, dict] = {
         "notes": (
             "robots.txt (2026-06-01): IR/newsroom 경로 Disallow 없음. "
             "공식 IR 자료 — 공시·실적·판매 (공개 정보). 본문 저장 가능. "
-            "출처 표기 필수."
+            "출처 표기 필수. sitemap_seeds 로 worldwide-ko/en 만 좁힘 "
+            "(root sitemap_index 50+ 지역 재귀 회피)."
         ),
     },
+    # NOTE: 'kia' 와 'kia_worldwide' 는 분리. 전자는 www.kia.com/kr/ (robots
+    # Disallow 명시 — 비활성), 후자는 worldwide.kia.com (별도 robots 검토 후 활성).
     "kia": {
         "active": False,   # ★ robots.txt Disallow 로 v0 비활성 ★
         "allowed_hosts": [],
@@ -114,8 +123,37 @@ OEM_NEWSROOM_POLICY: dict[str, dict] = {
             "별도 robots/ToS 검토 후 활성화 가능."
         ),
     },
-    "mobis": {
+    "kia_worldwide": {
         "active": True,
+        "allowed_hosts": ["worldwide.kia.com"],
+        "sitemap_seeds": [
+            "https://worldwide.kia.com/kr-sitemap.xml",
+        ],
+        "allowed_path_prefixes": [
+            "/kr/brand/",       # brand stories, partnerships
+            "/kr/about/",       # company info
+            "/kr/news/",        # newsroom (직접 확인 시 200)
+            "/kr/ir/",          # IR (직접 확인 시 200)
+            "/ko/brand/",
+            "/ko/about/",
+        ],
+        "disallowed_path_prefixes": [],
+        "rate_limit_sec": 2.0,
+        "user_agent": "AutoGraph-Research/0.1 (research, public-info)",
+        "notes": (
+            "robots.txt (2026-06-01, worldwide.kia.com): "
+            "'User-agent: * Allow: /kr/ Allow: /it/'. "
+            "Sitemap 광고: https://worldwide.kia.com/kr-sitemap.xml. "
+            "주요 OEM 도메인 www.kia.com/kr 와 별개 — 그쪽은 "
+            "'Disallow: /kr/discover-kia/news/' 명시. 본 worldwide 도메인은 "
+            "newsroom + IR 경로 모두 제한 없음 확인 후 활성. "
+            "라이선스: 'kia_ir' 와 별개로 'kia_worldwide_ir' 항목 사용. "
+            "⚠️ 실측 한계 (2026-06-01): React SPA — fetch 본문 평균 360 bytes "
+            "(JS shell only). URL 인벤토리는 유효, 본문 추출은 headless 필요."
+        ),
+    },
+    "mobis": {
+        "active": False,   # ★ 사이트 구조 (JS 라우팅) 로 v0 비활성 ★
         "allowed_hosts": ["www.mobis.com", "www.mobis.co.kr"],
         "allowed_path_prefixes": [
             "/news/",
@@ -125,8 +163,14 @@ OEM_NEWSROOM_POLICY: dict[str, dict] = {
         "rate_limit_sec": 2.0,
         "user_agent": "AutoGraph-Research/0.1 (research, public-info)",
         "notes": (
-            "robots.txt (2026-06-01): 'Allow: /'. 두 도메인 (mobis.com/mobis.co.kr) "
-            "모두 사용. 본문 저장 가능, 출처 표기 필수."
+            "robots.txt (2026-06-01): 'Allow: /' — 라이선스적으로는 OK. "
+            "그러나 사이트 구조 실측 (2026-06-01): "
+            "  · /sitemap.xml → 404 (robots.txt 광고는 있으나 실제 부재) "
+            "  · /news/, /ir/ 직접 URL → 404 (모든 .do URL JS 라우팅) "
+            "  · 홈페이지 HTML 에 정적 href 0건 (SPA + Struts .do 패턴) "
+            "정적 sitemap 크롤러 부적합. 활성화하려면 (a) headless 브라우저 "
+            "(Playwright/Selenium), (b) IR API 발견, (c) RSS feed 검토 필요. "
+            "본 v0 비활성. Hyundai 만 활성."
         ),
     },
 }

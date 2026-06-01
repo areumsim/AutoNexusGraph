@@ -47,9 +47,10 @@ _SOURCE_ROOT = "auto/oem_ir"
 
 # OEM → DART corp_code (DART production loader 와 일관)
 _OEM_CORP_CODE = {
-    "hyundai": "00164742",
-    "kia":     "00106641",
-    "mobis":   "00164788",
+    "hyundai":        "00164742",
+    "kia":            "00106641",
+    "kia_worldwide":  "00106641",   # 같은 Kia 법인 — 다른 도메인 정책
+    "mobis":          "00164788",
 }
 
 

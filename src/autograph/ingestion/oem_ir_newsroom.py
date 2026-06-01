@@ -162,7 +162,11 @@ def discover_sitemap_urls(*, oem: str, user_agent: str,
     pol = newsroom_policy(oem)
     if pol is None or not pol.get("active"):
         return []
-    seeds = [f"https://{h}/sitemap.xml" for h in pol["allowed_hosts"]]
+    # 정책에 sitemap_seeds 가 있으면 그것을 직접 사용 (좁은 범위)
+    # 없으면 generic /<host>/sitemap.xml.
+    seeds: list[str] = list(pol.get("sitemap_seeds") or [])
+    if not seeds:
+        seeds = [f"https://{h}/sitemap.xml" for h in pol["allowed_hosts"]]
 
     visited: set[str] = set()
     out: list[tuple[str, str | None]] = []

@@ -68,14 +68,17 @@ def test_hyundai_non_ir_path_rejected():
     assert ok is False
 
 
-def test_mobis_news_allowed():
-    ok, _ = is_url_allowed("mobis", "https://www.mobis.co.kr/news/recent.do")
-    assert ok is True
+def test_mobis_policy_inactive_after_sitemap_check():
+    """Mobis sitemap broken + SPA JS routing 으로 v0 비활성. robots.txt 와 별개."""
+    pol = OEM_NEWSROOM_POLICY["mobis"]
+    assert pol["active"] is False, "Mobis v0 비활성 — sitemap 404 + SPA 구조"
 
 
-def test_mobis_ir_allowed():
-    ok, _ = is_url_allowed("mobis", "https://www.mobis.com/ir/finance.html")
-    assert ok is True
+def test_mobis_url_rejected_due_to_inactive_policy():
+    """Mobis active=False 라 path 가 allowlist 안에 있어도 거부."""
+    ok, reason = is_url_allowed("mobis", "https://www.mobis.co.kr/news/recent.do")
+    assert ok is False
+    assert "active" in reason.lower() or "비활성" in reason
 
 
 def test_unknown_oem_rejected():
@@ -209,8 +212,8 @@ def test_discover_returns_empty_when_inactive(monkeypatch):
     assert out == []
 
 
-def test_discover_calls_sitemap_for_active_oem(monkeypatch):
-    """active=True 인 OEM 은 https://<host>/sitemap.xml 호출."""
+def test_discover_calls_sitemap_seeds_for_active_oem(monkeypatch):
+    """policy 에 sitemap_seeds 가 있으면 그것을 직접 호출."""
     called: list[str] = []
 
     def fake_fetch(url, **kwargs):
@@ -220,17 +223,19 @@ def test_discover_calls_sitemap_for_active_oem(monkeypatch):
     monkeypatch.setattr(O, "_fetch_text", fake_fetch)
     rate = O.RateLimiter(per_sec=100.0)
     O.discover_sitemap_urls(oem="hyundai", user_agent="test", rate_limit=rate)
-    assert any("hyundai.com/sitemap.xml" in u for u in called)
+    # Hyundai 정책의 sitemap_seeds (worldwide-ko/en) 가 호출됨
+    assert any("worldwide/ko/sitemap.xml" in u for u in called)
 
 
 def test_discover_recurses_into_sitemap_index(monkeypatch):
     """sitemapindex → 하위 sitemap fetch 까지 재귀."""
     pages = {
-        "https://www.hyundai.com/sitemap.xml": (
+        "https://www.hyundai.com/worldwide/ko/sitemap.xml": (
             "<sitemapindex><sitemap><loc>"
             "https://www.hyundai.com/sub.xml"
             "</loc></sitemap></sitemapindex>"
         ),
+        "https://www.hyundai.com/worldwide/en/sitemap.xml": "",
         "https://www.hyundai.com/sub.xml": (
             "<urlset><url><loc>https://www.hyundai.com/x</loc></url></urlset>"
         ),
