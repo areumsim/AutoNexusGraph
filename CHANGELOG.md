@@ -1,0 +1,135 @@
+# CHANGELOG
+
+본 파일은 AutoNexusGraph 의 release-grade 변경 이력. 작은 fix/refactor 는 `git log`
+참조. 도메인 추가·DoD audit 메커니즘 도입·schema 마이그레이션 등 중요 milestone 만 기록.
+
+본 prefix: `feat:` 기능 / `fix:` 버그 / `docs:` 문서 / `chore:` 잡무 / `refactor:`
+구조 변경. PRD §10 DoD 항목 영향은 `[DoD §10.X]` 로 표기.
+
+---
+
+## 2026-06-01 — 정합성 검토 + IPGraph (도메인3) 인프라 통합
+
+대형 검토·정리 PR. 본 세션 7 commit (`414bc1b` ~ `0066a19`) 으로 도메인3 (ip = 특허)
+정식 흡수 + 검증 layer 일원화 + DoD audit 자동 wiring + 문서 SSOT 정리 완료.
+
+### Added
+- **`src/ipgraph/` 패키지 전체** (18 py) — 도메인3 plug-in (handler / policy /
+  ontology / cypher_templates_ip + tools/{bridge,graph,patents,retrieve} +
+  loaders/{load_cpc,load_openalex,load_assignee_corp_map} + ingestion/{cpc_scheme,
+  kipris,uspto_odp,openalex}).
+- **PG schema 12 ip.* 테이블** — `18_ipgraph.sql` + `19_ipgraph_bridge.sql` 적용 완료.
+  patents/assignees/inventors/citations/patent_*/cpc_scheme/works/institution/
+  work_institution/assignee_corp_map. FK 정합 (master.companies(corp_code)
+  REFERENCES + ON DELETE CASCADE).
+- **`ontology/ip/{entities,relations}.yaml`** — 7 entity + 9 relation 정의.
+  edge_required_meta 7키 (auto/finance 표준 동기화).
+- **`docs/architecture.md`** — 시스템 구조 SSOT (~300줄, Mermaid 3) — 패키지
+  토폴로지 / 도메인 모듈 매트릭스 / SQL 24 마이그레이션 / LangGraph 11 노드 /
+  plug-in 등록 메커니즘 / SSOT 위치 색인. 6 docs (PRD/README/autograph/ipgraph/
+  mental_model/learning_guide) cross-link.
+- **검증 layer 5종**:
+  - `tests/test_license.py` (15 invariants) — LICENSE_POLICY 도메인별 source 키
+    동기화 강제. [DoD §6.7]
+  - `scripts/audit/ontology_validate.py` cypher↔yaml cross-check — `cypher_templates_<domain>.py`
+    의 엣지 타입이 `relations.yaml` 에 정의되어 있는지 검증. cross-domain
+    reference (예: ip cypher → auto.SUPPLIED_BY) WARN 강등. [DoD §10.17(c)]
+  - `scripts/audit/edge_meta_invariants.py` 확장 (auto 8 → 12 invariants —
+    ip/finance 도메인 추가). [DoD §6.7 / §10.11]
+  - `eval/runners/run_matrix_smoke.py:compute_dod_13_14()` — manifest 의
+    `main_hop_efficiency` + `latency` 를 흡수해 DoD #13/#14 자동 산출.
+    `prd_dashboard._collect_{hop,latency}_audit()` 가 자동 흡수 → `make audit-dod`
+    한 줄에 반영. [DoD §10.13 / §10.14]
+  - `eval/metrics/_thresholds.py` + `eval/metrics/_thesis.py` — PRD §10 임계값
+    SSOT 분리 (이전 4 모듈에 분산된 hardcoded 값 → 한 파일).
+- **`src/common/retrieve_base.py`** — 3 retrieve.py (finance/auto/ip) 의 공통
+  cap_topk + normalize_source_filter 추출.
+- **`Makefile smoke-e2e` target** — DB·LLM 없는 mock 정합성 일괄 검증 (pytest +
+  6 audit + gold qa lint). pre-push 게이트.
+- **gold_qa cross 신규 7 row** — CD-L3-009/010 + CD-L4-005 (auto cross 이행) +
+  CD-L3-011 + CD-L4-006/007 (refusal/fallback 시나리오). gold_qa_cross 38→44.
+- **`scripts/audit/validate_gold_qa.py` 강화** — `_` prefix 파일 자동 skip
+  (사용자 작업물 보호) + main_hop_path↔hop_count 자동 검증.
+- **`opendata_patch.md` 본문 흡수 후 삭제** — USGS MCS / EV chargers /
+  GLEIF×OpenCorporates / OpenAlex 4종을 README/docs/data_sources 본문에 분배.
+
+### Fixed
+- **SQL `12_` prefix 충돌** — `12_autograph_inspections.sql` + `12_autograph_investigations.sql`
+  → `12a_…` / `12b_…` rename.
+- **`ip.patents` schema drift** — 기존 (14 cols: application_no/registration_no/...)
+  vs `18_ipgraph.sql` DDL (pub_no/jurisdiction/source) mismatch → DROP CASCADE +
+  18 재적용 (row 0 이라 안전). [DoD §10.17(c)]
+- **`ip.assignee_corp_map` FK 미적용** — `corp_code VARCHAR` (FK 부재) →
+  `CHAR(8) REFERENCES master.companies(corp_code) ON DELETE CASCADE`.
+- **README §1 SSOT 수치 3건 재측정** (psycopg/neo4j-driver 직접 쿼리):
+  - `bridge.corp_entity` 4,806 = manufacturer reviewed 11 + cand 1 + supplier
+    reviewed 4 + cand 4,790 ✓ (이전 "10 + 4,792 + 2 = 4,804 ≠ 4,806" 모순 해소).
+  - SUPPLIED_BY 30 edges 100% meta (yaml 46 vs Neo4j 30 = customer dimension
+    dedupe — 데이터 모델 정상, "16 매핑 누락" 진단 부정확).
+  - strong_match **15/15 = 100%** (manufacturer 11 + supplier 4, conf≥0.9).
+    이전 "12/12" 는 stale.
+- **`ip relations.yaml edge_required_meta` 5키 → 7키** — extraction_method +
+  schema_version 추가 (auto/finance 표준 동기화).
+- **cypher↔yaml 누락 2건 보완**:
+  - `auto.LED_TO_RECALL` (Investigation → Recall, side_hop, deterministic, 0.95).
+  - `ip.MAPPED_TO` (Assignee → Company, main_hop cross-domain bridge, hybrid, 0.80).
+- **gold_qa_auto 의 3 cross_domain row** (AUTO0008/9/11) → `gold_qa_cross_v0.jsonl`
+  의 CD-L3-009/010 + CD-L4-005 로 이동 (`notes` 에 migration 흔적 보존).
+- **test isolation** — `test_auto_detect_domain_without_routers_returns_finance` 가
+  `_DISCOVERY_DONE=True` 도 monkeypatch 하여 후속 테스트의 `_ROUTERS` baseline 보존.
+
+### Changed
+- **README §10 DoD 트래픽라이트 표** — 자동 PASS 8→9/14 (§10.12 baseline reset
+  `bab9411` → `414bc1b` 효과 + §10.13/§10.14 wired 명시).
+- **baseline reset (§10.12)** — `4049caf` → `bab9411` → `414bc1b`
+  (`eval/reports/core_diff_baseline_ledger.md`).
+- **`eval/reports/prd_dashboard_latest.md`** — 최신 audit-dod 결과 (9 pass /
+  14 measurable) 로 동기화.
+
+### Removed
+- `eval/qa_gold/_stage2_cd_l4_ip.jsonl` (4행 모두 `gold_qa_cross_v0.jsonl` 에 흡수 완료).
+- `eval/qa_gold/_stage2_new_cross.jsonl` (3행 → CD-L3-011/CD-L4-006/CD-L4-007 로 흡수).
+- `opendata_patch.md` (본문 흡수 후 폐기).
+
+### Audit 측정 결과 (2026-06-01)
+
+| ID | 기준 | 상태 | 비고 |
+|---|---|:---:|---|
+| §10.4 | MVP 범위 | ✅ | OEM=5 / models=102 |
+| §10.5 | BOM L0~L3 + L4 ≥60% | ✅ | L4=63.7% |
+| §10.6 | strong_match ≥80% | ✅ | **15/15 = 100%** (재측정) |
+| §10.11 | SUPPLIED_BY 100% meta | ✅ | **30 edges**, all `source_type=manual_supplier_seed` |
+| §10.12 | 코어 변경 <5% | ✅ | baseline `414bc1b` → 0/15,396 = 0.00% |
+| §10.13 | 메인 홉 효율 -30% | (wired) | LLM 키 필요 (run_matrix_smoke --full) |
+| §10.14 | latency <8s/<12s | ✅ | internal pass=100% (simulation 측정 기준) |
+| §10.15 | ip 도메인 wire-up | ✅ | handler+router+ontology+25 cypher templates |
+| §10.16 | ip gold seed 30 + CD ip 8 | ✅ | gold_qa_ip 30 + cross_ip 8 |
+| §10.17(a) | MCP 래퍼 | ⚠️ | SDK 미설치 (`pip install -e ".[mcp]"` 후 PASS) |
+| §10.17(b) | Langfuse 실측 | ⚠️ | TRACE_BACKEND 미설정 |
+| §10.17(c) | 온톨로지 strict | ✅ | yaml 6/6 + cypher cross-check 통과 |
+| §10.17(d) | 평가 매트릭스 | (wired) | LLM 키 필요 |
+
+### 사용자 액션 대기 (외부 의존)
+- **KIPRIS_API_KEY 발급** → `python -m ipgraph.ingestion.kipris --applicants ...`.
+- **USPTO ODP bulk dataset 다운로드** → `data/raw/ip/uspto_odp/{patents,assignees,
+  citations,inventors}.jsonl` 배치 → `python -m ipgraph.ingestion.uspto_odp`.
+- **assignee → corp_entity 매핑** → `python -m ipgraph.loaders.load_assignee_corp_map`.
+- **finance 73,602 엣지 의무 메타 결손** — 별도 PR (본 PR 외 기존 적재 데이터).
+
+### 커밋 이력 (본 세션)
+1. `414bc1b` — feat: PRD/README/code 정합성 검토 + ipgraph 패키지 인프라 일괄
+2. `8021cff` — feat: cypher cross-check dashboard 노출 + stage 흡수 + 임계값 SSOT 분리
+3. `31171a6` — feat: P1-2 footnote 실측 + P2 ip.* schema drift 해소 + thesis 모듈 분리
+4. `32dbd78` — docs: README §1 SUPPLIED_BY footnote 데이터 모델 정상 명확화
+5. `6ae2439` — feat: §10.7 thesis — hits@k fallback metric + multi-hop subset 보강
+6. `0066a19` — fix+feat: 정합성 재검토 P0 4건 + edge_meta_invariants ip/finance 확장
+7. (본 commit) — final: P1 #5/#7/#8/#9 + CHANGELOG + retrieve common base
+
+---
+
+## 이전 milestone (참고)
+
+- **2026-05-29** `bab9411` — P0~P3 추가 결손 (vector search + Plant wiki + Korean
+  alias + eval gold).
+- **2026-05** `4049caf` — Phase B 안정화 (도메인1+2 finance+auto 완료) — IPGraph
+  통합 전 anchor.

@@ -10,23 +10,15 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
 
 log = logging.getLogger(__name__)
 
 
-DEFAULT_TOPK = 8
-HARD_TOPK = 50
-
 # 본 도메인의 vec.chunks source 화이트리스트.
 _IP_SOURCES = ("uspto_odp", "kipris", "openalex", "patent_abstract", "patent_claims")
-
-
-def _cap(k: int | None) -> int:
-    if k is None or k <= 0:
-        return DEFAULT_TOPK
-    return min(int(k), HARD_TOPK)
 
 
 def _build_where(*, assignee_id: str | None = None,

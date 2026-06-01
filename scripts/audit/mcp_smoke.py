@@ -89,7 +89,7 @@ def main() -> int:
     if not sdk_ok:
         payload = {
             "skipped":   True,
-            "reason":    "mcp SDK 미설치 — pip install mcp 후 재시도",
+            "reason":    "mcp SDK 미설치 — `pip install -e \".[mcp]\"` 후 재시도 (pyproject.toml optional-dep)",
             "n_tools":   len(specs),
             "by_domain": by_domain,
         }

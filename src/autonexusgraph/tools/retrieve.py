@@ -13,18 +13,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from ..db.postgres import get_pool
 from ..embeddings import EmbeddingError, get_embedding_client
-
-
-DEFAULT_TOPK = 8
-HARD_TOPK    = 50
-
-
-def _cap(k: int | None) -> int:
-    if k is None or k <= 0:
-        return DEFAULT_TOPK
-    return min(k, HARD_TOPK)
 
 
 def _build_filter_clause(

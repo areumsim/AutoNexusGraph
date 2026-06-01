@@ -111,6 +111,20 @@ def _check_row(path: Path, lineno: int, row: dict,
         if not row.get("requires_multi_hop") and int(row.get("hop_count") or 0) < 2:
             warn(f"complexity=hard 인데 requires_multi_hop=false & hop_count<2")
 
+    # 3a. main_hop_path ↔ hop_count 정합. path 가 list 면 hop_count = len(path)-1 권장.
+    mhp = row.get("main_hop_path")
+    if isinstance(mhp, list) and len(mhp) >= 2:
+        expected_hops = len(mhp) - 1   # path 노드 N → 엣지 N-1
+        actual = row.get("hop_count")
+        if actual is None:
+            warn(f"main_hop_path 있는데 hop_count 누락 (권장 {expected_hops})")
+        elif int(actual) != expected_hops:
+            warn(f"hop_count={actual} ≠ len(main_hop_path)-1={expected_hops}")
+    elif mhp is None and row.get("requires_multi_hop"):
+        # multi_hop 인데 path 없으면 정보성 — refusal 시나리오에서 의도된 경우 多
+        if row.get("is_answerable", True):
+            warn("requires_multi_hop=true + is_answerable=true 인데 main_hop_path 누락")
+
     # 4. is_answerable & gold_answer_text.
     if row.get("is_answerable", True):
         if not row.get("gold_answer_text") and not row.get("gold_answer_entities"):

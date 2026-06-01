@@ -4,7 +4,7 @@
         ingest-news ingest-fss ingest-ftc ingest-kosis \
         ingest-sec ingest-gleif ingest-gleif-enrich ingest-gleif-enrich-dry \
         ingest-openalex ingest-openalex-dry load-openalex \
-        ingest-kipris load-cpc load-cpc-dry ingest-uspto-odp \
+        ingest-kipris load-cpc load-cpc-dry load-assignee-corp-map load-assignee-corp-map-dry ingest-uspto-odp \
         ingest-law ingest-kcgs \
         serve-embeddings embed-chunks serve-api serve-ui \
         eval-smoke eval-full p3-extract-dry p3-extract p4-load \
@@ -290,6 +290,9 @@ ingest-kipris:        ; $(PYTHON) -m ipgraph.ingestion.kipris
 # CPC scheme bulk (USPTO+EPO 공동, 무인증) → PG ip.cpc_scheme + Neo4j :CPCCode + :SUBCLASS_OF.
 load-cpc:             ; $(PYTHON) -m ipgraph.loaders.load_cpc
 load-cpc-dry:         ; $(PYTHON) -m ipgraph.loaders.load_cpc --skip-neo4j --sections A
+# ip.assignee_corp_map PG → Neo4j (Assignee)-[:MAPPED_TO]->(Company) cross-domain bridge.
+load-assignee-corp-map:     ; $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map
+load-assignee-corp-map-dry: ; $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map --dry-run
 # USPTO Open Data Portal bulk (PatentsView 후속) — raw/ip/uspto_odp/ 에 jsonl 있으면 적재.
 ingest-uspto-odp:     ; $(PYTHON) -m ipgraph.ingestion.uspto_odp
 ingest-law:           ; $(PYTHON) scripts/ingest/download_law.py
