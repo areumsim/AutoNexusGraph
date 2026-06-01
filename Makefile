@@ -451,6 +451,9 @@ load-auto-all: neo4j-init-auto load-auto-pg load-auto-specs load-auto-neo4j \
                derive-auto-contains-system \
                load-wikidata-part-supplies \
                load-manufactured-at \
+               load-sandang-processes \
+               load-kama-macro \
+               load-dart-production \
                build-chunks-auto
 	@echo "[autograph] load-auto-all done."
 
@@ -557,3 +560,15 @@ load-kama-macro:
 
 load-kama-macro-dry:
 	$(PYTHON) -m autograph.loaders.load_kama_macro --dry-run
+
+# DART 사업보고서 "III. 생산 및 설비" → auto.plant_capacity + plant_production
+# + (선택) Neo4j (:Manufacturer)-[:MANUFACTURED_AT]->(:Plant) 동기화.
+# 대상 6 OEM: 현대차/기아/모비스/한온/만도/위아.
+load-dart-production:
+	$(PYTHON) -m autograph.loaders.load_dart_production
+
+load-dart-production-dry:
+	$(PYTHON) -m autograph.loaders.load_dart_production --dry-run
+
+load-dart-production-no-neo4j:
+	$(PYTHON) -m autograph.loaders.load_dart_production --no-neo4j
