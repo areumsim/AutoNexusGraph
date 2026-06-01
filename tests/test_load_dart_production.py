@@ -221,6 +221,16 @@ def test_resolve_manufacturer_id_no_alias_no_bridge_returns_none(monkeypatch):
 
 
 # ── _sync_manufactured_at_to_neo4j ────────────────────────────
+def test_manufactured_at_cypher_includes_year_in_merge_key():
+    """MERGE 키에 snapshot_year 포함 — 시계열 보존 (2026-06-01 P0 fix).
+
+    이전엔 MERGE (mm)-[r]->(p) 만 — 같은 plant 의 다년치가 한 edge 로
+    collapse 되어 history 91% 손실. 본 fix 로 MERGE 키에 year 포함.
+    """
+    assert "snapshot_year: r.snapshot_year" in L._MANUFACTURED_AT_CYPHER, \
+        "MERGE 키에 snapshot_year 누락 — 시계열 손실 회귀"
+
+
 def test_sync_manufactured_at_creates_rows_for_mapped_plants(monkeypatch):
     """Mapped plant (HMC → HYU_ULSAN) 만 cypher row 생성."""
     monkeypatch.setattr(L, "_resolve_manufacturer_id", lambda cc: 441)

@@ -1,10 +1,10 @@
 # AutoNexusGraph
 
-> **자동차 제품·부품·리콜·공급망 (auto) + 한국 상장사 공시·재무 (finance) 두 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 멀티도메인 GraphRAG 에이전트. 단일 도메인이 아닌, 도메인 어댑터를 plug-in 으로 추가하는 N-domain GraphRAG umbrella 가 최종 형태.**
+> **자동차·제조 (auto) + 한국 상장사 공시·재무 (finance) + 특허·기술혁신 (ipgraph, 예정) 3 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 산업·기업 인텔리전스 그래프. 단일 도메인이 아닌, 도메인 어댑터를 plug-in 으로 추가하는 N-domain GraphRAG umbrella 가 최종 형태이며, "**서비스 등급 (MCP·관측가능성·평가 실측) agent + ontology**" 를 정량 증명하는 것이 1차 목표.**
 
-자동차 OEM/부품사 ↔ 재무 데이터를 한 질문으로 추적 (예: "현대모비스 매출과 모비스가 공급하는 차종의 최근 리콜은?", "LG에너지솔루션 배터리를 쓰는 OEM 의 영업이익과 KCGS ESG 등급은?"). Vector 단독 RAG 가 풀지 못하는 멀티홉 / Cross-Domain / 시점 포함 공급망 추론을 Graph(Neo4j) + SQL(PostgreSQL) + Vector(pgvector) 하이브리드로 해결. Azure 종속 제거, LLM Provider(OpenAI / Anthropic / Google / 로컬) 환경변수 교체 가능. 도메인 모드는 사용자 hint 또는 키워드 자동 라우팅 — `auto` / `finance` / `cross_domain`.
+자동차 OEM/부품사 ↔ 재무 ↔ 특허(예정) 데이터를 한 질문으로 추적 (예: "현대모비스 매출과 모비스가 공급하는 차종의 최근 리콜은?" / "LG에너지솔루션 배터리를 쓰는 OEM 의 영업이익과 KCGS ESG 등급은?" / "삼성SDI 배터리 특허(H01M) 집중 분야 + 영업이익 + 그 셀을 쓰는 OEM 리콜은?" — CD-L4 ip 결합 시연). Vector 단독 RAG 가 풀지 못하는 멀티홉 / Cross-Domain / 시점 포함 공급망 추론을 Graph(Neo4j) + SQL(PostgreSQL) + Vector(pgvector) 하이브리드로 해결. Azure 종속 제거, LLM Provider(OpenAI / Anthropic / Google / 로컬) 환경변수 교체 가능. 도메인 모드는 사용자 hint 또는 키워드 자동 라우팅 — `auto` / `finance` / `ip`(예정) / `cross_domain`.
 
-상세 요구사항은 [PRD.md](./PRD.md) (v2.1) · AutoGraph(자동차) 전용 가이드는 [docs/autograph.md](./docs/autograph.md) · 결정·트레이드오프·열린 질문은 [docs/mental_model.md](./docs/mental_model.md) · 최종 비전 / 장기 로드맵은 본 README §10 참조.
+상세 요구사항은 [PRD.md](./PRD.md) (v2.2 — IPGraph 정식 흡수 + 상용 신호 DoD #15~#17 + §12.5 도메인3 SSOT) · AutoGraph(자동차) 전용 가이드는 [docs/autograph.md](./docs/autograph.md) · **IPGraph(특허, 예정) 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md)** · 결정·트레이드오프·열린 질문은 [docs/mental_model.md](./docs/mental_model.md) · 최종 비전 / 장기 로드맵은 본 README §10 참조.
 
 > **구성 요약:**
 > - **Core** (`src/autonexusgraph/`) — LangGraph multi-agent (StateGraph 11 노드 + 함수 체인 fallback), LLM 어댑터 (OpenAI/Anthropic/Google/local 자동 dispatch), 4 가드 (prompt_safety / cypher_guard / number_guard / language_guard), 비용 가드 3 tier (세션 hard limit + 도메인별 turn budget + auto-approve), DB·embedding·평가 harness 공유 인프라.
@@ -12,13 +12,13 @@
 > - **Finance 도메인** (`src/autonexusgraph/tools/financials,graph,retrieve`) — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100.
 > - **Auto 도메인** (`src/autograph/`) — NHTSA(vPIC/Recalls/Complaints/SafetyRatings/Investigations/TSB) + EPA fueleconomy + SEC EDGAR (글로벌 OEM) + Wikidata(manufacturers/models/suppliers, P176) + AI Hub(부품 결함 / 자율주행 진단) + KOTSA 수리검사 + DART 사업보고서 (제조 공정·생산) + 산단공 합성 공정 + 팩토리온(공장 등록) scaffold.
 > - **Cross-Domain Bridge** — `bridge.corp_entity` 가 두 도메인을 wikidata_qid / LEI / sec_cik / 사업자번호 / 이름으로 매칭. 한국 OEM (현대차/기아/현대모비스/현대위아/한국타이어 …) + 글로벌 OEM (Ford/GM/Stellantis/Tesla …) 가 corp_code/sec_cik 와 직접 연결.
-> - **확장성 (Domain plug-in)** — Core 는 외부 도메인 패키지를 직접 import 하지 않음. ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (기본 `autograph`) 의 모듈명을 import 시점에 soft-load → `register_handler` 부작용으로 활성. PRD §10.12 "코어 변경량 < 5%" 보존. 3번째 도메인 (의약품 · 전자제품 · 에너지 · 식품 등) 도 같은 패턴으로 추가 가능 — §10.1 참조.
+> - **확장성 (Domain plug-in)** — Core 는 외부 도메인 패키지를 직접 import 하지 않음. ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 의 모듈명을 import 시점에 soft-load → `register_handler` 부작용으로 활성. PRD §10.12 "코어 변경량 < 5%" 보존. **도메인3 (ip = 특허, 예정) 이 첫 plug-in 확장 정량 검증** — §10.12 baseline reset 후 재측정. 4번째~ (의약품·전자제품·에너지·식품) 는 비전 (§10.1 Phase D/E).
 
 ---
 
 ## 1. 한눈에 보는 현황
 
-> 이하 수치는 **2026-05-29 측정 시점** 기준. 갱신은 `data_inventory.md` + `eval/reports/prd_dashboard_latest.md` 참조. 모든 정량 수치는 ingestion 재실행 후 변동 가능 — SSOT 는 PG / Neo4j 직접 조회.
+> 이하 수치는 **2026-05-29 측정 SSOT + ⭐2026-06-01 = 신규 채널** (DART production / KAMA macro / 산단공 / OEM IR 등) 기준. 갱신은 `data_inventory.md` + `eval/reports/prd_dashboard_latest.md` 참조. SSOT 재조회는 `make audit-data-channels` + `make audit-dod`. 모든 정량 수치는 ingestion 재실행 후 변동 가능 — 발표·인용 시 PG / Neo4j 직접 조회. **bridge.corp_entity·SUPPLIED_BY·Cypher 템플릿 카운트 3 항목은 재측정 후 갱신 권장 (각주 표시).**
 
 ### Finance 도메인 (코스피200 + 코스닥100)
 
@@ -58,17 +58,36 @@
 | Neo4j RECALL_OF / CONTAINS_COMPONENT | 601 RECALL_OF | NHTSA taxonomy 적재 후 recall→component 매칭율 100% |
 | Neo4j Standard / Plant / Complaint | (seed 후) | `standards.yaml` 22 + `plants.yaml` 18 + `manufactured_at_seed.yaml` 46 모델↔공장 |
 | `auto.staging_relations` (P3 LLM + Wikidata P176) | extract-auto-p3 후 | SUPPLIED_BY / RECALL_OF 후보 — P4 검증 후 그래프 적재 |
-| `auto.processes` (산단공 합성 15151075) ⭐ 6/1 | (`make load-sandang-processes` 후) 550 row / 410 공정명 | C 등급 (0.50) — 공정명 정규형 사전. agent tool `search_processes` |
-| `auto.plant_capacity` (DART III. 생산·설비) ⭐ 6/1 | (`make load-dart-production` 후) capacity ~50 / production ~70 | B 등급 (0.80) — 6 OEM × 사업보고서. agent tool `get_plant_capacity` / `get_oem_production` / `list_plants_by_oem` |
-| `auto.macro_production_yearly` (KAMA 15051116) ⭐ 6/1 | (`make load-kama-macro` 후) 21 row | A 등급 (0.95) — 연 단위 한국·세계 생산량. agent tool `get_macro_production` |
-| `auto.macro_industry_monthly` (KAMA 15051118) ⭐ 6/1 | 204 row | A 등급 — 월 단위 내수·수출·수출금액. agent tool `get_macro_industry` |
-| Neo4j MANUFACTURED_AT (DART) ⭐ 6/1 | (load-dart-production 후) ~10 edges | `(Manufacturer)-[r:MANUFACTURED_AT {capa_units, actual_units, utilization_pct, source_type='dart_business_report', confidence_score=0.80}]->(Plant)`. plants.yaml 미등록 plant 는 skip |
+| `auto.processes` (산단공 합성 15151075) ⭐ 6/1 | **550 row / 410 공정명** | C 등급 (0.50) — 공정명 정규형 사전. agent tool `search_processes` |
+| `auto.plant_capacity` + `plant_production` (DART III. 생산·설비) ⭐ 6/1 | **107 + 77 row** (Hyundai 12 plants × 4~7년 + Kia 5 plants × 6년) | B 등급 (0.80) — Hyundai/Kia 6 OEM. Kia 파서 6/1 추가 (`품목/소재지` schema). agent tool `get_plant_capacity` / `get_oem_production` / `list_plants_by_oem` |
+| `auto.plant_utilization` (DART III. (3) 가동률) ⭐ 6/1 | **53 row** | B 등급 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct |
+| `auto.macro_production_yearly` (KAMA 15051116) ⭐ 6/1 | **21 row** (2005~2025) | A 등급 (0.95) — 연 단위 한국·세계 생산량. 2024 한국 점유 4.55%. agent tool `get_macro_production` |
+| `auto.macro_industry_monthly` (KAMA 15051118) ⭐ 6/1 | **204 row** (2009-01~2025-12) | A 등급 — 월 단위 내수·수출·수출금액. agent tool `get_macro_industry` |
+| `auto.events_oem_news` (IR/뉴스룸) ⭐ 6/1 | **37 row** (Hyundai 25 + Kia worldwide 12) | B 등급 — sitemap-first crawler + robots/ToS 게이트. Mobis/Kia 한국 비활성 (SPA/robots Disallow) |
+| `auto.events_inspections` (KOTSA 15155857) ⭐ 6/1 | **47,171 row** (2016~2025) | A 등급 — 사고 46,883 / 침수 183 / 도난 35 / 기타 70 검사 |
+| Neo4j MANUFACTURED_AT (DART) ⭐ 6/1 | **99 edges** (12 plants × 4~7년 시계열) | `(Manufacturer)-[r:MANUFACTURED_AT {snapshot_year, capa_units, actual_units, utilization_pct, source_type='dart_business_report', confidence_score=0.80}]->(Plant)`. MERGE 키에 year 포함 — 시계열 보존 |
+| `plants.yaml` (Hyundai/Kia 글로벌 30 plant) ⭐ 6/1 | 30 plant (HYU_ULSAN/HMMA/HMI/HAOS/HMMC/HMMR/HMB/HTMV/HMMI/HMGMA/HMTR + KIA_HWASEONG/WEST_POINT/ZILINA/MONTERREY/ANANTAPUR …) | `_DART_PLANT_CODE_MAP` 17 raw → :Plant.code 매핑. plants_skipped 0 (전 plant 매핑) |
+
+### IPGraph 도메인 (예정 — 도메인3, 본 PR outline·후속 PR ingestion)
+
+> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 PRD §10.12 "코어 변경 < 5%" 재측정 → baseline reset 정책은 §10.12 본문 + §11.1 참조. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md).
+
+| 영역 | 적재량 | 비고 |
+|---|---:|---|
+| `ip.patents` (KIPRIS + PatentsView) | 0 | (예정) — KIPRIS_API_KEY 발급 + PatentsView 엔드포인트 1주차 검증 후 활성 |
+| `ip.assignees` (Wikidata QID·LEI·business_no 매칭) | 0 | (예정) — Assignee → corp_entity 브리지 (M-3) |
+| `ip.cpc_scheme` (CPC 분류 계층 depth ≥ 4) | 0 | (예정) — CPC bulk 다운로드 (무인증 즉시 가능) |
+| `ip.citations` (PatentsView) | 0 | (예정) — 인용 네트워크, `get_citation_network(depth≤2)` cap 강제 |
+| `ip.assignee_corp_map` (신규 join 테이블) | 0 | (예정) — `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
+| Neo4j Patent / Assignee / Inventor / CPCCode | 0 / 0 / 0 / 0 | (예정) — `ontology/ip/entities.yaml` SSOT |
+| Neo4j ASSIGNED_TO / INVENTED / CLASSIFIED_AS / CITES / SUBCLASS_OF | 0 | (예정) — 모두 grade A (KIPRIS·PatentsView·CPC scheme) |
+| `eval/qa_gold/gold_qa_ip_v0.jsonl` | 0 | (예정) — IP-L1/L2/L3 seed 30 + CD-L3/L4 각 4 cross 결합 시연 |
 
 ---
 
 ## 2. 핵심 특징
 
-- **멀티도메인** — `finance` + `auto` + `cross_domain` 3 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain`). 단일 에이전트가 두 도메인 + 둘의 교차 추론을 한 turn 안에 처리. core 는 외부 도메인 패키지를 직접 import 하지 않고 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`) 를 기반으로 첫 호출 시 1회 soft-import — finance-only 환경에서는 ENV 를 빈 값으로 두면 됨
+- **멀티도메인** — `finance` + `auto` + `ip` (예정) + `cross_domain` 4 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain` + 후속 `src/ipgraph/policy.py::route_domain_ip`). 단일 에이전트가 도메인 + 그 교차 추론을 한 turn 안에 처리. core 는 외부 도메인 패키지를 직접 import 하지 않고 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 를 기반으로 첫 호출 시 1회 soft-import — finance-only 환경에서는 ENV 를 빈 값으로 두면 됨
 - **금융 도메인** — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100 대상
 - **자동차 도메인** — NHTSA vPIC/Recalls/Complaints / Wikidata (manufacturers/models/suppliers) / (옵션) car.go.kr / KATRI / KNCAP / 한국교통안전공단 수리검사. BOM Level 0~5 — Manufacturer → Model → Variant → System(L3) → Module(L4) → Part(L5, 리콜·LLM 출처에서 부분 커버). Level 6(소재·공법)은 PRD non-goal
 - **3-Store 하이브리드** — Neo4j(관계) + PostgreSQL(수치·메타·벡터) + (옵션) Qdrant — 청크 100만 이하는 pgvector 통합 운영
@@ -79,7 +98,7 @@
 - **한국어 자체 임베딩** — BGE-M3 + BGE-Reranker (GPU 자체 호스팅)
 - **Entity Resolution 마스터** — corp_code 를 단일 키로 wikidata_qid / lei / cik / isin / business_no 등을 묶음. 동명이인 인물은 (name, birth_year) 분리
 - **재실행 가능한 멱등 파이프라인** — raw → processed → DB. 모든 적재 `ON CONFLICT DO UPDATE` / `MERGE`. raw 만 있으면 언제든 재생성 가능
-- **도메인 확장성 (N-domain plug-in)** — core 는 외부 도메인 패키지를 직접 import 하지 않음. `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` 의 모듈을 첫 호출 시 soft-import 하고, 도메인 패키지의 `register_handler()` 부작용으로 활성. PRD §10.12 "코어 변경 < 5%" 보존 — 3번째 도메인 (의약품·전자제품·에너지·식품) 도 동일 패턴
+- **도메인 확장성 (N-domain plug-in)** — core 는 외부 도메인 패키지를 직접 import 하지 않음. `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` 의 모듈을 첫 호출 시 soft-import 하고, 도메인 패키지의 `register_handler()` 부작용으로 활성. PRD §10.12 "코어 변경 < 5%" 보존 — **도메인3 (ip = 특허) 이 첫 plug-in 확장 정량 검증.** §10.12 baseline reset 후 코어 변경 < 5% 가 N-domain 확장성의 정량 증거. 의약품·전자제품·에너지·식품은 비전 (§10.1 Phase D/E)
 - **출처 등급 기반 confidence (A/B/C)** — 모든 그래프 엣지의 `confidence_score` 기본값을 출처에 따라 결정 (NHTSA/공식 = 0.95 A / Wikidata = 0.80 B / LLM P3 = 0.50 C). `validated_status` 가 candidate/validated/needs_review/rejected — 답변 인용 시 grade 표시
 - **시점 + provenance 강제** — auto 도메인 모든 엣지에 `source_type` / `source_id` / `confidence_score` / `validated_status` / `snapshot_year` / `extraction_method` / `schema_version` 7키 의무. `make audit-edge-meta --strict` 가 invariant 강제
 
@@ -98,16 +117,16 @@
 └─ BGE-Reranker-v2-m3       : 한국어 재랭킹 (GPU, 옵션)
 
 [애플리케이션 계층]
-├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS 클라이언트
+├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS + NHTSA/AI Hub/EPA + (예정) KIPRIS/PatentsView/CPC bulk 클라이언트
 ├─ Loaders            : PG/Neo4j 멱등 적재 (P1 deterministic / P2 deterministic / P3 LLM / P4 cross-validate)
-├─ Tools              : 사전 정의 함수 풀 (financials/graph/retrieve) — 자유 SQL/Cypher 금지
+├─ Tools              : 사전 정의 함수 풀 (finance: financials/graph/retrieve · auto: spec/graph/retrieve/bridge · ip 예정: patents/graph/retrieve/bridge) — 자유 SQL/Cypher 금지
 ├─ Safety             : prompt_safety (XML escape + injection 감지 + high-risk 단발 차단) · cypher_guard (READ-ONLY + APOC write/dynamic-cypher procedure 블록) · language_guard
 ├─ Agents (LangGraph) : Triage → Planner(DAG) → Supervisor ↔ Workers(병렬: research/graph/sql/calculator)
 │                       → Synthesizer → Validator (replan ≤ 2, tasks/result 자동 리셋)
 │                       · Send API 병렬 디스패치 · 세션 메모리 (thread별 TTL/LRU)
 │                       · checkpoint (chat.checkpoints) · streaming (SSE / st.status)
 │                       · tracing (Langfuse/LangSmith)
-└─ API / UI           : FastAPI 5 엔드포인트 (`POST /chat` · `POST /chat/stream` (SSE) · `POST /chat/resume` (HITL 재개) · `GET /threads/{id}` (히스토리) · `GET /health` (PG/Neo4j ping)). Streamlit 채팅 (node progress · 👍/👎/📝). **인증 없음 — 외부 노출 시 reverse proxy + auth gateway 필요 (§11.1)**
+└─ API / UI           : FastAPI 5 엔드포인트 (`POST /chat` · `POST /chat/stream` (SSE) · `POST /chat/resume` (HITL 재개) · `GET /threads/{id}` (히스토리) · `GET /health` (PG/Neo4j ping)). Streamlit 채팅 (node progress · 👍/👎/📝). **인증 없음 — 외부 노출 시 reverse proxy + auth gateway 필요 (§11.2 운영 보안 P1)**
 
 [외부 의존성]
 └─ LLM Provider : OpenAI / Anthropic / 로컬 (환경변수 전환)
@@ -146,10 +165,10 @@
 | KCGS ESG 등급 | cgs.or.kr | 회원 (수동) | `esg.ratings` + Neo4j Company 속성 |
 | 공정위 기업집단 | data.go.kr | 공공 | (키 확보 후) Neo4j Group + BELONGS_TO_GROUP |
 | KOSIS 산업 통계 | kosis.kr | 공공 | (키 확보 후) `macro.kosis_series` |
-| KIPRIS 특허 | kipris.or.kr | 공공 | (키 확보 후) `ip.patents` |
 | LAW.go.kr 법령 | open.law.go.kr | 공공 | (키 확보 후) `law.laws` |
 
 **수집 범위 (1차):** 코스피 200 + 코스닥 100 약 300개사, 최근 3개 회계연도.
+**제조 데이터 끝까지 채움 (진행 중):** `DATA_GO_KR_API_KEY` (팩토리온 [15087611](https://www.data.go.kr/data/15087611/openapi.do) / 자동차 리콜 [15089863](https://www.data.go.kr/data/15089863/openapi.do) / 검사 [15155857](https://www.data.go.kr/data/15155857/fileData.do)) + DART 사업보고서 **가동률 표** 파서 (`src/autograph/extractors/dart_production_parser.py:316` TODO) + KOSIS 산업 통계. 모두 정형 — LLM 0%.
 **범위 외 (Out-of-Scope):** 빅카인즈 본문, 나무위키(CC BY-NC-SA), 종목토론방, LinkedIn, Twitter.
 
 ### AutoGraph 데이터 소스
@@ -175,6 +194,28 @@
 | 공장 등록정보 (15087611) — 회사·공장번호·산단별 조회 | data.go.kr 팩토리온 (`apis.data.go.kr/B550624`) | 공공 | `DATA_GO_KR_API_KEY` | (키 확보 후) `auto.factory_registry` → MANUFACTURED_AT 보강 |
 
 > 인증 키 부재 시 ingestion 은 graceful skip — 코드 변경 없이 `.env` 만 채우면 활성화.
+
+### IPGraph 데이터 소스 (예정 — 본 PR outline · 후속 PR ingestion)
+
+> 상세 설계·온톨로지·gold QA SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 배터리·소재 표는 본 절 아님 — auto 의 L5/L6 확장 (다음 표).
+
+| 데이터 | 출처 | 라이선스 | 인증 | 적재 위치 | 상태 |
+|---|---|---|---|---|---|
+| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개**) | `KIPRIS_API_KEY` | `ip.patents` + Neo4j Patent | (예정) |
+| 미국 특허·인용·assignee 정규화 | PatentsView API (USPTO) | 공공 (US Gov) | **1주차 엔드포인트 검증 필요 — 2026 USPTO Open Data Portal 이관 가능** | `ip.patents` + `ip.citations` | (예정) |
+| CPC 분류 체계 (계층 depth ≥ 4) | CPC scheme bulk (USPTO / EPO) | 공공 | 불필요 | `ip.cpc_scheme` + Neo4j CPCCode/SUBCLASS_OF | (예정) — 무인증 즉시 가능 |
+| 글로벌·연구 확장 | OpenAlex API | CC0 | 불필요 (rate limit) | `ip.works` | (예정, 옵션) |
+
+### 배터리·소재 보완 (auto 의 L5/L6 확장 — 예정)
+
+> ip 도메인이 아님. `(:Module {배터리팩})-[:CONTAINS_MODULE]->(:Cell)-[:MADE_OF]->(:Material {NCM811})-[:DERIVED_FROM]->(:Mineral {Ni})` BOM 하향. 상세는 [docs/autograph.md](./docs/autograph.md) §2.5.4.
+
+| 데이터 | 출처 | 라이선스 | 적재 위치 | 상태 |
+|---|---|---|---|---|
+| 배터리 화학조성 (NCM/LFP 등 셀 chem) | Wikidata + 셀 제조사 공개 IR PDF | CC0 / 공공 | `auto.master_materials` | (예정) |
+| 핵심광물 (Li/Ni/Co/Mn) 통계 | USGS Mineral Commodity Summaries | 공공 (US Gov) | `auto.master_minerals` | (예정) |
+| 광물 수입 통계 (한국) | 관세청 무역통계 / 무역협회 K-stat | 공공 | `macro.trade_minerals` | (예정) |
+| 회사단위 소싱 (셀 ↔ OEM) | 공개 IR 부분 — grade C candidate | 공공 (sparse — 정직 표기) | `auto.staging_relations` (candidate) | (예정, 한계 명시) |
 
 ---
 
@@ -216,20 +257,29 @@
 - **`retrieve.py`** — `search_documents_auto` / `search_by_metadata_auto` / `get_chunk_auto` (pgvector + manufacturer_id/model_id/variant_id 필터, source ∈ nhtsa_recall/complaint/tsb/wikipedia_auto/aihub/epa)
 - **`bridge.py`** — `bridge_corp_to_entity` / `bridge_entity_to_corp` / `bridge_sec_cik_to_entity` / `bridge_entity_to_sec_cik` / `cross_query` (한국 corp_code 와 글로벌 SEC CIK 양방향 매칭, `reviewed_status='rejected'` 제외)
 
+### IPGraph tools (`src/ipgraph/tools/*`) — (예정)
+
+도메인 `ip` / `cross_domain` 에서만 활성 (예정). workers 화이트리스트로 강제. **본 PR 은 outline — 코드 미구현.** 상세 시그니처·온톨로지·gold QA SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md).
+
+- **`patents.py`** — `lookup_patent` / `get_patent_info` / `list_patents_by_assignee` / `count_patents_by_field` / `compare_assignees_patent_volume`
+- **`graph.py`** — `lookup_assignee_graph` / `list_patents_of_assignee` / `get_inventors_of_patent` / `find_co_assignees` / `list_patents_in_cpc(include_subclasses=True)` / `list_assignees_in_field` / `get_citation_network(depth≤2, limit_nodes≤300, max_total≤1000, direction ∈ cited_by|cites|both)` / `most_cited_patents` — Cypher 템플릿 `ip_*` (~25 = lookup 5 + assignee 6 + cpc 6 + citation 4 + cross 4)
+- **`retrieve.py`** — `search_patents` / `search_by_metadata_ip` / `get_chunk_ip` (abstract+claims pgvector + `assignee_id`/`cpc`/`jurisdiction` 메타 필터)
+- **`bridge.py`** — `bridge_assignee_to_corp` / `bridge_corp_to_assignee` / `cross_query_ip` (특허 ↔ finance R&D비·영업이익 ↔ auto 부품·리콜). **신규 join 테이블 `ip.assignee_corp_map`** — `bridge.corp_entity` 직접 변경 없음, supplier candidate 운영 SOP (4,792 row) 재사용
+
 ---
 
 ## 6. 평가 전략
 
 ### 평가셋 구성
-- 공개 벤치마크: Allganize RAG-Evaluation-Dataset-KO (금융)
+- 공개 벤치마크: Allganize RAG-Evaluation-Dataset-KO (금융) — **외부 벤치 (자기충족성 완화 신호)**
 - 자체 구축 Multi-hop QA — 도메인 내 100문항 + Cross-Domain 30문항
   - finance: `eval/qa_gold/gold_qa_v0.jsonl` — L1/L2/L3 — seed 30 (목표 100)
   - auto: `eval/qa_gold/gold_qa_auto_v0.jsonl` — L1/L2/L3 — seed 42 (목표 100)
-  - cross: `eval/qa_gold/gold_qa_cross_v0.jsonl` — CD-L1 10 / CD-L2 8 / CD-L3 8 / CD-L4 4
+  - cross: `eval/qa_gold/gold_qa_cross_v0.jsonl` — CD-L1 10 / CD-L2 8 / CD-L3 8 / CD-L4 4 + **(예정) CD-L3 4 + CD-L4 4 = ip 결합 시연 (38 row)**
+  - **ip (예정): `eval/qa_gold/gold_qa_ip_v0.jsonl` — IP-L1/L2/L3 — seed 30 (목표 100)**
 
-### 비교 매트릭스
-Vector only / Graph only / **Hybrid Agent** / SQL+Vector — 4종 × LLM 3종 = 12조합
-+ Cross-Domain 은 Hybrid+Bridge 어댑터 단독 (다른 어댑터는 Bridge 미사용).
+### 비교 매트릭스 — 축소 (예산 내 우선)
+Vector only / Graph only / **Hybrid Agent** / SQL+Vector — **4 어댑터 × 저비용 LLM 1종 (FAST tier — Sonnet 4.6 / GPT-4o-mini / Gemini Flash) = 4 조합** 으로 thesis(§10.7 Hybrid > Vector) headline 확보. 2번째 LLM 은 subset (CD-L3/L4) 만. **rerank on/off ablation 1행 (BGE-Reranker-v2-m3 wired 활용).** Cross-Domain 은 Hybrid+Bridge 어댑터 단독.
 
 ### 목표 지표
 
@@ -267,7 +317,7 @@ make audit-dod            # 14항 트래픽라이트 종합 리포트 → eval/r
 | §10.5 | BOM L0~L3 안정 + L4 coverage ≥ 60% | ✅ | L0~L3 stable, L4=63.7% |
 | §10.6 | bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+ | ✅ | strong_match 12/12 = 100% |
 | §10.11 | SUPPLIED_BY 엣지 confidence/provenance/snapshot_year 100% | ✅ | 30 edges 100% meta |
-| §10.12 | 코어 코드 변경 < 5% | ✅ | baseline `4049caf856` → 0/12,786 LOC = 0.00% (baseline 이동 시 재측정 필요 — §11.5) |
+| §10.12 | 코어 코드 변경 < 5% | ✅ | baseline `4049caf856` → 0/12,786 LOC = 0.00%. **ip 도메인 추가 시 baseline reset — 누적 reset 이력 별도 기록 (§11.1 baseline reset 정책 본문 승격)** |
 | §10.7 | Hybrid vs Vector Multi-hop +30%p | ⊘ | LLM 키 필요 — `make eval-auto` 실행 후 자동 측정 |
 | §10.8 | Cross-Domain QA CD-L1~L4 | ⊘ | LLM 키 필요 |
 | §10.9 | 제원 수치 EM 95%+ | ⊘ | LLM 키 필요 |
@@ -340,6 +390,13 @@ make audit-dod            # 14항 트래픽라이트 종합 리포트 → eval/r
 | 모델 출력 reranker (BGE-Reranker-v2-m3) | 코드 wired (`RERANKER_URL=...`) | 실서비스에서 미활성. 활성 조건·임계 미정의 |
 | USES_PROCESS / MADE_OF (L6) | wired (ontology 정의) | `:Process` 노드 사전 산단공 적재 / `:Material` 노드 미구현. 엣지 적재 routine 미구현 |
 | DART 사업보고서 가동률 표 | 코드 TODO (`extractors/dart_production_parser.py:316`) | capacity 만 추출. 가동률은 컬럼 구성이 다양해 별도 경로 필요 |
+| **IPGraph 도메인 어댑터** | **(예정)** — 도메인3 | `src/ipgraph/*` + `ontology/ip/*` + `18_ipgraph.sql` + tool pool 4종 + cypher `ip_*` ~25 + gold seed 30. 본 PR 은 outline + skeleton 만 — 상세 SSOT [docs/ipgraph.md](./docs/ipgraph.md) |
+| **`ip.assignee_corp_map`** | **(예정)** | `bridge.corp_entity` 직접 변경 회피, 신규 join 테이블 (`19_ipgraph_bridge.sql`) + supplier candidate 와 동일 `reviewed_status` 운영 SOP |
+| **KIPRIS / PatentsView / CPC bulk / OpenAlex** | **(예정)** — 키 발급·엔드포인트 검증 대기 | PatentsView 는 2026 USPTO Open Data Portal 이관 가능성 — 1주차 확인 |
+| **배터리·소재 (auto L5/L6)** | **(예정)** — ontology 정의만, 데이터 0 | Wikidata cell chem + USGS minerals + 무역통계. 회사단위 셀 ↔ OEM 소싱은 grade C candidate 정직 표기 |
+| **MCP 래퍼** | **(예정)** — 상용 신호 §11.1 | typed tool pool 위에 얇은 MCP server. 2026 상호운용 표준 신호 (Claude/OpenAI Agents SDK 양쪽 MCP 채택) |
+| **Langfuse 실측 ON** | **(예정)** — 상용 신호 §11.1 | `TRACE_BACKEND=langfuse` 설정 + turn별 token/cost/replan dashboard + replan ROI 정량화 |
+| **온톨로지 SHACL/pydantic 검증** | **(예정)** — 상용 신호 §11.1 | `ontology/*.yaml` 로드 시 스키마 검증 + `schema_version` 을 엣지 레벨에서 온톨로지 레벨로 끌어올림 |
 
 ---
 
@@ -370,11 +427,16 @@ make audit-dod            # 14항 트래픽라이트 종합 리포트 → eval/r
 
 MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 
-- 비상장사 / 사모펀드 / 글로벌 영문 기업 → §10.1 (3번째 도메인 + N-domain bridge)
-- BOM Level 5 (Part) 대량 / Level 6 (Material·Process) → §10.2
-- 공정·라인·설비·원가·생산량 → §10.2 (DART 사업보고서 파서 + 산단공 + 팩토리온 으로 부분 진입)
+- 비상장사 / 사모펀드 / 글로벌 영문 기업 → §10.1 Bridge 확장
+- **도메인3 = 특허 (ipgraph) = §10.1 Phase C (현 단계)** — N-domain 확장성 정량 증명 수단 (코어 변경 < 5% 재측정)
+- BOM Level 5 (Part) 대량 / Level 6 (Material·Process) → §10.2 (배터리·소재 부분 진입)
+- **공정·라인·설비·원가·생산량 → 진행 중** — DATA_GO_KR_API_KEY (팩토리온/리콜/검사) + DART 가동률 표 + KOSIS 산업 통계로 끝까지 채움
 - 실시간 이벤트 처리 (분 단위) → §10.4
 - ESG ↔ 제품 친환경성 결합 / 공급망 위험 분석 / 리콜 전파 분석 → §10.3
+
+**본 단계 영구 비목표 (의도적 강등):**
+
+- **N-domain 4번째 ~ (의약품 `pharmagraph` · 전자제품 `elecgraph` · 에너지 `energygraph` · 식품 `foodgraph`)** — ip 가 §10.12 < 5% 를 실측으로 증명한 뒤 의사결정 갱신 (§10.1 Phase D/E 비전 박스로 유지)
 
 ---
 
@@ -384,14 +446,16 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 
 ### 10.1 N-domain GraphRAG umbrella — 3번째·4번째 도메인 확장
 
+> **현 단계는 Phase C 까지.** Phase D/E 는 ip 가 §10.12 < 5% 를 실측으로 증명한 뒤 의사결정 갱신. PRD §12 동기화는 후속 PR.
+
 | 단계 | 도메인 | 추가 데이터 소스 | Bridge 확장 |
 |---|---|---|---|
-| 현재 | finance (한국 상장사) + auto (자동차) | DART/KRX/ECOS/NHTSA/Wikidata | `bridge.corp_entity` (corp_code ↔ entity_id, sec_cik) |
-| Phase C (다음) | + **의약품** (`pharmagraph`) | PMDA / FDA 라벨 / 임상 시험 / DUR / 보험 EDI | `bridge.corp_entity` + `bridge.drug_entity` (다형) |
-| Phase D | + **전자제품 / 반도체** (`elecgraph`) | DRAM/Logic 로드맵 · IEC 표준 · GHS-RoHS · iFixit 분해 | `bridge.corp_entity` + 부품·소재 매핑 |
-| Phase E | + **에너지·식품** (`energygraph` / `foodgraph`) | 한국전력 발전소 / 식약처 회수 | 다양한 도메인이 동일 corp_entity 로 join |
+| 현재 | finance (한국 상장사) + auto (자동차/제조) | DART/KRX/ECOS/NHTSA/Wikidata + DART 사업보고서·산단공·KAMA·OEM IR | `bridge.corp_entity` (corp_code ↔ entity_id, sec_cik) |
+| **Phase C (현 단계)** | **+ 특허·기술혁신 (`ipgraph`)** | **KIPRIS / PatentsView / CPC bulk / OpenAlex — 거의 전부 정형, LLM 0%** | **`bridge.corp_entity` 재사용 + 신규 join `ip.assignee_corp_map` (M-3)**. **N-domain 확장성 정량 증명 = §10.12 < 5% 재측정** |
+| Phase D (비전) | + 의약품 (`pharmagraph`) / 전자제품 (`elecgraph`) | PMDA / FDA / DRAM 로드맵 · IEC · iFixit | `bridge.corp_entity` + `bridge.drug_entity` 등 다형 |
+| Phase E (비전) | + 에너지·식품 (`energygraph` / `foodgraph`) | 한국전력 발전소 / 식약처 회수 | 다양한 도메인이 동일 corp_entity 로 join |
 
-**왜 가능한가:** core 는 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV) 의 모듈을 import 시점에 soft-load. 새 도메인은 `register_handler` 부작용 + `ontology/<domain>/*.yaml` + 사전 정의 도구 + Cypher 템플릿 + 화이트리스트 + gold QA seed 만 추가. **PRD §10.12 "코어 변경 < 5%" 가 강제** (`scripts/audit/dod_audit.py` baseline 비교). 자동차 추가 시 4.47% 측정값 (`docs/mental_model.md §5.1`).
+**왜 가능한가:** core 는 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV) 의 모듈을 import 시점에 soft-load. 새 도메인은 `register_handler` 부작용 + `ontology/<domain>/*.yaml` + 사전 정의 도구 + Cypher 템플릿 + 화이트리스트 + gold QA seed 만 추가. **PRD §10.12 "코어 변경 < 5%" 가 강제** (`eval/metrics/core_diff.py` baseline 비교). **ip 추가 후 baseline reset 정책 (§11.1) 에 따라 재측정 → 정량 증거 산출.**
 
 **열린 질문 / 갭:**
 - 코어와 finance 어댑터의 분리 (`docs/mental_model.md §3.1.4`) — pure core / fingraph / autograph / pharmagraph 3+ 분할이 필요한지, 현재 2-pkg 가 영구 설계인지 미정
@@ -405,7 +469,7 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 | L3 (System) | `system_taxonomy.yaml` 19 시스템 SSOT | 동일 — 표준 분류이므로 확장 없음 | (해당 없음) |
 | L4 (Module) | NHTSA component taxonomy 176 + AI Hub + manual seed = 220 | OEM 별 베스트셀러 모델 ≥ 90% module coverage | 부품사 IR cross-reference (현대모비스/한온/만도 …) 미수집 |
 | **L5 (Part)** | post-MVP — 리콜 텍스트 LLM 추출 → RECALL_OF 자연 발생만 | OEM 별 BOM "주요 부품 30~50종" coverage, Part ↔ Supplier 시점별 매핑 | 데이터 본질 부재 (`docs/mental_model.md §5.4`) — (a) 공개 채널 자체가 sparse, (b) 부품사 IR 라이선스/정확도, (c) Part 정체성 정의 (같은 부품번호가 OEM 별로 다름) |
-| **L6 (Material·Process)** | PRD non-goal | 배터리 셀 NCM 조성 / 알루미늄 합금 / 다이캐스팅 같은 공법 ontology + (:Module)-[:MADE_OF]->(:Material) / [:USES_PROCESS]->(:Process) | 산단공 합성 공정데이터 (15151075) 가 :Process 사전을 채우고 있음 — :Material 은 미구현 |
+| **L6 (Material·Process)** | **부분 진입 (예정)** — 배터리 셀 NCM 조성 + 핵심광물 (Wikidata / USGS Mineral Commodity Summaries) — auto 의 L5/L6 확장 부록 | `(:Module {배터리팩})-[:CONTAINS_MODULE]->(:Cell)-[:MADE_OF]->(:Material {NCM811})-[:DERIVED_FROM]->(:Mineral {Ni})` BOM 하향. 알루미늄 합금 / 다이캐스팅 같은 공법 ontology + (:Module)-[:USES_PROCESS]->(:Process). 회사단위 셀 ↔ OEM 소싱은 grade C candidate — sparse. 상세 [docs/autograph.md](./docs/autograph.md) §2.5.4 | 산단공 합성 공정데이터 (15151075) 가 :Process 사전을 채우고 있음 — :Material / :Mineral 적재는 (예정) |
 
 **현재 작업 중인 것:**
 - DART 사업보고서 본문 파서 — 한국 OEM/부품사의 생산능력·가동률·공장명을 LLM 0% 정규식 + 표 파서로 추출 (가장 최근 커밋 `215f7e5`)
@@ -421,6 +485,7 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 2. **리콜 전파 분석** — 동일 부품 사용 차종 자동 영향 평가. 예: "이 BMS 리콜이 다른 OEM 의 어느 모델·연식까지 적용 가능한가". (`get_vehicles_using_component` + `find_vehicle_component_paths` + snapshot_year 시점 필터)
 3. **ESG ↔ 제품 친환경성 결합** — KCGS ESG 등급 (finance) + EPA fueleconomy MPG·배출등급 (auto) + 배터리 셀 조성 (L6) → "ESG B+ 이상 OEM 의 평균 GHG score 와 EV/HEV 비율".
 4. **시점 정합 cross-domain** — "2023년 LG에너지솔루션 배터리를 쓰는 OEM 의 KCGS ESG 등급" — Bridge·SUPPLIED_BY·ESG ratings 모두에 `snapshot_year` / `valid_from/to` 정합 필요.
+5. **R&D ↔ 특허 ↔ 제품 (ipgraph + cross 시연 핵심)** — "현대모비스 R&D비 (finance) 대비 ADAS(CPC B60W) 특허 출원 추세 (ip)" (CD-L3) / "삼성SDI 배터리 특허(H01M) 집중 분야 + 영업이익 + 그 셀을 쓰는 OEM 리콜" (CD-L4). 호출 경로: `bridge_assignee_to_corp` → `list_patents_in_cpc` → `get_revenue / get_operating_income` → `list_recalls_affecting` — 3 도메인 동시 추론 시연.
 
 **현재 갭:**
 - 모든 엣지에 `snapshot_year` 강제는 완료. 하지만 시점 정합 cross-domain QA 의 ground truth 정의가 모호 (`docs/mental_model.md §5.8`) — 분기별 공급 비율 변동 시 어느 시점을 "정답" 으로?
@@ -431,7 +496,7 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 
 | 영역 | 현재 | 최종 |
 |---|---|---|
-| 평가 매트릭스 | 4 어댑터 × 3 LLM = 12 조합 인프라 완성, 실측 대기 | 12 조합 풀 실측 + Confidence-Weighted Accuracy calibration + Vector RAG 비교 공정성 검증 (외부 큐레이터 gold QA 도입) |
+| 평가 매트릭스 | 4 어댑터 × 3 LLM = 12 조합 인프라 완성, 실측 대기 | **축소 매트릭스 4 조합 (4 어댑터 × FAST tier 1종) 우선 headline (thesis §10.7) + Allganize 외부 벤치 + rerank on/off ablation.** 2번째 LLM 은 subset (CD-L3/L4) — 풀 12 조합 실측 + Confidence-Weighted Accuracy calibration + Vector RAG 비교 공정성 검증은 후속 |
 | Gold QA | finance 30 / auto 42 / cross 30 row seed | finance 100 / auto 100 / cross 100 — CD-L1~L4 라벨 + 사람 검증 |
 | Cross-Domain 목표 정답률 | (미실측) | CD-L1 80%+ / L2 70%+ / L3 50–60% / L4 40–50% (PRD §2.2) |
 | Bridge 품질 | confidence ≥ 0.9 비율 측정 인프라 (`eval/metrics/bridge_quality.py`) | confidence ≥ 0.9 비율 80%+ + 검토 SOP + 자동 만료 정책 (예: 6개월 미검토 candidate → 자동 rejected) |
@@ -442,22 +507,123 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 | Embedding 모델 | BGE-M3 1024d 자체 호스팅 | BGE-M3 + multilingual fine-tune (자동차·금융 도메인 코퍼스 LoRA) + 청크 100만 넘으면 Qdrant 분리 (현재 765K) |
 | LLM 비용 | session HARD_LIMIT + turn budget + auto-approve | cost_estimator ±20% 정확도 검증 + 사용자별 quota + budget guard 발동 시 UX 완화 (부분 답변 + "예산 초과 — 추가 승인?") |
 
-### 10.5 우선순위 권장 (다음 한 분기)
+### 10.5 우선순위 권장 (다음 한 분기) — 재배열
 
-1. **데이터 채널 확장 (즉시 가능, 키 무관)** — EPA Annual Certification (Tier 3) / NHTSA TSB / DBpedia P527 / SEC EDGAR 글로벌 OEM 5사 더 추가 (`docs/data_sources.md §11`)
-2. **gold QA 100/100/100 확장** — CD-L1~L4 라벨 + 외부 큐레이터 30%
-3. **12 조합 매트릭스 실측** — `make eval-full / eval-auto / eval-cross` 풀 실행 + Confidence-Weighted Accuracy calibration
-4. **부품사 IR cross-reference** — DART finance 측에 이미 있는 현대모비스/만도/한온시스템 사업보고서를 auto 도메인 BOM Level 4~5 보강에 활용 (Bridge 흐름의 reverse — finance → auto)
-5. **3번째 도메인 PoC** — `pharmagraph` skeleton (DomainHandler 6 메서드 + ontology yaml 만 + gold QA 10 row) 으로 N-domain 확장성 정량 검증
+1. **IPGraph PoC (도메인3)** — CPC scheme bulk (무인증 즉시) → PatentsView 엔드포인트 검증 → US 특허 + 인용 → KIPRIS 키 발급 후 한국 특허 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) → assignee→corp_entity 매핑 → gold seed 30. **N-domain 확장성 정량 증명 (§10.12 < 5% 재측정).** 상세 [docs/ipgraph.md](./docs/ipgraph.md).
+2. **제조 데이터 끝까지 채움** — DATA_GO_KR_API_KEY (팩토리온 / 리콜 / 검사) + DART 사업보고서 가동률 표 (`extractors/dart_production_parser.py:316`) + KOSIS 산업 통계. 정형 — LLM 0%.
+3. **상용 신호 (§11.1 신설)** — MCP 래퍼 + Langfuse 실측 ON + 온톨로지 SHACL/pydantic 검증 + 축소 평가 매트릭스 (4 어댑터 × FAST tier 1종) + Allganize 외부 벤치 + rerank ablation.
+4. **gold QA 확장** — finance 100 / auto 100 / cross 38 (CD-L1~L4 + ip 결합) + ip 30 + 외부 큐레이터 30%.
+5. **부품사 IR cross-reference** — DART finance 의 현대모비스/만도/한온시스템 사업보고서를 auto 도메인 BOM L4~5 보강에 활용 (Bridge 흐름의 reverse — finance → auto).
+6. **데이터 채널 확장 (즉시 가능, 키 무관)** — EPA Annual Certification (Tier 3) / NHTSA TSB / DBpedia P527 / SEC EDGAR 글로벌 OEM 5사 더 추가 (`docs/data_sources.md §11`).
 
 ---
 
-## 11. 문서
+## 11. 보완 개발 백로그 (Critical Gaps)
 
-- [PRD.md](./PRD.md) — 요구사항·아키텍처 SSOT (AutoGraph v2.1 통합)
+> 본 절은 §10 의 장기 비전과 **별개**다. §10 은 "어디로 가는가" — 본 절은 "지금 이 상태로 production 에 올리면 무엇이 깨지는가". 측정·코드·문서로 드러난 실제 부재만 적는다. 우선순위는 (P0+ 상용 신호 / P0 차단 / P1 운영필수 / P2 개선) 로 라벨.
+>
+> **§11.1 상용 신호 백로그 (P0+) 가 가장 우선.** 기존 §11.2~§11.7 (운영·보안·배포·CI 등) 는 PoC → MVP → 상용 화살표의 후반부로 의도적 강등. **도메인3 (ip) + 제조 데이터 끝까지 + 축소 평가 매트릭스 + MCP·관측가능성** 이 우선.
+
+### 11.1 상용 신호 (Service-Grade Signals, P0+) — 신설
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **MCP 래퍼** | 없음 | typed tool pool 위에 얇은 MCP server — 2026 상호운용 표준 신호 (Claude Agent SDK / OpenAI Agents SDK 양쪽 MCP 채택) |
+| **Langfuse 실측 ON** | fail-soft 만 (TRACE_BACKEND 미설정) | `.env` 의 `TRACE_BACKEND=langfuse` + `LANGFUSE_*` 키 설정 → turn별 token/cost/replan dashboard + replan ROI 정량화 |
+| **온톨로지 SHACL/pydantic 검증** | yaml 로드만 | `ontology/*.yaml` 로드 시 pydantic/SHACL 스키마 검증 + `schema_version` 을 엣지 레벨에서 온톨로지 레벨로 끌어올림 — "확장해도 안 깨진다" 보장 |
+| **축소 평가 매트릭스 실측** | 인프라만 (LLM 키 대기) | 4 어댑터 × FAST tier 1종 (Sonnet 4.6 / GPT-4o-mini / Gemini Flash) + Allganize 외부 벤치 + rerank on/off ablation — thesis(§10.7) headline 확보 |
+| **§10.12 baseline reset 정책** | dod_audit baseline `4049caf856` 고정, 정책은 §11.5 에만 산재 | **§10.12 본문 승격** + `make audit-dod` 출력에 baseline commit + 누적 reset 이력 + "도메인 추가 마다 reset" 명시 |
+| **스택 업그레이드 경로 박음** | BGE-M3 / LangGraph 1.x 현행, 교체 금지 | 1줄 명시: Qwen3-Embedding-8B / Jina-rerank-v3 후보 + 기존 wired BGE-Reranker on/off ablation 활용 |
+
+### 11.2 운영·보안 (P1 — 강등)
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **API 인증** | 없음 — `/chat` `/chat/stream` `/chat/resume` `/threads/{id}` 모두 open | OAuth2 / API key middleware (FastAPI `Depends`) + Streamlit 측 토큰 주입 + thread_id 의 user_id binding (현재 thread_id 만 알면 누구나 타인 히스토리 조회 가능) |
+| **Rate limit** | 없음 | per-IP / per-user (slowapi 또는 reverse proxy) — LLM 비용 폭주 차단 |
+| **PII / 민감정보 정책** | 미정의 | 임원 인물·뉴스 본문에 이름·생년 포함 (`master.persons` 9,948 / (name, birth_year) 동명이인 분리). GDPR-style 삭제 권리 처리 / log redaction 정책 미문서화 |
+| **`data/cost_log.jsonl` 회전** | 영속 append, size 무제한 (gitignored 확인 완료) | 일·주별 rotate + 보존 기간 정책 + 누계 집계 cron (`python -m autonexusgraph.llm.cost_history`) |
+| **Secrets 관리** | `.env` 한 곳 | prod 는 vault / k8s secret 분리. `.env.example` 의 dev placeholder 와 prod 키 흐름 분리 절차 없음 |
+| **TLS** | uvicorn http 만 | reverse proxy (nginx/caddy) + HSTS + cert renewal — Quickstart 에 없음 |
+
+### 11.3 Production 배포 (P1 — 강등)
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **배포 가이드** | Quickstart dev 한정 | `docs/operations/production_deploy.md` 신설 — k8s/compose prod profile / health probe / blue-green / canary |
+| **백업·DR** | 없음 | PG dump 스케줄 + Neo4j `neo4j-admin backup` cron + vec.chunks embedding 재생성 RPO/RTO. raw → DB 재생성 가능하지만 시간 미측정 (finance 748K + auto 16K backfill 추정 ~수 시간) |
+| **모니터링·알람** | Langfuse / LangSmith fail-soft 만 | Prometheus exporter (node count / chunk count / cost / error rate) + Grafana 대시보드 + 알람 (PG 끊김 / Neo4j disk full / LLM cost spike) |
+| **Multi-instance scaling** | PG checkpointer 공유 가능 — 검증 안 됨 | uvicorn worker N + checkpointer concurrent write 검증 + LLM rate limit 분산 |
+| **CI/CD** | 없음 (`.github/workflows/` 부재) | unit test + lint + `make audit-dod --strict` + (옵션) ephemeral PG/Neo4j 컨테이너 integration test |
+| **Integration test 마커** | `pytest -m integration` 0 케이스 | `tests/integration/*` 신설 — load_auto_all / extract_p3+p4 / cross_query 실제 DB end-to-end |
+
+### 11.4 데이터 품질·운영 (P1)
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **Bridge candidate 검토 SOP** | 4,792 supplier candidate 영속 누적 — 검토 UI / 정책 없음 | (1) Streamlit 검토 페이지 — name match candidate 를 reviewer 가 ✓/✗ 라벨. (2) 6개월 미검토 candidate 자동 `rejected` 정책. (3) 검토 진행률 KPI |
+| **confidence_score calibration** | 미수행 — A(0.95) / B(0.80) / C(0.50) 가 실제 정답률과 단조 미검증 | gold QA 100+ 실측 후 `eval/metrics/confidence_weighted.py` 로 calibration plot. 필요 시 출처별 confidence 재조정 |
+| **`master.persons` 동명·동년생 충돌** | (name, birth_year) 키 사용 | 충돌 빈도 측정 routine + (name, birth_year, 회사) 보조 키 |
+| **embedding backfill 진행률 가시화** | finance 748K 중 일부, auto 16K 100% | `make embed-status` 또는 dashboard — backfill 진행률 + 누락 청크 자동 재시도 cron |
+| **데이터 freshness 모니터링** | 없음 | NHTSA recalls 마지막 호출 시각 / DART 마지막 filing 등 source 별 freshness check + stale 알람 |
+| **Schema 마이그레이션 버전 추적** | `infra/postgres/init/01~16.sql` 멱등 | Alembic 같은 versioned migration. 현재 `make migrate-schema-pg MIGRATE_FILE=...` 는 사용자가 무엇이 적용됐는지 추적 안 함 |
+
+### 11.5 추출·그래프 완성도 (P1)
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **USES_PROCESS / MADE_OF (L6)** | `:Process` 노드 사전 적재 / `:Material` 미구현 / 엣지 0 | (1) 산단공 `:Process` ↔ `:Module` 매칭 routine, (2) `:Material` 노드 ontology + 배터리/합금 seed, (3) Wikidata P186 (made from material) staging |
+| **DART 사업보고서 가동률 표** | TODO (`extractors/dart_production_parser.py:316`) | 가동률 표 컬럼 정규화 후 `auto.production_utilization` 적재 |
+| **부품사 IR cross-reference** | 미구현 | DART finance 의 현대모비스/한온/만도 사업보고서 → auto 도메인 SUPPLIED_BY/MANUFACTURED_AT 보강 (reverse-direction Bridge) |
+| **NHTSA TSB / Manufacturer Communications** | 수동 zip 다운로드 모드만 | URL 자동 다운 routine (NHTSA URL 변경 추적) |
+| **KNCAP / Euro NCAP / IIHS** | 인터페이스만 (KNCAP) / 미구현 (Euro/IIHS) | PDF 파서 + Standard 노드 매핑 |
+| **Cypher 템플릿 추가** | finance 22 + auto 19 | 새 use case (recall 전파·공급 집중도·시점 정합 cross) 별 템플릿 — 자유 Cypher 금지 원칙 유지 |
+| **HITL `sensitive_decision`** | wired-but-disabled (payload builder 없음) | 고위험 답변 (재무 추정·법적 조언 인접) 자동 감지 → user 승인 |
+| **P3 LLM 4종 활성화** | `enabled:false` (COMPETES_WITH / MANUFACTURED_AT(LLM) / CONTAINS_MODULE / CONTAINS_PART) | 비용·환각 위험 검증 후 selectively 활성. validation gate 강화 |
+| **N-domain bridge 일반화** | `bridge.corp_entity` 만 (2-domain 가정) | 3번째 도메인 추가 시 `bridge.drug_entity` / `bridge.component_entity` 등 다리 추가. 또는 `bridge.cross` 다형 1 테이블 |
+
+### 11.6 평가·신뢰성 (P1)
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **12 조합 매트릭스 실측** | 인프라 완성, LLM 키 필요 | `make eval-full / eval-auto / eval-cross` 풀 실행 + `eval/reports/<run>/summary.md` PR 첨부 |
+| **gold QA 확장** | finance 30 / auto 42 / cross 30 seed | 각각 100 row + CD-L1~L4 라벨 + 외부 큐레이터 30% (자기충족성 완화 — `docs/mental_model.md §5.7`) |
+| **§10.12 baseline 이동 정책** | dod_audit 가 baseline (`4049caf856`) 고정. 실제 코어 변경량은 baseline 갱신 시점에 reset | "baseline 은 도메인 추가 마다 reset" 또는 "월 단위 reset" 같은 명시 정책 + 누적 차분 표 |
+| **§10.13/14 trace 메트릭** | `eval/runners/run_qa_eval.py` 가 latency 수집하나 hop 수 미구현 | per-turn trace 에 cypher hop count + tool call sequence 기록 → `eval/metrics/main_hop_efficiency.py` 활성 |
+| **답변 사용자 피드백 루프** | UI 에 👍/👎/📝 wiring, 저장소 정의 없음 | `chat.feedback` 스키마 + 저주파 retraining loop |
+| **Vector RAG 공정성 검증** | 매트릭스 내 Vector adapter 단독 측정 | gold QA 의 "Vector 도 풀 수 있는 질문" 비율 측정 — 작성자 편향 완화 |
+
+### 11.7 문서·개발자 경험 (P2)
+
+| 항목 | 현재 | 필요 작업 |
+|---|---|---|
+| **CONTRIBUTING.md / SECURITY.md** | 없음 | 코드 스타일 / PR 절차 / 보안 보고 채널 |
+| **`docs/design/` 빈 디렉토리** | placeholder | 핵심 컴포넌트 (LangGraph 노드 / DomainHandler / Bridge / P3-P4) ADR + diagrams |
+| **`_legacy/` 정책** | 보존 (v1/v2 KGQA Agent) | (a) deprecate notice + 일정 (b) 마이그레이션 가이드 (c) 또는 archived branch 로 이동 |
+| **architecture diagram 통합** | `docs/autograph.md §2.5` mermaid 만 | README 본문에 1장 핵심 다이어그램 (현재 텍스트 박스만) |
+| **performance benchmark** | PRD 목표만 | 실측 latency p50/p95/p99 + 평균 토큰/turn + 평균 cost/turn dashboard |
+| **TROUBLESHOOTING.md** | 없음 | 흔한 실패 (LLM rate limit / pgvector 미설치 / Neo4j auth / DART 키 만료) 진단 트리 |
+| **changelog** | git log + `_legacy/CHANGELOG.md` | repo root `CHANGELOG.md` keepachangelog 형식 |
+| **GitHub Issue/PR template** | 없음 | bug / feature / data-source 템플릿 |
+| **README 다이어그램·스크린샷** | 텍스트 박스만 | Streamlit UI 캡처 + Neo4j Browser cross-domain 결과 캡처 |
+
+### 11.8 한 줄 요약 — "상용 신호 → 도메인3 → production" 순서
+
+- **MVP 검증 (PoC)** — 5/5 측정 가능 DoD pass. 즉시 다음 단계 진입 가능.
+- **상용 신호 (P0+, §11.1)** — MCP 래퍼 + Langfuse 실측 ON + 온톨로지 SHACL + 축소 평가 매트릭스 실측 = 가장 우선. 대략 2~4 주.
+- **도메인3 (IPGraph, §10.5#1)** — CPC + PatentsView + KIPRIS + tool pool + gold seed = N-domain 확장성 정량 증명. 대략 4~6 주.
+- **제조 데이터 끝까지 채움 (§10.5#2)** — DATA_GO_KR + DART 가동률 + KOSIS. 2~3 주.
+- **Production 까지의 비용 (P1, §11.2~§11.3)** — 인증 / 배포 / 백업 / CI / Bridge 검토 SOP / calibration. **의도적 후순위** — 위 3 가지 완료 후 4~8 주.
+
+---
+
+## 12. 문서
+
+- [PRD.md](./PRD.md) — 요구사항·DoD·범위 SSOT (v2.2 — AutoGraph + IPGraph 통합, DoD #15~#17 신설, §12.5 도메인3 어댑터 슬롯·작업 항목 SSOT)
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트
 - [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 33 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
-- [docs/autograph.md](./docs/autograph.md) — **AutoGraph (auto 도메인) 단독** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약)
+- [docs/autograph.md](./docs/autograph.md) — **AutoGraph (auto 도메인) 단독** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약 / §2.5.4 배터리·소재 L5/L6 부록)
+- [docs/ipgraph.md](./docs/ipgraph.md) — **IPGraph (ip 도메인, 예정) 설계 SSOT** — DomainHandler / ontology yaml / tool pool / Cypher 템플릿 / gold QA / 작업 순서
 - [docs/data_sources.md](./docs/data_sources.md) — 데이터 소스 후보 카탈로그 + 라이선스 + 인증 키
 - [docs/data_inventory.md](./docs/data_inventory.md) — 적재 현황 측정 (재실행 시 갱신, `make audit-data-channels`)
 - [docs/data_catalog.md](./docs/data_catalog.md) — **구현된 채널 운영 가이드** (출처·등급·ingestion·loader·tool·한계 표준 9 항목 형식)
@@ -471,7 +637,7 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 
 ---
 
-## 12. Quickstart
+## 13. Quickstart
 
 ```bash
 # 0. .env 작성 (.env.example 복사 후 DART_API_KEY 채움)
@@ -653,8 +819,32 @@ make audit-dod                       # 14 항 종합 — eval/reports/dod_v2.1.m
 
 자세한 절차·미구현 영역·회귀 안전성은 [docs/autograph.md](./docs/autograph.md). 도메인 라우팅 흐름은 [docs/operations/agents.md](./docs/operations/agents.md#도메인-라우팅-finance--auto--cross_domain).
 
+### Quickstart — IPGraph (예정 outline · 후속 PR 코드)
+
+상세 시나리오·핸들러·온톨로지·도구 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 본 PR 은 outline + skeleton 만.
+
+```bash
+# 0. ENV 에 ipgraph 추가 (코드 머지 후)
+# echo "AUTONEXUSGRAPH_DOMAIN_PLUGINS=autograph,ipgraph" >> .env
+# echo "KIPRIS_API_KEY=…" >> .env   # 공공데이터포털 발급 후
+
+# 1. (예정) 스키마 마이그레이션
+# make migrate-schema-pg MIGRATE_FILE=18_ipgraph.sql
+# make migrate-schema-pg MIGRATE_FILE=19_ipgraph_bridge.sql
+
+# 2. (예정) 데이터 인제스션
+# make ingest-ipgraph-cpc          # 무인증 즉시 가능 (USPTO/EPO CPC scheme bulk)
+# make ingest-ipgraph-patentsview  # 1주차 엔드포인트 검증 후 (US Gov)
+# make ingest-ipgraph-kipris       # KIPRIS_API_KEY 발급 후 (한국)
+
+# 3. (예정) 평가 + DoD 재측정
+# make eval-ip                     # gold_qa_ip_v0.jsonl 30 row + 축소 매트릭스
+# make eval-cross                  # CD-L3/L4 ip 결합 포함 (38 row)
+# make audit-dod                   # §10.12 baseline reset 후 ip 추가 코어 변경량 측정
+```
+
 ---
 
-## 13. 라이선스
+## 14. 라이선스
 
 내부 연구·개발 단계. 라이선스 미정.

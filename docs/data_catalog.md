@@ -206,6 +206,23 @@ PRD §3.5 출처 신뢰도 등급. 본 등급은 코드 SSOT 인 `src/autograph/
 
 ---
 
+## 채널 11: KCGS ESG 등급 (한국ESG기준원) {#kcgs-esg}
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | cgs.or.kr (한국ESG기준원) — 공식 API 없음, 회원 페이지 + 보도자료 |
+| 라이선스 | 공공 (보도자료) + 회원 (등급 풀데이터) — 본문/CSV 는 수동 다운로드 |
+| 등급 | **B** (0.80) — 등급표는 정확, 발표 시점은 보도자료 수동 확인 |
+| Raw | `data/raw/kcgs/press/<no>/{meta.json, body.html}` (보도자료 자동) + `data/raw/kcgs/<year>/ratings.csv` (등급표 수동) + `data/raw/kcgs/sample/template.csv` (형식 예시) |
+| Ingestion | (자동) `make ingest-kcgs` — `scripts/ingest/download_kcgs.py` 가 press_list.jsp 의 '등급' 키워드 보도자료 polling. ESG 등급 조정·평가 발표 시 새 게시물 자동 감지. 커스텀: `python scripts/ingest/download_kcgs.py --svalue 평가 --pages 5 --with-body` |
+| Loader | (수동 CSV → PG/Neo4j) `make load-kcgs` (기본 year=2024) 또는 `python scripts/load/load_kcgs.py --year 2024` → PG `esg.ratings` + Neo4j `Company.esg_<year>_{env,soc,gov,total}` |
+| CSV 형식 | `회사명, 종목코드, 환경, 사회, 지배구조, 종합` — 컬럼명 자동 감지 (회사명/기업명, 종목코드/코드, 환경/E, 사회/S, 지배구조/G, 종합/통합) |
+| 검증 | PG `SELECT total_grade, count(*) FROM esg.ratings WHERE year=2024 GROUP BY 1` / Neo4j `MATCH (c:Company) WHERE c.esg_2024_total='A+' RETURN c.corp_code, c.corp_name LIMIT 10` |
+| 알려진 한계 | (a) **자동 다운로드 불가** — 등급 풀데이터는 회원 가입 + 약관. (b) 등급 조정 보도자료 본문은 자동 OK, **첨부 PDF 는 JS 함수 호출이라 수동 다운로드 필요**. (c) 매년 정기 등급 발표 (10~11월) 시 보도자료 monitor → 사용자 페이지 방문 후 CSV 저장 → `make load-kcgs` 자동 적재. |
+| 다운로드 경로 | (1) 회원 가입 시 KCGS 회원 페이지 / (2) 공개 시점 보도자료 첨부 HWP/PDF / (3) 3rd party (DBpia / 언론사 정리 자료) |
+
+---
+
 ## Raw 디스크 보존 정책
 
 | 영역 | 보존 정책 | 라이선스 게이트 |

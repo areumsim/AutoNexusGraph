@@ -190,6 +190,14 @@ def _normalize_plant_name_for_wiki(name: str) -> str:
     return name
 
 
+_HANGUL_RE = re.compile(r"[가-힣]")
+
+
+def _has_korean(text: str) -> bool:
+    """이름에 한글이 있는가."""
+    return bool(_HANGUL_RE.search(text or ""))
+
+
 def _load_plants_from_yaml(limit: int | None) -> list[tuple]:
     """``ontology/auto/plants.yaml`` 의 plant 목록 → (code, normalized_name, wikidata_qid).
 
@@ -270,15 +278,30 @@ def ingest(
             out[f"{lang}/{tgt}"] = {"fetched": 0, "skipped": 0,
                                      "missing": 0, "errors": 0}
             continue
-        log.info("[wiki] %s — %d entities", tgt, len(rows))
+
+        # plants 최적화 (2026-06-01): 비한국 plant name (Tesla/BMW/Toyota 등) 은
+        # 1차 ko 검색을 skip — 어차피 한국어 wiki 에 없음. en 우선 시도.
+        rows_for_primary = rows
+        if tgt == "plants" and lang == "ko":
+            rows_for_primary = [(c, n, q) for (c, n, q) in rows if _has_korean(n)]
+            n_skipped_ko = len(rows) - len(rows_for_primary)
+            if n_skipped_ko:
+                log.info("[wiki:plants] %d non-Korean names → ko skip, en 직행",
+                         n_skipped_ko)
+
+        log.info("[wiki] %s — %d entities (primary lang=%s)",
+                 tgt, len(rows_for_primary), lang)
         stats = _fetch_entity_pages(
-            entity_kind=tgt, rows=rows, lang=lang,
+            entity_kind=tgt, rows=rows_for_primary, lang=lang,
             with_html=with_html, with_infobox=with_infobox,
         )
         out[f"{lang}/{tgt}"] = stats
 
-        # 미발견 entity 만 fallback_lang 으로 재시도.
-        if fallback_lang and fallback_lang != lang and stats["missing"]:
+        # 미발견 entity (+ ko-skipped non-Korean) 모두 fallback_lang 시도.
+        fallback_rows = rows if tgt == "plants" else rows
+        if (fallback_lang and fallback_lang != lang
+                and (stats["missing"] or
+                     len(rows_for_primary) < len(rows))):
             log.info("[wiki:%s→%s] %d missing entities 재시도",
                      lang, fallback_lang, stats["missing"])
             stats_fb = _fetch_entity_pages(

@@ -372,7 +372,7 @@ _MANUFACTURED_AT_CYPHER = f"""
 UNWIND $rows AS r
 MATCH (mm:Manufacturer {{id: r.manufacturer_id}})
 MATCH (p:Plant {{code: r.plant_code}})
-MERGE (mm)-[edge:MANUFACTURED_AT]->(p)
+MERGE (mm)-[edge:MANUFACTURED_AT {{snapshot_year: r.snapshot_year}}]->(p)
 SET {edge_meta_cypher('edge')},
     edge.capa_units      = r.capa_units,
     edge.actual_units    = r.actual_units,
