@@ -8,6 +8,11 @@ ontology/auto/{entities,relations,extractors,system_taxonomy,standards,plants}.y
 - ``extractors/*``         : 프롬프트에 entity/relation 표 주입 (schema-aware)
 - ``extractors.cross_validate``: 관계 from/to 라벨 검증 + confidence_default
 
+검증 (PRD §10 DoD #17 (c)): entities.yaml / relations.yaml 은 load 시점에
+``autonexusgraph.ontology.OntologyFile`` 로 pydantic strict-validate. 미지정 키 /
+잘못된 enum / 미존재 라벨 reference 는 import 시점에 reject. ``schema_version``
+은 파일 헤더 1곳 SoT — ``ontology_schema_version()`` 헬퍼 노출.
+
 주의: 본 로더는 ``autonexusgraph/`` (금융) 의 ``ontology/*.yaml`` 은 건드리지 않음.
 finance 측은 자체 코드에서 직접 ``ontology/`` 를 읽는다 (변경 없음).
 """
@@ -20,30 +25,57 @@ from typing import Any
 
 import yaml
 
+from autonexusgraph.ontology import OntologyFile, load_and_validate
+
 
 # repo_root/ontology/auto/
 _ONTOLOGY_DIR = Path(__file__).resolve().parents[2] / "ontology" / "auto"
 
 
 @lru_cache(maxsize=1)
+def _load_entities_file() -> OntologyFile:
+    """entities.yaml 의 pydantic-validated OntologyFile 캐시."""
+    return load_and_validate(_ONTOLOGY_DIR / "entities.yaml")
+
+
+@lru_cache(maxsize=1)
+def _load_relations_file() -> OntologyFile:
+    """relations.yaml 의 pydantic-validated OntologyFile 캐시."""
+    return load_and_validate(_ONTOLOGY_DIR / "relations.yaml")
+
+
+@lru_cache(maxsize=1)
 def load_entities() -> dict[str, dict[str, Any]]:
-    """entities.yaml → {label: spec}."""
-    data = yaml.safe_load((_ONTOLOGY_DIR / "entities.yaml").read_text(encoding="utf-8"))
-    return data["entities"]
+    """entities.yaml → {label: spec}. raw dict 환원 — 기존 호출자 호환."""
+    ont = _load_entities_file()
+    return {label: spec.model_dump(by_alias=True, exclude_none=False)
+            for label, spec in (ont.entities or {}).items()}
 
 
 @lru_cache(maxsize=1)
 def load_relations() -> dict[str, dict[str, Any]]:
-    """relations.yaml → {rel_type: spec}. 'edge_required_meta' 는 별도 함수."""
-    data = yaml.safe_load((_ONTOLOGY_DIR / "relations.yaml").read_text(encoding="utf-8"))
-    return data["relations"]
+    """relations.yaml → {rel_type: spec}. raw dict 환원 — 기존 호출자 호환."""
+    ont = _load_relations_file()
+    return {rt: spec.model_dump(by_alias=True, exclude_none=False)
+            for rt, spec in (ont.relations or {}).items()}
 
 
 @lru_cache(maxsize=1)
 def load_edge_required_meta() -> tuple[str, ...]:
     """relations.yaml::edge_required_meta — 모든 엣지가 가져야 할 속성 키."""
-    data = yaml.safe_load((_ONTOLOGY_DIR / "relations.yaml").read_text(encoding="utf-8"))
-    return tuple(data.get("edge_required_meta", ()))
+    ont = _load_relations_file()
+    return tuple(ont.edge_required_meta or ())
+
+
+@lru_cache(maxsize=1)
+def ontology_schema_version() -> str:
+    """온톨로지 헤더의 schema_version — 엣지 적재 helper 가 본 값을 자동 부여한다.
+
+    relations.yaml 헤더의 ``schema_version`` 이 SoT. 없으면 'v0' (legacy)
+    반환 — 점진적 도입 호환.
+    """
+    ont = _load_relations_file()
+    return ont.schema_version or "v0"
 
 
 @lru_cache(maxsize=1)
@@ -122,8 +154,16 @@ def canonical_system_code(raw: str | None) -> str:
     return table.get(key, table.get(key.upper(), table.get(key.lower(), "UNKNOWN")))
 
 
-def entity_key_property(label: str) -> str:
-    """라벨의 자연 키 속성명. neo4j_init 가 CONSTRAINT 만들 때 사용."""
+def entity_key_property(label: str) -> str | list[str]:
+    """라벨의 자연 키 속성명. neo4j_init 가 CONSTRAINT 만들 때 사용.
+
+    반환 타입:
+        - str: 단일 키 (auto 도메인 다수 — 'id', 'code', 'entity_id')
+        - list[str]: 복합 키 (finance Person ['name', 'birth_year'] 등)
+
+    호출자는 isinstance check 또는 ``_constraint`` (neo4j_init.py) 같은
+    헬퍼로 분기.
+    """
     spec = load_entities().get(label)
     if not spec:
         raise KeyError(f"unknown entity label: {label}")
@@ -185,6 +225,8 @@ __all__ = [
     "load_system_taxonomy",
     "load_standards",
     "load_plants",
+    "load_manufactured_at_seed",
+    "ontology_schema_version",
     "canonical_system_code",
     "entity_key_property",
     "entity_labels",

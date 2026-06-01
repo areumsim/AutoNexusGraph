@@ -16,6 +16,7 @@
 #   bom_level      : BOM 계층 (0..5). 없으면 사이드 홉.
 
 version: 1
+schema_version: "v2.2"   # PRD §10 DoD #17 (c) — 온톨로지 레벨 schema_version SoT
 domain: automotive
 last_updated: 2026-05-28
 
@@ -181,3 +182,30 @@ entities:
       - wikidata_qid
     pg_table: null              # YAML seed (ontology/auto/plants.yaml)
     provenance_src: [plants_seed, wikidata]
+
+  Material:
+    description: |
+      배터리/소재 화학조성 (Level 6) — NCM811 / NCM622 / NCA / LFP / LMFP 등.
+      Cell 의 cathode chemistry 단위. Wikidata + 셀 제조사 IR PDF (CC0 / 공공).
+    key: code                  # 'NCM811' 같은 화학조성 코드 (대문자 SCREAMING)
+    bom_level: 6
+    required: [code, name]
+    optional:
+      - cathode_ratio          # '8:1:1' 등
+      - chem_family            # 'NCM' | 'NCA' | 'LFP' | 'LMFP'
+      - aliases
+    pg_table: null              # YAML seed (ontology/auto/materials_seed.yaml)
+    provenance_src: [materials_seed, wikidata]
+
+  Mineral:
+    description: |
+      핵심광물 (Level 6 광물 끝단) — Li/Ni/Co/Mn/Graphite. USGS MCS 공식 통계 SSOT.
+      년 단위 세계·미국 생산·수입·가격·매장량은 `auto.master_minerals` PG 테이블에.
+    key: code                  # 'Li' | 'Ni' | 'Co' | 'Mn' | 'Graphite'
+    bom_level: 6
+    required: [code, name]
+    optional:
+      - element_symbol         # 화학 기호 (Li 같은 단원소만)
+      - aliases
+    pg_table: auto.master_minerals
+    provenance_src: [usgs_mcs]

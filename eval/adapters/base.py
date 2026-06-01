@@ -70,10 +70,35 @@ class AgentAdapter(ABC):
     """모든 시스템 어댑터의 공통 ABC.
 
     name 은 metric report 컬럼명. version 은 회귀 비교용.
+
+    PRD §10 DoD #17 (d) — 축소 평가 매트릭스 변수 (rerank on/off ablation,
+    LLM tier) 를 어댑터 시그니처에 1급 노출. 각 어댑터는 ``label()`` 로
+    매트릭스 셀 식별자 (예: ``vector_fast_rerank1``) 를 자동 생성.
     """
 
     name: str = ""
     version: str = ""
+
+    def __init__(self, *,
+                 rerank: bool = True,
+                 llm_tier: str = "fast") -> None:
+        """매트릭스 변수.
+
+        Args:
+            rerank: BGE-Reranker 적용 여부. False = vector top_k 만 (ablation baseline).
+            llm_tier: 'fast' | 'smart' — env LLM_MODEL_<TIER> 매핑. 본 단계는 라벨용,
+                실제 모델 선택은 ``get_llm_client(role=..., tier=...)`` 가 처리.
+        """
+        self.rerank = bool(rerank)
+        self.llm_tier = str(llm_tier or "fast").lower()
+
+    def label(self) -> str:
+        """매트릭스 셀 식별자 — predictions.jsonl / per_question.csv 의 adapter 컬럼.
+
+        예: ``vector_fast_rerank1``, ``hybrid_fast_rerank0``. runner 가 본 라벨로
+        per-cell 파일을 분리해 동일 어댑터의 rerank on/off 두 셀을 분리 저장.
+        """
+        return f"{self.name}_{self.llm_tier}_rerank{int(self.rerank)}"
 
     @abstractmethod
     def query(self, question: str, *,

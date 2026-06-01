@@ -39,7 +39,10 @@ from typing import Any, TypeVar
 log = logging.getLogger(__name__)
 
 from ..config import get_settings
-from ._license import allow_body
+from ._license import LICENSE_POLICY, allow_body
+
+
+_WARNED_UNKNOWN_SOURCES: set[str] = set()
 
 
 T = TypeVar("T")
@@ -219,6 +222,15 @@ def save_raw(
     """
     target = raw_dir(source) / rel_path
     target.parent.mkdir(parents=True, exist_ok=True)
+
+    if source not in LICENSE_POLICY and source not in _WARNED_UNKNOWN_SOURCES:
+        # 미등록 source 는 silent default 로 본문 strip 되므로 첫 사용 시 경고.
+        # 정책 동기화는 src/autonexusgraph/ingestion/_license.py + tests/test_license.py 참조.
+        log.warning(
+            "[save_raw] source=%r 가 LICENSE_POLICY 에 미등록 — 본문 자동 strip. "
+            "_license.py 에 정책 등록 권장.", source,
+        )
+        _WARNED_UNKNOWN_SOURCES.add(source)
 
     if isinstance(payload, dict) and not allow_body(source):
         # 본문 필드 제거 (메타·요약만 보존)

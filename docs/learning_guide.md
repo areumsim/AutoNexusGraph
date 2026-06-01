@@ -18,9 +18,11 @@
 |---|---|---|
 | **이 문서 (`learning_guide.md`)** | **이론 교재** — 왜 GraphRAG / 3-Store / LangGraph 인가, 각 알고리즘·정규식·휴리스틱의 이론적 근거, 예상 질문 | 발표용 통독 |
 | `docs/mental_model.md` | **결정 카탈로그** — 모든 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트 | 본 가이드에서 결정 사실을 인용. 라벨 시스템 SSOT |
+| `docs/architecture.md` | **구조 SSOT** — 패키지 토폴로지 / 도메인 모듈 매트릭스 / LangGraph 노드 / plug-in 등록 / SSOT 색인 | 본 가이드의 "어디에 무엇이 있는가" 빠른 참조처 |
 | `README.md` | **사실 카탈로그** — 데이터 수치, 도구 목록, Quickstart 명령어 | 본 가이드에서 수치·명령어를 인용 |
 | `PRD.md` | **요구사항 SSOT** — 시스템이 무엇을 해야 하는지의 절번호 출처 | "왜 이 기능이 있는가" 의 근거 |
 | `docs/autograph.md` | **auto 도메인 단독 가이드** | §2.3 BOM 계층 / §7.2 P3·P4 절에서 인용 |
+| `docs/ipgraph.md` | **ip 도메인 단독 가이드** (도메인3, PRD §12.5) | M-점수 설계 SSOT — 특허·CPC·OpenAlex |
 | `docs/operations/*.md` | **운영 절차** — Docker / 데이터 파이프라인 / agents / RAG 도구 / migrations / KCGS | 절차 막힘 시 참조처 |
 | `docs/data_sources.md`, `docs/data_inventory.md` | **데이터 소스 + 적재 현황** | 가설의 정량 근거 |
 
@@ -66,17 +68,18 @@
 
 ### 1.2 시스템의 가치 제안
 
-`README.md:3` 의 한 줄 정의:
+`README.md:3` 의 한 줄 정의 (**v2.2 — IPGraph 흡수**):
 
-> 자동차 제품·부품·리콜·공급망 (auto) + 한국 상장사 공시·재무 (finance) 두 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 멀티도메인 GraphRAG 에이전트.
+> 자동차·제조 (auto) + 한국 상장사 공시·재무 (finance) + **특허·기술혁신 (ipgraph, 예정)** 3 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 산업·기업 인텔리전스 그래프. **서비스 등급 (MCP·관측가능성·평가 실측) agent + ontology 를 정량 증명하는 것이 1차 목표.**
 
-[확정] 사용자 시나리오 (`PRD §2.1`):
+[확정] 사용자 시나리오 (`PRD §2.1` + `PRD §12.5`):
 
 1. **도메인 내 멀티홉** — "현대 쏘나타의 에어백 리콜과 관련된 공급사는?"
 2. **Cross-Domain** — "현대모비스 매출과 모비스가 공급하는 차종의 최근 리콜은?"
 3. **Cross-Domain + 시점** — "2023년 LG에너지솔루션 배터리를 쓰는 OEM 의 KCGS ESG 등급은?"
+4. **3 도메인 동시 (v2.2 신규 — CD-L4 시연 핵심)** — "**삼성SDI 배터리 특허(CPC H01M) 집중 분야 (ip) + 영업이익 (finance) + 그 셀을 쓰는 OEM 리콜 (auto)**" → 호출 경로 `bridge_assignee_to_corp → list_patents_in_cpc → get_revenue → list_recalls_affecting`
 
-Vector 단독 RAG 로는 #1 일부, #2/#3 사실상 불가능. 그래프(관계) + 정형(수치) + 벡터(서술) 의 하이브리드가 정당화되는 지점이다.
+Vector 단독 RAG 로는 #1 일부, #2/#3/#4 사실상 불가능. 그래프(관계) + 정형(수치) + 벡터(서술) 의 하이브리드가 정당화되는 지점이다.
 
 ### 1.3 Vector-only 가 풀 수 있는 것 / 풀 수 없는 것
 
@@ -91,15 +94,19 @@ Vector 단독 RAG 로는 #1 일부, #2/#3 사실상 불가능. 그래프(관계)
 
 ### 1.4 명시적 비목표 (Non-Goals)
 
-`README §9`, `PRD §2.3` 에서 명시:
+`README §9`, `PRD §2.3` (v2.2) 에서 명시:
 
 - 실시간 주가 예측 / 매매 신호 생성 / 투자 자문
 - 비상장사 데이터 (DART 미제공)
 - 영문 글로벌 기업 (1차 범위 외)
 - 차량 가격 예측 / 중고차 시세
-- **공정·라인·설비·원가·생산량** — 공개 데이터 없음. PRD v2.1 에서 "제품·부품·리콜·공급망" 으로 포지셔닝 재정의 (`PRD §1.2`)
 - 비공개 OEM 내부 BOM / 자율주행 안전성 인증 대체 / 실시간 텔레매틱스
-- **BOM Level 6 (소재·공법)** — 장기 확장 (`PRD §3.4`)
+- **N-domain 4번째~ (의약품 `pharmagraph` / 전자제품 `elecgraph` / 에너지 `energygraph` / 식품 `foodgraph`) — v2.2 영구 비목표.** ip 도메인이 §10.12 < 5% 를 실측 증명한 뒤 의사결정 갱신 (PRD §12.5).
+
+**v2.2 에서 부분 진입 (이전 비목표였지만 흡수):**
+
+- **공정·라인·설비·원가·생산량** — DART 사업보고서 가동률 + 산단공 합성 공정 + KAMA 매크로 + 팩토리온 (DATA_GO_KR) 으로 부분 진입 (정형, LLM 0%).
+- **BOM Level 6 (소재·공법)** — 배터리 셀 chem + USGS 핵심광물 + 관세청 무역통계로 부분 진입 (`docs/autograph.md §2.5.4`). 회사단위 셀↔OEM 소싱은 grade C candidate.
 
 ---
 
@@ -351,7 +358,20 @@ def should_replan(state):
 
 [확정] 모든 메서드는 **선택적** — `hasattr()` 또는 `NotImplementedError` 로 skip 가능. autograph 가 부분 구현이어도 core 는 finance 기본 동작 유지.
 
-[잠정] PRD §10.12 의 "코어 변경량 < 5%" 메트릭이 어떻게 측정되는지 — 코어 LOC 대비 신규 도메인 추가 시 코어 수정 라인 % 인지, 아니면 다른 정의인지 코드만으로 안 보임. `[설계 의도 확인 필요]`.
+[확정 — v2.2] PRD §10.12 코어 변경량 < 5% 메트릭은 `eval/metrics/core_diff.py:38-178` 가 측정 (`collect_core_diff()`). baseline = ENV `CORE_DIFF_BASELINE` 또는 `src/autograph` 첫 등장 직전 commit (현재 `4049caf856`). **v2.2 DoD #15 신설** — ip 도메인 추가 후 baseline reset → 재측정 < 5% 가 N-domain 확장성 정량 증거. 누적 reset 이력은 `make audit-dod` 출력에 별도 기록 (§11.1 baseline reset 정책).
+
+#### 3.6.2 IPGraph (도메인3) 적용 사례 — v2.2 시연
+
+[확정 — PRD §12.5] 도메인3 = IPGraph 가 본 메커니즘의 첫 plug-in 확장 정량 증명 사례.
+
+- 핸들러: `src/ipgraph/agent_handler.py` (autograph 1:1 미러) — `domain = "ip"` + Protocol 6 메서드.
+- 라우터: `route_domain_ip(question, hint)` 를 `register_router` 로 별도 등록 (autograph 의 `route_domain` 과 동일 패턴).
+- 온톨로지: `ontology/ip/{entities,relations}.yaml` — Patent / Assignee / Inventor / CPCCode / TechField + 5 엣지.
+- Bridge: `bridge.corp_entity` 직접 변경 없이 신규 join 테이블 `ip.assignee_corp_map` (assignee→corp) — supplier candidate 4,792 row 운영 SOP 와 동일 흐름 재사용 → core/bridge 스키마 변경 0.
+- 데이터: KIPRIS (한국) + USPTO ODP bulk (미국, PatentsView 후속) + CPC scheme bulk + OpenAlex — 거의 전부 정형, LLM 비용 거의 0.
+- 가치 데모: CD-L4 "삼성SDI 배터리 특허(CPC H01M) 집중 분야 + 영업이익 + 그 셀을 쓰는 OEM 리콜" — 3 도메인 동시 추론.
+
+상세 설계 SSOT 는 [docs/ipgraph.md](./ipgraph.md). PRD §12.5 (어댑터 슬롯 + 작업 순서 + 측정 게이트) 가 후속 PR 작업 항목 SSOT.
 
 ---
 

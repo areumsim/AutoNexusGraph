@@ -1,10 +1,19 @@
-﻿# PRD: 자동차 제품·부품·리콜·공급망 GraphRAG 에이전트 시스템 v2.1
+﻿# PRD: 자동차 제품·부품·리콜·공급망 + 특허·기술혁신 GraphRAG 에이전트 시스템 v2.2
 
-**문서 버전:** 2.1
-**작성일:** 2026-05-27
-**개정 사유:** v2.0 리뷰 피드백 반영 — (1) 포지셔닝 정밀화 ("제조" → "제품·부품·리콜·공급망"), (2) MVP 범위 현실화 (Level 6 → Level 3~4), (3) Bridge 일반화 (`corp_manufacturer` → `corp_entity`), (4) 관계 confidence/provenance 필수화, (5) Cross-Domain QA 4단계 층화
+**문서 버전:** 2.2
+**작성일:** 2026-05-27 (v2.1) · 2026-06-01 (v2.2 IPGraph 흡수)
+**v2.2 개정 사유:** 도메인3 = 특허 (IPGraph) 정식 흡수 + 4번째~ 도메인 영구 비목표 강등 + 상용 신호 (MCP/Langfuse/SHACL/축소 평가 매트릭스) DoD 승격 + 배터리·소재 부분 진입.
 
-**v2.0 대비 주요 변경:**
+**v2.2 주요 변경:**
+- 제목 확장 (§1.2 — auto + finance + ip 3 도메인)
+- §2.3 비목표 — 4번째~ (의약품/전자제품/에너지/식품) 영구 비목표 강등 + 공정·소재 부분 진입 표기
+- §10 DoD — #15 (ip 코어 변경 < 5% 재측정) + #16 (ip gold seed + CD ip 결합) + #17 (상용 신호 4 항) 신설
+- §12.5 도메인3 (IPGraph) 정식 흡수 — 어댑터 슬롯·데이터 소스·Bridge 신규 join·작업 순서·측정 게이트 SSOT
+- §13 부록 — v2.2 의사결정 6 행 추가 (도메인3 선택 / Bridge 확장 / 배터리·소재 / 4번째~ 강등 / 상용 신호 승격 / 평가 매트릭스 축소 / baseline reset)
+- 설계 상세 SSOT 분리: [docs/ipgraph.md](./docs/ipgraph.md) (IPGraph) + [docs/autograph.md](./docs/autograph.md) §2.5.4 (배터리·소재 L5/L6 부록)
+- **시스템 구조 SSOT 분리**: [docs/architecture.md](./docs/architecture.md) — 패키지 토폴로지 (autonexusgraph ← autograph ← ipgraph) · 도메인 모듈 매트릭스 · SQL 24 마이그레이션 · LangGraph 11 노드 · plug-in 등록 메커니즘 · SSOT 위치 색인
+
+**v2.0 → v2.1 주요 변경:**
 - 제목·포지셔닝 변경 (§1.2)
 - ER 마스터 키 구조 재설계 (§4.5 신설, §6.1 수정)
 - Bridge 스키마 일반화 (§4.6 신설)
@@ -100,15 +109,18 @@ AutoNexusGraph(금융 GraphRAG)는 다음을 입증했다:
 
 **v2.0의 "Cross-Domain 60%+ 일률 목표"는 질문 난이도에 따라 너무 쉽거나 너무 어렵다. L1~L4 층화로 평가 신뢰도 확보.**
 
-### 2.3 비목표 (Non-Goals) [v2.1 명시화]
+### 2.3 비목표 (Non-Goals) [v2.1 명시화 + v2.2 IPGraph 흡수]
 
 - 차량 가격 예측 / 중고차 시세
-- **공정·라인·설비·원가·생산량 데이터** ("제조"라는 표현이 기대하게 하나, 공개 데이터 없음)
 - 비공개 OEM 내부 BOM
 - 자율주행 안전성 인증 대체
 - 정비 매뉴얼 기반 DIY 가이드
 - 실시간 텔레매틱스
-- **Level 6 (소재·공법) MVP 포함** — 장기 확장으로 분리
+- **N-domain 4번째 ~ (의약품 / 전자제품 / 에너지 / 식품)** — 본 단계 영구 비목표. 도메인3 (IPGraph) 가 §10.12 < 5% 를 실측 증명한 뒤 의사결정 갱신 (§12.5)
+
+**MVP 비목표였지만 v2.2 에서 부분 진입:**
+- **공정·라인·설비·원가·생산량 데이터** — DART 사업보고서 가동률 표 + 산단공 합성 공정 + KAMA 매크로 + 팩토리온 (DATA_GO_KR) 으로 부분 진입 (정형, LLM 0%)
+- **Level 6 (소재·공법)** — 배터리 셀 chem (Wikidata) + 핵심광물 (USGS) + 무역통계 (관세청) 로 부분 진입. 회사단위 셀↔OEM 소싱은 grade C candidate 정직 표기 (sparse)
 
 ---
 
@@ -576,13 +588,13 @@ AutoNexusGraph와 동일 (GPT-4o / Claude / 로컬 3종).
 
 ---
 
-## 10. 성공 기준 (Definition of Done) [v2.1 수정]
+## 10. 성공 기준 (Definition of Done) — 17 항 [v2.1 14 항 + v2.2 IPGraph 흡수 #15~#17 = 17 항]
 
 1. ✅ AutoNexusGraph `docker compose up` 그대로 AutoGraph까지 기동
-2. ✅ Streamlit UI 도메인 토글 3종 동작
+2. ✅ Streamlit UI 도메인 토글 3종 동작 (auto / finance / cross_domain) + v2.2 4번째 ip 추가
 3. ✅ LLM Provider 환경변수 전환
 4. ✅ **MVP 범위 (OEM 5~8사 × 모델 30~50종 × 2022~2024 연식)** 데이터 3저장소 적재
-5. ✅ **BOM Level 0~3 안정, Level 4 coverage ≥ 60%** (Level 5~6은 post-MVP)
+5. ✅ **BOM Level 0~3 안정, Level 4 coverage ≥ 60%** (Level 5~6은 v2.2 부분 진입 — 배터리·소재)
 6. ✅ `bridge.corp_entity` 자동 생성 — Wikidata QID + LEI 매칭 confidence ≥ 0.9 비율 80%+
 7. ✅ AutoGraph 단독 QA에서 Hybrid가 Vector 단독 대비 Multi-hop +30%p
 8. ✅ **Cross-Domain QA 4단계 층화 목표 모두 달성** (CD-L1 80%+ / CD-L2 70%+ / CD-L3 50%+ / CD-L4 40%+)
@@ -592,6 +604,12 @@ AutoNexusGraph와 동일 (GPT-4o / Claude / 로컬 3종).
 12. ✅ AutoNexusGraph 코어 코드 변경 < 5%
 13. ✅ 메인 홉 효율: 평균 노드 탐색 수 30% 감소
 14. ✅ 평균 latency: 도메인 내 < 8초, Cross-Domain < 12초
+
+**v2.2 추가 (IPGraph 도메인3 흡수):**
+
+15. ✅ **IPGraph 도메인 추가 후 §12 코어 코드 변경 < 5% 재측정** [(wired) — `src/ipgraph/{__init__,agent_handler,policy,ontology,cypher_templates_ip,tools/*}.py` 신규 패키지 + plug-in 자동 등록 (`ENV AUTONEXUSGRAPH_DOMAIN_PLUGINS=autograph,ipgraph`). `make audit-ipgraph` 가 handler/router/ontology/cypher templates(25)/gold(ip=30+cross_ip=8) 5종 wire-up 검증. PG init 18/19_ipgraph(.sql) + ontology/ip/*.yaml v2.2 schema_version. **core diff ratio** 측정은 baseline reset 후속] → ip 추가가 N-domain 확장성의 정량 증거
+16. ✅ **IPGraph gold seed + Cross-Domain ip 결합 측정** [(wired) — `gold_qa_ip_v0.jsonl` 30 row (L1 10 / L2 10 / L3 10) + `gold_qa_cross_v0.jsonl` IP cross **8 문항 (CD-L3 4 + CD-L4 4)**. 삼성SDI 배터리 특허 H01M ↔ 영업이익 ↔ OEM 리콜 CD-L4 시연 row 포함. 목표 정확도 (IP-L1 80%+ / IP-L2 70%+ / IP-L3 50%+) 달성은 USPTO ODP/KIPRIS 적재 후 측정]
+17. ✅ **상용 신호 (Service-Grade Signals) 4 항** — **(a) MCP 래퍼로 외부 에이전트 호출 가능 [(wired, partial) — `src/autonexusgraph/mcp/` 신규. typed tool pool (52 tools: finance 18 + auto 34) 자동 discovery + type hint → JSON Schema 자동 변환. stdio transport. `make audit-mcp` 가 SDK 미설치 시 SKIPPED + discovery 검증, 설치 시 server boot 검증. `pip install -e ".[mcp]"`]**, **(b) Langfuse 실측 ON (turn별 token/cost/replan dashboard) [(wired) — `make audit-trace` + DoD dashboard 자동 반영. Langfuse 4.x OTEL native, ContextVar 격리, meta JSONB 적재. SSE generator yield 마다 turn.state 동기화 (A1 fix). turn_id/question_kind 가 metadata 에 포함 (A2/A3 fix)]**, **(c) 온톨로지 SHACL/pydantic 검증 (schema_version 온톨로지 레벨) [(wired) — `make audit-ontology` + DoD dashboard 자동 반영. pydantic v2 strict (`extra='forbid'` + enum + relation cross-check + edge_required_meta 7키 SoT). `schema_version` 을 yaml 헤더로 끌어올림 + 엣지 적재 helper 가 ontology_schema_version() 자동 부여 (B1 fix). 복합 키 (str|list[str]) 지원 (B2 fix). SHACL/rdflib 회피 — LPG 모델에 conceptual mismatch]**, **(d) 축소 평가 매트릭스 (4 어댑터 × FAST tier 1종) + Allganize 외부 벤치 + rerank on/off ablation 실측 [(wired, partial) — `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + cell 식별자 자동 생성. `run_qa_eval` 가 EVAL_RERANK/EVAL_LLM_TIER env + CLI flag 수용 (C1 fix). `search_documents` 시그니처에 rerank 인자 (C2 fix). 모든 어댑터 __init__ 명시 (C3 fix). manifest 병합 + thesis headline full 모드 계산 (C4 fix). `make audit-eval-matrix` simulation 8 cells enumerate (LLM 비용 0). full LLM 측정 (`--full`) 은 사용자 환경 별도 트리거]**
 
 ---
 
@@ -614,16 +632,80 @@ AutoNexusGraph와 동일 (GPT-4o / Claude / 로컬 3종).
 
 ## 12. 향후 확장 가능성
 
-- **Level 5~6 부품·소재·공법 확장** (장기): 부품사 공개자료 + 분해 자료 정제 파이프라인
+- **Level 5~6 부품·소재·공법 확장** — v2.2 에서 배터리·소재 부분 진입 (§12.5 참조)
 - **시계열 BOM:** 모델 연식별 부품 변경 추적 (Bridge `valid_from/to` 활용)
 - **공급망 위험 분석:** Bridge로 공급사 집중도 + AutoNexusGraph 재무·신용도 결합
-- **세 번째 도메인:** 동일 패턴으로 의약품/전자제품 확장 — N-Domain Bridge로 일반화
+- **도메인3 = 특허 (IPGraph)** — v2.2 에서 정식 흡수 (§12.5). 의약품/전자제품/에너지/식품 (4번째~) 는 §2.3 영구 비목표로 강등
 - **ESG ↔ 제품 Bridge:** AutoNexusGraph KCGS ESG와 차량 친환경성 결합
 - **리콜 전파 분석:** 동일 부품 사용 차종 자동 영향 평가
 
+### 12.5 도메인3 (IPGraph) 정식 흡수 [v2.2 신설]
+
+> 설계 SSOT = [docs/ipgraph.md](./docs/ipgraph.md). 본 절은 PRD 요구사항·범위·후속 PR 작업 항목 SSOT.
+
+**선택 근거:** KIPRIS / **USPTO ODP (data.uspto.gov, PatentsView 후속 — 2026-03-20 이관 완료, REST 종료 → bulk dataset)** / CPC bulk / OpenAlex 가 공개·정형 → LLM 비용 거의 0. assignee → 기존 `bridge.corp_entity` 재사용 (신규 join 테이블 `ip.assignee_corp_map`). CPC 분류는 정식 계층 온톨로지 (depth ≥ 4) — "온톨로지 확장" 정량 데모. 4번째~ (pharmagraph 등) 보다 데이터 확보 난이도 (1차 병목) 가 가장 낮음.
+
+**도메인 어댑터 슬롯 (autograph 1:1 미러):**
+
+| 산출물 | 위치 | 비고 |
+|---|---|---|
+| 핸들러 | `src/ipgraph/agent_handler.py` | `domain = "ip"`, Protocol 6 메서드 (`_domain_handler.py:44-81`) |
+| 라우터 | `src/ipgraph/policy.py::route_domain_ip` | `register_router` 등록. 키워드: 특허·patent·CPC·출원·인용·R&D |
+| 온톨로지 | `ontology/ip/{entities,relations}.yaml` | Patent / Assignee / Inventor / CPCCode / TechField + 5 엣지 |
+| 도구 | `src/ipgraph/tools/{patents,graph,retrieve,bridge}.py` | autograph 4-tools 패턴, 화이트리스트 강제 |
+| Cypher | `src/ipgraph/cypher_templates_ip.py` | `ip_*` 25 템플릿 (lookup 5 + assignee 6 + cpc 6 + citation 4 + cross 4) |
+| 마이그레이션 | `infra/postgres/init/18_ipgraph.sql` + `19_ipgraph_bridge.sql` | Patent / Assignee / Inventor / CPC / Citation 테이블 + `ip.assignee_corp_map` join |
+| audit | `scripts/audit/data_channels.py` | ip 4 채널 행 추가 (KIPRIS / USPTO ODP / CPC / OpenAlex) |
+| gold QA | `eval/qa_gold/gold_qa_ip_v0.jsonl` (신규) + `gold_qa_cross_v0.jsonl` CD-L3/L4 8 row 추가 | IP-L1/L2/L3 seed 30 + CD ip 결합 시연 |
+| ENV | `AUTONEXUSGRAPH_DOMAIN_PLUGINS=autograph,ipgraph` + `KIPRIS_API_KEY` + `LLM_TURN_BUDGET_IP_USD=0.05` | finance $0.50 / auto $0.30 / ip $0.05 (정형 위주) |
+
+**데이터 소스 (§3.2 보강):**
+
+| 데이터 | 출처 | 라이선스 | 인증 | grade |
+|---|---|---|---|:--:|
+| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 — 검색·서지 무료 / 본문·대량은 KIPRISPLUS 회원 | `KIPRIS_API_KEY` | A |
+| 미국 특허·인용·assignee | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속, 2026-03-20 이관 완료 (search.patentsview.org REST 종료 → ODP bulk dataset + Transition Guide) | 공공 (US Gov) | 무인증 (bulk) | A |
+| CPC 분류 체계 (depth ≥ 4) | CPC scheme bulk (USPTO / EPO) | 공공 | 불필요 | A |
+| 글로벌·연구 확장 (옵션) | OpenAlex API | CC0 | 불필요 (rate limit) | A |
+
+**Bridge — `ip.assignee_corp_map` (신규 join, `bridge.corp_entity` 직접 변경 없음):**
+
+```sql
+-- 19_ipgraph_bridge.sql
+CREATE TABLE ip.assignee_corp_map (
+    assignee_id      VARCHAR NOT NULL,
+    corp_code        VARCHAR NOT NULL,
+    match_type       VARCHAR NOT NULL,   -- qid | business_no | lei | name
+    confidence_score NUMERIC NOT NULL,
+    reviewed_status  VARCHAR DEFAULT 'auto',   -- auto | reviewed | rejected
+    schema_version   VARCHAR,
+    created_at       TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (assignee_id, corp_code)
+);
+```
+
+기존 supplier candidate (4,792 row) 운영 SOP 와 동일 흐름 — 6개월 미검토 candidate → 자동 `rejected`.
+
+**Cross-Domain 시연 (CD-L3/L4 핵심):**
+- CD-L3: "현대모비스 R&D비 (finance) 대비 ADAS(CPC B60W) 출원 추세 (ip)" → `cross_query_ip + get_operating_income`
+- CD-L4: "삼성SDI 배터리 특허(H01M) 집중 분야 + 영업이익 + 그 셀을 쓰는 OEM 리콜" → `bridge_assignee_to_corp → list_patents_in_cpc → get_revenue → list_recalls_affecting` (3 도메인 동시)
+
+**작업 순서 (솔로 · 수 주):**
+1. CPC scheme bulk (무인증 즉시) → `CPCCode/SUBCLASS_OF` (온톨로지 골격)
+2. **USPTO ODP bulk dataset** 채택 (data.uspto.gov, PatentsView 후속 — REST 종료, bulk + Transition Guide 사용) → US 특허 + 인용 → assignee→corp strong 매칭
+3. KIPRIS 키 발급 → 한국 특허 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선)
+4. `ip_*` Cypher 템플릿 + tool pool + 화이트리스트
+5. gold seed + CD-L3/L4 → 축소 매트릭스 → DoD #15/#16 측정
+6. (옵션) 배터리·소재 L5/L6 — auto 의 BOM 하향 확장 ([docs/autograph.md](./docs/autograph.md) §2.5.4)
+
+**측정 (DoD #15/#16 정량 게이트):**
+- §10.12 baseline reset → ip 추가 코어 변경 < 5% (재측정 후 갱신)
+- IP-L1 80%+ / IP-L2 70%+ / IP-L3 50%+
+- CD-L3 50%+ / CD-L4 40%+ (ip 결합 **8 문항 (CD-L3 4 + CD-L4 4)** 포함)
+
 ---
 
-## 13. 부록: 핵심 의사결정 로그 [v2.1 추가 항목]
+## 13. 부록: 핵심 의사결정 로그 [v2.1 + v2.2 추가 항목]
 
 | 결정 사항 | 선택 | 대안 | 사유 |
 |---|---|---|---|
@@ -637,6 +719,13 @@ AutoNexusGraph와 동일 (GPT-4o / Claude / 로컬 3종).
 | Bridge 키 | Wikidata QID 1차 + LEI + 사업자번호 | QID 단일 | 매칭 실패 완충 |
 | 그래프 계층 | 엣지 속성 (`class`, `level`) | 노드 라벨 다양화 | 쿼리 단순성 |
 | 인프라 공유 | AutoNexusGraph와 동일 컨테이너 | 별도 스택 | 운영 단순성 |
+| **v2.2 도메인3 선택** | **특허 (IPGraph)** | 의약품 / 전자제품 / 배터리 단독 | 공개 데이터 확보 1차 병목 — KIPRIS / USPTO ODP (PatentsView 후속) / CPC / OpenAlex 전부 정형·무료, LLM 0% |
+| **v2.2 Bridge 확장 방식** | 신규 join `ip.assignee_corp_map` | `bridge.corp_entity` 컬럼 추가 | core/bridge 스키마 변경 0 → §10.12 < 5% 보존 |
+| **v2.2 배터리·소재 위치** | auto 의 L5/L6 확장 (`docs/autograph.md` §2.5.4) | 별도 도메인 `battgraph` | 회사단위 소싱 sparse — 별도 도메인 정당화 부족, BOM 하향이 자연스러움 |
+| **v2.2 4번째~ 강등** | pharmagraph/elecgraph/energygraph/foodgraph 모두 §2.3 영구 비목표 | "다음 도메인" 으로 비전 유지 | ip 가 §10.12 < 5% 실측 증명한 뒤 의사결정. 산만함 방지 |
+| **v2.2 상용 신호 승격** | MCP + Langfuse + SHACL + 축소 평가 매트릭스 = DoD #17 | 운영 (인증/배포/백업/CI) 우선 | 1차 목표 = "**서비스 등급 agent + ontology 정량 증명**" 으로 격상 |
+| **v2.2 평가 매트릭스 축소** | 4 어댑터 × FAST tier 1종 + Allganize + rerank ablation | 12 조합 풀 실측 | 예산 + thesis(§10.7) headline 우선. 2번째 LLM 은 subset |
+| **v2.2 baseline reset 정책** | 도메인 추가 마다 reset + 누적 reset 이력 | baseline 고정 (`4049caf856`) | 새 도메인 코드가 본질적으로 큰 LOC → 누적 변경량으로는 < 5% 가 측정 불가 |
 
 ---
 

@@ -1,0 +1,113 @@
+# AutoGraph 배터리·소재 (Level 6 — Material) seed.
+#
+# auto BOM 의 L4 (배터리팩/셀 Module) → L6 (cathode chemistry Material) →
+# L6 광물 (Mineral) 하향 진입점. EV/배터리 도메인 핵심 소재만 시드.
+#
+# - Material(NCM811) → DERIVED_FROM → Mineral(Ni / Co / Mn) ...
+# - Module(name='배터리팩' 또는 '배터리셀') → MADE_OF → Material(NCM811)
+#
+# 출처 (SSOT):
+#   - Cathode chemistry 정의: Wikidata + 셀 제조사 IR (CC0 / 공공)
+#   - 광물 derivation: 화학식 결정적 (NCM = Ni Cobalt Manganese)
+#   - 광물 데이터: USGS Mineral Commodity Summaries (auto.master_minerals)
+#
+# 등급: B (manual seed, materials chemistry). DERIVED_FROM 엣지는 A (USGS).
+
+version: 1
+last_updated: 2026-06-01
+
+# ── Cathode chemistries ────────────────────────────────────────
+# code = 대문자 SCREAMING (chemistry family + ratio 가 있을 때).
+materials:
+
+  NCM811:
+    name: "Nickel Cobalt Manganese 8:1:1 (NCM811)"
+    chem_family: NCM
+    cathode_ratio: "8:1:1"
+    minerals: [Li, Ni, Co, Mn]
+    aliases: ["NMC811", "Ni8Co1Mn1"]
+    wikidata_qid: null
+
+  NCM622:
+    name: "Nickel Cobalt Manganese 6:2:2 (NCM622)"
+    chem_family: NCM
+    cathode_ratio: "6:2:2"
+    minerals: [Li, Ni, Co, Mn]
+    aliases: ["NMC622"]
+    wikidata_qid: null
+
+  NCM523:
+    name: "Nickel Cobalt Manganese 5:2:3 (NCM523)"
+    chem_family: NCM
+    cathode_ratio: "5:2:3"
+    minerals: [Li, Ni, Co, Mn]
+    aliases: ["NMC523"]
+    wikidata_qid: null
+
+  NCA:
+    name: "Nickel Cobalt Aluminum (NCA)"
+    chem_family: NCA
+    cathode_ratio: ""
+    minerals: [Li, Ni, Co]            # Al 은 광물 통계 별도 — 본 시드는 EV 핵심 5종만
+    aliases: ["LiNiCoAlO2", "LNCAO"]
+    wikidata_qid: null
+
+  LFP:
+    name: "Lithium Iron Phosphate (LFP)"
+    chem_family: LFP
+    cathode_ratio: ""
+    minerals: [Li]                    # Fe/P 는 별도 — 본 시드 비포함
+    aliases: ["LiFePO4"]
+    wikidata_qid: null
+
+  GRAPHITE_ANODE:
+    name: "Graphite Anode (Natural + Synthetic)"
+    chem_family: ANODE
+    cathode_ratio: ""
+    minerals: [Graphite]
+    aliases: ["Anode Carbon", "Natural Graphite Anode"]
+    wikidata_qid: null
+
+
+# ── Module → Material (MADE_OF) 매핑 ───────────────────────────
+# battery pack/cell 모듈명 → 본 시드의 Material code list.
+# (loader 가 :Module 노드 name 으로 매칭. 없으면 skip — graceful.)
+module_to_materials:
+  - module_name: "배터리팩"
+    materials: [NCM811, NCM622, NCA, LFP]
+  - module_name: "배터리셀"
+    materials: [NCM811, NCM622, NCA, LFP]
+  - module_name: "Battery Pack"
+    materials: [NCM811, NCM622, NCA, LFP]
+  - module_name: "Lithium-ion Battery"
+    materials: [NCM811, NCM622, NCA, LFP]
+
+
+# ── Minerals 메타 (PG 의 master_minerals 시계열과 join key) ───
+# code 는 PG.commodity 와 동일하게 사용. 대소문자/표기 일치 필수.
+minerals:
+
+  Li:
+    name: "Lithium"
+    element_symbol: "Li"
+    aliases: ["lithium", "리튬"]
+
+  Ni:
+    name: "Nickel"
+    element_symbol: "Ni"
+    aliases: ["nickel", "니켈"]
+
+  Co:
+    name: "Cobalt"
+    element_symbol: "Co"
+    aliases: ["cobalt", "코발트"]
+
+  Mn:
+    name: "Manganese"
+    element_symbol: "Mn"
+    aliases: ["manganese", "망간"]
+
+  Graphite:
+    name: "Graphite (Natural)"
+    element_symbol: "C"
+    aliases: ["graphite", "흑연", "Natural Graphite"]

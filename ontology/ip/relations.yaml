@@ -1,0 +1,144 @@
+# IPGraph 특허 도메인 relation 정의 (SSOT) — docs/ipgraph.md §2.
+#
+# 모든 엣지는 §6.7 의무 메타 7키 보유. helper (_neo4j_helpers) 가
+# schema_version 자동 부여 (yaml 헤더 v2.2 → 엣지 적재 시 동일 값).
+
+version: 1
+schema_version: "v2.2"   # PRD §10 DoD #17 (c) — 온톨로지 레벨 schema_version SoT
+last_updated: 2026-06-01
+
+# 모든 엣지 공통 의무 메타 (PRD §6.7 7키 SoT — auto / finance 와 동일).
+edge_required_meta:
+  - source_type
+  - source_id
+  - confidence_score
+  - validated_status
+  - snapshot_year
+  - extraction_method
+  - schema_version
+
+relations:
+
+  # ── Patent → Assignee (출원인 매핑) ─────────────────────────────
+  ASSIGNED_TO:
+    from: Patent
+    to: Assignee
+    directed: true
+    cardinality: many-to-many        # 1 특허 → 다수 출원인 가능
+    class: main_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.95         # KIPRIS / USPTO ODP grade A
+    enabled: true
+
+  # ── Inventor → Patent ─────────────────────────────────────────
+  INVENTED:
+    from: Inventor
+    to: Patent
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.95
+    enabled: true
+
+  # ── Patent → CPCCode ─────────────────────────────────────────
+  CLASSIFIED_AS:
+    from: Patent
+    to: CPCCode
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.95
+    enabled: true
+    notes: |
+      한 특허는 다수 CPC 코드 부여 가능. primary_flag 로 주분류 표기.
+
+  # ── Patent ↔ Patent (인용) ────────────────────────────────────
+  CITES:
+    from: Patent
+    to: Patent
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.95
+    enabled: true
+    notes: |
+      USPTO ODP citations bulk. cited_pub_no 가 우리 ip.patents 에 없을 수도 있음
+      (외부 인용). Cypher 에서 OPTIONAL MATCH 사용.
+
+  # ── CPCCode 계층 (depth ≥ 4) ─────────────────────────────────
+  SUBCLASS_OF:
+    from: CPCCode
+    to: CPCCode
+    directed: true
+    cardinality: many-to-one         # 1 자식 → 1 부모 (CPC 표준)
+    class: main_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 1.0          # 공식 분류 체계
+    enabled: true
+
+  # ── Assignee → Company (cross-domain bridge — ip ↔ finance/auto) ──
+  MAPPED_TO:
+    from: Assignee
+    to: Company                      # finance 도메인 Company (corp_entity) — cross-domain
+    directed: true
+    cardinality: many-to-one         # 한 Assignee 는 정확히 한 Company 에 매핑
+    class: main_hop                  # ip → finance 다리 (cross-domain bridge). PG 미러: ip.assignee_corp_map
+    provenance: hybrid               # 이름·LEI·QID·business_no 매칭 + 수동 검토
+    pass: P3
+    confidence_default: 0.80
+    enabled: true
+    notes: |
+      Assignee (특허 권리자) → Company (corp_entity) 매핑. PG SSOT = ``ip.assignee_corp_map``
+      (`19_ipgraph_bridge.sql`). Neo4j 표현은 ``(a:Assignee)-[:MAPPED_TO]->(c:Company)``.
+      ``bridge.corp_entity`` 직접 변경은 회피 — supplier candidate 운영 SOP 재사용.
+      Cypher 패턴: ``ip_lookup_assignee`` / ``ip_cross_corp_to_patents`` / ``ip_cross_assignee_to_supply`` 가 사용.
+
+  # ── Assignee/Institution 연결 (옵션 — type=company 일 때만) ──
+  AFFILIATED_WITH:
+    from: Assignee
+    to: Institution
+    directed: true
+    cardinality: many-to-one
+    class: side_hop
+    provenance: hybrid               # OpenAlex/ROR 매칭 + 수동 검토
+    pass: P3
+    confidence_default: 0.80
+    enabled: false                   # 본 PR 비활성 (OpenAlex 적재 후 활성)
+
+  # ── Work ↔ Institution (OpenAlex) ─────────────────────────────
+  AUTHORED_AT:
+    from: Work
+    to: Institution
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.90
+    enabled: false                   # OpenAlex 적재 후 활성
+
+  # ── 임베딩 유사도 (ablation — 본 PR 비활성) ──────────────────
+  SIMILAR_TECH:
+    from: Patent
+    to: Patent
+    directed: false
+    cardinality: many-to-many
+    class: side_hop
+    provenance: llm                  # vector similarity
+    pass: P3
+    confidence_default: 0.60
+    enabled: false                   # ablation 후 활성
+
+naming_conventions:
+  entity_type:    "PascalCase (Patent, Assignee)"
+  relation_type:  "SCREAMING_SNAKE_CASE (ASSIGNED_TO, CITES)"
+  property:       "snake_case (filing_date, pub_no)"
+  direction:      "FROM -> TO (Patent ASSIGNED_TO Assignee)"

@@ -155,16 +155,17 @@ def collect() -> list[ChannelStatus]:
         notes="A 등급 (KAMA), 매크로 시계열 (key 불필요!)",
     ))
 
-    # 팩토리온 (15087611)
+    # 팩토리온 (15087611) — M-11 단계에서 PG 스키마 + loader 완성.
     factoryon_dir = raw_root / "auto" / "factoryon"
     factoryon_files = _count_files(factoryon_dir, "**/*.json")
+    factoryon_pg = _try_pg_count("SELECT count(*) FROM auto.factoryon_registry")
     out.append(ChannelStatus(
         name="팩토리온 공장등록 (15087611)",
         raw_count=factoryon_files,
         raw_detail="JSON pages (key 필요)",
-        pg_count="N/A",
-        pg_detail="(스키마 미정 — 키 도착 후 정의)",
-        notes="DATA_GO_KR_API_KEY 필요",
+        pg_count=factoryon_pg,
+        pg_detail="auto.factoryon_registry (24_auto_factoryon.sql)",
+        notes="DATA_GO_KR_API_KEY 필요. wire 완료 (load_factoryon.py)",
     ))
 
     # 한국 리콜 (15089863)
@@ -246,6 +247,75 @@ def collect() -> list[ChannelStatus]:
         pg_count=total_ir_p3,
         pg_detail=f"oem_ir={chunks_ir} + wiki/plants={chunks_plants} + dart_narrative={chunks_narrative}",
         notes="P3 LLM 추출 가능 (run_p3_ir.py / IRRelationExtractor)",
+    ))
+
+    # ── 신규 4 오픈데이터 채널 (opendata_patch.md) ────────────────────
+    # 1) USGS MCS — 핵심광물 L6.
+    usgs_raw = _count_files(ROOT / "data/raw/usgs_mcs", "mcs*.pdf")
+    out.append(ChannelStatus(
+        name="USGS MCS — 핵심광물 L6 (Li/Ni/Co/Mn/Graphite)",
+        raw_count=usgs_raw, raw_detail="MCS PDF 5+ files",
+        pg_count=_try_pg_count("SELECT count(*) FROM auto.master_minerals"),
+        pg_detail="auto.master_minerals",
+        neo4j_count=_try_neo4j_count(
+            "MATCH ()-[r:DERIVED_FROM]->() RETURN count(r)"),
+        neo4j_detail="DERIVED_FROM 엣지 (Material→Mineral, 7-key 100%)",
+        notes="A 등급 (USGS, 무인증). materials_seed.yaml = 6 cathode chem",
+    ))
+    # 2) GLEIF KR enrich — bridge 품질 보강.
+    gleif_pages = _count_files(ROOT / "data/raw/gleif/kr", "gleif_kr_p*.json")
+    out.append(ChannelStatus(
+        name="GLEIF KR enrich — Bridge 품질 (LEI↔corp_code)",
+        raw_count=gleif_pages, raw_detail="raw JSON pages (KR 2,704 LEI)",
+        pg_count=_try_pg_count(
+            "SELECT count(*) FROM master.entity_map WHERE id_type='lei'"),
+        pg_detail="master.entity_map(id_type='lei')",
+        neo4j_count="N/A", neo4j_detail="PG-only",
+        notes="A 등급 (GLEIF API CC BY 4.0, 무인증). registeredAs → business_no/jurir_no 매칭",
+    ))
+    # 3) OpenAlex Work/Institution.
+    oa_inst = _count_files(ROOT / "data/raw/openalex", "institution_*.json")
+    out.append(ChannelStatus(
+        name="OpenAlex — Work / Institution / AUTHORED_AT",
+        raw_count=oa_inst, raw_detail="institution JSON snapshots",
+        pg_count=_try_pg_count("SELECT count(*) FROM ip.works"),
+        pg_detail="ip.works (+ip.institution +ip.work_institution)",
+        neo4j_count=_try_neo4j_count(
+            "MATCH ()-[r:AUTHORED_AT]->() RETURN count(r)"),
+        neo4j_detail="AUTHORED_AT (7-key 100%) + IS_ENTITY (→Company)",
+        notes="A 등급 (OpenAlex CC0). OPENALEX_API_KEY 사용. abstract→vec.chunks",
+    ))
+    # 4) data.go.kr EV chargers — 본 PR 보류 (사용자 결정).
+    out.append(ChannelStatus(
+        name="EV 충전소 (data.go.kr B552584/B553530)",
+        raw_count=0, raw_detail="(보류 — 사용자 결정)",
+        pg_count="N/A", pg_detail="SQL 슬롯만 존재",
+        neo4j_count="N/A", neo4j_detail="—",
+        notes="DATA_GO_KR_API_KEY 발급 + 활용신청 필요. 본 PR 미진행",
+    ))
+
+    # ── M-13/M-14 (제조 데이터 끝까지) 추가 채널 ───────────────────────
+    # KOSIS 산업 통계 — kosis.kr/openapi
+    kosis_files = _count_files(ROOT / "data/raw/kosis", "**/*.json")
+    out.append(ChannelStatus(
+        name="KOSIS 산업 통계 (kosis.kr)",
+        raw_count=kosis_files, raw_detail="raw JSON (stat_code/period)",
+        pg_count=_try_pg_count("SELECT count(*) FROM macro.kosis_series"),
+        pg_detail="macro.kosis_series (04_external_data.sql)",
+        neo4j_count="N/A", neo4j_detail="—",
+        notes="A 등급 (공공). KOSIS_API_KEY 필요. wire 완료 (load_kosis_industry.py)",
+    ))
+
+    # Wikidata cathode chemistry — CC0 무인증.
+    cell_chem_files = _count_files(ROOT / "data/raw/auto/wikidata_cell_chem", "*.json")
+    out.append(ChannelStatus(
+        name="Wikidata 배터리 셀 chem (cathode)",
+        raw_count=cell_chem_files, raw_detail="cathode_chem_YYYY.json",
+        pg_count="N/A", pg_detail="materials_seed.yaml manual seed 활용",
+        neo4j_count=_try_neo4j_count(
+            "MATCH (m:Material) WHERE m.source='wikidata' RETURN count(m)"),
+        neo4j_detail=":Material (Wikidata 보강)",
+        notes="B 등급 (Wikidata CC0). 회사단위 셀↔OEM 소싱은 grade C candidate (PRD §2.3)",
     ))
 
     return out

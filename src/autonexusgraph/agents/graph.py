@@ -23,6 +23,7 @@ from typing import Any, Iterator
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
 from .state import AgentState
 from .supervisor import supervisor_done, supervisor_node, sup_send_directives
+from .tracing import start_turn_context
 from .validator import MAX_REPLANS, mark_replan, should_replan, validator_node
 from .workers import (
     calculator_worker,
@@ -178,17 +179,17 @@ def _get_langgraph_app():
 
 
 def _make_run_config(thread_id: str, *, state: dict | None = None) -> dict:
-    """LangGraph app.invoke 에 넘길 config — checkpoint + tracing + 도메인 태그.
+    """LangGraph app.invoke 에 넘길 config — checkpoint + LangSmith 태그.
 
-    state 가 주어지면 ``tags`` / ``metadata`` 에 domain·target 카운트 부착 (PRD §7.5.11)
-    → Langfuse/LangSmith UI 에서 autograph turn 을 finance 와 분리 모니터링 가능.
+    Langfuse 4.x 는 OTEL native ─ start_turn_context 의 ``start_as_current_observation``
+    span 이 trace 책임. 본 config 는 LangSmith 자동 송신 (langchain 설치 시) 의
+    tags/metadata 만 부착한다.
     """
     cfg: dict = {"configurable": {"thread_id": thread_id or "default"}}
     try:
         from .tracing import get_trace_callbacks, metadata_for_state, tags_for_domain
-        cbs = get_trace_callbacks()
-        if cbs:
-            cfg["callbacks"] = cbs
+        # LangSmith env-flag 보강 (langchain 자동 송신용) — 부수효과 only.
+        get_trace_callbacks()
         if state is not None:
             domain = state.get("domain") if isinstance(state, dict) else None
             cfg["tags"] = tags_for_domain(domain)
@@ -227,14 +228,24 @@ def run_agent(question: str, *,
               thread_id: str = "default",
               history: list[dict] | None = None,
               domain: str | None = None) -> AgentState:
+    """단일 turn 실행 (blocking). PRD §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
+
+    ``start_turn_context`` 가 ContextVar 격리된 CostTracker + Langfuse span 을
+    enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG ops.llm_usage 의
+    meta JSONB 에 thread_id/turn_id/n_replans/domain 영구 적재.
+    """
     state: AgentState = _init_state(question, thread_id, history, domain=domain)
-    if _HAS_LANGGRAPH:
-        try:
-            return _run_with_langgraph(state)
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[run_agent] LangGraph 실행 실패 — 함수 체인 폴백: %s", exc)
-            return _run_with_fallback_chain(state)
-    return _run_with_fallback_chain(state)
+    with start_turn_context(thread_id or "default", state) as turn:
+        if _HAS_LANGGRAPH:
+            try:
+                result = _run_with_langgraph(state)
+                turn.state = result   # type: ignore[assignment]
+                return result
+            except Exception as exc:   # noqa: BLE001
+                log.warning("[run_agent] LangGraph 실행 실패 — 함수 체인 폴백: %s", exc)
+        result = _run_with_fallback_chain(state)
+        turn.state = result   # type: ignore[assignment]
+        return result
 
 
 def run_agent_stream(question: str, *,
@@ -244,17 +255,28 @@ def run_agent_stream(question: str, *,
                      ) -> Iterator[tuple[str, AgentState]]:
     """노드별 partial state stream — UI/SSE 용 (PRD §7.6.5).
 
-    yields (node_name, partial_state). 마지막은 ('__final__', final_state).
+    yields (node_name, partial_state). 마지막은 ('__final__', final_state) 또는
+    ('__interrupt__', state). generator close 시 ``start_turn_context.__exit__`` 가
+    트리거되어 PG/Langfuse 적재 완료.
     """
     state: AgentState = _init_state(question, thread_id, history, domain=domain)
-    if _HAS_LANGGRAPH:
-        try:
-            yield from _stream_with_langgraph(state)
-            return
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
-            state = _init_state(question, thread_id, history, domain=domain)
-    yield from _stream_with_fallback_chain(state)
+    with start_turn_context(thread_id or "default", state) as turn:
+        # A1 (P0+ #1 결함 fix): 매 yield 직후 turn.state 갱신 — generator close /
+        # client disconnect 시점에도 마지막 partial 까지 PG/Langfuse 에 기록되도록.
+        # try/finally 만으로는 yield 도중 GeneratorExit 시 final 동기화 미보장.
+        if _HAS_LANGGRAPH:
+            try:
+                for node_name, partial in _stream_with_langgraph(state):
+                    turn.state = partial   # type: ignore[assignment]
+                    yield (node_name, partial)
+                return
+            except Exception as exc:   # noqa: BLE001
+                log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
+                state = _init_state(question, thread_id, history, domain=domain)
+                turn.state = state   # type: ignore[assignment]
+        for node_name, partial in _stream_with_fallback_chain(state):
+            turn.state = partial   # type: ignore[assignment]
+            yield (node_name, partial)
 
 
 def _stream_with_langgraph(state: AgentState) -> Iterator[tuple[str, AgentState]]:
@@ -306,6 +328,7 @@ def run_agent_resume(thread_id: str, response: Any) -> AgentState:
     """interrupt 후 graph 재개 (blocking). PRD §7.5.6.
 
     동일 thread_id 의 checkpoint 에서 이어감 + Command(resume=response).
+    resume 는 새 turn 으로 간주 — 별도의 ops.llm_usage row + Langfuse span.
     langgraph 미설치 환경 → InterruptUnavailable 우회: 호출자가 새 turn 으로
     response 를 question 에 합쳐 재호출하는 패턴 권장.
     """
@@ -313,17 +336,31 @@ def run_agent_resume(thread_id: str, response: Any) -> AgentState:
         raise RuntimeError("LangGraph + Command 필요 — interrupt resume 미지원 환경")
     app = _get_langgraph_app()
     config = _make_run_config(thread_id)
-    final_state = app.invoke(Command(resume=response), config=config)
-    return final_state   # type: ignore[return-value]
+    seed: dict = {"question": "(resume)", "domain": None,
+                  "thread_id": thread_id}
+    with start_turn_context(thread_id or "default", seed,
+                            caller="agent_resume") as turn:
+        final_state = app.invoke(Command(resume=response), config=config)
+        turn.state = final_state if isinstance(final_state, dict) else {}
+        return final_state   # type: ignore[return-value]
 
 
 def run_agent_resume_stream(thread_id: str, response: Any
                              ) -> Iterator[tuple[str, AgentState]]:
-    """interrupt 후 graph 재개 (streaming). SSE 용."""
+    """interrupt 후 graph 재개 (streaming). SSE 용. 새 turn 으로 turn lifecycle 진입."""
     if not _HAS_LANGGRAPH or not _HAS_COMMAND:
         raise RuntimeError("LangGraph + Command 필요 — interrupt resume 미지원 환경")
     app = _get_langgraph_app()
     config = _make_run_config(thread_id)
+    seed: dict = {"question": "(resume)", "domain": None,
+                  "thread_id": thread_id}
+    with start_turn_context(thread_id or "default", seed,
+                            caller="agent_resume_stream") as turn:
+        yield from _resume_stream_inner(app, response, config, turn)
+
+
+def _resume_stream_inner(app: Any, response: Any, config: dict,
+                          turn: Any) -> Iterator[tuple[str, AgentState]]:
     final_state: AgentState = {}   # type: ignore[assignment]
     interrupted = False
     for update in app.stream(Command(resume=response),
@@ -343,6 +380,8 @@ def run_agent_resume_stream(thread_id: str, response: Any
             yield (node_name, final_state)
     if not interrupted:
         yield ("__final__", final_state)
+    # final state 를 turn 에 동기화 — finalize 시 n_replans/answer 추출 용.
+    turn.state = final_state if isinstance(final_state, dict) else {}
 
 
 def _stream_with_fallback_chain(state: AgentState) -> Iterator[tuple[str, AgentState]]:

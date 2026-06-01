@@ -20,11 +20,18 @@ ADAPTER_REGISTRY: dict[str, type[AgentAdapter]] = {
 }
 
 
-def get_adapter(name: str) -> AgentAdapter:
+def get_adapter(name: str, *,
+                 rerank: bool = True,
+                 llm_tier: str = "fast") -> AgentAdapter:
+    """이름으로 어댑터 인스턴스 — 매트릭스 변수 (rerank/llm_tier) 옵션.
+
+    PRD §10 DoD #17 (d) 축소 평가 매트릭스 셀 enumeration 용. 동일 어댑터를
+    (rerank=True, rerank=False) 두 셀로 호출 가능.
+    """
     cls = ADAPTER_REGISTRY.get(name)
     if cls is None:
         raise ValueError(f"unknown adapter: {name}. available={list(ADAPTER_REGISTRY)}")
-    return cls()
+    return cls(rerank=rerank, llm_tier=llm_tier)
 
 
 __all__ = [

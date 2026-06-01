@@ -24,11 +24,26 @@ from ..ontology import entity_key_property, entity_labels
 log = logging.getLogger(__name__)
 
 
-def _constraint(label: str, key: str) -> str:
-    """label.key UNIQUE — Neo4j 5 구문."""
-    cname = f"auto_{label.lower()}_{key}_unique"
+def _constraint(label: str, key: str | list[str]) -> str:
+    """label.key UNIQUE — Neo4j 5 구문. 복합 키 (list[str]) 지원.
+
+    단일: ``CREATE CONSTRAINT … FOR (n:L) REQUIRE n.k IS UNIQUE``
+    복합: ``CREATE CONSTRAINT … FOR (n:L) REQUIRE (n.k1, n.k2) IS UNIQUE``
+
+    PRD §10 DoD #17 (c) — ontology EntitySpec.key 가 str|list[str] 양쪽 허용.
+    finance Person (key=['name', 'birth_year']) 같은 복합 키 엔티티 호환.
+    """
+    if isinstance(key, str):
+        cname = f"auto_{label.lower()}_{key}_unique"
+        return (f"CREATE CONSTRAINT {cname} IF NOT EXISTS "
+                f"FOR (n:{label}) REQUIRE n.{key} IS UNIQUE")
+    # 복합 키 (list[str]) — composite UNIQUE.
+    if not key:
+        raise ValueError(f"entity '{label}' 의 key 가 빈 리스트")
+    cname = f"auto_{label.lower()}_{'_'.join(key)}_unique"
+    keys_expr = ", ".join(f"n.{k}" for k in key)
     return (f"CREATE CONSTRAINT {cname} IF NOT EXISTS "
-            f"FOR (n:{label}) REQUIRE n.{key} IS UNIQUE")
+            f"FOR (n:{label}) REQUIRE ({keys_expr}) IS UNIQUE")
 
 
 # 보조 인덱스 (검색용). 라벨이 ontology 에 있어야만 생성 시도.

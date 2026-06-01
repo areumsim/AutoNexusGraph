@@ -1,0 +1,102 @@
+# IPGraph 특허 도메인 entity 정의 (SSOT) — docs/ipgraph.md §2.
+#
+# 본 파일은 src/ipgraph/ontology.py 가 로드 — Neo4j 제약/인덱스, LLM 프롬프트,
+# P4 cross-validate 의 schema 검증.
+
+version: 1
+schema_version: "v2.2"   # PRD §10 DoD #17 (c) — 온톨로지 레벨 schema_version SoT
+domain: intellectual-property
+last_updated: 2026-06-01
+
+entities:
+
+  Patent:
+    description: |
+      특허 (출원·공개·등록). KIPRIS / USPTO ODP / OpenAlex 합집합.
+      pub_no = 공개번호 또는 등록번호 (jurisdiction prefix 포함).
+    key: pub_no
+    required: [pub_no, jurisdiction, source]
+    optional:
+      - app_no
+      - title
+      - abstract
+      - filing_date
+      - grant_date
+      - kind                     # 'A' (출원) / 'B1' / 'B2' (등록)
+      - snapshot_year
+    pg_table: ip.patents
+    provenance_src: [kipris, uspto_odp, openalex]
+
+  Assignee:
+    description: |
+      특허 출원인. corp_entity 브리지 진입점 — Cross-Domain 의 핵심.
+      type: company | individual | university | gov
+    key: assignee_id
+    required: [assignee_id, name]
+    optional:
+      - name_norm
+      - country
+      - type
+      - wikidata_qid
+    pg_table: ip.assignees
+    provenance_src: [kipris, uspto_odp]
+
+  Inventor:
+    description: |
+      발명자 — master.persons 와 별도 (특허 도메인 식별자 체계 분리).
+      복합 키 도입 가능하나 본 단계는 inventor_id 단일 키.
+    key: inventor_id
+    required: [inventor_id, name]
+    optional:
+      - name_norm
+      - country
+    pg_table: ip.inventors
+    provenance_src: [kipris, uspto_odp]
+
+  CPCCode:
+    description: |
+      CPC 분류 계층 (USPTO/EPO bulk scheme, depth ≥ 4).
+      level: section | class | subclass | maingroup | subgroup.
+    key: code
+    required: [code, level]
+    optional:
+      - title
+      - parent_code
+      - snapshot_year
+    pg_table: ip.cpc_scheme
+    provenance_src: [cpc_scheme]
+
+  TechField:
+    description: 기술 분야 그룹 — OpenAlex concept 또는 CPC section 단위 묶음 (옵션).
+    key: field_id
+    required: [field_id, label]
+    optional:
+      - description
+    pg_table: null               # 일단 Neo4j only (확장 시 PG 마이그)
+    provenance_src: [openalex, cpc_scheme]
+
+  Work:
+    description: |
+      OpenAlex 학술 논문 — institution/author 링크로 특허×논문 cross-domain 승격.
+    key: openalex_id
+    required: [openalex_id]
+    optional:
+      - title
+      - publication_year
+      - cited_by_count
+      - doi
+      - type                     # 'article' / 'preprint' / 'review' / ...
+    pg_table: null               # 옵션 — `ip.works` 확장 시 추가
+    provenance_src: [openalex]
+
+  Institution:
+    description: |
+      연구·기업 기관. type=company 일 때 corp_entity 브리지 가능
+      (기업 R&D 추적용).
+    key: ror_id
+    required: [ror_id, name]
+    optional:
+      - country
+      - type                     # company | education | government
+    pg_table: null
+    provenance_src: [openalex, ror]

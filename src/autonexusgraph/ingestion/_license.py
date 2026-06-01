@@ -42,9 +42,14 @@ LICENSE_POLICY: dict[str, LicenseTier] = {
     "kosis":           "public_domain",   # 통계청
     "ecos":            "public_domain",   # 한국은행
     "law":             "public_domain",   # LAW.go.kr
-    "kipris":          "kogl_type1",      # 특허청 — 메타·서지정보
+    "kipris":          "kogl_type1",      # 특허청 — 메타·서지정보 (KIPRISPLUS 본문은 별도)
+    "uspto_odp":       "public_domain",   # USPTO Open Data Portal (PatentsView 후속, 2026-03-20 이관)
+    "cpc_scheme":      "public_domain",   # CPC 분류 체계 (USPTO/EPO 공동)
+    "openalex":        "cc0",             # OpenAlex — CC0 (full body 가능)
     "sec_edgar":       "public_domain",   # SEC (미국)
-    "gleif":           "cc_by_4_0",       # GLEIF LEI
+    "gleif":           "cc_by_4_0",       # GLEIF LEI Level 1/2 — CC0 사실상이지만 표기 CC BY 4.0
+    "gleif_enrich":    "cc_by_4_0",       # GLEIF API 보강 (registeredAs / legal_name) — 출처표기 의무
+    "opencorporates":  "cc_by_sa",        # ODbL/CC BY-SA share-alike — 본문 저장 시 동일 라이선스 부여 의무
     "krx":             "public_domain",   # KRX 시세 (정보데이터시스템 공개)
 
     # 위키 계열
@@ -236,6 +241,16 @@ def require_attribution(source: str) -> bool:
     return tier in {"cc_by_sa", "cc_by_4_0", "kogl_type3", "kogl_type4"}
 
 
+def require_share_alike(source: str) -> bool:
+    """downstream 재배포 시 동일 share-alike 라이선스 부여 의무가 있는가.
+
+    OpenCorporates (ODbL/CC BY-SA) / Wikipedia (CC BY-SA) 등.
+    True 인 source 는 본문 청크/임베딩 결과를 외부 노출할 때 동일 라이선스 표기 + 원문 링크 의무.
+    """
+    tier = LICENSE_POLICY.get(source, "unknown")
+    return tier == "cc_by_sa"
+
+
 def policy(source: str) -> LicenseTier:
     return LICENSE_POLICY.get(source, "unknown")
 
@@ -247,6 +262,7 @@ __all__ = [
     "OEM_NEWSROOM_POLICY",
     "allow_body",
     "require_attribution",
+    "require_share_alike",
     "policy",
     "newsroom_policy",
     "is_url_allowed",

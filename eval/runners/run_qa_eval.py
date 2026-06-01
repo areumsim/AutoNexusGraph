@@ -566,6 +566,14 @@ def main() -> int:
                         help="adapter 별 동시 LLM 호출 수 (I/O 바운드 — 4~8 권장).")
     parser.add_argument("--force", action="store_true",
                         help="resume 무시 — 기존 predictions 삭제 후 재실행")
+    # 축소 평가 매트릭스 변수 — PRD §10 DoD #17 (d).
+    # ENV (EVAL_RERANK / EVAL_LLM_TIER) 또는 CLI flag 로 cell 분리.
+    parser.add_argument("--rerank", default=None,
+                        choices=("on", "off", "1", "0", "true", "false"),
+                        help="rerank ablation — on|off (env EVAL_RERANK 와 동일 효과). 기본 on.")
+    parser.add_argument("--llm-tier", default=None,
+                        choices=("fast", "smart"),
+                        help="LLM tier — fast|smart (env EVAL_LLM_TIER 와 동일). 기본 fast.")
     args = parser.parse_args()
 
     if not args.gold.exists():
@@ -588,17 +596,41 @@ def main() -> int:
     adapter_names = [a.strip() for a in args.adapters.split(",") if a.strip()]
     from eval.adapters import get_adapter
 
+    # 매트릭스 변수 결정 — CLI > ENV > default(rerank=on, tier=fast).
+    # PRD §10 DoD #17 (d) — run_matrix_smoke.py 가 subprocess 로 ENV 전달.
+    _matrix_mode = bool(
+        args.rerank is not None or args.llm_tier is not None
+        or "EVAL_RERANK" in os.environ or "EVAL_LLM_TIER" in os.environ
+    )
+
+    def _resolve_rerank() -> bool:
+        if args.rerank is not None:
+            return args.rerank.lower() in ("on", "1", "true")
+        return os.getenv("EVAL_RERANK", "1").lower() not in ("0", "false", "off", "no")
+    def _resolve_tier() -> str:
+        if args.llm_tier is not None:
+            return args.llm_tier
+        return os.getenv("EVAL_LLM_TIER", "fast").lower()
+    _rerank = _resolve_rerank()
+    _tier = _resolve_tier()
+
     all_per_q: list[dict] = []
     budgets: dict[str, dict] = {}
 
     for ad_name in adapter_names:
         try:
-            adapter = get_adapter(ad_name)
+            adapter = get_adapter(ad_name, rerank=_rerank, llm_tier=_tier)
         except ValueError as e:
             print(f"  [{ad_name}] {e}", file=sys.stderr)
             continue
 
-        pred_path = out_dir / f"{ad_name}_predictions.jsonl"
+        # cell label — 매트릭스 셀 식별자. 매트릭스 모드 (env/CLI 명시) 일 때만
+        # predictions/metrics 의 adapter 필드를 cell label 로 갈아끼움 → 동일 어댑터
+        # 의 rerank on/off 가 분리. 비-매트릭스 모드는 기존 ad_name 보존 (회귀 방지).
+        cell_label = adapter.label() if _matrix_mode else ad_name
+        if _matrix_mode:
+            adapter.name = cell_label  # AgentResponse 의 adapter 필드 분리 강제.
+        pred_path = out_dir / f"{cell_label}_predictions.jsonl"
         if args.force and pred_path.exists():
             pred_path.unlink()
 
@@ -609,7 +641,7 @@ def main() -> int:
         )
         pred_rows = run_adapter_on_gold(adapter, gold_rows, pred_path,
                                           budget=budget, workers=args.workers)
-        budgets[ad_name] = budget.as_dict()
+        budgets[cell_label] = budget.as_dict()
 
         per_q = compute_per_question_metrics(
             gold_rows, pred_rows,
@@ -636,9 +668,14 @@ def main() -> int:
         bq = {}
 
     # 모든 adapter 의 prediction row 합치기 — 추가 메트릭 입력.
+    # 매트릭스 모드 시 cell_label, 비-매트릭스 모드 시 ad_name 으로 파일명 결정.
     all_pred_rows: list[dict] = []
     for ad_name in adapter_names:
-        pred_path = out_dir / f"{ad_name}_predictions.jsonl"
+        # cell_label 재구성 — 매트릭스 모드 일 때만 (label 시그니처와 동일).
+        label_for_path = (
+            f"{ad_name}_{_tier}_rerank{int(_rerank)}" if _matrix_mode else ad_name
+        )
+        pred_path = out_dir / f"{label_for_path}_predictions.jsonl"
         all_pred_rows.extend(load_jsonl(pred_path))
 
     # PRD §10.13 Main-Hop Efficiency.
@@ -670,11 +707,15 @@ def main() -> int:
         "gold": str(args.gold),
         "n_gold": len(gold_rows),
         "adapters": adapter_names,
+        "matrix_mode": _matrix_mode,
+        "rerank": _rerank,
+        "llm_tier": _tier,
         "top_k": args.top_k,
         "enable_judge": args.enable_judge,
         "started_at": datetime.now().isoformat(),
         "git": git_info(),
         "budgets": budgets,
+        "summary": summary,            # ← run_matrix_smoke 가 multi_hop_em 회수용
         "hybrid_vs_vector": hvv,
         "by_difficulty": by_difficulty,
         "bridge_quality": bq,

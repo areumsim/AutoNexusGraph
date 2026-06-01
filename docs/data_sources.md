@@ -10,7 +10,7 @@
 
 | Tier | 정의 | 소스 개수 |
 |---|---|---|
-| **S** | 코드 통합 완료, 키 불필요 | 5 |
+| **S** | 코드 통합 완료, 키 불필요 | 7 |
 | **A** | 코드만으로 추가 가능, 키 불필요 | 9 |
 | **B** | 키 발급 필요, 무료 (data.go.kr 등) | 7 |
 | **C** | 스크래핑 또는 PDF 파싱 필요 | 5 |
@@ -396,6 +396,60 @@
 - **AI Hub 키** 발급 + 데이터셋 다운로드 승인 (S7).
 - **car365.go.kr 데이터프리존** 예약 + 승인 (§B6).
 - **KIDI 등급요율** 분기별 PDF 다운 (§C3).
+
+---
+
+## 12. IPGraph 도메인 데이터 소스 (도메인3 — PRD v2.2 §12.5)
+
+> 2026-06-01 신설. 상세 설계·온톨로지·gold QA SSOT 는 [docs/ipgraph.md](./ipgraph.md). 본 §는 데이터 소스 후보 카탈로그 분담만.
+
+### IP-S1. **CPC 분류 체계 bulk** (USPTO + EPO)
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | USPTO Bulk Data — CPC Master Classification File (XML) / EPO Open Patent Services |
+| 라이선스 | 공공 |
+| 인증 | 불필요 |
+| 등급 | **A** (0.95) — 정식 분류 계층 (section A~H+Y → class → subclass → maingroup → subgroup, depth ≥ 4) |
+| 채울 PRD 항목 | PRD §12.5 — `ip.cpc_scheme` + Neo4j `CPCCode/SUBCLASS_OF` |
+| 작업 상태 | (예정) — 무인증 즉시 가능, 작업 순서 1번 |
+| 미수집 사유 | `src/ipgraph/*` 실제 코드 미머지 |
+
+### IP-S2. **USPTO Open Data Portal (PatentsView 후속)**
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | data.uspto.gov — **PatentsView REST 종료 (2026-03-20)** 후 ODP bulk dataset + Transition Guide |
+| 라이선스 | 공공 (US Gov) |
+| 인증 | 무인증 (bulk dataset) |
+| 등급 | **A** (0.95) — 공식 특허청. 미국 특허 + 인용 + assignee 정규화 |
+| 채울 PRD 항목 | PRD §12.5 — `ip.patents` (US) + `ip.citations` + `ip.assignee_corp_map` (strong 매칭) |
+| 작업 상태 | (예정) — REST 가정 코드 모두 폐기, bulk dataset 기반 ingestion |
+| 미수집 사유 | REST 종료로 인한 ingestion 전략 전환 필요. 작업 순서 2번 |
+
+### IP-A1. **OpenAlex API**
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | api.openalex.org — 학술 논문 / 특허 / works 통합 |
+| 라이선스 | CC0 |
+| 인증 | 불필요 (mailto 헤더 권장, rate limit) |
+| 등급 | **A** (0.95) — 글로벌·연구 확장. 특허는 부분 커버 |
+| 채울 PRD 항목 | PRD §12.5 옵션 — `ip.works` (R&D ↔ 특허 cross-reference 보강) |
+| 작업 상태 | (예정, 옵션) |
+| 미수집 사유 | 핵심 ingestion (CPC + USPTO ODP + KIPRIS) 후 보강 |
+
+### IP-B1. **KIPRIS Open API (공공데이터포털)**
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | 공공데이터포털 — 한국특허정보원 KIPRIS Open API |
+| 라이선스 | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원 / 일부 비공개**) |
+| 인증 | `KIPRIS_API_KEY` (공공데이터포털 발급) |
+| 등급 | **A** (0.95) — 한국 특허·출원 |
+| 채울 PRD 항목 | PRD §12.5 — `ip.patents` (KR) + assignee→corp_code 매칭 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) |
+| 작업 상태 | (예정) — 키 발급 + `src/autonexusgraph/ingestion/_license.py` 에 KIPRIS 게이트 추가 (commit `b70527a` IR/뉴스룸 license-gate 패턴 재사용) |
+| 미수집 사유 | 키 발급 + 라이선스 게이트 |
 
 ---
 

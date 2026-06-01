@@ -56,11 +56,18 @@ agent = [
     "langchain-core>=0.3",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
-    # Tracing (PRD §7.5.11) — Langfuse self-host 또는 LangSmith 양쪽 지원
-    "langfuse>=2.0",
+    # Tracing (PRD §7.5.11 + §10 DoD #17 (b)) — Langfuse 4.x OTEL native (CallbackHandler 폐기).
+    # LangSmith 분기는 env-flag 자동 송신 (langchain 자동 설치 시 작동).
+    "langfuse>=4.0",
     "langsmith>=0.1",
     # calculator_worker — eval() fallback 제거 후 numexpr 강제 (보안).
     "numexpr>=2.10",
+]
+
+# MCP 래퍼 (PRD §10 DoD #17 (a)) — 외부 에이전트 (Claude Desktop / Cline / OpenAI Agents SDK)
+# 가 우리 typed tool pool 호출. SDK 미설치 환경 fail-soft.
+mcp = [
+    "mcp>=1.0",
 ]
 
 # UI

@@ -14,6 +14,13 @@ class HybridAdapter(AgentAdapter):
     name = "hybrid"
     version = "0.1"
 
+    def __init__(self, *, rerank: bool = True, llm_tier: str = "fast") -> None:
+        """Hybrid 어댑터 — 본 단계는 매트릭스 시그니처 명시. rerank 의 실 효과는
+        run_agent 내부 retriever (autonexusgraph.tools.retrieve.search_documents)
+        가 받게 별도 작업 (다음 사이클). 본 단계는 매트릭스 셀 라벨 보장만.
+        """
+        super().__init__(rerank=rerank, llm_tier=llm_tier)
+
     def query(self, question: str, *,
               domain: str | None = None) -> AgentResponse:
         from autonexusgraph.agents import run_agent

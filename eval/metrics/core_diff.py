@@ -4,6 +4,11 @@
     1. 환경변수 ``CORE_DIFF_BASELINE`` 가 지정되면 그 commit (운영자 명시 우선).
     2. 그렇지 않으면 ``src/autograph`` 가 처음 등장한 commit 의 직전 commit.
 
+baseline reset 이력 SSOT = ``eval/reports/core_diff_baseline_ledger.md``.
+도메인 추가 마다 reset (정책 §11.1).
+현재 Makefile default = ``bab9411`` (2026-06-01 도메인3 ipgraph 통합 직전 anchor).
+이전 anchor = ``4049caf`` (Phase B 안정화).
+
 baseline 1 의 의미: 어떤 stable 시점부터 누적된 의도된 변화율을 보고자 할 때.
 예: 'b1be342' (Phase B 안정화) 또는 strategy/plugin 리팩터 후 commit 등.
 

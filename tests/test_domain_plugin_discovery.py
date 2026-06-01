@@ -26,6 +26,10 @@ def _reset_registry():
 
     autograph 가 다른 테스트에서 미리 import 되어 있을 수 있으므로 sys.modules
     에서도 제거 — 본 테스트는 cold-start 시나리오를 검증한다.
+
+    Teardown 에서는 saved state 를 복원하되, **saved 가 비어있던 경우** (본 모듈이
+    처음 실행되어 다른 테스트 baseline 이 없는 경우) discovery 를 1회 트리거해
+    후속 테스트가 autograph 자동 등록 baseline 을 기대할 수 있게 보장한다.
     """
     saved_handlers = dict(DH._HANDLERS)
     saved_routers = list(DH._ROUTERS)
@@ -41,6 +45,13 @@ def _reset_registry():
     DH._HANDLERS.update(saved_handlers)
     DH._ROUTERS[:] = saved_routers
     DH._reset_discovery_for_test()
+    # 격리 후 baseline 보장: 다른 테스트는 autograph 가 등록되어 있다고 가정.
+    if not DH._HANDLERS or not DH._ROUTERS:
+        try:
+            DH.discover_plugins(force=True)
+        except Exception:
+            # discovery 실패는 무시 — 본 테스트 외부에서 자체 처리.
+            pass
 
 
 def test_discovery_loads_autograph_by_default():

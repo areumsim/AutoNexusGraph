@@ -13,6 +13,8 @@
 #   meta_required  : 엣지 속성 — §6.7 의 의무 메타.
 
 version: 1
+schema_version: "v2.2"   # PRD §10 DoD #17 (c) — 온톨로지 레벨 schema_version SoT.
+                         # 엣지 적재 helper 가 본 값을 자동 부여 (엣지마다 반복 안 함).
 last_updated: 2026-05-28
 
 # 모든 엣지에 공통으로 강제되는 메타 키 (PRD §6.7).
@@ -154,7 +156,23 @@ relations:
     notes: |
       NHTSA ODI 가 개시·종결한 결함 조사. NHTSA_ACTION_NUMBER 단위.
       Investigation 이 리콜로 종결되면 campno 가 채워지고 동일 Recall 노드 와의 연결은
-      별도 INVESTIGATION_LED_TO_RECALL 관계 (선택 — load_auto_investigations 가 처리).
+      별도 LED_TO_RECALL 관계 (아래) — load_auto_investigations 가 처리.
+
+  # ── Investigation → Recall (조사가 리콜로 종결) ─────────────────
+  LED_TO_RECALL:
+    from: Investigation
+    to: Recall
+    directed: true
+    cardinality: many-to-many        # 한 조사가 여러 리콜로 분할되거나, 한 리콜이 여러 조사 종결
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.95         # NHTSA 공식 결과 = grade A
+    enabled: true
+    notes: |
+      Investigation 이 리콜로 종결된 경우의 명시적 연결. NHTSA ODI 의
+      'result' 필드 또는 campno 가 Recall 마스터에 존재하면 적재.
+      Cypher: ``(inv:Investigation)-[:LED_TO_RECALL]->(rc:Recall)``.
 
   # ── 규격 / 평가 ────────────────────────────────────────────────
   COMPLIES_WITH:
@@ -215,6 +233,35 @@ relations:
     pass: P3
     confidence_default: 0.65
     enabled: false                  # 본 PR 비활성 (다음 패스)
+
+  # ── L6 배터리·소재 (USGS MCS) ────────────────────────────────────
+  MADE_OF:                          # Module(배터리팩/셀) → Material(NCM811/LFP)
+    from: Module
+    to: Material
+    directed: true
+    cardinality: many-to-many
+    class: main_hop                 # BOM 하향 (L4 → L6)
+    provenance: deterministic       # materials_seed.yaml
+    pass: P2
+    confidence_default: 0.80         # B 등급 (manual seed)
+    enabled: true
+    notes: |
+      배터리 모듈(`:Module {name:'배터리팩'}` 또는 `:Module {name:'배터리셀'}`)
+      → cathode chemistry(`:Material {NCM811}`). materials_seed.yaml SSOT.
+
+  DERIVED_FROM:                     # Material(NCM811) → Mineral(Ni/Co/Mn/Li/Graphite)
+    from: Material
+    to: Mineral
+    directed: true
+    cardinality: many-to-many
+    class: main_hop
+    provenance: deterministic       # 화학조성 → 광물 derivation (USGS MCS grade A)
+    pass: P2
+    confidence_default: 0.95         # A 등급 (USGS MCS 공식 통계)
+    enabled: true
+    notes: |
+      소재의 광물 derivation. NCM811 → Ni·Co·Mn / NCA → Ni·Co·Al / LFP → Fe·P /
+      Graphite anode → Graphite. confidence 0.95 grade A (USGS MCS).
 
 # ── 명명 컨벤션 ─────────────────────────────────────────────────
 naming_conventions:

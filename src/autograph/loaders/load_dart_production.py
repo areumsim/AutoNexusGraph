@@ -46,6 +46,7 @@ from ..extractors.dart_production_parser import (
     parse_business_report,
 )
 from ._neo4j_helpers import edge_meta_cypher, run_batched
+from ._neo4j_helpers import default_schema_version as _default_schema_version
 
 
 log = logging.getLogger(__name__)
@@ -426,7 +427,7 @@ def _sync_manufactured_at_to_neo4j(*, capacity_rows: list[PlantRow],
             "confidence_score": _CONFIDENCE_SCORE,
             "validated_status": _VALIDATED_STATUS,
             "extraction_method": _EXTRACTION_METHOD,
-            "schema_version":   "v2.1",
+            "schema_version":   _default_schema_version(),
         })
 
     if not rows:

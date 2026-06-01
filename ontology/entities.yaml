@@ -14,6 +14,7 @@
 #   provenance_src : 어디서 만들어지는지 — extractors.yaml 참조
 
 version: 1
+schema_version: "v2.2"   # PRD §10 DoD #17 (c) — 온톨로지 레벨 schema_version SoT
 domain: korean-listed-corp
 last_updated: 2026-05-26
 

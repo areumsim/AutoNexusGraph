@@ -84,8 +84,15 @@ def search_documents_auto(query: str, *,
                           manufacturer_id: int | list[int] | None = None,
                           model_id: int | list[int] | None = None,
                           variant_id: int | list[int] | None = None,
-                          source: str | list[str] | None = None) -> list[dict]:
-    """자동차 청크 의미 검색 + 메타 필터."""
+                          source: str | list[str] | None = None,
+                          rerank: bool = True,
+                          rerank_candidate_multiplier: int = 3) -> list[dict]:
+    """자동차 청크 의미 검색 + 메타 필터 + (옵션) BGE-Reranker.
+
+    Args:
+        rerank: True (기본) 시 vector top_k × multiplier 후보를 BGE-Reranker 재정렬.
+            False 시 vector 유사도만. PRD §10 DoD #17 (d) ablation 셀 토글.
+    """
     if not query or not query.strip():
         return []
 
@@ -105,7 +112,8 @@ def search_documents_auto(query: str, *,
         require_embedding=True,
     )
     params["q"] = qvec
-    params["k"] = _cap(top_k)
+    effective_k = _cap(top_k * rerank_candidate_multiplier if rerank else top_k)
+    params["k"] = effective_k
     sql = f"""
     SELECT id, manufacturer_id, model_id, variant_id, source, section,
            chunk_idx, text, token_count, metadata,
@@ -122,12 +130,33 @@ def search_documents_auto(query: str, *,
         with conn.cursor() as cur:
             # pgvector HNSW 의 ef_search 증가 (기본 40) — auto 청크가 finance 748k
             # 가운데 소수 (16k) 라 기본 ef 로는 source 필터 후 0 rows 발생.
-            # 400 ef_search 면 충분 (실측 nhtsa+wiki+ir+narrative 합 ~16.5k 청크
-            # 중 가장 유사한 top-K 선별).
             cur.execute("SET LOCAL hnsw.ef_search = 400")
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    if not rerank or not hits:
+        for h in hits[:_cap(top_k)]:
+            h["reranked"] = False
+        return hits[:_cap(top_k)]
+
+    texts = [(h.get("text") or "") for h in hits]
+    try:
+        ranked = client.rerank(query, texts, top_k=_cap(top_k))
+    except EmbeddingError:
+        for h in hits[:_cap(top_k)]:
+            h["reranked"] = False
+        return hits[:_cap(top_k)]
+    out: list[dict] = []
+    for r in ranked:
+        idx = getattr(r, "index", None)
+        if idx is None or idx >= len(hits):
+            continue
+        row = dict(hits[idx])
+        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
+        row["reranked"] = True
+        out.append(row)
+    return out
 
 
 def search_by_metadata_auto(*,

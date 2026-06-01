@@ -9,8 +9,10 @@
 - `10_autograph_bom.sql` — `auto.components` 에 `level / parent_component_id / snapshot_year`
   컬럼 추가 + 기존 row backfill + 인덱스.
 - `11_autograph_staging.sql` — 신규 테이블 `auto.master_suppliers`, `auto.staging_relations`.
-- `12_autograph_inspections.sql` — 신규 테이블 `auto.events_inspections`
+- `12a_autograph_inspections.sql` — 신규 테이블 `auto.events_inspections`
   (data.go.kr 15155857 KOTSA 수리검사내역 적재용).
+- `12b_autograph_investigations.sql` — 신규 테이블 `auto.events_investigations`
+  (NHTSA ODI 결함 조사 적재용).
 
 > 두 마이그레이션 모두 **멱등** (`ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`)
 > 이라서 재실행해도 무해. 단 `ALTER COLUMN SET NOT NULL` / `ADD CONSTRAINT` 는 backfill 직후
@@ -154,13 +156,18 @@ stringified supplier_id 를 쓴다.
 
 ---
 
-## 3.5 Hot-apply — 12_autograph_inspections.sql
+## 3.5 Hot-apply — 12a_autograph_inspections.sql / 12b_autograph_investigations.sql
+
+> 동일 prefix `12_` 두 파일 충돌 해결을 위해 `12a_` (KOTSA 수리검사) / `12b_` (NHTSA ODI 조사)
+> 로 분리. 알파벳 정렬은 보존 (postgres `docker-entrypoint-initdb.d` 가 알파벳 순 실행).
 
 ### 3.5.1 적용 (신규 테이블 — 백업 불필요)
 
 ```bash
 psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
-     -f infra/postgres/init/12_autograph_inspections.sql
+     -f infra/postgres/init/12a_autograph_inspections.sql
+psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
+     -f infra/postgres/init/12b_autograph_investigations.sql
 ```
 
 ### 3.5.2 검증

@@ -14,11 +14,11 @@
 |---|---|
 | 시스템이 풀려는 **문제와 그 한계** | 데이터 적재량·최신 수치 → `data/README.md`, `docs/data_inventory.md` |
 | **핵심 추상화**(개념 사전) | Quickstart / 명령어 → `README §11`, `docs/operations/*.md` |
-| 두 패키지의 책임 분리와 한 turn 흐름 | 데이터 소스 라이선스 전수 표 → `README §4`, `docs/data_sources.md` |
-| **설계 의도와 그 트레이드오프 / 대안** | autograph 도메인 단독 가이드 → `docs/autograph.md` |
-| **확정 / 잠정 / 미정** 의 명시적 구분 | PRD 의 완전한 요구사항·DoD 트래픽라이트 → `PRD.md` |
-| 열린 질문·숨은 가정·위험 | 평가 결과 / 비교 매트릭스 실측값 → `eval/reports/*` |
-| (지도 역할 — *무엇이* 어디에 왜) | (여행 일정 — *어떤 순서로* 며칠 동안 → `docs/learning_guide.md`) |
+| 두 패키지의 책임 분리와 한 turn 흐름 (요약) | **구조 SSOT (패키지 토폴로지·LangGraph 노드·SSOT 색인) → `docs/architecture.md`** |
+| **설계 의도와 그 트레이드오프 / 대안** | 데이터 소스 라이선스 전수 표 → `README §4`, `docs/data_sources.md` |
+| **확정 / 잠정 / 미정** 의 명시적 구분 | autograph 도메인 단독 가이드 → `docs/autograph.md` / ipgraph (도메인3) → `docs/ipgraph.md` |
+| 열린 질문·숨은 가정·위험 | PRD 의 완전한 요구사항·DoD 트래픽라이트 → `PRD.md` |
+| (결정 카탈로그 — *무엇이* 어디에 왜) | 평가 결과 / 비교 매트릭스 실측값 → `eval/reports/*` / 이론 교재 → `docs/learning_guide.md` |
 
 ### 0.2 라벨 컨벤션 (가장 중요)
 
@@ -94,7 +94,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 [잠정] 2026 년 초 리네이밍 (커밋 `10680a4`). 의미:
 
 - finance 단일 도메인 시스템이 아니라 **여러 도메인을 묶는 우산** 으로 포지셔닝.
-- 현재는 finance + auto 두 도메인. 향후 도메인 확장은 PRD 에 명시되지 않음.
+- 현재는 finance + auto 두 도메인. **[확정 — 2026-06-01 PRD v2.2]** 도메인3 = 특허 (IPGraph) 정식 흡수 — `docs/ipgraph.md` SSOT + PRD §12.5 + DoD #15~#17. 4번째~ (의약품/전자제품/에너지/식품) 는 §2.3 영구 비목표 강등.
 
 **[의도 확인 필요]**: "AutoNexusGraph" 가 영구적 우산 이름인지, 다음 리브랜딩 가능성이 있는지 — 코드/PRD 만으론 확인 불가. 단, `src/autonexusgraph/__init__.py:1` 가 "finance 코어" 로 자기 정의하고 있어 패키지 이름과 도메인 명칭이 완전히 정합되진 않음 (§3.1 의 [의도 확인 필요] 항목 참조).
 
@@ -370,13 +370,15 @@ autonexusgraph         autonexusgraph ──┐
 - `import autograph` 가 어딘가에서 발생하면 (`__init__.py:23`) 핸들러·라우터가 코어 레지스트리에 등록되어 auto/cross_domain 동작.
 - autograph 가 import 안 되면 core 는 finance 만 동작 — handler 미등록이라 분기 자동 폴백 (`_domain_handler.py:117-130`).
 
-#### 3.1.4 코어와 finance 의 분리 — **[의도 확인 필요]**
+#### 3.1.4 코어와 finance 의 분리 — **[잠정] (v2.2 결정 시점 도래)**
 
 - 현재 구조에서 `autonexusgraph/tools/{financials,graph,retrieve}.py` 는 finance 데이터에 강하게 의존 (corp_code 등). agents/ 안의 fallback 도 `lookup_company` 를 직접 import (`agents/nodes.py:34`).
 - 즉 **"코어 = 코어 인프라 + finance 어댑터"** 가 한 패키지에 묶여 있다.
 - [잠정 / 가능성] 다음 단계에서 `autonexusgraph` = pure core, `fingraph` = finance 어댑터로 분리하는 그림. 현재 그 분리가 안 됨.
-- [의도 확인 필요]: 의도된 임시인가, 영구 설계인가. PRD §10.12 는 "코어 변경 < 5%" 만 측정하고 "코어 = pure" 는 정의 안 함.
-- [위험]: 3번째 도메인을 추가할 때 또 이 [의도 확인 필요] 가 부메랑으로 돌아옴 (§5.1 참조).
+- **[확정 — 2026-06-01 PRD v2.2]** 도메인3 (IPGraph, PRD §12.5) 정식 흡수로 인해 **"코어/finance 분리" 결정 압력 실제 도래**. PRD §10.12 는 여전히 "코어 변경 < 5%" 만 측정하지만, **DoD #15 (ip 추가 후 baseline reset → 재측정 < 5%)** 가 새 게이트. 따라서:
+  - 옵션 A — pure core 분리 (3분할: `autonexusgraph` + `fingraph` + `autograph` + `ipgraph`) 로 가야 "코어 변경" 의 의미가 명확해짐.
+  - 옵션 B — 2분할 유지 + baseline reset 정책으로 누적 변화 추적 (현 v2.2 결정).
+  - **v2.2 는 옵션 B 채택 (§11.1 baseline reset 정책 본문 승격).** 옵션 A 는 ipgraph 머지 후 누적 변경량이 너무 커지면 재고.
 
 ### 3.2 한 turn 의 흐름 (시퀀스 상세)
 
@@ -566,7 +568,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 | 연합뉴스 RSS | finance | [확정] 활성 (메타+요약만, 저작권) | `news.articles` 338 |
 | SEC EDGAR | finance | [확정] 활성 (한국 ADR 한정) | `sec.filings` 1,857 |
 | GLEIF | finance | [확정] 활성 | `sec.lei` 2,700 (LEI 매칭 120) |
-| KCGS ESG | finance | [잠정] 수동 CSV (회원 라이선스) | `docs/operations/kcgs_esg_guide.md` |
+| KCGS ESG | finance | [잠정] 수동 CSV (회원 라이선스) | `docs/data_catalog.md#kcgs-esg` |
 | 공정위 기업집단 (data.go.kr) | finance | [미정] 키 확보 후 | `README §4` |
 | KOSIS 산업통계 | finance | [미정] 키 확보 후 | `README §4` |
 | KIPRIS 특허 | finance | [미정] 키 확보 후 | `README §4` |
@@ -714,8 +716,8 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **단일 패키지** — `autonexusgraph` 안에 finance / auto 분리. 의존 방향 양방향. PRD §10.12 미달.
   - **core / finance / auto 3분할** — `autonexusgraph_core` + `fingraph` + `autograph`. 깔끔하지만 패키지 3개 운영.
 - **대안 트레이드오프**: 단일 → core 무수정 도메인 추가 불가. 3분할 → finance 어댑터 분리 비용 발생 (3.1.4 의 [의도 확인 필요]).
-- [확정 — 현재 구조] 2분할 (autonexusgraph + autograph), import 자동 등록.
-- [잠정] 3분할 가능성 — PRD 에 명시 없음 (3.1.4 참조).
+- [확정 — 현재 구조] 2분할 (autonexusgraph + autograph), import 자동 등록. **v2.2 IPGraph 흡수 후 = 2분할 + ipgraph (코어/finance 는 여전히 미분리, §3.1.4 의 옵션 B 채택).**
+- [잠정] 3분할 (pure core 분리) 가능성 — PRD v2.2 §12.5 본문 + §11.1 baseline reset 정책으로 "옵션 B 우선" 결정. 누적 변경량이 임계 초과 시 옵션 A 재고 (§3.1.4 참조).
 
 ### 4.6 왜 ER 마스터 + Bridge
 
@@ -860,7 +862,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 ### 5.11 우선순위가 큰 미정 사항 5개 (세미나 토론용)
 
-1. 코어와 finance 어댑터의 분리 (§3.1.4) — 3번째 도메인 추가 전에 결정해야.
+1. 코어와 finance 어댑터의 분리 (§3.1.4) — **v2.2 옵션 B (baseline reset 정책) 채택**. ipgraph 머지 후 누적 변경량이 임계 초과 시 옵션 A (pure core 분리) 재고.
 2. confidence_score 의 calibration (§5.2) — 평가 메트릭이 신뢰 가능한지의 전제.
 3. Bridge candidate 의 검토 운영 (§5.3) — graph quality 가 시간이 갈수록 떨어짐.
 4. BOM Level 5 의 채널 정책 (§5.4) — non-goal vs deferred 의 경계.
@@ -870,15 +872,15 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 ## 6. 다음 한 걸음 — 심화 고민용 출발점
 
-> 새로 합류하는 사람을 위한 **시간 단위 학습 동선**(Day 0~7) 은 별도 문서 `docs/learning_guide.md` 에 정리. 이 절은 코드 진입점·체크리스트·세미나 질문만 짧게.
+> 이론적 설명·아키텍처·예상 청중 질문은 별도 문서 `docs/learning_guide.md` (심화 세미나 가이드) 에 정리. 이 절은 코드 진입점·체크리스트·세미나 질문만 짧게.
 
 ### 6.1 코드 읽기 추천 순서
 
 새로 합류한 사람이 멘탈 모델을 잡는 최단 경로:
 
-1. `src/autonexusgraph/agents/state.py` (50줄, 5분) — 한 turn 의 모든 필드.
-2. `src/autonexusgraph/agents/_domain_handler.py` (143줄, 10분) — DomainHandler Protocol + 라우터.
-3. `src/autograph/agent_handler.py` (163줄, 10분) — auto/cross_domain 구현체.
+1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict 33 필드).
+2. `src/autonexusgraph/agents/_domain_handler.py` — DomainHandler Protocol + 라우터 + ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` soft-import.
+3. `src/autograph/agent_handler.py` — auto/cross_domain 구현체.
 4. `src/autograph/policy.py:1-100` (10분) — 키워드 라우팅 / question kind 분류.
 5. `src/autonexusgraph/agents/nodes.py` (Triage / Planner / Synthesizer) — 각 노드의 진입 로직.
 6. `src/autonexusgraph/agents/workers.py:1-100` (10분) — 4 worker + 화이트리스트.
@@ -1019,7 +1021,7 @@ from . import agent_handler  # 등록 부작용
 | **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `PRD §7.5.6` |
 | **idempotent (멱등) 파이프라인** | 재실행해도 같은 결과. raw → DB 모든 단계 | `README §2` |
 | **KATRI** | 자동차안전연구원. bigdata-tic.kr OAuth | `docs/autograph.md §5` |
-| **KCGS** | 한국기업지배구조원. ESG 등급 공급 | `docs/operations/kcgs_esg_guide.md` |
+| **KCGS** | 한국기업지배구조원. ESG 등급 공급 | `docs/data_catalog.md#kcgs-esg` |
 | **KNCAP** | 한국 신차 안전도 평가. car.go.kr | `PRD §3.2`, `docs/autograph.md §5` |
 | **KOTSA** | 한국교통안전공단. 수리검사 데이터 | `README §4`, `docs/autograph.md §5` |
 | **LangGraph** | Multi-agent StateGraph 프레임워크 | `PRD §7.5` |

@@ -34,7 +34,7 @@ VALID_QUESTION_TYPE = {
     "aggregation", "ranking", "comparison",
 }
 VALID_COMPLEXITY = {"easy", "medium", "hard"}
-VALID_DOMAIN = {"finance", "auto", "cross_domain"}
+VALID_DOMAIN = {"finance", "auto", "ip", "cross_domain"}
 
 QID_PREFIX_RE = re.compile(
     r"^(FIN|AUTO|CD|EX)-?L?(\d|CD-?L\d)?[-_]?\d{0,4}$",
@@ -90,6 +90,8 @@ def _check_row(path: Path, lineno: int, row: dict,
         expected_dom = "cross_domain"
     elif "auto" in fname:
         expected_dom = "auto"
+    elif "_ip_" in fname or fname.startswith("gold_qa_ip"):
+        expected_dom = "ip"
     elif fname.startswith("gold_qa_v") or "fin" in fname or "example" in fname:
         expected_dom = "finance"
     if dom and dom not in VALID_DOMAIN:
@@ -152,6 +154,13 @@ def main() -> int:
         else:
             paths.append(Path(p_arg))
     paths = [p for p in paths if p.is_file()]
+    # `_` prefix 파일 (예: `_stage2_*.jsonl`) 은 사용자 작업물·스테이징 메모로
+    # 정식 schema 검증 대상 외. CLAUDE.md 정책 (`_*tmp*` 등 사용자 개인 파일) 과 정합.
+    skipped = [p for p in paths if p.name.startswith("_")]
+    paths   = [p for p in paths if not p.name.startswith("_")]
+    if skipped:
+        print(f"[lint] skip (사용자 작업물 — `_` prefix): "
+              + ", ".join(p.name for p in skipped), file=sys.stderr)
     if not paths:
         print("[lint] 검사할 파일 없음", file=sys.stderr)
         return 2

@@ -15,6 +15,10 @@ class SqlVecAdapter(AgentAdapter):
     name = "sql_vec"
     version = "0.1"
 
+    def __init__(self, *, rerank: bool = True, llm_tier: str = "fast") -> None:
+        """SQL+Vec 어댑터 — 매트릭스 라벨 + vector 검색 rerank 토글 전파."""
+        super().__init__(rerank=rerank, llm_tier=llm_tier)
+
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — sql_vec 는 finance 전용.
         from autonexusgraph.tools.financials import lookup_company, get_revenue, get_operating_income
         from autonexusgraph.tools.retrieve import search_documents
@@ -58,7 +62,8 @@ class SqlVecAdapter(AgentAdapter):
         # Vector
         try:
             hits = search_documents(question, top_k=5,
-                                     corp_code=targets[0] if len(targets) == 1 else None)
+                                     corp_code=targets[0] if len(targets) == 1 else None,
+                                     rerank=self.rerank)
         except Exception:
             hits = []
 

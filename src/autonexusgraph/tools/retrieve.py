@@ -90,12 +90,21 @@ def search_documents(
     source: str | list[str] | None = None,
     section_contains: str | None = None,
     report_type: str | None = None,
+    rerank: bool = True,
+    rerank_candidate_multiplier: int = 3,
 ) -> list[dict]:
-    """벡터 유사도 검색 + 메타 필터.
+    """벡터 유사도 검색 + 메타 필터 + (옵션) BGE-Reranker.
+
+    Args:
+        rerank: True (기본) 시 vector top_k * candidate_multiplier 후보를 가져와
+            BGE-Reranker 로 재정렬 후 top_k 반환. False 시 vector 유사도만.
+            PRD §10 DoD #17 (d) ablation 셀에서 토글.
+        rerank_candidate_multiplier: rerank 활성 시 candidate pool = top_k × 본 값.
+            서버 실패 시 vector 유사도 fallback (fail-soft).
 
     리턴 row 키:
       id, corp_code, rcept_no, source, section, report_type, fiscal_year,
-      chunk_idx, text, score(cosine sim 0~1), token_count
+      chunk_idx, text, score(rerank_score 또는 cosine sim), token_count, reranked(bool)
     """
     if not query or not query.strip():
         return []
@@ -114,7 +123,9 @@ def search_documents(
         require_embedding=True,
     )
     params["q"] = qvec
-    params["k"] = _cap(top_k)
+    # rerank 활성 시 candidate pool 확장 — top_k 의 N 배 가져와 reranker 가 재정렬.
+    effective_k = _cap(top_k * rerank_candidate_multiplier if rerank else top_k)
+    params["k"] = effective_k
 
     sql = f"""
     SELECT id, corp_code, rcept_no, source, section, report_type,
@@ -132,7 +143,34 @@ def search_documents(
         with conn.cursor() as cur:
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    # rerank 비활성 — vector 유사도 결과 그대로 top_k 잘라 반환.
+    if not rerank or not hits:
+        for h in hits[:_cap(top_k)]:
+            h["reranked"] = False
+        return hits[:_cap(top_k)]
+
+    # rerank 활성 — BGE-Reranker 호출. 실패 시 vector fallback (fail-soft).
+    texts = [(h.get("text") or "") for h in hits]
+    try:
+        ranked = client.rerank(query, texts, top_k=_cap(top_k))
+    except EmbeddingError:
+        # reranker 서버 다운 / 미가용 — vector 유사도 fallback.
+        for h in hits[:_cap(top_k)]:
+            h["reranked"] = False
+        return hits[:_cap(top_k)]
+    # ranked: list[RerankResult(index, score)] — index 는 원 candidate 위치.
+    out: list[dict] = []
+    for r in ranked:
+        idx = getattr(r, "index", None)
+        if idx is None or idx >= len(hits):
+            continue
+        row = dict(hits[idx])
+        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
+        row["reranked"] = True
+        out.append(row)
+    return out
 
 
 def search_by_metadata(

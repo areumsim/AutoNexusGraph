@@ -11,6 +11,8 @@
 #   confidence     : 적재 결정 신뢰도 정책
 
 version: 1
+schema_version: "v2.2"   # PRD §10 DoD #17 (c) — 온톨로지 레벨 schema_version SoT.
+                         # 엣지 적재 helper 가 본 값을 자동 부여 (엣지마다 반복 안 함).
 last_updated: 2026-05-26
 
 relations:
@@ -186,7 +188,7 @@ relations:
 
 # ── 명명 컨벤션 ─────────────────────────────────────────────────
 naming_conventions:
-  - entity_type:    PascalCase (Company, Person)
-  - relation_type:  SCREAMING_SNAKE_CASE (SUBSIDIARY_OF, EXECUTIVE_OF)
-  - property:       snake_case (ownership_pct, snapshot_date)
-  - direction:      "FROM → TO" 항상 일관 (예: child SUBSIDIARY_OF parent)
+  entity_type:    "PascalCase (Company, Person)"
+  relation_type:  "SCREAMING_SNAKE_CASE (SUBSIDIARY_OF, EXECUTIVE_OF)"
+  property:       "snake_case (ownership_pct, snapshot_date)"
+  direction:      "FROM -> TO (예: child SUBSIDIARY_OF parent)"

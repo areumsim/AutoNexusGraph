@@ -1,8 +1,11 @@
-.PHONY: help install fmt lint test test-int up down logs health clean \
+.PHONY: help install fmt lint test test-int smoke-e2e up down logs health clean \
         ingest-corp ingest-krx ingest-ecos ingest-targets ingest-bulk \
         ingest-structural ingest-wikidata ingest-wikipedia \
         ingest-news ingest-fss ingest-ftc ingest-kosis \
-        ingest-sec ingest-gleif ingest-kipris ingest-law ingest-kcgs \
+        ingest-sec ingest-gleif ingest-gleif-enrich ingest-gleif-enrich-dry \
+        ingest-openalex ingest-openalex-dry load-openalex \
+        ingest-kipris load-cpc load-cpc-dry ingest-uspto-odp \
+        ingest-law ingest-kcgs \
         serve-embeddings embed-chunks serve-api serve-ui \
         eval-smoke eval-full p3-extract-dry p3-extract p4-load \
         ingest-step1 ingest-step2 ingest-step3 ingest-step4 \
@@ -26,8 +29,8 @@
         load-auto-investigations load-auto-oem-sec load-auto-mfrcomm \
         derive-auto-contains-system load-wikidata-part-supplies \
         extract-auto-p3 extract-auto-p3-cost validate-auto-p4 extract-validate-auto \
-        audit-bom-coverage audit-edge-meta audit-dod \
-        validate-gold-qa eval-cross \
+        audit-bom-coverage audit-edge-meta audit-trace audit-ontology audit-eval-matrix audit-mcp audit-ipgraph audit-dod \
+        validate-gold-qa eval-cross eval-ip \
         ingest-datagokr-recalls ingest-datagokr-inspections \
         ingest-car-go-kr ingest-katri ingest-kncap \
         load-manufactured-at load-datagokr-recalls load-datagokr-inspections \
@@ -37,7 +40,10 @@
         migrate-schema-pg migrate-auto-production migrate-auto-kama \
         migrate-auto-oem-news \
         load-kama-macro load-kama-macro-dry \
+        load-usgs-minerals load-usgs-minerals-dry \
         load-dart-production audit-data-channels \
+        load-factoryon load-factoryon-dry load-kosis load-kosis-dry \
+        ingest-wikidata-cell-chem \
         ingest-oem-ir-hyundai ingest-oem-ir-mobis ingest-oem-ir-policies \
         load-oem-ir-news load-oem-ir-news-dry
 
@@ -55,6 +61,7 @@ help:
 	@echo "  lint            ruff check + mypy"
 	@echo "  test            pytest (integration 제외)"
 	@echo "  test-int        pytest -m integration (실제 DB/LLM 필요)"
+	@echo "  smoke-e2e       DB·LLM 없이 돌아가는 모든 mock 정합성 검증 (pre-push 게이트)"
 	@echo ""
 	@echo "  up              docker compose up -d (Neo4j + PG + Qdrant)"
 	@echo "  down            docker compose down"
@@ -100,11 +107,17 @@ help:
 	@echo "  extract-validate-auto             P3 → P4 한 번에"
 	@echo "  eval-auto                         자동차 QA 평가셋 실행"
 	@echo "  eval-cross                        Cross-Domain QA (PRD §8.1 CD-L1~L4)"
+	@echo "  eval-ip                           IPGraph QA 평가셋 (gold_qa_ip_v0.jsonl × hybrid)"
 	@echo ""
 	@echo "── DoD audit (PRD §10) ──"
 	@echo "  audit-bom-coverage                Level 0~5 노드 + L4 coverage 측정"
 	@echo "  audit-edge-meta                   PRD §6.7 의무 메타 invariant (strict)"
-	@echo "  audit-dod                         14 항목 트래픽라이트 리포트"
+	@echo "  audit-trace                       PRD §10 DoD #17 (b) Langfuse 실측 (turn별 token/cost/replan)"
+	@echo "  audit-ontology                    PRD §10 DoD #17 (c) 온톨로지 pydantic strict 검증"
+	@echo "  audit-eval-matrix                 PRD §10 DoD #17 (d) 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation)"
+	@echo "  audit-mcp                         PRD §10 DoD #17 (a) MCP 래퍼 wire-up (mcp SDK 미설치 시 SKIPPED)"
+	@echo "  audit-ipgraph                     PRD §10 DoD #15/#16 IPGraph (도메인3) plug-in wire-up"
+	@echo "  audit-dod                         17 항목 트래픽라이트 리포트 (v2.2 — IPGraph + 상용신호 4종 포함)"
 	@echo "  validate-gold-qa                  eval/qa_gold/*.jsonl 스키마/엔티티 lint"
 	@echo ""
 	@echo "── 외부 데이터 (graceful skip 패턴 — 키 없으면 스킵) ──"
@@ -151,6 +164,20 @@ test:
 
 test-int:
 	pytest -m integration
+
+# DB·LLM 없이 돌아가는 모든 정합성 smoke — CI 미설정 환경의 1-shot pre-push 게이트.
+# pytest 전체 + 온톨로지 (cypher cross-check 포함) + 평가 매트릭스 simulation +
+# gold QA lint + MCP/IPGraph/Trace simulation. 외부 DB·LLM 키 불필요.
+smoke-e2e:
+	@echo "[smoke-e2e] mock-mode 정합성 일괄 검증 시작"
+	$(MAKE) test
+	$(MAKE) audit-ontology
+	$(MAKE) audit-eval-matrix
+	$(MAKE) audit-mcp
+	$(MAKE) audit-ipgraph
+	$(MAKE) audit-trace
+	$(PYTHON) scripts/audit/validate_gold_qa.py --no-db eval/qa_gold/*.jsonl
+	@echo "[smoke-e2e] ✅ 모든 mock-mode 검증 통과"
 
 up:
 	$(DOCKER_COMPOSE) up -d
@@ -246,7 +273,24 @@ ingest-ftc:           ; $(PYTHON) scripts/ingest/download_ftc_groups.py --year 2
 ingest-kosis:         ; $(PYTHON) scripts/ingest/download_kosis.py
 ingest-sec:           ; $(PYTHON) scripts/ingest/download_sec_edgar.py
 ingest-gleif:         ; $(PYTHON) scripts/ingest/download_gleif.py
-ingest-kipris:        ; $(PYTHON) scripts/ingest/download_kipris.py
+
+# GLEIF KR API 보강 (registeredAs → business_no/jurir_no → corp_code 매칭).
+# 무인증, public CC BY 4.0. sec.lei.corp_code + master.entity_map(id_type='lei')
+# + bridge.corp_entity.lei 멱등 UPSERT. strong-match 승급률 측정.
+ingest-gleif-enrich:     ; $(PYTHON) -m autonexusgraph.ingestion.gleif_enrich
+ingest-gleif-enrich-dry: ; $(PYTHON) -m autonexusgraph.ingestion.gleif_enrich --dry-run --max-pages 1
+
+# OpenAlex (특허×논문×재무 3중 cross) — ip.institution / ip.works + Neo4j Work/Institution/AUTHORED_AT.
+# OPENALEX_API_KEY 필요 (없으면 mailto polite pool). 무료 키, 하루 10만 크레딧.
+ingest-openalex:     ; $(PYTHON) -m ipgraph.ingestion.openalex --works-per-inst 20 --from-year 2020
+ingest-openalex-dry: ; $(PYTHON) -m ipgraph.ingestion.openalex --dry-run --qids Q20718,Q59243,Q497534
+load-openalex:       ; $(PYTHON) -m ipgraph.loaders.load_openalex
+ingest-kipris:        ; $(PYTHON) -m ipgraph.ingestion.kipris
+# CPC scheme bulk (USPTO+EPO 공동, 무인증) → PG ip.cpc_scheme + Neo4j :CPCCode + :SUBCLASS_OF.
+load-cpc:             ; $(PYTHON) -m ipgraph.loaders.load_cpc
+load-cpc-dry:         ; $(PYTHON) -m ipgraph.loaders.load_cpc --skip-neo4j --sections A
+# USPTO Open Data Portal bulk (PatentsView 후속) — raw/ip/uspto_odp/ 에 jsonl 있으면 적재.
+ingest-uspto-odp:     ; $(PYTHON) -m ipgraph.ingestion.uspto_odp
 ingest-law:           ; $(PYTHON) scripts/ingest/download_law.py
 ingest-kcgs:          ; $(PYTHON) scripts/ingest/download_kcgs.py --with-body
 
@@ -498,6 +542,14 @@ eval-cross:
 	    --adapters hybrid \
 	    --run-id "cross_$$(date +%Y%m%d_%H%M%S)"
 
+# IPGraph QA — gold_qa_ip_v0.jsonl × hybrid. PRD §10 DoD #16.
+eval-ip:
+	$(PYTHON) -m eval.runners.run_qa_eval \
+	    --gold eval/qa_gold/gold_qa_ip_v0.jsonl \
+	    --adapters hybrid \
+	    --run-id "ip_$$(date +%Y%m%d_%H%M%S)" \
+	    --max-cost-usd 1.0
+
 # ─── DoD audit (PRD §10) ─────────────────────────────────────────
 audit-bom-coverage:
 	$(PYTHON) scripts/audit/bom_coverage.py
@@ -505,10 +557,58 @@ audit-bom-coverage:
 audit-edge-meta:
 	$(PYTHON) scripts/audit/edge_meta_invariants.py --strict
 
+audit-trace:
+	# PRD §10 DoD #17 (b) — Langfuse 실측 (turn별 token/cost/replan).
+	# 기본 = simulation (LLM 비용 0). --full 옵션으로 실제 run_agent 호출 가능.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/trace_smoke.py
+
+audit-ontology:
+	# PRD §10 DoD #17 (c) — 온톨로지 pydantic strict 검증.
+	# ontology/auto + ontology/ (finance) 의 entities/relations.yaml 모두 검증.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/ontology_validate.py
+
+audit-eval-matrix:
+	# PRD §10 DoD #17 (d) — 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation).
+	# 기본 = simulation (LLM 비용 0). --full 옵션으로 실제 LLM 호출.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py
+
+audit-mcp:
+	# PRD §10 DoD #17 (a) — MCP 래퍼 wire-up.
+	# mcp SDK 미설치 시 SKIPPED + tool discovery 52건만 검증.
+	# 설치 시 build_mcp_server boot + tool list 검증.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/mcp_smoke.py
+
+audit-ipgraph:
+	# PRD §10 DoD #15/#16 — IPGraph (도메인3) 의 plug-in wire-up.
+	# handler/router/ontology/cypher_templates(25)/gold(ip=30+cross=8) 검증.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/ipgraph_smoke.py
+
+# ── 제조 데이터 끝까지 (M-11~M-14) — 정형, LLM 0% ─────────────
+load-factoryon:
+	# 팩토리온 raw json → auto.factoryon_registry PG (data.go.kr 15087611).
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_factoryon
+
+load-factoryon-dry:
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_factoryon --dry-run
+
+load-kosis:
+	# KOSIS raw json → macro.kosis_series PG.
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_kosis_industry
+
+load-kosis-dry:
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_kosis_industry --dry-run
+
+ingest-wikidata-cell-chem:
+	# Wikidata 배터리 셀 chem (cathode) 메타 수집 — CC0, 무인증.
+	PYTHONPATH=src:. $(PYTHON) -m autograph.ingestion.wikidata_cell_chem
+
 audit-dod:
-	# baseline 은 strategy/plugin 리팩터 commit 이후 (PRD §10.12 의도가 AST 로
-	# 영구 강제된 시점). 운영자가 별도 commit 으로 baseline 이동 원하면 env override.
-	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-4049caf} $(PYTHON) scripts/audit/dod_audit.py
+	# CORE_DIFF_BASELINE 이력 (PRD §10.12 / §11.1):
+	#   - 4049caf  : 2026-05 Phase B 안정화 (도메인1+2 finance+auto 완료) — 본 PR 이전 anchor.
+	#   - bab9411  : 2026-06-01 도메인3 (ipgraph) 통합 직전 reset (current default).
+	# 도메인 추가/대형 리팩터 마다 reset → 누적 ratio 가 5% 위협 시 의도된 변경
+	# 인지 식별. 운영자가 별도 commit 으로 baseline 이동 원하면 env override.
+	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-bab9411} $(PYTHON) scripts/audit/dod_audit.py
 
 validate-gold-qa:
 	$(PYTHON) scripts/audit/validate_gold_qa.py eval/qa_gold/*.jsonl
@@ -566,6 +666,14 @@ load-kama-macro:
 
 load-kama-macro-dry:
 	$(PYTHON) -m autograph.loaders.load_kama_macro --dry-run
+
+# USGS Mineral Commodity Summaries (MCS) — L6 핵심광물 (Li/Ni/Co/Mn/Graphite).
+# 무인증, PDF 다운 → text 파싱 → auto.master_minerals + Neo4j :Mineral/:Material/:DERIVED_FROM.
+load-usgs-minerals:
+	$(PYTHON) -m autograph.loaders.load_usgs_minerals --year 2025
+
+load-usgs-minerals-dry:
+	$(PYTHON) -m autograph.loaders.load_usgs_minerals --year 2025 --dry-run
 
 # DART 사업보고서 "III. 생산 및 설비" → auto.plant_capacity + plant_production
 # + (선택) Neo4j (:Manufacturer)-[:MANUFACTURED_AT]->(:Plant) 동기화.

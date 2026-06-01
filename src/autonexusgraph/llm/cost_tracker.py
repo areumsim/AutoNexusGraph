@@ -1,26 +1,25 @@
-"""런타임 LLM 비용 트래커 + circuit breaker.
+"""런타임 LLM 비용 트래커 + circuit breaker — ContextVar 격리.
 
-singleton — 프로세스 1회 instance. thread-safe.
+설계 (v2 — 근본 재정비):
+- ContextVar 기반 격리. FastAPI threadpool / asyncio task 단위로 자동 분리되어
+  multi-turn 동시 실행 시 turn boundary 가 깨지지 않는다.
+- 기존 process singleton (_singleton + _singleton_lock) 제거.
+- get_tracker / get_session_tracker 이원화 → get_session_tracker 단일 진입점.
+- ops.llm_usage 의 ``meta JSONB`` 컬럼에 turn 식별자 (thread_id, turn_id, n_replans,
+  domain) 적재 — 별도 ALTER 불필요.
 
-설계 원칙 (사용자 명시 요구):
-- 모든 LLM adapter 의 chat()/chat_stream()/chat_json() 호출 후 tracker.record() 호출.
-- 누적 비용이 hard_limit 도달 시 다음 호출에서 BudgetExceeded raise → batch abort.
-- 매 N 호출마다 누적 비용 로그.
-- 시작 시 ops.llm_usage 에 run row 생성, 종료 시 status / 총합 update.
+수명 주기 (turn 단위):
+    from autonexusgraph.agents.tracing import start_turn_context
 
-사용 패턴:
-    from autonexusgraph.llm.cost_tracker import get_tracker, BudgetExceeded
+    with start_turn_context(thread_id="t1", state={"domain": "auto"}) as turn:
+        resp = client.chat(...)         # budget_aware wrapper 가 tracker 자동 사용
+        turn.state["n_replans"] = 2     # final state 갱신
+    # __exit__ 시 tracker.finalize() + meta JSONB 영구 적재.
 
-    tracker = get_tracker(caller='p3_extract', model='gpt-4o-mini')
-    try:
-        for item in items:
-            tracker.guard()                  # 한도 초과면 BudgetExceeded
-            resp = llm.chat(...)
-            tracker.record(resp.usage_input, resp.usage_output, model='gpt-4o-mini')
-    except BudgetExceeded:
-        ...                                  # state 저장 후 종료
-    finally:
-        tracker.finalize(status='ok' or 'aborted_budget')
+배치 (extractor) 단위:
+    with CostTracker(caller='p3_extract', model='gpt-4o-mini') as tracker:
+        tracker.guard()
+        ...
 """
 
 from __future__ import annotations
@@ -29,7 +28,8 @@ import logging
 import os
 import threading
 import uuid
-from dataclasses import dataclass
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from typing import Any
 
 from .cost import cost_of_call, get_hard_limit_usd, get_report_every
@@ -54,18 +54,35 @@ class TrackerState:
     cost_usd: float = 0.0
     aborted: bool = False
     finalized: bool = False
+    # turn 식별자 — ops.llm_usage.meta JSONB 에 적재
+    thread_id: str | None = None
+    turn_id: str | None = None
+    domain: str | None = None
+    n_replans: int = 0
+    extra_meta: dict = field(default_factory=dict)
 
 
 class CostTracker:
-    """프로세스 단위 LLM 비용 누적 + 한도 가드."""
+    """프로세스 단위 LLM 비용 누적 + 한도 가드.
 
-    def __init__(self, caller: str, model: str, hard_limit: float | None = None) -> None:
+    ContextVar 로 격리되어 동시 실행 turn 끼리 공유되지 않는다.
+    """
+
+    def __init__(self, caller: str, model: str,
+                 hard_limit: float | None = None,
+                 *,
+                 thread_id: str | None = None,
+                 turn_id: str | None = None,
+                 domain: str | None = None) -> None:
         limit = hard_limit if hard_limit is not None else get_hard_limit_usd()
         self.state = TrackerState(
             run_id=str(uuid.uuid4()),
             caller=caller,
             model=model,
             hard_limit_usd=limit,
+            thread_id=thread_id,
+            turn_id=turn_id or str(uuid.uuid4()),
+            domain=domain,
         )
         self._lock = threading.Lock()
         self._report_every = get_report_every()
@@ -114,35 +131,64 @@ class CostTracker:
                 )
 
     # ── 종료 ──────────────────────────────────────────────────
-    def finalize(self, status: str = "ok") -> None:
-        """run 종료 — ops.llm_usage 에 ended_at/총합/status update."""
+    def finalize(self, status: str = "ok", *,
+                 n_replans: int | None = None,
+                 extra_meta: dict | None = None) -> None:
+        """run 종료 — ops.llm_usage 의 ended_at/총합/status + meta JSONB 갱신.
+
+        n_replans: turn 단위 lifecycle 에서 final state.n_replans 전달.
+        extra_meta: 추가 메타 (예: ``{"question_kind": "factual"}``) — meta JSONB 머지.
+        """
         with self._lock:
             if self.state.finalized:
                 return
             if self.state.aborted and status == "ok":
                 status = "aborted_budget"
+            if n_replans is not None:
+                self.state.n_replans = int(n_replans)
+            if extra_meta:
+                self.state.extra_meta.update(extra_meta)
             self.state.finalized = True
         self._persist_final(status)
         log.info(f"[COST] FINAL caller={self.state.caller} status={status} "
-                 f"n_calls={self.state.n_calls} cost=${self.state.cost_usd:.4f}")
+                 f"n_calls={self.state.n_calls} cost=${self.state.cost_usd:.4f} "
+                 f"n_replans={self.state.n_replans}")
+
+    # ── meta JSONB 직렬화 (PG 적재 공통) ─────────────────────────
+    def _build_meta(self) -> dict:
+        """ops.llm_usage.meta 에 적재할 dict — turn 식별자 + extra_meta 통합."""
+        meta: dict = {}
+        if self.state.thread_id is not None:
+            meta["thread_id"] = self.state.thread_id
+        if self.state.turn_id is not None:
+            meta["turn_id"] = self.state.turn_id
+        if self.state.domain is not None:
+            meta["domain"] = self.state.domain
+        meta["n_replans"] = self.state.n_replans
+        if self.state.extra_meta:
+            meta.update(self.state.extra_meta)
+        return meta
 
     # ── DB 적재 (모두 best-effort — DB 다운 시 추적은 메모리에만) ─────
     def _persist_initial(self) -> None:
         try:
+            import json
             from ..db.postgres import get_pool
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO ops.llm_usage (run_id, caller, model, status)
-                    VALUES (%s, %s, %s, 'running')
+                    INSERT INTO ops.llm_usage (run_id, caller, model, status, meta)
+                    VALUES (%s, %s, %s, 'running', %s::jsonb)
                     """,
-                    (self.state.run_id, self.state.caller, self.state.model),
+                    (self.state.run_id, self.state.caller, self.state.model,
+                     json.dumps(self._build_meta())),
                 )
         except Exception as e:
             log.warning(f"[COST] llm_usage init persist failed: {e}")
 
     def _persist_final(self, status: str) -> None:
         try:
+            import json
             from ..db.postgres import get_pool
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
@@ -153,12 +199,14 @@ class CostTracker:
                            input_tokens  = %s,
                            output_tokens = %s,
                            cost_usd      = %s,
-                           status        = %s
+                           status        = %s,
+                           meta          = meta || %s::jsonb
                      WHERE run_id = %s
                     """,
                     (self.state.n_calls, self.state.input_tokens,
                      self.state.output_tokens, self.state.cost_usd,
-                     status, self.state.run_id),
+                     status, json.dumps(self._build_meta()),
+                     self.state.run_id),
                 )
         except Exception as e:
             log.warning(f"[COST] llm_usage final persist failed: {e}")
@@ -195,62 +243,78 @@ class CostTracker:
             self.finalize("ok")
 
 
-# ─── 프로세스 싱글톤 ────────────────────────────────────────────
-_singleton: CostTracker | None = None
-_singleton_lock = threading.Lock()
-
-
-def get_tracker(caller: str, model: str,
-                 hard_limit: float | None = None) -> CostTracker:
-    """프로세스 안에서 1개 tracker 만. 새 run 시작 시 reset_tracker() 호출 후 get."""
-    global _singleton
-    with _singleton_lock:
-        if _singleton is None or _singleton.state.finalized:
-            _singleton = CostTracker(caller=caller, model=model, hard_limit=hard_limit)
-        return _singleton
-
-
-def reset_tracker() -> None:
-    """이전 tracker finalize 후 새 run 시작 준비."""
-    global _singleton
-    with _singleton_lock:
-        if _singleton and not _singleton.state.finalized:
-            _singleton.finalize("ok")
-        _singleton = None
+# ─── ContextVar 격리 ─────────────────────────────────────────────
+# FastAPI threadpool / asyncio task 단위로 자동 분리.
+# 동시 turn A/B 가 서로의 tracker 를 덮어쓰지 않는다.
+_tracker_ctx: ContextVar["CostTracker | None"] = ContextVar(
+    "autonexus_cost_tracker", default=None,
+)
 
 
 def get_session_tracker(caller: str | None = None,
-                        model: str | None = None) -> CostTracker:
-    """프로세스 단위 글로벌 세션 트래커 — settings 의 한도를 자동 적용.
+                        model: str | None = None,
+                        *,
+                        thread_id: str | None = None,
+                        turn_id: str | None = None,
+                        domain: str | None = None,
+                        hard_limit: float | None = None) -> CostTracker:
+    """현재 context 의 session tracker 반환. 없으면 새로 생성 후 ctx set.
 
-    모든 LLM 호출이 본 트래커를 공유 → 누적 비용이 ``llm_session_hard_limit_usd``
-    도달 시 다음 호출에서 ``BudgetExceeded`` raise.
-
-    Args:
-        caller: 디버그용 — 첫 호출자만 트래커 ``caller`` 필드에 저장. 이후 호출은
-                기존 트래커 재사용.
-        model: 첫 호출 시 디폴트 모델명. 실제 호출당 모델은 record() 에서 별도 전달.
-
-    Returns: 공유 CostTracker.
+    ``start_turn_context`` 가 이미 새 tracker 를 ctx 에 박아둔 경우 그것을 그대로
+    반환. 일반 batch 코드는 ``with CostTracker(...) as tracker`` 직접 사용 가능.
     """
-    # 지연 import 로 순환 회피 (cost_tracker → config → cost_tracker 가능성).
-    from ..config import get_settings
-    s = get_settings()
-    # env override (LLM_COST_HARD_LIMIT_USD) 가 있으면 그것 — get_hard_limit_usd
-    # 가 이미 처리. 없으면 settings 값.
-    env_limit = os.environ.get("LLM_COST_HARD_LIMIT_USD")
-    hard_limit = (
-        get_hard_limit_usd(s.llm_session_hard_limit_usd) if env_limit is None
-        else get_hard_limit_usd(s.llm_session_hard_limit_usd)
-    )
-    return get_tracker(
+    tracker = _tracker_ctx.get()
+    if tracker is not None and not tracker.state.finalized:
+        return tracker
+
+    # ctx 에 없거나 이전 tracker 가 이미 finalized 인 경우 — 새로 생성.
+    if hard_limit is None:
+        try:
+            from ..config import get_settings
+            hard_limit = get_hard_limit_usd(get_settings().llm_session_hard_limit_usd)
+        except Exception:   # noqa: BLE001
+            hard_limit = get_hard_limit_usd()
+
+    tracker = CostTracker(
         caller=caller or "session",
         model=model or "mixed",
         hard_limit=hard_limit,
+        thread_id=thread_id,
+        turn_id=turn_id,
+        domain=domain,
     )
+    _tracker_ctx.set(tracker)
+    return tracker
+
+
+def reset_tracker() -> None:
+    """현재 context 의 tracker 를 finalize 한 뒤 ctx 비움. 다음 호출은 새 tracker."""
+    tracker = _tracker_ctx.get()
+    if tracker is not None and not tracker.state.finalized:
+        tracker.finalize("ok")
+    _tracker_ctx.set(None)
+
+
+def set_current_tracker(tracker: "CostTracker | None") -> None:
+    """ctx 변수에 tracker 박기 — start_turn_context 가 사용."""
+    _tracker_ctx.set(tracker)
+
+
+def current_tracker() -> "CostTracker | None":
+    """현재 context 의 tracker (없으면 None) — 진단·테스트용."""
+    return _tracker_ctx.get()
+
+
+# ── 하위 호환 alias — 기존 호출자 (extract_business_report_relations.py 등) ──
+def get_tracker(caller: str, model: str,
+                hard_limit: float | None = None) -> CostTracker:
+    """[deprecated] ContextVar 격리 도입 전 호출자 호환. 새 코드는 get_session_tracker
+    또는 ``with CostTracker(...)`` 사용."""
+    return get_session_tracker(caller=caller, model=model, hard_limit=hard_limit)
 
 
 __all__ = [
     "CostTracker", "BudgetExceeded",
     "get_tracker", "reset_tracker", "get_session_tracker",
+    "set_current_tracker", "current_tracker",
 ]

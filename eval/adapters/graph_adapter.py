@@ -14,6 +14,14 @@ class GraphAdapter(AgentAdapter):
     name = "graph"
     version = "0.1"
 
+    def __init__(self, *, rerank: bool = True, llm_tier: str = "fast") -> None:
+        """그래프-only 어댑터 — rerank flag 는 매트릭스 라벨용 (실 retrieve 무관).
+
+        Graph-only 는 vector 검색 사용 안 함 → rerank 가 결과에 영향 0.
+        매트릭스 셀 식별자 일관성을 위해 시그니처만 base 와 맞춤.
+        """
+        super().__init__(rerank=rerank, llm_tier=llm_tier)
+
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — graph-only 는 finance 그래프만 본다.
         from autonexusgraph.agents.policy import classify_question
         from autonexusgraph.tools.graph import lookup_company, list_subsidiaries, get_executives, get_major_shareholders

@@ -14,7 +14,9 @@ class VectorAdapter(AgentAdapter):
     name = "vector"
     version = "0.1"
 
-    def __init__(self, top_k: int = 8) -> None:
+    def __init__(self, top_k: int = 8, *,
+                 rerank: bool = True, llm_tier: str = "fast") -> None:
+        super().__init__(rerank=rerank, llm_tier=llm_tier)
         self.top_k = top_k
 
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — vector-only 는 도메인 무관.
@@ -25,7 +27,7 @@ class VectorAdapter(AgentAdapter):
 
         t0 = time.monotonic()
         try:
-            hits = search_documents(question, top_k=self.top_k)
+            hits = search_documents(question, top_k=self.top_k, rerank=self.rerank)
         except Exception as e:
             return AgentResponse(
                 refused=True, refusal_reason=f"retrieve_failed:{e}",

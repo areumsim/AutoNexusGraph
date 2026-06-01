@@ -65,8 +65,14 @@ def test_core_has_zero_autograph_imports():
 # ── 2) handler 미등록 시 finance 만 동작 ──────────────────────────
 def test_auto_detect_domain_without_routers_returns_finance(monkeypatch):
     # 라우터를 임시로 비움 — autograph 미설치 환경 모사.
+    # _DISCOVERY_DONE 도 True 로 강제: 그렇지 않으면 auto_detect_domain 이 discover_plugins
+    # 를 트리거하여 register_router(route_domain) 가 monkeypatch 의 새 [] 에 append 됨.
+    # teardown 시 원본 (빈) list 로 복원되어 후속 테스트가 baseline 을 잃는다.
     monkeypatch.setattr(
         "autonexusgraph.agents._domain_handler._ROUTERS", [],
+    )
+    monkeypatch.setattr(
+        "autonexusgraph.agents._domain_handler._DISCOVERY_DONE", True,
     )
     assert auto_detect_domain("아무 질문") == "finance"
 
