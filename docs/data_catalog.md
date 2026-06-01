@@ -166,7 +166,33 @@ PRD §3.5 출처 신뢰도 등급. 본 등급은 코드 SSOT 인 `src/autograph/
 
 ---
 
-## 채널 9: KOTSA 수리검사 (15155857)
+## 채널 9: 제조사 IR / 뉴스룸 (Hyundai · Mobis · ~~Kia~~) ⭐ 신규
+
+| 항목 | 내용 |
+|---|---|
+| 출처 | Hyundai www.hyundai.com/worldwide/{ko,en}/company/ir/, Mobis www.mobis.com + www.mobis.co.kr |
+| 라이선스 | `public_partial` (Hyundai/Mobis — 본문 저장 가능, 출처 표기 필수) / `metadata_only` (Kia) |
+| 등급 | **B** (0.80) — 공식 IR |
+| **Kia 한국 정책** | ⚠️ **비활성** — robots.txt `Disallow: /kr/discover-kia/news/` 명시 (2026-06-01 직접 확인) |
+| 라이선스 SSOT | `src/autonexusgraph/ingestion/_license.py::OEM_NEWSROOM_POLICY` — robots.txt + ToS 결정 매트릭스 |
+| Ingestion | `src/autograph/ingestion/oem_ir_newsroom.py` — sitemap-first crawler |
+| 보호 메커니즘 | (1) `is_url_allowed()` 정책 게이트 (host + path prefix whitelist + 명시 Disallow), (2) `urllib.robotparser` 런타임 robots.txt 검증 (User-Agent 별), (3) RateLimiter 2 req/sec, (4) User-Agent `AutoGraph-Research/0.1 (research, public-info)`, (5) HTTP 429 → Retry-After 인식 |
+| Raw | `data/raw/auto/oem_ir/<oem>/_meta.jsonl` (메타) + `<YYYY-MM-DD>_<slug>.html` (본문) |
+| Loader | `src/autograph/loaders/load_oem_ir_news.py` |
+| 운영 | `make ingest-oem-ir-hyundai` / `make ingest-oem-ir-mobis` / `make ingest-oem-ir-policies` (정책 dump) / `make load-oem-ir-news` |
+| Schema | `infra/postgres/init/17_autograph_oem_news.sql` |
+| PG 적재 | `auto.events_oem_news` (UNIQUE oem+url, section 분류, body_text, body_html_path, license_tier 동봉) |
+| Section 분류 | `ir/public_disclosure` / `ir/quarterly_earnings` / `ir/sales_results` / `ir/events` / `news/press` 등 — URL 패턴 기반 자동 라벨링 |
+| 활용 가치 | (1) 공장 위치 / CAPA / 모델 배정 발표 추출 → `MANUFACTURED_AT` 보강, (2) IR 분기실적·판매실적 → DART 매출과 시계열 정합, (3) 신규 모델 출시 발표 → variant 마스터 보강 |
+| LLM 추출 경로 (후속) | P3 LLM → plant 명 / 모델명 / 수치 후보 → `auto.staging_relations` → P4 cross-validate (DART 본문 매칭) → Neo4j MANUFACTURED_AT promote |
+| 한계 | (1) Kia 한국 비활성 — `press.kia.com` 등 글로벌 newsroom 별도 검토 필요. (2) 본 v0 는 sitemap-base — RSS feed 발견 시 그쪽 우선. (3) JS 렌더링 페이지 (SPA) 는 본문 비어있을 수 있음 (lxml + headless 후속) |
+| 검증 | `make ingest-oem-ir-policies` 로 적용 정책 dump, `tests/test_oem_ir_newsroom.py` 36 케이스 (라이선스 게이트 + sitemap + 텍스트 추출) |
+
+> **운영 약관 주의**: 본 모듈은 robots.txt 변경에 대응하지 못한다. 약관 갱신 시 `OEM_NEWSROOM_POLICY` dict 의 `notes` 필드 측정일 갱신 + `disallowed_path_prefixes` 동기화 필수. PR 시 robots.txt 갱신 확인 `curl https://<host>/robots.txt` 결과 첨부 권장.
+
+---
+
+## 채널 10: KOTSA 수리검사 (15155857)
 
 | 항목 | 내용 |
 |---|---|

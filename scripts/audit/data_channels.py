@@ -197,6 +197,24 @@ def collect() -> list[ChannelStatus]:
         notes="키 불필요 (파일 다운로드)",
     ))
 
+    # OEM IR / 뉴스룸 — Hyundai/Mobis 활성, Kia 비활성
+    oem_ir_root = raw_root / "auto" / "oem_ir"
+    hyundai_meta = oem_ir_root / "hyundai" / "_meta.jsonl"
+    mobis_meta = oem_ir_root / "mobis" / "_meta.jsonl"
+    n_hyundai_meta = sum(1 for _ in hyundai_meta.read_text().splitlines()
+                          if _.strip()) if hyundai_meta.exists() else 0
+    n_mobis_meta = sum(1 for _ in mobis_meta.read_text().splitlines()
+                        if _.strip()) if mobis_meta.exists() else 0
+    oem_news_pg = _try_pg_count("SELECT count(*) FROM auto.events_oem_news")
+    out.append(ChannelStatus(
+        name="OEM IR/뉴스룸 (Hyundai+Mobis)",
+        raw_count=n_hyundai_meta + n_mobis_meta,
+        raw_detail=f"hyundai={n_hyundai_meta} + mobis={n_mobis_meta} (active OEM)",
+        pg_count=oem_news_pg,
+        pg_detail="auto.events_oem_news",
+        notes="B 등급 — robots.txt + ToS 게이트. Kia 한국 = 비활성 (robots Disallow)",
+    ))
+
     return out
 
 

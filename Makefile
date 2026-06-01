@@ -35,8 +35,11 @@
         load-sandang-processes load-sandang-processes-dry \
         ingest-factoryon-company ingest-factoryon-factory-no ingest-factoryon-complex \
         migrate-schema-pg migrate-auto-production migrate-auto-kama \
+        migrate-auto-oem-news \
         load-kama-macro load-kama-macro-dry \
-        load-dart-production audit-data-channels
+        load-dart-production audit-data-channels \
+        ingest-oem-ir-hyundai ingest-oem-ir-mobis ingest-oem-ir-policies \
+        load-oem-ir-news load-oem-ir-news-dry
 
 # 호스트가 Ubuntu/Debian 계열이면 `python` 없이 `python3` 만 있을 수 있음 — auto-detect.
 # 명시 지정하려면: make PYTHON=python3.11 ...
@@ -229,6 +232,9 @@ migrate-auto-production:
 
 migrate-auto-kama:
 	$(MAKE) migrate-schema-pg MIGRATE_FILE=16_autograph_kama_macro.sql
+
+migrate-auto-oem-news:
+	$(MAKE) migrate-schema-pg MIGRATE_FILE=17_autograph_oem_news.sql
 
 # ── Step별 묶음 target — 데이터 통합 고도화 (천천히 안 터지게) ───────────────
 ingest-structural:    ; $(PYTHON) scripts/ingest/bulk_dart_structural.py
@@ -576,3 +582,21 @@ load-dart-production-no-neo4j:
 # 데이터 채널 트래픽라이트 — 산단공/DART/KAMA/팩토리온/리콜 상태 한눈에.
 audit-data-channels:
 	$(PYTHON) scripts/audit/data_channels.py
+
+# ── OEM IR/뉴스룸 — 사용자 명시 P1 (B2). 약관 준수 crawler ──────
+# robots.txt + ToS 게이트 (_license.OEM_NEWSROOM_POLICY). Kia 한국은
+# robots.txt Disallow 라 active=False — 기본 비활성. 키 불필요.
+ingest-oem-ir-hyundai:
+	$(PYTHON) -m autograph.ingestion.oem_ir_newsroom --oem hyundai --limit 50
+
+ingest-oem-ir-mobis:
+	$(PYTHON) -m autograph.ingestion.oem_ir_newsroom --oem mobis --limit 50
+
+ingest-oem-ir-policies:
+	$(PYTHON) -m autograph.ingestion.oem_ir_newsroom --list-policies
+
+load-oem-ir-news:
+	$(PYTHON) -m autograph.loaders.load_oem_ir_news --all
+
+load-oem-ir-news-dry:
+	$(PYTHON) -m autograph.loaders.load_oem_ir_news --all --dry-run
