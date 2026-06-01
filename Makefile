@@ -31,7 +31,12 @@
         ingest-datagokr-recalls ingest-datagokr-inspections \
         ingest-car-go-kr ingest-katri ingest-kncap \
         load-manufactured-at load-datagokr-recalls load-datagokr-inspections \
-        load-kncap
+        load-kncap \
+        load-sandang-processes load-sandang-processes-dry \
+        ingest-factoryon-company ingest-factoryon-factory-no ingest-factoryon-complex \
+        migrate-schema-pg migrate-auto-production migrate-auto-kama \
+        load-kama-macro load-kama-macro-dry \
+        load-dart-production audit-data-channels
 
 # 호스트가 Ubuntu/Debian 계열이면 `python` 없이 `python3` 만 있을 수 있음 — auto-detect.
 # 명시 지정하려면: make PYTHON=python3.11 ...
@@ -207,6 +212,23 @@ load-graph:
 
 migrate-schema:                                      # Neo4j 스키마 정합성 마이그레이션 (README §11.6)
 	$(PYTHON) scripts/migrate_neo4j_schema.py
+
+# ── PG hot-apply (운영 중 컨테이너에 신규 init/*.sql 멱등 적용) ────────────
+# docker-entrypoint-initdb.d 는 빈 볼륨 첫 기동 시에만 실행되므로, 신규
+# 마이그레이션 파일을 추가하면 본 타겟으로 수동 적용. 모든 신규 SQL 은
+# `CREATE ... IF NOT EXISTS` 로 멱등이어야 함.
+#   make migrate-schema-pg MIGRATE_FILE=15_autograph_production.sql
+migrate-schema-pg:
+	@test -n "$(MIGRATE_FILE)" || (echo "MIGRATE_FILE=NN_xxx.sql 필요" && exit 1)
+	$(DOCKER_COMPOSE) exec -T postgres \
+	    psql -U autonexusgraph -d autonexusgraph -v ON_ERROR_STOP=1 \
+	    -f /docker-entrypoint-initdb.d/$(MIGRATE_FILE)
+
+migrate-auto-production:
+	$(MAKE) migrate-schema-pg MIGRATE_FILE=15_autograph_production.sql
+
+migrate-auto-kama:
+	$(MAKE) migrate-schema-pg MIGRATE_FILE=16_autograph_kama_macro.sql
 
 # ── Step별 묶음 target — 데이터 통합 고도화 (천천히 안 터지게) ───────────────
 ingest-structural:    ; $(PYTHON) scripts/ingest/bulk_dart_structural.py
@@ -528,3 +550,10 @@ ingest-factoryon-factory-no:
 
 ingest-factoryon-complex:
 	$(PYTHON) -m autograph.ingestion.factoryon_registry --by-industrial-complex "$(COMPLEX)"
+
+# KAMA 매크로 통계 (data.go.kr 15051116/15051118) — CSV 형식, 키 불필요.
+load-kama-macro:
+	$(PYTHON) -m autograph.loaders.load_kama_macro
+
+load-kama-macro-dry:
+	$(PYTHON) -m autograph.loaders.load_kama_macro --dry-run
