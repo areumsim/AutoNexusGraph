@@ -72,13 +72,27 @@ class IRRelationExtractor(BaseExtractor):
         oem_name = oem_name_resolver.get(oem, "")
 
         text = (chunk.get("text") or "")[:6000]   # IR 본문은 더 큼 (Hyundai 80KB 가능)
+        # DART narrative chunk 는 title/url 대신 corp_code/rcept_no 보유 — title
+        # 자리에 DART 메타 표기.
+        if chunk.get("source") == "dart_narrative":
+            title_repr = (
+                f"DART 사업보고서 (corp_code={meta.get('oem_corp_code', '')}, "
+                f"rcept_no={meta.get('rcept_no', '')})"
+            )
+            url_repr = ""
+            published_repr = ""
+        else:
+            title_repr = meta.get("title") or ""
+            url_repr = meta.get("url") or ""
+            published_repr = meta.get("published_date") or ""
+
         user = self.prompt["user_template"].format(
             oem=oem,
             oem_name=oem_name,
             section=chunk.get("section") or meta.get("section") or "",
-            title=meta.get("title") or "",
-            url=meta.get("url") or "",
-            published_date=meta.get("published_date") or "",
+            title=title_repr,
+            url=url_repr,
+            published_date=published_repr,
             chunk_text=text,
         )
 

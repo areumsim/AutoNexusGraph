@@ -62,7 +62,7 @@ system: |
   }
 
 user_template: |
-  [OEM IR/뉴스룸 본문 추출 컨텍스트]
+  [OEM IR / 뉴스룸 / DART 본문 추출 컨텍스트]
     oem={oem} ({oem_name})
     section={section}
     title={title}
@@ -73,8 +73,14 @@ user_template: |
   {chunk_text}
 
   위 본문에서 MANUFACTURED_AT 와 CAPACITY_REPORTED 관계만 추출. 본문에 명시적
-  으로 적힌 사실만 — 추론·미래시점 제외. 본 본문이 IR 공시면 confidence 0.9+,
-  보도자료면 0.7~0.85. 본문에 관계가 없으면 빈 list.
+  으로 적힌 사실만 — 추론·미래시점 제외. 본 본문이 IR 공시 또는 DART 사업보고서면
+  confidence 0.9+, 일반 보도자료면 0.7~0.85. 본문에 관계가 없으면 빈 list.
+
+  단위 처리 (DART supplier 보고서 특이사항):
+  - "백만원" 단위 — Manufacturer 의 매출/capacity 기반 (모비스/위아). attributes.capacity_units
+    저장 시 그대로 정수 보존하고 attributes.unit='krw_million' 표기.
+  - "천개" 단위 — 부품 수 (한온/만도). attributes.unit='thousand_units'.
+  - "대" 단위 — 차량 수 (Hyundai/Kia). attributes.unit='vehicles' (default).
 
 # JSON schema — chat_json() 가 enforce.
 json_schema:
@@ -109,3 +115,6 @@ json_schema:
             properties:
               capacity_units: {type: integer, minimum: 0}
               snapshot_year: {type: integer, minimum: 1900, maximum: 2100}
+              unit:
+                type: string
+                enum: [vehicles, thousand_units, krw_million, krw_billion, unknown]

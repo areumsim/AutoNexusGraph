@@ -275,6 +275,114 @@ def build_from_wikipedia(*, max_html_chars: int = 4000) -> int:
     return n
 
 
+def build_from_dart_narrative(*, context_chars: int = 600) -> int:
+    """4 supplier OEM (현대모비스/한온/HL만도/현대위아) 의 DART 사업보고서
+    III. 생산 및 설비 narrative → vec.chunks (source='dart_narrative').
+
+    Hyundai/Kia 는 표 기반이라 dart_production_parser 가 자동 추출. 그 외 4 사 는
+    narrative 본문에 capacity 가 적혀있어 LLM P3 추출이 필요.
+
+    추출 전략:
+        1. zip → main XML
+        2. 정규식으로 '생산능력' / '가동률' / '생산실적' 키워드 주변
+           ``context_chars`` (default 600) 만큼 컨텍스트 발췌
+        3. XML 태그 strip, 공백 정규화
+        4. (corp_code, rcept_no, match_idx) 단위로 vec.chunks 적재
+
+    metadata:
+        oem (mobis/hanon/mando/wia), corp_code, rcept_no, sequence_in_zip
+
+    실측: 4 OEM × 16~17 zip × 3~7 matches = 200+ narrative chunks 기대.
+    2026-06-01 신규.
+    """
+    import re
+    import zipfile
+
+    SUPPLIER_OEMS = {
+        "00164788": "mobis",     # 현대모비스
+        "00161125": "hanon",     # 한온시스템
+        "01042775": "mando",     # HL만도
+        "00106623": "wia",       # 현대위아
+    }
+    KEYWORD_RE = re.compile(r"생산\s*능력|가동\s*률|생산\s*실적")
+    XML_TAG_RE = re.compile(r"<[^>]+>")
+    WS_RE = re.compile(r"\s+")
+
+    bulk_root = get_settings().ingest_raw_dir / "dart_bulk" / "corp"
+    if not bulk_root.exists():
+        log.warning("[chunks:dart_narrative] %s 없음 — skip", bulk_root)
+        return 0
+
+    conn = get_connection()
+    n = 0
+    with conn.cursor() as cur:
+        for cc, oem in SUPPLIER_OEMS.items():
+            docs = bulk_root / cc / "documents"
+            if not docs.exists():
+                continue
+            for z in sorted(docs.glob("*.zip")):
+                rcept_no = z.stem
+                try:
+                    with zipfile.ZipFile(z) as zf:
+                        xml_name = f"{rcept_no}.xml"
+                        if xml_name not in zf.namelist():
+                            xml_name = next(
+                                (nm for nm in zf.namelist()
+                                 if nm.endswith(".xml")
+                                 and "_" not in Path(nm).stem),
+                                None,
+                            )
+                        if not xml_name:
+                            continue
+                        xml = zf.read(xml_name).decode("utf-8",
+                                                        errors="replace")
+                except Exception as e:   # noqa: BLE001
+                    log.warning("[chunks:dart_narrative] %s 손상: %s", z.name, e)
+                    continue
+
+                # 키워드 주변 컨텍스트 추출 — overlap 방지로 마지막 end 추적
+                last_end = -1
+                seq_in_zip = 0
+                for m in KEYWORD_RE.finditer(xml):
+                    if m.start() < last_end:
+                        continue   # 이전 컨텍스트와 겹침
+                    start = max(0, m.start() - 100)
+                    end = min(len(xml), m.end() + context_chars)
+                    last_end = end
+                    raw_ctx = xml[start:end]
+                    ctx = XML_TAG_RE.sub(" ", raw_ctx)
+                    ctx = WS_RE.sub(" ", ctx).strip()
+                    if len(ctx) < 150:
+                        continue
+                    seq_in_zip += 1
+                    uniq = f"dart_narrative::{cc}::{rcept_no}::{seq_in_zip}"
+                    try:
+                        _upsert_chunk(
+                            cur,
+                            source="dart_narrative",
+                            section=f"dart.생산설비",
+                            text=ctx,
+                            metadata={
+                                "uniq": uniq,
+                                "oem": oem,
+                                "oem_corp_code": cc,
+                                "rcept_no": rcept_no,
+                                "sequence_in_zip": seq_in_zip,
+                                "context_chars": context_chars,
+                            },
+                            manufacturer_id=None,
+                            model_id=None,
+                            variant_id=None,
+                        )
+                        n += 1
+                    except Exception as e:   # noqa: BLE001
+                        log.warning("[chunks:dart_narrative] %s: %s", uniq, e)
+    conn.commit()
+    log.info("[chunks:dart_narrative] inserted/updated=%d "
+             "(4 supplier OEMs × DART zips)", n)
+    return n
+
+
 def build_from_oem_ir() -> int:
     """auto.events_oem_news.body_text → vec.chunks (source='oem_ir').
 
@@ -336,7 +444,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="autograph.loaders.build_chunks_auto")
     ap.add_argument("--source",
                     choices=["recalls", "complaints", "wikipedia",
-                              "oem_ir", "all"],
+                              "oem_ir", "dart_narrative", "all"],
                     default="all")
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
@@ -351,6 +459,8 @@ def main() -> None:
         build_from_wikipedia()
     if args.source in ("oem_ir", "all"):
         build_from_oem_ir()
+    if args.source in ("dart_narrative", "all"):
+        build_from_dart_narrative()
 
 
 if __name__ == "__main__":

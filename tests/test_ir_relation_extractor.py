@@ -150,6 +150,44 @@ def test_run_p3_ir_dry_run_no_llm_call(monkeypatch):
     assert "estimate" in out
 
 
+# ── DART narrative source (2026-06-01 신규) ─────────────────
+def test_ir_sources_includes_dart_narrative():
+    """IR_SOURCES 에 'dart_narrative' 포함 — 4 supplier OEM narrative 처리."""
+    from autograph.extractors.chunk_selector import IR_SOURCES
+    assert "oem_ir" in IR_SOURCES
+    assert "dart_narrative" in IR_SOURCES
+
+
+def test_extract_handles_dart_narrative_metadata():
+    """dart_narrative chunk 는 title/url 대신 corp_code/rcept_no 사용."""
+    from autonexusgraph.extractors.base import RunContext
+    ext = IRRelationExtractor()
+    chunk = {
+        "id": 99,
+        "source": "dart_narrative",
+        "section": "dart.생산설비",
+        "text": "현대모비스 국내 생산능력은 33,422,655 백만원입니다.",
+        "metadata": {
+            "oem": "mobis",
+            "oem_corp_code": "00164788",
+            "rcept_no": "20240315001234",
+            "sequence_in_zip": 2,
+        },
+    }
+    fake_client = MagicMock()
+    fake_client.chat_json.return_value = {"entities": [], "relations": []}
+    ctx = RunContext(llm_client=fake_client, prompt_spec=ext.prompt,
+                      extra={"oem_names": {"mobis": "현대모비스"}})
+    ext.extract(chunk, ctx)
+
+    # 호출됐고, user msg 에 DART 컨텍스트 포함
+    user_msg = fake_client.chat_json.call_args[0][0][1]["content"]
+    assert "mobis" in user_msg
+    assert "00164788" in user_msg
+    assert "20240315001234" in user_msg
+    assert "33,422,655 백만원" in user_msg
+
+
 def test_run_p3_ir_empty_chunks_skips(monkeypatch):
     from autograph.extractors import run_p3_ir
     monkeypatch.setattr(run_p3_ir, "select_ir_chunks", lambda **kw: [])

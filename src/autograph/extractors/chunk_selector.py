@@ -25,11 +25,16 @@ DEFAULT_SOURCES: tuple[str, ...] = (
     "wikipedia_auto",
 )
 
-# IR/뉴스룸 본문 — 별도 프롬프트 'relation_extract_ir.yaml' (MANUFACTURED_AT +
-# CAPACITY_REPORTED) 사용. select_ir_chunks() 가 manufacturer_id 무관 oem 키로 필터.
-# 2026-06-01 신규.
+# IR/뉴스룸 본문 + DART narrative — relation_extract_ir.yaml (MANUFACTURED_AT +
+# CAPACITY_REPORTED) 프롬프트 공유. select_ir_chunks() 가 manufacturer_id 무관
+# oem 키로 필터.
+# - oem_ir: Hyundai/Kia worldwide IR/뉴스룸 페이지 본문
+# - dart_narrative: 4 supplier OEM (모비스/한온/만도/위아) 의 DART 사업보고서
+#   생산·설비 narrative (Hyundai/Kia 는 표 기반이라 dart_production_parser 자동)
+# 2026-06-01 신규 (dart_narrative 추가).
 IR_SOURCES: tuple[str, ...] = (
     "oem_ir",
+    "dart_narrative",
 )
 
 

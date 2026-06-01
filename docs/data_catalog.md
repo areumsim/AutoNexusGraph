@@ -297,6 +297,8 @@ make audit-data-channels    # eval/reports/data_channels_latest.md 생성
 | DART 가동률 utilization | 🟢 | 53 | Hyundai 본사 116.6% / 베트남 54.1% |
 | KAMA 매크로 (yearly+monthly) | 🟢 | 225 | 2009~2025 시계열 |
 | OEM IR 뉴스룸 (Hyundai+Kia ww) | 🟢 | 37 (Hy 25 + Kia ww 12) | sitemap-first, robots/ToS 게이트 |
+| DART narrative (모비스/한온/만도/위아) ⭐ 6/1 | 🟢 | 182 chunks (Mobis 37 + Hanon 48 + Mando 25 + WIA 72) | 4 supplier OEM 생산·설비 narrative — LLM P3 (IRRelationExtractor) |
+| KOTSA 수리검사 (15155857) ⭐ 6/1 | 🟢 | 47,171 (사고 99.4% / 침수 0.4%) | 2016~2025 시계열, 키 불필요 (CSV 다운) |
 | vec.chunks (oem_ir + wiki plants) | 🟢 | 75 | LLM P3 가능 |
 | 팩토리온 (15087611) | ⊘ | 0 | DATA_GO_KR_API_KEY 대기 |
 | 한국 리콜 (15089863) | 🔴 | 0 | DATA_GO_KR_API_KEY 대기 |

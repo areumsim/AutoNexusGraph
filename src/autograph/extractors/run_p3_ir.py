@@ -37,12 +37,16 @@ from .staging_writer import upsert_staging
 log = logging.getLogger(__name__)
 
 
-# corp_code → 한국어 OEM 이름 (LLM prompt context 보강용)
+# OEM 키 → 한국어 OEM 이름 (LLM prompt context 보강용)
+# IR (Hyundai/Kia) + DART narrative (Mobis/Hanon/Mando/WIA — supplier)
 _OEM_DISPLAY_NAMES = {
     "hyundai":       "현대자동차",
     "kia":           "기아",
     "kia_worldwide": "기아 (worldwide)",
     "mobis":         "현대모비스",
+    "hanon":         "한온시스템",
+    "mando":         "HL만도",
+    "wia":           "현대위아",
 }
 
 

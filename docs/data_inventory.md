@@ -26,12 +26,18 @@ PRD §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/
 | AI-Hub 71347 (모터·배터리) | 3.0 GB | 616,898 라벨 | 4 components (L4) | 통합 |
 | AI-Hub 578 (부품 품질) | 703 MB | 22 tar | 22 components | 통합 |
 | supplier_seed (manual) | — | 1 yaml | 18 components + 19 suppliers | 30 SUPPLIED_BY |
-| **산단공 공정 합성 (15151075)** ⭐ 신규 6/1 | 256 KB | 1 CSV | 550 row (적재 대기) | — (후속 PR) |
-| **DART production (6 OEM)** ⭐ 신규 6/1 | (DART zip 재사용) | 98 zip | (적재 대기) capacity ~50 / production ~70 | MANUFACTURED_AT (적재 후) |
-| **KAMA macro yearly (15051116)** ⭐ 신규 6/1 | 397 B | 1 CSV | (적재 대기) 21 row | — |
-| **KAMA macro monthly (15051118)** ⭐ 신규 6/1 | 6.3 KB | 1 CSV | (적재 대기) 204 row | — |
+| **산단공 공정 합성 (15151075)** ⭐ 6/1 | 256 KB | 1 CSV | **550 row 적재 완료** | — (후속 PR) |
+| **DART production (Hyundai+Kia)** ⭐ 6/1 | (DART zip 재사용) | 98 zip | **capacity 107 + production 77 + utilization 53** | **99 edges (12 plants × 4~7년 시계열)** |
+| **DART narrative (4 supplier OEM)** ⭐ 6/1 | (DART zip 재사용) | 4 OEM × 16+ zip | **vec.chunks 182** (Mobis 37 + Hanon 48 + Mando 25 + WIA 72) | LLM P3 통해 향후 적재 |
+| **KAMA macro yearly (15051116)** ⭐ 6/1 | 397 B | 1 CSV | **21 row 적재 완료** | — |
+| **KAMA macro monthly (15051118)** ⭐ 6/1 | 6.3 KB | 1 CSV | **204 row 적재 완료** | — |
+| **OEM IR / 뉴스룸 (Hyundai + Kia ww)** ⭐ 6/1 | (실측 fetch) | 37 HTML pages | **events_oem_news 37 row + vec.chunks 37** | (LLM P3 후) MANUFACTURED_AT 보강 |
+| **KOTSA 수리검사 (15155857)** ⭐ 6/1 | 1.4 MB | 1 CSV | **events_inspections 47,171 row 적재 완료** | — |
+| **Wikipedia plants** ⭐ 6/1 | 0.5 MB | 30 plant raw | **vec.chunks 38** (ko 18 + en 20 / fuzzy match 12 miss) | :Plant 노드 속성 보강 (후속) |
 | 팩토리온 (15087611) | 0 | 0 | 0 | 키 발급 대기 |
-| **합계** | **~3.8 GB** | **~618k files + 4 신규 CSV** | **~52k 적재 / +825 row 적재 대기** | **48k 노드 / 28k 관계** |
+| 한국 리콜 (15089863) | 0 | 0 | 0 | 키 발급 대기 |
+| **plants.yaml** ⭐ 6/1 | — | 30 plant | (Neo4j seed 적재 후) `:Plant` 29 노드 | `_DART_PLANT_CODE_MAP` 17 raw → :Plant.code 매핑 (100% 매핑, plants_skipped=0) |
+| **합계** | **~3.8 GB** | **~618k files + 6 신규 CSV** | **+48k 신규 행 (KOTSA 47k 우세)** + **vec.chunks +257** | **+99 MANUFACTURED_AT 시계열 edges** |
 
 진행 단계 (2026-06-01 갱신):
 - ✅ PRD §3.3 MVP 범위 OEM 5사 (HYUNDAI/KIA/GENESIS/TESLA/FORD) × 5 year (2020-24) NHTSA 채워짐.

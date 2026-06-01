@@ -227,18 +227,24 @@ def collect() -> list[ChannelStatus]:
         notes="B 등급. Hyundai 사업보고서 III.(3) — explicit utilization_pct",
     ))
 
-    # vec.chunks OEM IR + Wikipedia plants
+    # vec.chunks OEM IR + Wikipedia plants + DART narrative (LLM P3 가능)
     chunks_ir = _try_pg_count("SELECT count(*) FROM vec.chunks WHERE source='oem_ir'")
     chunks_plants = _try_pg_count(
         "SELECT count(*) FROM vec.chunks WHERE source='wikipedia_auto' AND metadata->>'kind'='plants'"
     )
+    chunks_narrative = _try_pg_count(
+        "SELECT count(*) FROM vec.chunks WHERE source='dart_narrative'"
+    )
+    total_ir_p3 = sum(
+        v if isinstance(v, int) else 0
+        for v in (chunks_ir, chunks_plants, chunks_narrative)
+    )
     out.append(ChannelStatus(
-        name="vec.chunks — OEM IR + Wiki plants",
+        name="vec.chunks — IR + Wiki plants + DART narrative",
         raw_count="from PG",
-        raw_detail="2 sources",
-        pg_count=(chunks_ir if isinstance(chunks_ir, int) else 0)
-                  + (chunks_plants if isinstance(chunks_plants, int) else 0),
-        pg_detail=f"oem_ir={chunks_ir} + wiki/plants={chunks_plants}",
+        raw_detail="3 sources",
+        pg_count=total_ir_p3,
+        pg_detail=f"oem_ir={chunks_ir} + wiki/plants={chunks_plants} + dart_narrative={chunks_narrative}",
         notes="P3 LLM 추출 가능 (run_p3_ir.py / IRRelationExtractor)",
     ))
 
