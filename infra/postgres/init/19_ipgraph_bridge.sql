@@ -10,7 +10,7 @@ SET client_encoding = 'UTF8';
 
 CREATE TABLE IF NOT EXISTS ip.assignee_corp_map (
     assignee_id       VARCHAR NOT NULL REFERENCES ip.assignees(assignee_id) ON DELETE CASCADE,
-    corp_code         VARCHAR NOT NULL,                  -- AutoNexusGraph (finance) master.companies.corp_code
+    corp_code         CHAR(8) NOT NULL REFERENCES master.companies(corp_code) ON DELETE CASCADE,  -- finance bridge.corp_entity 와 동일 패턴
     match_type        VARCHAR(16) NOT NULL,              -- 'qid' | 'business_no' | 'lei' | 'name' | 'manual'
     confidence_score  NUMERIC NOT NULL CHECK (confidence_score >= 0 AND confidence_score <= 1),
     reviewed_status   VARCHAR(16) DEFAULT 'auto',        -- 'auto' | 'reviewed' | 'rejected'

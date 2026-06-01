@@ -1,10 +1,10 @@
 # AutoNexusGraph
 
-> **자동차·제조 (auto) + 한국 상장사 공시·재무 (finance) + 특허·기술혁신 (ipgraph, 예정) 3 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 산업·기업 인텔리전스 그래프. 단일 도메인이 아닌, 도메인 어댑터를 plug-in 으로 추가하는 N-domain GraphRAG umbrella 가 최종 형태이며, "**서비스 등급 (MCP·관측가능성·평가 실측) agent + ontology**" 를 정량 증명하는 것이 1차 목표.**
+> **자동차·제조 (auto) + 한국 상장사 공시·재무 (finance) + 특허·기술혁신 (ipgraph — 코드/온톨로지/스키마 완료, 특허 데이터 적재 대기) 3 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 산업·기업 인텔리전스 그래프. 단일 도메인이 아닌, 도메인 어댑터를 plug-in 으로 추가하는 N-domain GraphRAG umbrella 가 최종 형태이며, "**서비스 등급 (MCP·관측가능성·평가 실측) agent + ontology**" 를 정량 증명하는 것이 1차 목표.**
 
-자동차 OEM/부품사 ↔ 재무 ↔ 특허(예정) 데이터를 한 질문으로 추적 (예: "현대모비스 매출과 모비스가 공급하는 차종의 최근 리콜은?" / "LG에너지솔루션 배터리를 쓰는 OEM 의 영업이익과 KCGS ESG 등급은?" / "삼성SDI 배터리 특허(H01M) 집중 분야 + 영업이익 + 그 셀을 쓰는 OEM 리콜은?" — CD-L4 ip 결합 시연). Vector 단독 RAG 가 풀지 못하는 멀티홉 / Cross-Domain / 시점 포함 공급망 추론을 Graph(Neo4j) + SQL(PostgreSQL) + Vector(pgvector) 하이브리드로 해결. Azure 종속 제거, LLM Provider(OpenAI / Anthropic / Google / 로컬) 환경변수 교체 가능. 도메인 모드는 사용자 hint 또는 키워드 자동 라우팅 — `auto` / `finance` / `ip`(예정) / `cross_domain`.
+자동차 OEM/부품사 ↔ 재무 ↔ 특허(코드 완료·데이터 적재 대기) 데이터를 한 질문으로 추적 (예: "현대모비스 매출과 모비스가 공급하는 차종의 최근 리콜은?" / "LG에너지솔루션 배터리를 쓰는 OEM 의 영업이익과 KCGS ESG 등급은?" / "삼성SDI 배터리 특허(H01M) 집중 분야 + 영업이익 + 그 셀을 쓰는 OEM 리콜은?" — CD-L4 ip 결합 시연). Vector 단독 RAG 가 풀지 못하는 멀티홉 / Cross-Domain / 시점 포함 공급망 추론을 Graph(Neo4j) + SQL(PostgreSQL) + Vector(pgvector) 하이브리드로 해결. Azure 종속 제거, LLM Provider(OpenAI / Anthropic / Google / 로컬) 환경변수 교체 가능. 도메인 모드는 사용자 hint 또는 키워드 자동 라우팅 — `auto` / `finance` / `ip`(예정) / `cross_domain`.
 
-상세 요구사항은 [PRD.md](./PRD.md) (v2.2 — IPGraph 정식 흡수 + 상용 신호 DoD #15~#17 + §12.5 도메인3 SSOT) · **시스템 구조 SSOT (패키지 토폴로지·LangGraph 노드·SSOT 색인) 는 [docs/architecture.md](./docs/architecture.md)** · AutoGraph(자동차) 전용 가이드는 [docs/autograph.md](./docs/autograph.md) · **IPGraph(특허, 예정) 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md)** · 결정·트레이드오프·열린 질문은 [docs/mental_model.md](./docs/mental_model.md) · 최종 비전 / 장기 로드맵은 본 README §10 참조.
+상세 요구사항은 [PRD.md](./PRD.md) (v2.2 — IPGraph 정식 흡수 + 상용 신호 DoD #15~#17 + §12.5 도메인3 SSOT) · **시스템 구조 SSOT (패키지 토폴로지·LangGraph 노드·SSOT 색인) 는 [docs/architecture.md](./docs/architecture.md)** · AutoGraph(자동차) 전용 가이드는 [docs/autograph.md](./docs/autograph.md) · **IPGraph(특허) 설계·구현 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md)** · 결정·트레이드오프·열린 질문은 [docs/mental_model.md](./docs/mental_model.md) · 최종 비전 / 장기 로드맵은 본 README §10 참조.
 
 > **구성 요약:**
 > - **Core** (`src/autonexusgraph/`) — LangGraph multi-agent (StateGraph 11 노드 + 함수 체인 fallback), LLM 어댑터 (OpenAI/Anthropic/Google/local 자동 dispatch), 4 가드 (prompt_safety / cypher_guard / number_guard / language_guard), 비용 가드 3 tier (세션 hard limit + 도메인별 turn budget + auto-approve), DB·embedding·평가 harness 공유 인프라.
@@ -12,7 +12,7 @@
 > - **Finance 도메인** (`src/autonexusgraph/tools/financials,graph,retrieve`) — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100.
 > - **Auto 도메인** (`src/autograph/`) — NHTSA(vPIC/Recalls/Complaints/SafetyRatings/Investigations/TSB) + EPA fueleconomy + SEC EDGAR (글로벌 OEM) + Wikidata(manufacturers/models/suppliers, P176) + AI Hub(부품 결함 / 자율주행 진단) + KOTSA 수리검사 + DART 사업보고서 (제조 공정·생산) + 산단공 합성 공정 + 팩토리온(공장 등록) scaffold.
 > - **Cross-Domain Bridge** — `bridge.corp_entity` 가 두 도메인을 wikidata_qid / LEI / sec_cik / 사업자번호 / 이름으로 매칭. 한국 OEM (현대차/기아/현대모비스/현대위아/한국타이어 …) + 글로벌 OEM (Ford/GM/Stellantis/Tesla …) 가 corp_code/sec_cik 와 직접 연결.
-> - **확장성 (Domain plug-in)** — Core 는 외부 도메인 패키지를 직접 import 하지 않음. ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 의 모듈명을 import 시점에 soft-load → `register_handler` 부작용으로 활성. PRD §10.12 "코어 변경량 < 5%" 보존. **도메인3 (ip = 특허, 예정) 이 첫 plug-in 확장 정량 검증** — §10.12 baseline reset 후 재측정. 4번째~ (의약품·전자제품·에너지·식품) 는 비전 (§10.1 Phase D/E).
+> - **확장성 (Domain plug-in)** — Core 는 외부 도메인 패키지를 직접 import 하지 않음. ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 의 모듈명을 import 시점에 soft-load → `register_handler` 부작용으로 활성. PRD §10.12 "코어 변경량 < 5%" 보존. **도메인3 (ip = 특허) 이 첫 plug-in 확장 정량 검증** — §10.12 baseline reset 414bc1b 후 **0/15,396 = 0.00%** ✅. KIPRIS/USPTO 데이터 적재만 사용자 액션 대기. 4번째~ (의약품·전자제품·에너지·식품) 는 비전 (§10.1 Phase D/E).
 
 ---
 
@@ -100,7 +100,7 @@
 
 ## 2. 핵심 특징
 
-- **멀티도메인** — `finance` + `auto` + `ip` (예정) + `cross_domain` 4 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain` + 후속 `src/ipgraph/policy.py::route_domain_ip`). 단일 에이전트가 도메인 + 그 교차 추론을 한 turn 안에 처리. core 는 외부 도메인 패키지를 직접 import 하지 않고 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 를 기반으로 첫 호출 시 1회 soft-import — finance-only 환경에서는 ENV 를 빈 값으로 두면 됨
+- **멀티도메인** — `finance` + `auto` + `ip` (코드/온톨로지/스키마 완료, 특허 데이터 적재 대기) + `cross_domain` 4 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain` + 후속 `src/ipgraph/policy.py::route_domain_ip`). 단일 에이전트가 도메인 + 그 교차 추론을 한 turn 안에 처리. core 는 외부 도메인 패키지를 직접 import 하지 않고 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 를 기반으로 첫 호출 시 1회 soft-import — finance-only 환경에서는 ENV 를 빈 값으로 두면 됨
 - **금융 도메인** — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100 대상
 - **자동차 도메인** — NHTSA vPIC/Recalls/Complaints / Wikidata (manufacturers/models/suppliers) / (옵션) car.go.kr / KATRI / KNCAP / 한국교통안전공단 수리검사. BOM Level 0~5 — Manufacturer → Model → Variant → System(L3) → Module(L4) → Part(L5, 리콜·LLM 출처에서 부분 커버). **Level 6 (소재·공법) = 부분 진입 (예정)** — 배터리 셀 chem + 핵심광물 + 무역통계 (§10.2 / [docs/autograph.md §2.5.4](./docs/autograph.md))
 - **3-Store 하이브리드** — Neo4j(관계) + PostgreSQL(수치·메타·벡터) + (옵션) Qdrant — 청크 100만 이하는 pgvector 통합 운영
@@ -132,7 +132,7 @@
 [애플리케이션 계층]
 ├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS + NHTSA/AI Hub/EPA + (예정) KIPRIS/USPTO ODP/CPC bulk 클라이언트
 ├─ Loaders            : PG/Neo4j 멱등 적재 (P1 deterministic / P2 deterministic / P3 LLM / P4 cross-validate)
-├─ Tools              : 사전 정의 함수 풀 (finance: financials/graph/retrieve · auto: spec/graph/retrieve/bridge · ip 예정: patents/graph/retrieve/bridge) — 자유 SQL/Cypher 금지
+├─ Tools              : 사전 정의 함수 풀 (finance: financials/graph/retrieve · auto: spec/graph/retrieve/bridge · ip: patents/graph/retrieve/bridge — 코드 완료) — 자유 SQL/Cypher 금지
 ├─ Safety             : prompt_safety (XML escape + injection 감지 + high-risk 단발 차단) · cypher_guard (READ-ONLY + APOC write/dynamic-cypher procedure 블록) · language_guard
 ├─ Agents (LangGraph) : Triage → Planner(DAG) → Supervisor ↔ Workers(병렬: research/graph/sql/calculator)
 │                       → Synthesizer → Validator (replan ≤ 2, tasks/result 자동 리셋)
@@ -306,8 +306,8 @@
 - 자체 구축 Multi-hop QA — 도메인 내 100문항 + Cross-Domain 30문항
   - finance: `eval/qa_gold/gold_qa_v0.jsonl` — L1/L2/L3 — seed 30 (목표 100)
   - auto: `eval/qa_gold/gold_qa_auto_v0.jsonl` — L1/L2/L3 — seed 42 (목표 100)
-  - cross: `eval/qa_gold/gold_qa_cross_v0.jsonl` — CD-L1 10 / CD-L2 8 / CD-L3 8 / CD-L4 4 + **(예정) CD-L3 4 + CD-L4 4 = ip 결합 시연 (38 row)**
-  - **ip (예정): `eval/qa_gold/gold_qa_ip_v0.jsonl` — IP-L1/L2/L3 — seed 30 (목표 100)**
+  - cross: `eval/qa_gold/gold_qa_cross_v0.jsonl` — **44 row** (CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + CD-L3-IP/CD-L4-IP 8 = ip 결합 시연 + CD-L3-011/CD-L4-006/007 fallback 시나리오)
+  - **ip: `eval/qa_gold/gold_qa_ip_v0.jsonl` — IP-L1/L2/L3 각 10 = seed 30 ✓** (gold_answer 채우기는 KIPRIS/USPTO 적재 후)
 
 ### 비교 매트릭스 — 축소 (예산 내 우선)
 Vector only / Graph only / **Hybrid Agent** / SQL+Vector — **4 어댑터 × 저비용 LLM 1종 (FAST tier — Sonnet 4.6 / GPT-4o-mini / Gemini Flash) = 4 조합** 으로 thesis(§10.7 Hybrid > Vector) headline 확보. 2번째 LLM 은 subset (CD-L3/L4) 만. **rerank on/off ablation 1행 (BGE-Reranker-v2-m3 wired 활용).** Cross-Domain 은 Hybrid+Bridge 어댑터 단독.
@@ -340,7 +340,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 
 ### 현재 측정 결과 (PRD §10 DoD **17 항** v2.2, 2026-05-29 측정)
 
-`make audit-dod` 의 최신 출력 — **5 측정 가능 모두 pass / 9 LLM 키 / ip 추가 대기 / 3 외부 측정 영역**. (14 = 기존 / +3 = v2.2 신설 §10.15~§10.17 모두 ⊘ 예정)
+`make audit-dod` 의 최신 출력 (2026-06-01 baseline `414bc1b`) — **자동 PASS 9/14 · ⊘ 3 LLM 키 / · 3 외부 측정 / ⚠️ 2 부분 (MCP SDK·Langfuse) / ❌ 3 미달 (LLM simulation 모드)**. 17 항목 = 기존 14 + v2.2 신설 §10.15~§10.17.
 
 | ID | 기준 | 상태 | 상세 |
 |---|---|:---:|---|
@@ -664,7 +664,7 @@ MVP 비목표이지만 §10 장기 로드맵에서 다루는 것:
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트
 - [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 33 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
 - [docs/autograph.md](./docs/autograph.md) — **AutoGraph (auto 도메인) 단독** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약 / §2.5.4 배터리·소재 L5/L6 부록)
-- [docs/ipgraph.md](./docs/ipgraph.md) — **IPGraph (ip 도메인, 예정) 설계 SSOT** — DomainHandler / ontology yaml / tool pool / Cypher 템플릿 / gold QA / 작업 순서
+- [docs/ipgraph.md](./docs/ipgraph.md) — **IPGraph (ip 도메인 = 도메인3) 설계+구현 SSOT** — DomainHandler / ontology yaml / tool pool / Cypher 템플릿 / gold QA / 작업 순서. 코드/스키마 완료, 특허 데이터 적재 대기
 - [docs/data_sources.md](./docs/data_sources.md) — 데이터 소스 후보 카탈로그 + 라이선스 + 인증 키
 - [docs/data_inventory.md](./docs/data_inventory.md) — 적재 현황 측정 (재실행 시 갱신, `make audit-data-channels`)
 - [docs/data_catalog.md](./docs/data_catalog.md) — **구현된 채널 운영 가이드** (출처·등급·ingestion·loader·tool·한계 표준 9 항목 형식)

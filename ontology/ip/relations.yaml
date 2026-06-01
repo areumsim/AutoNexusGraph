@@ -9,13 +9,13 @@ last_updated: 2026-06-01
 
 # 모든 엣지 공통 의무 메타 (PRD §6.7 7키 SoT — auto / finance 와 동일).
 edge_required_meta:
-  - source_type
-  - source_id
-  - confidence_score
-  - validated_status
-  - snapshot_year
-  - extraction_method
-  - schema_version
+  - source_type            # 'kipris' | 'uspto_odp' | 'cpc_scheme' | 'openalex' | 'manual' | ...
+  - source_id              # 출처 식별자 (KIPRIS app_no / USPTO pub_no / ROR id / chunk_id …)
+  - confidence_score       # 0.0 ~ 1.0
+  - validated_status       # 'verified' | 'validated' | 'candidate' | 'needs_review' | 'rejected'
+  - snapshot_year          # 기준 연도 (filing_year 기본, grant_year 별도 prop)
+  - extraction_method      # 'deterministic' | 'llm' | 'wikidata' | 'manual'
+  - schema_version         # 'v2.2' — 적재 시점 PRD 버전 (helper 가 yaml header 의 v2.2 자동 부여)
 
 relations:
 

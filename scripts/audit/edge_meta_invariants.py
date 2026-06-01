@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""auto 도메인 엣지 메타 무결성 audit (PRD §6.7 / DoD #11).
+"""auto / ip / finance 도메인 엣지 메타 무결성 audit (PRD §6.7 / DoD #11).
 
-`ontology/auto/relations.yaml` 의 `edge_required_meta` (source_type / source_id /
-confidence_score / validated_status / snapshot_year / extraction_method) 가
-모든 auto 엣지에 채워져 있는지 검증.
+`ontology/{auto,ip}/relations.yaml` 와 `ontology/relations.yaml` 의 `edge_required_meta`
+(7키: source_type / source_id / confidence_score / validated_status / snapshot_year /
+extraction_method / schema_version) 가 모든 도메인 엣지에 채워져 있는지 검증.
 
 DoD #11: "모든 SUPPLIED_BY 엣지에 confidence + provenance + snapshot_year 100% 채움."
 
@@ -96,6 +96,55 @@ _CHECKS: list[tuple[str, str, int, str]] = [
      WHERE r.validated_status = 'rejected'
      RETURN count(r) AS n
      """, 0, "validated_status='rejected' 인 엣지가 그래프에 적재됨"),
+
+    # ── ip 도메인 (도메인3) 의무 메타 ──────────────────────────
+    ("ip_edge_missing_meta",
+     """
+     MATCH (a)-[r]->(b)
+     WHERE (r.confidence_score IS NULL
+            OR r.source_type IS NULL
+            OR r.snapshot_year IS NULL
+            OR r.validated_status IS NULL
+            OR r.extraction_method IS NULL
+            OR r.schema_version IS NULL)
+       AND any(l IN labels(a) WHERE l IN
+            ['Patent','Assignee','Inventor','CPCCode','Work','Institution','TechField'])
+     RETURN count(*) AS n
+     """, 0, "PRD §6.7 — ip 도메인 엣지 의무 메타 7키 결손 (Patent/Assignee/Inventor/CPCCode/Work/Institution)"),
+
+    # CPC SUBCLASS_OF — 적재 완료 후 100% meta 검증.
+    ("subclass_of_missing_meta",
+     """
+     MATCH ()-[r:SUBCLASS_OF]->()
+     WHERE r.confidence_score IS NULL
+        OR r.source_type IS NULL
+        OR r.schema_version IS NULL
+     RETURN count(r) AS n
+     """, 0, "SUBCLASS_OF (CPC 계층) 의무 메타 결손 — cpc_scheme A 등급 의무 100%"),
+
+    # IS_ENTITY / AUTHORED_AT — OpenAlex cross-domain 엣지.
+    ("authored_at_missing_meta",
+     """
+     MATCH ()-[r:AUTHORED_AT]->()
+     WHERE r.confidence_score IS NULL
+        OR r.source_type IS NULL
+        OR r.snapshot_year IS NULL
+        OR r.schema_version IS NULL
+     RETURN count(r) AS n
+     """, 0, "AUTHORED_AT (Work→Institution) 의무 메타 결손"),
+
+    # ── finance 도메인 의무 메타 ──────────────────────────────
+    ("finance_edge_missing_meta",
+     """
+     MATCH (a)-[r]->(b)
+     WHERE (r.confidence_score IS NULL
+            OR r.source_type IS NULL
+            OR r.snapshot_year IS NULL
+            OR r.schema_version IS NULL)
+       AND any(l IN labels(a) WHERE l IN
+            ['Company','Person','NewsEvent'])
+     RETURN count(*) AS n
+     """, 0, "PRD §6.7 — finance 도메인 엣지 의무 메타 4키 (source/snapshot/schema/conf) 결손"),
 ]
 
 
@@ -132,9 +181,9 @@ def run_all() -> list[dict]:
 def render_md(rows: list[dict]) -> str:
     lines = ["# Edge Meta Invariants Audit",
              "",
-             "PRD §6.7 / DoD #11 — auto 도메인 엣지의 의무 메타 (source_type / "
-             "source_id / confidence_score / validated_status / snapshot_year / "
-             "extraction_method) 와 라벨/식별 invariant 검사.",
+             "PRD §6.7 / DoD #11 — auto / ip / finance 3 도메인 엣지의 의무 메타 7키 "
+             "(source_type / source_id / confidence_score / validated_status / "
+             "snapshot_year / extraction_method / schema_version) 와 라벨/식별 invariant 검사.",
              "",
              "| check | count | threshold | passed |",
              "|---|---|---|---|"]
