@@ -57,9 +57,13 @@ def test_resolve_plant_node_code_known_pair():
 
 
 def test_resolve_plant_node_code_unmapped_returns_none():
-    """plants.yaml 미등록 plant — None (Neo4j 엣지 skip)."""
-    assert L._resolve_plant_node_code("00164742", "HMI") is None
-    assert L._resolve_plant_node_code("00164742", "HTMV") is None
+    """plants.yaml 미등록 plant — None (Neo4j 엣지 skip).
+
+    2026-06-01 plants.yaml 확장으로 HMI/HTMV 등은 이제 매핑됨.
+    완전히 미정의 가상 라벨로 회귀 보호.
+    """
+    assert L._resolve_plant_node_code("00164742", "NONEXISTENT_LABEL") is None
+    assert L._resolve_plant_node_code("99999999", "HMC") is None
 
 
 def test_resolve_plant_node_code_strips_whitespace():
@@ -234,9 +238,19 @@ def test_sync_manufactured_at_creates_rows_for_mapped_plants(monkeypatch):
 
 
 def test_sync_manufactured_at_skips_unmapped_plants(monkeypatch, caplog):
-    """plants.yaml 미등록 plant (HMI) — edge 0 + 경고."""
+    """plants.yaml 미등록 plant — edge 0 + 경고.
+
+    2026-06-01 HMI/HTMV 등은 매핑되었으므로 가상 라벨 사용.
+    """
     monkeypatch.setattr(L, "_resolve_manufacturer_id", lambda cc: 441)
-    capacity = [PlantRow(business_division="차량부문", plant_code="HMI",
+    # driver mock (호출 안 되어야 함)
+    session = mock.MagicMock()
+    driver = mock.MagicMock()
+    driver.session.return_value.__enter__.return_value = session
+    monkeypatch.setattr("autonexusgraph.db.neo4j.get_driver", lambda: driver)
+
+    capacity = [PlantRow(business_division="차량부문",
+                          plant_code="NONEXISTENT_LABEL",
                           plant_region="인도", year=2024, value=750000.0)]
     out = L._sync_manufactured_at_to_neo4j(
         capacity_rows=capacity, production_rows=[],

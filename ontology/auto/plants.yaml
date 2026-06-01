@@ -123,3 +123,81 @@ plants:
     manufacturer_name: GM
     country: US
     city: Detroit
+
+  # ── 현대자동차 글로벌 (DART 2024 사업보고서 실측 plant_code) ⭐ 2026-06-01 ──
+  # 본 추가는 src/autograph/loaders/load_dart_production.py 가 PG 에 저장한
+  # raw plant_code 와 1:1 매핑되어, _DART_PLANT_CODE_MAP 갱신 후 Neo4j
+  # MANUFACTURED_AT 엣지 자동 생성 가능. capacity_units 는 PG plant_capacity 참조.
+
+  - code: HYU_CHENNAI
+    name: Hyundai Motor India (HMI)
+    manufacturer_name: HYUNDAI
+    country: IN
+    city: Chennai
+
+  - code: HYU_IZMIT
+    name: Hyundai Assan Otomotiv Sanayi (HAOS)
+    manufacturer_name: HYUNDAI
+    country: TR
+    city: Izmit
+    wikidata_qid: Q5942030
+
+  - code: HYU_NOSOVICE
+    name: Hyundai Motor Manufacturing Czech (HMMC)
+    manufacturer_name: HYUNDAI
+    country: CZ
+    city: Nosovice
+
+  - code: HYU_PETERSBURG
+    name: Hyundai Motor Manufacturing Rus (HMMR — 운영중단)
+    manufacturer_name: HYUNDAI
+    country: RU
+    city: Saint Petersburg
+    notes: "2022 우크라이나 전쟁 후 운영 중단; DART 보고서 capa 추적 위해 유지"
+
+  - code: HYU_PIRACICABA
+    name: Hyundai Motor Brasil (HMB)
+    manufacturer_name: HYUNDAI
+    country: BR
+    city: Piracicaba
+
+  - code: HYU_NINH_BINH
+    name: Hyundai Thanh Cong Vietnam (HTMV)
+    manufacturer_name: HYUNDAI
+    country: VN
+    city: Ninh Binh
+
+  - code: HYU_BEKASI
+    name: Hyundai Motor Manufacturing Indonesia (HMMI)
+    manufacturer_name: HYUNDAI
+    country: ID
+    city: Bekasi
+
+  - code: HYU_METAPLANT
+    name: Hyundai Motor Group Metaplant America (HMGMA, EV 전용)
+    manufacturer_name: HYUNDAI
+    country: US
+    city: Ellabell
+    notes: "2024 가동 신규 EV 전용 — Ioniq 5/7 생산"
+
+  - code: HYU_IZMIR
+    name: Hyundai Motor Türkiye (HMTR, HAOS 별표기)
+    manufacturer_name: HYUNDAI
+    country: TR
+    city: Izmir
+    notes: "DART 표에서 HAOS 와 별도 칸 — 동일 자회사 다른 표기 가능"
+
+  # ── 기아 글로벌 (Wikipedia + 사업보고서 일반) ──
+
+  - code: KIA_ZILINA
+    name: Kia Motors Slovakia (KMS)
+    manufacturer_name: KIA
+    country: SK
+    city: Zilina
+    wikidata_qid: Q6403720
+
+  - code: KIA_MONTERREY
+    name: Kia Mexico (KMX)
+    manufacturer_name: KIA
+    country: MX
+    city: Pesqueria

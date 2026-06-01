@@ -69,22 +69,27 @@ OEM_CORP_CODES: dict[str, dict] = {
 # 행이 저장되지만 Neo4j 엣지는 생성되지 않고 log.warning. 후속 PR 로 plants.yaml
 # 을 확장하면 본 dict 만 갱신.
 _DART_PLANT_CODE_MAP: dict[tuple[str, str], str] = {
-    # 현대자동차 (00164742)
-    ("00164742", "HMC"):    "HYU_ULSAN",       # 한국 — 본사 (울산 mass)
-    ("00164742", "HMMA"):   "HYU_MONTGOMERY",  # 미국 앨라배마
-    # ("00164742", "HMI"):    None              # 인도 첸나이 — plants.yaml 미등록
-    # ("00164742", "HAOS"):   None              # 터키 이즈미트
-    # ("00164742", "HMMC"):   None              # 체코 노쇼비체
-    # ("00164742", "HMMR"):   None              # 러시아 상트페테르부르크 (운영중단)
-    # ("00164742", "HMB"):    None              # 브라질
-    # ("00164742", "HTMV"):   None              # 베트남
-    # ("00164742", "HMMI"):   None              # 인도네시아
-    # 기아 (00106641)
-    ("00106641", "기아"):    "KIA_HWASEONG",    # 한국 (대표) — 화성/광주 통합
-    # ("00106641", "KMA"):    None              # 미국 조지아 (KIA_WEST_POINT 가능)
-    # ("00106641", "KMMG"):   None              # 미국 조지아
-    # ("00106641", "KMS"):    None              # 슬로바키아 질리나
-    # 모비스/한온/만도/위아 의 사내 법인명은 사업보고서 별 다양 — 향후 1:1 매핑 추가.
+    # 현대자동차 (00164742) — 2026-06-01 plants.yaml 확장 완료
+    ("00164742", "HMC"):          "HYU_ULSAN",        # 한국 — 본사 (울산 mass)
+    ("00164742", "HMMA"):         "HYU_MONTGOMERY",   # 미국 앨라배마
+    ("00164742", "HMI"):          "HYU_CHENNAI",      # 인도 첸나이
+    ("00164742", "HAOS"):         "HYU_IZMIT",        # 튀르키예 이즈미트
+    ("00164742", "HMMC"):         "HYU_NOSOVICE",     # 체코 노쇼비체
+    ("00164742", "HMMR"):         "HYU_PETERSBURG",   # 러시아 상트페테르부르크 (운영중단)
+    ("00164742", "HMB"):          "HYU_PIRACICABA",   # 브라질 피라시카바
+    ("00164742", "HTMV"):         "HYU_NINH_BINH",    # 베트남 닌빈
+    ("00164742", "HMMI"):         "HYU_BEKASI",       # 인도네시아 브카시
+    ("00164742", "HMGMA"):        "HYU_METAPLANT",    # 미국 조지아 (EV 전용, 2024 가동)
+    ("00164742", "HMMA/ HMGMA"):  "HYU_METAPLANT",    # HMMA 와 HMGMA 통합 칸 → 신규 metaplant 우선
+    ("00164742", "HMTR"):         "HYU_IZMIR",        # 튀르키예 이즈미르 (HAOS 별표기)
+    # 기아 (00106641) — DART 사업보고서 capa 표 추출 실패 (B4 후속).
+    # 본 매핑은 향후 Kia 파서 확장 시 유효.
+    ("00106641", "기아"):          "KIA_HWASEONG",     # 한국 (대표) — 화성/광주 통합
+    ("00106641", "KMA"):          "KIA_WEST_POINT",   # 미국 조지아 (Kia Motors America)
+    ("00106641", "KMMG"):         "KIA_WEST_POINT",   # 미국 조지아 (Kia Motors Manufacturing Georgia)
+    ("00106641", "KMS"):          "KIA_ZILINA",       # 슬로바키아 질리나
+    ("00106641", "KMX"):          "KIA_MONTERREY",    # 멕시코 페스케리아
+    # 모비스/한온/만도/위아 의 사내 법인명은 사업보고서 별 다양 — B4 후속에서 1:1 매핑 추가.
 }
 
 
