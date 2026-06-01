@@ -7,7 +7,7 @@ name = "autonexusgraph"
 version = "0.1.0"
 description = "한국 상장사 공시·재무 기반 금융 GraphRAG 에이전트 (Multi-Agent + Planning, LangGraph)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 authors = [{ name = "areumsim" }]
 license = { text = "Proprietary" }
 keywords = ["graphrag", "finance", "korean", "dart", "langgraph", "neo4j"]
