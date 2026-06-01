@@ -243,6 +243,75 @@ def test_parse_utilization_handles_dashes():
     assert hmmr[0].extra["actual_units"] is None
 
 
+# ── Kia-style header (품목 / 소재지, TH 헤더, '제80기('23.1.1)' year) ────────
+_KIA_CAPACITY_XML = """<DOCUMENT>
+<P><SPAN>(1) 생산능력</SPAN></P>
+<TABLE><TBODY>
+  <TR><TD>(단위 : 대)</TD></TR>
+</TBODY></TABLE>
+<TABLE>
+  <THEAD>
+    <TR>
+      <TH>사업부문</TH><TH>품  목</TH><TH>소재지</TH>
+      <TH>제80기('23.1.1~12.31)</TH>
+      <TH>제79기('22.1.1~12.31)</TH>
+      <TH>제78기('21.1.1~12.31)</TH>
+    </TR>
+  </THEAD>
+  <TBODY>
+    <TR>
+      <TD>자동차제조업</TD><TD>완성차</TD><TD>국내공장</TD>
+      <TD>1,477,000</TD><TD>1,557,000</TD><TD>1,554,000</TD>
+    </TR>
+    <TR>
+      <TD>완성차</TD><TD>미국공장</TD>
+      <TD>340,000</TD><TD>340,000</TD><TD>340,000</TD>
+    </TR>
+    <TR>
+      <TD>완성차</TD><TD>인도공장</TD>
+      <TD>386,000</TD><TD>373,000</TD><TD>329,000</TD>
+    </TR>
+  </TBODY>
+</TABLE>
+</DOCUMENT>
+"""
+
+
+def test_parse_kia_capacity_skips_unit_only_table():
+    """첫 (1-col '(단위:대)') 표 skip 후 두 번째 표 채택."""
+    rows = parse_section(_KIA_CAPACITY_XML, "capacity")
+    assert len(rows) == 9   # 3 plants × 3 years
+
+
+def test_parse_kia_capacity_korean_year_format():
+    """제80기('23.1.1~12.31) 형식 → 2023."""
+    rows = parse_section(_KIA_CAPACITY_XML, "capacity")
+    years = sorted({r.year for r in rows})
+    assert years == [2021, 2022, 2023]
+
+
+def test_parse_kia_capacity_uses_소재지_as_plant():
+    """Kia header 의 '품목'/'소재지' 패턴 검출 → 소재지 가 plant_code."""
+    rows = parse_section(_KIA_CAPACITY_XML, "capacity")
+    plants = sorted({r.plant_code for r in rows})
+    assert plants == ["국내공장", "미국공장", "인도공장"]
+
+
+def test_parse_kia_capacity_extracts_correct_values():
+    """국내공장 2023 = 1,477,000."""
+    rows = parse_section(_KIA_CAPACITY_XML, "capacity")
+    domestic_2023 = [r for r in rows
+                     if r.plant_code == "국내공장" and r.year == 2023]
+    assert len(domestic_2023) == 1
+    assert domestic_2023[0].value == 1477000.0
+
+
+def test_parse_kia_capacity_uses_th_header():
+    """Kia 표 헤더가 <TH> 라 _parse_table_rows 가 TD+TH 둘 다 인식."""
+    rows = parse_section(_KIA_CAPACITY_XML, "capacity")
+    assert rows   # TH 인식 안 되면 빈 list 일 것
+
+
 def test_parse_section_without_header_returns_empty():
     """헤더 SPAN 없이 표만 있으면 빈 list (oversearch 방지)."""
     no_header_xml = """<DOCUMENT>

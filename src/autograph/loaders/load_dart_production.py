@@ -33,6 +33,7 @@ import argparse
 import io
 import json
 import logging
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -80,7 +81,8 @@ _DART_PLANT_CODE_MAP: dict[tuple[str, str], str] = {
     ("00164742", "HTMV"):         "HYU_NINH_BINH",    # 베트남 닌빈
     ("00164742", "HMMI"):         "HYU_BEKASI",       # 인도네시아 브카시
     ("00164742", "HMGMA"):        "HYU_METAPLANT",    # 미국 조지아 (EV 전용, 2024 가동)
-    ("00164742", "HMMA/ HMGMA"):  "HYU_METAPLANT",    # HMMA 와 HMGMA 통합 칸 → 신규 metaplant 우선
+    # DART XML 의 "HMMA / HMGMA" / "HMMA/ HMGMA" 등 공백 변형 — 정규화 후 단일 키.
+    ("00164742", "HMMA/HMGMA"):   "HYU_METAPLANT",    # 통합 칸 → 신규 metaplant 우선
     ("00164742", "HMTR"):         "HYU_IZMIR",        # 튀르키예 이즈미르 (HAOS 별표기)
     # 기아 (00106641) — DART 사업보고서 capa 표 추출 실패 (B4 후속).
     # 본 매핑은 향후 Kia 파서 확장 시 유효.
@@ -89,6 +91,12 @@ _DART_PLANT_CODE_MAP: dict[tuple[str, str], str] = {
     ("00106641", "KMMG"):         "KIA_WEST_POINT",   # 미국 조지아 (Kia Motors Manufacturing Georgia)
     ("00106641", "KMS"):          "KIA_ZILINA",       # 슬로바키아 질리나
     ("00106641", "KMX"):          "KIA_MONTERREY",    # 멕시코 페스케리아
+    # Kia 사업보고서 (한국어 plant 명) — 사업보고서가 영문 약어 아닌 한국어 사용
+    ("00106641", "국내공장"):       "KIA_HWASEONG",     # 광명+화성+광주+서산 통합 (대표)
+    ("00106641", "미국공장"):       "KIA_WEST_POINT",   # KMA/KMMG 통합
+    ("00106641", "슬로박공장"):      "KIA_ZILINA",
+    ("00106641", "멕시코공장"):      "KIA_MONTERREY",
+    ("00106641", "인도공장"):       "KIA_ANANTAPUR",    # 2026-06-01 plants.yaml 추가
     # 모비스/한온/만도/위아 의 사내 법인명은 사업보고서 별 다양 — B4 후속에서 1:1 매핑 추가.
 }
 
@@ -142,15 +150,17 @@ def _read_main_xml(zip_path: Path) -> str | None:
 
 
 def _is_vehicle_division(div: str | None) -> bool:
-    """차량부문 여부 — 금융부문 / 위탁 / 상용 제외 (PRD non-goal).
+    """차량/자동차 사업부문 여부 — 금융/위탁/상용/레일솔루션 제외.
 
-    DART 표의 사업부문 cell 은 '차량부문' / '차량부문(대수)' / '금융부문' /
-    '레일솔루션부문' 등. 차량만 채택. None 은 ROWSPAN 상속 행 — 그것도 차량으로
-    간주 (상위 그룹이 차량부문일 때만 그 행에 도달).
+    DART 표의 사업부문 cell 변형:
+        Hyundai: '차량부문' / '차량부문(대수)' / '기타부문(억원)' / '레일솔루션부문'
+        Kia:     '자동차제조업' (대표) / '기타' 등
+    '차량' 또는 '자동차' substring 매칭으로 양쪽 인식. None 은 ROWSPAN 상속 →
+    상위 그룹이 차량/자동차일 때만 그 행에 도달하므로 True.
     """
     if not div:
         return True   # 상속 행
-    return "차량" in div
+    return ("차량" in div) or ("자동차" in div)
 
 
 # ── UPSERT 함수 ──────────────────────────────────────────────────
@@ -273,10 +283,38 @@ def _resolve_manufacturer_id(corp_code: str) -> int | None:
     return None
 
 
+_PLANT_LABEL_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_dart_plant_label(label: str) -> str:
+    """DART raw plant 표기 정규화 — 공백 압축 + 대문자 일관.
+
+    예: 'HMMA/ HMGMA' → 'HMMA/HMGMA' (DART XML 의 공백 노이즈 제거)
+        '  HMC  '   → 'HMC'
+    한글 표기 (예: '기아') 는 strip + 동일.
+    """
+    if not label:
+        return ""
+    # 공백 모두 압축 (탭/줄바꿈 포함)
+    return _PLANT_LABEL_WS_RE.sub("", label.strip())
+
+
 def _resolve_plant_node_code(corp_code: str, raw_plant_label: str
                              ) -> str | None:
-    """DART raw 법인명 → plants.yaml :Plant.code. 미매핑이면 None."""
-    return _DART_PLANT_CODE_MAP.get((corp_code, (raw_plant_label or "").strip()))
+    """DART raw 법인명 → plants.yaml :Plant.code. 미매핑이면 None.
+
+    1차: raw label 그대로 (strip) 매칭.
+    2차: 공백 압축 정규화 매칭 ('HMMA/ HMGMA' → 'HMMA/HMGMA' 등).
+    """
+    raw = (raw_plant_label or "").strip()
+    direct = _DART_PLANT_CODE_MAP.get((corp_code, raw))
+    if direct is not None:
+        return direct
+    # 공백 노이즈 제거 후 재시도
+    norm = _normalize_dart_plant_label(raw_plant_label)
+    if norm != raw:
+        return _DART_PLANT_CODE_MAP.get((corp_code, norm))
+    return None
 
 
 def _merge_capa_and_actual(capacity_rows: list[PlantRow],

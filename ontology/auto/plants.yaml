@@ -201,3 +201,10 @@ plants:
     manufacturer_name: KIA
     country: MX
     city: Pesqueria
+
+  - code: KIA_ANANTAPUR
+    name: Kia India (KIN)
+    manufacturer_name: KIA
+    country: IN
+    city: Anantapur
+    notes: "Kia 사업보고서 '인도공장' — 안드라프라데시 아난타푸르 (2019 가동)"

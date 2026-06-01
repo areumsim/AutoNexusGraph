@@ -70,6 +70,23 @@ def test_resolve_plant_node_code_strips_whitespace():
     assert L._resolve_plant_node_code("00164742", "  HMC  ") == "HYU_ULSAN"
 
 
+def test_resolve_plant_node_code_normalizes_internal_whitespace():
+    """DART XML 의 'HMMA / HMGMA' / 'HMMA/ HMGMA' 등 공백 변형 — 2026-06-01 신규.
+
+    dict 키는 정규형 'HMMA/HMGMA' 만 등록. _normalize_dart_plant_label 이
+    raw 입력을 정규형으로 변환 후 매칭.
+    """
+    # raw 변형 3 가지 모두 같은 결과
+    assert L._resolve_plant_node_code("00164742", "HMMA / HMGMA") == "HYU_METAPLANT"
+    assert L._resolve_plant_node_code("00164742", "HMMA/ HMGMA") == "HYU_METAPLANT"
+    assert L._resolve_plant_node_code("00164742", "HMMA/HMGMA")  == "HYU_METAPLANT"
+    # 정규화 함수 자체
+    assert L._normalize_dart_plant_label("HMMA / HMGMA") == "HMMA/HMGMA"
+    assert L._normalize_dart_plant_label("HMMA/ HMGMA") == "HMMA/HMGMA"
+    assert L._normalize_dart_plant_label("  HMC  ") == "HMC"
+    assert L._normalize_dart_plant_label("") == ""
+
+
 # ── _merge_capa_and_actual ────────────────────────────────────
 def test_merge_combines_same_plant_and_year():
     capa = [PlantRow(business_division="차량부문", plant_code="HMC",

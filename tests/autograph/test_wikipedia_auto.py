@@ -200,3 +200,32 @@ def test_build_from_wikipedia_truncates_long_html(tmp_path, monkeypatch):
     # title + extract + truncated html < 1000 자
     assert len(captured[0]) < 1500
     assert "..." in captured[0]
+
+
+# ── plant name 정규화 (2026-06-01 신규) ──────────────────────
+def test_normalize_strips_trailing_parentheses():
+    from autograph.ingestion.wikipedia_auto import _normalize_plant_name_for_wiki as N
+    assert N("Hyundai Motor Group Metaplant America (HMGMA, EV 전용)") \
+        == "Hyundai Motor Group Metaplant America"
+    assert N("Hyundai Motor Türkiye (HMTR, HAOS 별표기)") \
+        == "Hyundai Motor Türkiye"
+
+
+def test_normalize_preserves_internal_punctuation():
+    from autograph.ingestion.wikipedia_auto import _normalize_plant_name_for_wiki as N
+    # 중간 punctuation 은 유지
+    assert N("Tesla, Inc.") == "Tesla, Inc."
+    # 한국어 plant name 무변경
+    assert N("현대자동차 울산공장") == "현대자동차 울산공장"
+
+
+def test_normalize_handles_empty():
+    from autograph.ingestion.wikipedia_auto import _normalize_plant_name_for_wiki as N
+    assert N("") == ""
+    assert N(None) == ""   # type: ignore[arg-type]
+
+
+def test_normalize_recursive_multiple_parens():
+    """뒤에 여러 개 괄호도 모두 strip."""
+    from autograph.ingestion.wikipedia_auto import _normalize_plant_name_for_wiki as N
+    assert N("Plant Name (alias1) (alias2)") == "Plant Name"

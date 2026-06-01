@@ -58,7 +58,14 @@ _HDR_UTILIZATION = re.compile(
 )
 
 # 회계연도 (제 N 기) 또는 4자리 연도 추출.
-_YEAR_RE = re.compile(r"(20\d{2})\s*년|(\d{4})\s*년\s*\(제")
+# Year 추출 — 다음 변형 모두 인식:
+#   '2023년(제56기)' / '2023년' / '2024년' — Hyundai
+#   '제80기('23.1.1~12.31)'                — Kia (2자리 연도 → 20XX)
+_YEAR_RE = re.compile(
+    r"(20\d{2})\s*년"                       # 2023년
+    r"|(\d{4})\s*년\s*\(제"                  # 2023년(제
+    r"|제\s*\d+\s*기\s*\(\s*'?(\d{2})\."     # 제80기('23.  → year 23
+)
 
 
 @dataclass
@@ -128,16 +135,25 @@ def _parse_number(s: str) -> float | None:
 def _extract_years_from_header(header_cells: list[str]) -> list[int]:
     """헤더 cell 들에서 연도 추출. 잡힌 순서 유지.
 
-    DART 형식 예: ['사업부문', '법인명', '소재지', '2023년(제56기)', '2022년(제55기)', '2021년(제54기)']
-    → [2023, 2022, 2021]
+    DART 형식 예:
+        Hyundai: ['사업부문', '법인명', '소재지', '2023년(제56기)', '2022년(제55기)', '2021년(제54기)']
+            → [2023, 2022, 2021]
+        Kia: ['사업부문', '품목', '소재지', "제80기('23.1.1~12.31)", "제79기('22.1.1~12.31)", "제78기('21.1.1~12.31)"]
+            → [2023, 2022, 2021]
     """
     out: list[int] = []
     for c in header_cells:
         m = _YEAR_RE.search(c)
         if m:
-            y = m.group(1) or m.group(2)
+            # group(1)='2023년' 4자리 / group(2)=4자리 / group(3)='23' 2자리
+            y = m.group(1) or m.group(2) or m.group(3)
             try:
-                out.append(int(y))
+                yi = int(y)
+                # 2자리 연도 → 2000+
+                if yi < 100:
+                    yi += 2000
+                out.append(yi)
+                continue   # 중복 캡쳐 회피
             except (TypeError, ValueError):
                 continue
     return out
@@ -152,11 +168,12 @@ def _iter_spans_with_text(root) -> Iterable[tuple[object, str]]:
             yield elem, txt
 
 
-def _find_next_table_after(root, anchor):
-    """anchor 엘리먼트 이후 document order 의 첫 <TABLE>.
+def _find_next_table_after(root, anchor, *, min_rows: int = 2,
+                            min_cols: int = 3):
+    """anchor 엘리먼트 이후 document order 의 의미있는 첫 <TABLE>.
 
-    ElementTree 는 parent pointer 가 없으므로 document order 를 flatten 후
-    index 비교. lxml.html 도 같은 패턴 사용 가능.
+    min_rows / min_cols 미만 표는 skip — Kia 사업보고서의 `(단위:대)` 1-cell
+    안내 표 같은 경우를 건너뛰기 위함.
     """
     flat = list(root.iter())
     try:
@@ -164,8 +181,19 @@ def _find_next_table_after(root, anchor):
     except ValueError:
         return None
     for e in flat[idx + 1:]:
-        if _tag(e) == "TABLE":
-            return e
+        if _tag(e) != "TABLE":
+            continue
+        # 행/컬럼 최소 size 검사
+        trs = list(_iter_by_tag(e, "TR"))
+        if len(trs) < min_rows:
+            continue
+        max_cols = max(
+            (len(list(_iter_by_tag(tr, "TD", "TH"))) for tr in trs),
+            default=0,
+        )
+        if max_cols < min_cols:
+            continue
+        return e
     return None
 
 
@@ -173,7 +201,8 @@ def _parse_table_rows(table) -> tuple[list[str], list[list[str]]]:
     """첫 행 = 헤더 cell 텍스트, 나머지 = 데이터 cell 텍스트 list."""
     rows: list[list[str]] = []
     for tr in _iter_by_tag(table, "TR"):
-        cells = [_text(td) for td in _iter_by_tag(tr, "TD")]
+        # TD + TH 양쪽 — Kia/일부 사업보고서는 헤더에 <TH> 사용
+        cells = [_text(td) for td in _iter_by_tag(tr, "TD", "TH")]
         if cells:
             rows.append(cells)
     if not rows:
@@ -183,7 +212,10 @@ def _parse_table_rows(table) -> tuple[list[str], list[list[str]]]:
 
 def _row_to_plant_rows(data_cells: list[str], years: list[int],
                        running_division: str | None,
-                       expected_full_count: int
+                       expected_full_count: int,
+                       *,
+                       plant_col: int = 0,
+                       region_col: int = 1,
                        ) -> tuple[list[PlantRow], str | None]:
     """한 데이터 행 → PlantRow list (연도 수만큼).
 
@@ -221,9 +253,14 @@ def _row_to_plant_rows(data_cells: list[str], years: list[int],
     if len(body_cells) < 2 + len(years):
         return [], running_division
 
-    plant_code = body_cells[0].strip()
-    plant_region = body_cells[1].strip() or None
-    value_cells = body_cells[2:2 + len(years)]
+    # 컬럼 매핑 — plant_col/region_col 은 body_cells (division 제외) 기준 index.
+    # Hyundai (5-col body): [plant_code=0, region=1, y1, y2, y3]
+    # Kia    (5-col body): [품목=0, 소재지=1, y1, y2, y3] → plant_col=1, region_col=None
+    plant_code = body_cells[plant_col].strip()
+    plant_region = (body_cells[region_col].strip() or None
+                    if region_col is not None and region_col < len(body_cells)
+                    else None)
+    value_cells = body_cells[-len(years):]
 
     rows: list[PlantRow] = []
     for year, vcell in zip(years, value_cells):
@@ -402,10 +439,24 @@ def parse_section(xml_text: str, section: str) -> list[PlantRow]:
 
         # header cell 수 = 사업부문 + 법인명 + 소재지 + year * N (capacity / production)
         expected_full = len(header)
+
+        # 컬럼 매핑 자동 검출 — Kia 사업보고서는 header[1]='품목' 이라
+        # plant 식별자가 header[2]='소재지' 에 들어있음.
+        # Hyundai: header[1]='법인명' (plant_code), header[2]='소재지' (region)
+        plant_col, region_col = 0, 1     # default Hyundai
+        h1 = re.sub(r"\s+", "", (header[1] if len(header) > 1 else ""))
+        if "품목" in h1:
+            # Kia 스타일 — body[0]='품목', body[1]='소재지' (plant 식별자)
+            plant_col, region_col = 1, None
+            log.info("[dart_production] Kia-style header detected (품목/소재지) — "
+                     "plant_col=1")
+
         running: str | None = None
         for cells in data_rows:
-            rows, running = _row_to_plant_rows(cells, years, running,
-                                                expected_full)
+            rows, running = _row_to_plant_rows(
+                cells, years, running, expected_full,
+                plant_col=plant_col, region_col=region_col,
+            )
             out.extend(rows)
         # 첫 매칭 표만 채용 — 동일 섹션이 본문에 여러 번 등장하면 중복 위험
         break

@@ -31,6 +31,7 @@ import argparse
 import dataclasses
 import json
 import logging
+import re
 from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
@@ -162,8 +163,35 @@ def _fetch_entity_pages(
     return stats
 
 
+_PLANT_NAME_PAREN_RE = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _normalize_plant_name_for_wiki(name: str) -> str:
+    """plants.yaml name 의 괄호 부연 strip — Wikipedia fuzzy search 정확도 향상.
+
+    예:
+        'Hyundai Motor Group Metaplant America (HMGMA, EV 전용)' →
+            'Hyundai Motor Group Metaplant America'
+        'Hyundai Motor Türkiye (HMTR, HAOS 별표기)' →
+            'Hyundai Motor Türkiye'
+        '현대자동차 울산공장' → (변경 없음)
+
+    Wikipedia search 가 'List of Coca-Cola brands' / 'Kia Ceed' 같이 엉뚱한
+    페이지로 빠지던 원인 해결.
+    """
+    if not name:
+        return ""
+    # 끝에 붙은 (...) 1회 제거. 중간 괄호는 보존 (예: 'Tesla, Inc.').
+    while True:
+        new = _PLANT_NAME_PAREN_RE.sub("", name).strip()
+        if new == name:
+            break
+        name = new
+    return name
+
+
 def _load_plants_from_yaml(limit: int | None) -> list[tuple]:
-    """``ontology/auto/plants.yaml`` 의 plant 목록 → (code, name, wikidata_qid).
+    """``ontology/auto/plants.yaml`` 의 plant 목록 → (code, normalized_name, wikidata_qid).
 
     plants.yaml 의 schema:
         plants:
@@ -173,13 +201,16 @@ def _load_plants_from_yaml(limit: int | None) -> list[tuple]:
             country: KR
             city: Ulsan
             wikidata_qid: Q5928430   # optional
+
+    name 의 괄호 부연 ('(HMGMA, EV 전용)' 등) 은 정규화 후 wiki 검색에 사용.
     """
     from ..ontology import load_plants
     plants = load_plants() or []
     rows: list[tuple] = []
     for p in plants:
-        # plants.yaml 의 name 은 한국어 또는 영문 — name 자체로 wiki 검색
-        rows.append((p.get("code"), p.get("name"), p.get("wikidata_qid")))
+        raw_name = p.get("name") or ""
+        clean_name = _normalize_plant_name_for_wiki(raw_name)
+        rows.append((p.get("code"), clean_name, p.get("wikidata_qid")))
     if limit:
         rows = rows[:limit]
     return rows
