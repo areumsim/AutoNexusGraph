@@ -275,10 +275,68 @@ def build_from_wikipedia(*, max_html_chars: int = 4000) -> int:
     return n
 
 
+def build_from_oem_ir() -> int:
+    """auto.events_oem_news.body_text → vec.chunks (source='oem_ir').
+
+    OEM 별 corp_code 를 메타데이터에 동봉 — finance 측 검색과도 cross 가능.
+    Body 가 비어있거나 SPA 한계로 너무 짧으면 skip (< 300 chars).
+
+    2026-06-01 신규.
+    """
+    conn = get_connection()
+    n = 0
+    skipped_short = 0
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT news_id, oem, oem_corp_code, url, title, section,
+                   body_text, published_date, source
+              FROM auto.events_oem_news
+             WHERE body_text IS NOT NULL AND length(body_text) >= 300
+        """)
+        rows = cur.fetchall()
+        cur.execute("""
+            SELECT count(*) FROM auto.events_oem_news
+             WHERE body_text IS NULL OR length(coalesce(body_text,'')) < 300
+        """)
+        skipped_short = cur.fetchone()[0]
+    with conn.cursor() as cur:
+        for r in rows:
+            (nid, oem, corp_code, url, title, section,
+             body_text, pub_date, source_tag) = r
+            try:
+                _upsert_chunk(
+                    cur,
+                    source="oem_ir",
+                    section=section or "ir/other",
+                    text=body_text,
+                    metadata={
+                        "uniq": f"oem_ir::{oem}::{url}",
+                        "oem": oem,
+                        "oem_corp_code": corp_code,
+                        "url": url,
+                        "title": title,
+                        "published_date": (pub_date.isoformat()
+                                            if pub_date else None),
+                        "ir_source_tag": source_tag,
+                    },
+                    manufacturer_id=None,
+                    model_id=None,
+                    variant_id=None,
+                )
+                n += 1
+            except Exception as e:   # noqa: BLE001
+                log.warning("[chunks:oem_ir] %s: %s", url, e)
+    conn.commit()
+    log.info("[chunks:oem_ir] inserted/updated=%d skipped_too_short=%d",
+             n, skipped_short)
+    return n
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="autograph.loaders.build_chunks_auto")
     ap.add_argument("--source",
-                    choices=["recalls", "complaints", "wikipedia", "all"],
+                    choices=["recalls", "complaints", "wikipedia",
+                              "oem_ir", "all"],
                     default="all")
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
@@ -291,6 +349,8 @@ def main() -> None:
         build_from_complaints()
     if args.source in ("wikipedia", "all"):
         build_from_wikipedia()
+    if args.source in ("oem_ir", "all"):
+        build_from_oem_ir()
 
 
 if __name__ == "__main__":
