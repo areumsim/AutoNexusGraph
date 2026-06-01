@@ -92,7 +92,7 @@ all = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["autonexusgraph*", "autograph*"]
+include = ["autonexusgraph*", "autograph*", "ipgraph*", "common*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

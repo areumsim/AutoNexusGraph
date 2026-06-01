@@ -283,18 +283,19 @@ ingest-gleif-enrich-dry: ; $(PYTHON) -m autonexusgraph.ingestion.gleif_enrich --
 
 # OpenAlex (특허×논문×재무 3중 cross) — ip.institution / ip.works + Neo4j Work/Institution/AUTHORED_AT.
 # OPENALEX_API_KEY 필요 (없으면 mailto polite pool). 무료 키, 하루 10만 크레딧.
-ingest-openalex:     ; $(PYTHON) -m ipgraph.ingestion.openalex --works-per-inst 20 --from-year 2020
-ingest-openalex-dry: ; $(PYTHON) -m ipgraph.ingestion.openalex --dry-run --qids Q20718,Q59243,Q497534
-load-openalex:       ; $(PYTHON) -m ipgraph.loaders.load_openalex
-ingest-kipris:        ; $(PYTHON) -m ipgraph.ingestion.kipris
+# NOTE: ipgraph 는 `src/` layout — `pip install -e .` 안 한 경우 PYTHONPATH=src 필요.
+ingest-openalex:     ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.openalex --works-per-inst 20 --from-year 2020
+ingest-openalex-dry: ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.openalex --dry-run --qids Q20718,Q59243,Q497534
+load-openalex:       ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_openalex
+ingest-kipris:        ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.kipris
 # CPC scheme bulk (USPTO+EPO 공동, 무인증) → PG ip.cpc_scheme + Neo4j :CPCCode + :SUBCLASS_OF.
-load-cpc:             ; $(PYTHON) -m ipgraph.loaders.load_cpc
-load-cpc-dry:         ; $(PYTHON) -m ipgraph.loaders.load_cpc --skip-neo4j --sections A
+load-cpc:             ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_cpc
+load-cpc-dry:         ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_cpc --skip-neo4j --sections A
 # ip.assignee_corp_map PG → Neo4j (Assignee)-[:MAPPED_TO]->(Company) cross-domain bridge.
-load-assignee-corp-map:     ; $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map
-load-assignee-corp-map-dry: ; $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map --dry-run
+load-assignee-corp-map:     ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map
+load-assignee-corp-map-dry: ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map --dry-run
 # USPTO Open Data Portal bulk (PatentsView 후속) — raw/ip/uspto_odp/ 에 jsonl 있으면 적재.
-ingest-uspto-odp:     ; $(PYTHON) -m ipgraph.ingestion.uspto_odp
+ingest-uspto-odp:     ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.uspto_odp
 ingest-law:           ; $(PYTHON) scripts/ingest/download_law.py
 ingest-kcgs:          ; $(PYTHON) scripts/ingest/download_kcgs.py --with-body
 
