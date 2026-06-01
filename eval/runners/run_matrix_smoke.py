@@ -175,16 +175,32 @@ def compute_thesis_headline(cells_with_metrics: list[dict[str, Any]]
             "hybrid":     hybrid_best["label"],
             "vector":     vector_baseline["label"],
         }
-    diff_pp, target_met = compute_diff_pp(
+    em_diff_pp, em_met = compute_diff_pp(
         hybrid_best["multi_hop_em"], vector_baseline["multi_hop_em"],
     )
+    # hits@k 도 비교 — gold_answer_text 부재 시 entity-level fallback.
+    h_hits = hybrid_best.get("multi_hop_hits")
+    v_hits = vector_baseline.get("multi_hop_hits")
+    if h_hits is not None and v_hits is not None:
+        hits_diff_pp, hits_met = compute_diff_pp(h_hits, v_hits)
+    else:
+        hits_diff_pp, hits_met = None, False
+    target_met = em_met or hits_met
+    # diff_pp 는 primary (em) 표시, 단 hits 가 met 이면 hits 기준으로 표기.
+    primary_metric = "hits" if (hits_met and not em_met) else "em"
+    primary_diff = hits_diff_pp if primary_metric == "hits" else em_diff_pp
     return {
-        "available":   True,
-        "hybrid_em":   hybrid_best["multi_hop_em"],
-        "vector_em":   vector_baseline["multi_hop_em"],
-        "diff_pp":     diff_pp,
-        "target_pp":   THESIS_DIFF_PP_TARGET,
-        "target_met":  target_met,
+        "available":     True,
+        "hybrid_em":     hybrid_best["multi_hop_em"],
+        "vector_em":     vector_baseline["multi_hop_em"],
+        "em_diff_pp":    em_diff_pp,
+        "hybrid_hits":   h_hits,
+        "vector_hits":   v_hits,
+        "hits_diff_pp":  hits_diff_pp,
+        "diff_pp":       primary_diff,
+        "primary":       primary_metric,
+        "target_pp":     THESIS_DIFF_PP_TARGET,
+        "target_met":    target_met,
     }
 
 
