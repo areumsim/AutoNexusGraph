@@ -269,6 +269,35 @@ make audit-data-channels    # eval/reports/data_channels_latest.md 생성
 
 ---
 
+## 2026-06-01 실측 적재 상태 (`make audit-data-channels`)
+
+🟢 = 적재 완료 / 🟡 = raw 만 / 🔴 = 미수집 / ⊘ = 키 대기
+
+| 채널 | 상태 | PG row | 인사이트 |
+|---|:---:|---:|---|
+| 산단공 공정 (15151075) | 🟢 | 550 | 410 distinct 공정명 |
+| DART production (Hyundai+Kia) | 🟢 | 184 (capa 107+prod 77) | 12 + 5 = 17 plants × 4-6 years |
+| DART 가동률 utilization | 🟢 | 53 | Hyundai 본사 116.6% / 베트남 54.1% |
+| KAMA 매크로 (yearly+monthly) | 🟢 | 225 | 2009~2025 시계열 |
+| OEM IR 뉴스룸 (Hyundai+Kia ww) | 🟢 | 37 (Hy 25 + Kia ww 12) | sitemap-first, robots/ToS 게이트 |
+| vec.chunks (oem_ir + wiki plants) | 🟢 | 75 | LLM P3 가능 |
+| 팩토리온 (15087611) | ⊘ | 0 | DATA_GO_KR_API_KEY 대기 |
+| 한국 리콜 (15089863) | 🔴 | 0 | DATA_GO_KR_API_KEY 대기 |
+| KOTSA 수리검사 (15155857) | 🟡 | (raw 1 CSV) | loader 실행 대기 |
+
+신규 에이전트 도구 (2026-06-01):
+- `get_plant_capacity` / `get_oem_production` / `list_plants_by_oem` (DART)
+- `search_processes` (산단공)
+- `get_macro_industry` / `get_macro_production` (KAMA)
+
+LLM P3 활성화 경로:
+- `make extract-ir-p3-cost` — 비용 추정 ($0.024 / 25 chunks @ gpt-4o-mini)
+- `make extract-ir-p3` — 실제 호출 (IR_P3_HARD_LIMIT=1.0 보호)
+- `IRRelationExtractor` → `MANUFACTURED_AT` + `CAPACITY_REPORTED` →
+  `auto.staging_relations` → P4 cross-validate → Neo4j 적재
+
+---
+
 ## 더 필요한 데이터 (우선순위)
 
 PRD §3.4 BOM 가용성 매트릭스 + 사용자 의제 ("크롤링이 진짜 가치") 기준.

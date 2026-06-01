@@ -49,22 +49,63 @@ system: |
 
   반드시 다음 JSON 스키마로만 응답:
   {
-    "entities": [
-      {"name": str, "kind": "Plant"|"VehicleModel"|"Manufacturer"|"Module", "alias": [str]}
-    ],
+    "entities": [...],
     "relations": [
       {
         "type": "MANUFACTURED_AT" | "CAPACITY_REPORTED",
-        "head": str,
-        "head_kind": "VehicleModel" | "Plant",
-        "tail": str,
-        "tail_kind": "Plant" | "Manufacturer",
-        "evidence": str,           # 본문 인용 (최대 200자)
-        "confidence": 0.0 ~ 1.0,
-        "attributes": {            # CAPACITY_REPORTED 의 경우
-          "capacity_units": int,   # 대/년
-          "snapshot_year": int     # 발표·보고 시점
-        }
+        "head": str, "head_kind": "VehicleModel"|"Plant",
+        "tail": str, "tail_kind": "Plant"|"Manufacturer",
+        "evidence": str, "confidence": 0.0~1.0,
+        "attributes": { "capacity_units": int, "snapshot_year": int }
       }
     ]
   }
+
+user_template: |
+  [OEM IR/뉴스룸 본문 추출 컨텍스트]
+    oem={oem} ({oem_name})
+    section={section}
+    title={title}
+    url={url}
+    published_date={published_date}
+
+  [본문]
+  {chunk_text}
+
+  위 본문에서 MANUFACTURED_AT 와 CAPACITY_REPORTED 관계만 추출. 본문에 명시적
+  으로 적힌 사실만 — 추론·미래시점 제외. 본 본문이 IR 공시면 confidence 0.9+,
+  보도자료면 0.7~0.85. 본문에 관계가 없으면 빈 list.
+
+# JSON schema — chat_json() 가 enforce.
+json_schema:
+  type: object
+  required: [relations]
+  properties:
+    entities:
+      type: array
+      items:
+        type: object
+        properties:
+          name: {type: string}
+          kind:
+            type: string
+            enum: [Manufacturer, VehicleModel, Plant, Module]
+          alias: {type: array, items: {type: string}}
+    relations:
+      type: array
+      items:
+        type: object
+        required: [type, head, tail, confidence]
+        properties:
+          type: {type: string, enum: [MANUFACTURED_AT, CAPACITY_REPORTED]}
+          head: {type: string}
+          head_kind: {type: string, enum: [VehicleModel, Plant]}
+          tail: {type: string}
+          tail_kind: {type: string, enum: [Plant, Manufacturer]}
+          evidence: {type: string}
+          confidence: {type: number, minimum: 0.0, maximum: 1.0}
+          attributes:
+            type: object
+            properties:
+              capacity_units: {type: integer, minimum: 0}
+              snapshot_year: {type: integer, minimum: 1900, maximum: 2100}

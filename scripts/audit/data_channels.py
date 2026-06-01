@@ -197,22 +197,49 @@ def collect() -> list[ChannelStatus]:
         notes="키 불필요 (파일 다운로드)",
     ))
 
-    # OEM IR / 뉴스룸 — Hyundai/Mobis 활성, Kia 비활성
+    # OEM IR / 뉴스룸 — Hyundai 활성, Kia worldwide 활성, Mobis/Kia 한국 비활성
     oem_ir_root = raw_root / "auto" / "oem_ir"
-    hyundai_meta = oem_ir_root / "hyundai" / "_meta.jsonl"
-    mobis_meta = oem_ir_root / "mobis" / "_meta.jsonl"
-    n_hyundai_meta = sum(1 for _ in hyundai_meta.read_text().splitlines()
-                          if _.strip()) if hyundai_meta.exists() else 0
-    n_mobis_meta = sum(1 for _ in mobis_meta.read_text().splitlines()
-                        if _.strip()) if mobis_meta.exists() else 0
+    def _meta_n(oem):
+        p = oem_ir_root / oem / "_meta.jsonl"
+        if not p.exists():
+            return 0
+        return sum(1 for line in p.read_text().splitlines() if line.strip())
+    n_hyundai_meta = _meta_n("hyundai")
+    n_kia_ww_meta  = _meta_n("kia_worldwide")
     oem_news_pg = _try_pg_count("SELECT count(*) FROM auto.events_oem_news")
     out.append(ChannelStatus(
-        name="OEM IR/뉴스룸 (Hyundai+Mobis)",
-        raw_count=n_hyundai_meta + n_mobis_meta,
-        raw_detail=f"hyundai={n_hyundai_meta} + mobis={n_mobis_meta} (active OEM)",
+        name="OEM IR/뉴스룸 (Hyundai+Kia ww)",
+        raw_count=n_hyundai_meta + n_kia_ww_meta,
+        raw_detail=f"hyundai={n_hyundai_meta} + kia_worldwide={n_kia_ww_meta}",
         pg_count=oem_news_pg,
         pg_detail="auto.events_oem_news",
-        notes="B 등급 — robots.txt + ToS 게이트. Kia 한국 = 비활성 (robots Disallow)",
+        notes="B 등급. Kia 한국·Mobis 비활성 (robots Disallow / SPA)",
+    ))
+
+    # DART 가동률 (2026-06-01 신규)
+    util_pg = _try_pg_count("SELECT count(*) FROM auto.plant_utilization")
+    out.append(ChannelStatus(
+        name="DART 가동률 (utilization, Hyundai)",
+        raw_count="포함",
+        raw_detail="(DART zip 재사용)",
+        pg_count=util_pg,
+        pg_detail="auto.plant_utilization",
+        notes="B 등급. Hyundai 사업보고서 III.(3) — explicit utilization_pct",
+    ))
+
+    # vec.chunks OEM IR + Wikipedia plants
+    chunks_ir = _try_pg_count("SELECT count(*) FROM vec.chunks WHERE source='oem_ir'")
+    chunks_plants = _try_pg_count(
+        "SELECT count(*) FROM vec.chunks WHERE source='wikipedia_auto' AND metadata->>'kind'='plants'"
+    )
+    out.append(ChannelStatus(
+        name="vec.chunks — OEM IR + Wiki plants",
+        raw_count="from PG",
+        raw_detail="2 sources",
+        pg_count=(chunks_ir if isinstance(chunks_ir, int) else 0)
+                  + (chunks_plants if isinstance(chunks_plants, int) else 0),
+        pg_detail=f"oem_ir={chunks_ir} + wiki/plants={chunks_plants}",
+        notes="P3 LLM 추출 가능 (run_p3_ir.py / IRRelationExtractor)",
     ))
 
     return out

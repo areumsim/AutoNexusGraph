@@ -600,3 +600,16 @@ load-oem-ir-news:
 
 load-oem-ir-news-dry:
 	$(PYTHON) -m autograph.loaders.load_oem_ir_news --all --dry-run
+
+# LLM P3 IR 추출 — IRRelationExtractor 경유.
+# 본문 → MANUFACTURED_AT / CAPACITY_REPORTED 후보 → auto.staging_relations.
+# 비용 추정 ($0.024 / 25 chunks @ gpt-4o-mini):
+extract-ir-p3-cost:
+	$(PYTHON) -m autograph.extractors.run_p3_ir --oems hyundai --dry-run-cost
+
+# 실제 호출 — IR_P3_HARD_LIMIT 보호 (기본 $1.0).
+IR_P3_HARD_LIMIT ?= 1.0
+extract-ir-p3:
+	$(PYTHON) -m autograph.extractors.run_p3_ir \
+	    --oems hyundai \
+	    --hard-limit-usd $(IR_P3_HARD_LIMIT)
