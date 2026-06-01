@@ -278,6 +278,82 @@ def _parse_dart_xml(xml_text: str):
         return None
 
 
+# ── utilization 표 전용 파서 (2026-06-01 신규) ────────────────────
+def _parse_pct(s: str) -> float | None:
+    """'116.6%' / '116.6 %' / '-' → float (없으면 None)."""
+    if not s:
+        return None
+    s = s.strip().replace(",", "").rstrip("%").strip()
+    if s in ("", "-", "—", "–"):
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _parse_utilization_table(data_rows: list[list[str]],
+                              years: list[int]) -> list[PlantRow]:
+    """Hyundai 사업보고서 "(3) 가동률" 표 — 다른 컬럼 schema 처리.
+
+    Table layout (Hyundai 표 기준):
+        Header row 0: 사업부문 / 법인명 / 소재지 / 2023년(제56기) [COLSPAN=3]
+        Subheader row 1: 생산능력 / 생산실적 / 가동률(%)
+        Data rows (cells=6): [사업부문(ROWSPAN), 법인명, 소재지, capa, actual, util%]
+        Inherited rows (cells=5): [법인명, 소재지, capa, actual, util%]
+
+    Args:
+        data_rows: ``_parse_table_rows`` 의 ``data_rows`` (header 1 행 제거 후).
+            첫 행이 subheader '생산능력/생산실적/가동률(%)' 면 자동 skip.
+        years: 헤더에서 추출한 년도 list (보통 1 개).
+
+    Returns:
+        Plant 마다 1 행 — ``value=utilization_pct``, ``extra`` 에 capa/actual.
+    """
+    if not data_rows or not years:
+        return []
+    out: list[PlantRow] = []
+    year = years[0]
+
+    # subheader row skip
+    rows_iter = list(data_rows)
+    if rows_iter and any("생산능력" in c or "가동률" in c
+                          for c in rows_iter[0]):
+        rows_iter = rows_iter[1:]
+
+    running_division: str | None = None
+    for cells in rows_iter:
+        n = len(cells)
+        if n == 6:
+            division = cells[0].strip() or running_division
+            running_division = division
+            plant_code = cells[1].strip()
+            region = cells[2].strip() or None
+            capa = _parse_number(cells[3])
+            actual = _parse_number(cells[4])
+            util = _parse_pct(cells[5])
+        elif n == 5:
+            division = running_division
+            plant_code = cells[0].strip()
+            region = cells[1].strip() or None
+            capa = _parse_number(cells[2])
+            actual = _parse_number(cells[3])
+            util = _parse_pct(cells[4])
+        else:
+            continue
+        if not plant_code or plant_code in ("-", "—"):
+            continue
+        out.append(PlantRow(
+            business_division=division,
+            plant_code=plant_code,
+            plant_region=region,
+            year=year,
+            value=util,
+            extra={"capacity_units": capa, "actual_units": actual},
+        ))
+    return out
+
+
 # ── 공개 API ──────────────────────────────────────────────────────
 def parse_section(xml_text: str, section: str) -> list[PlantRow]:
     """단일 섹션 파싱. section ∈ {'capacity', 'production', 'utilization'}.
@@ -312,15 +388,20 @@ def parse_section(xml_text: str, section: str) -> list[PlantRow]:
         years = _extract_years_from_header(header)
         if not years:
             continue
-        # header cell 수 = 사업부문 + 법인명 + 소재지 + year * N
-        # 가동률 표는 컬럼 구성이 다르므로 별도 경로 (TODO — 본 PR 은 capacity /
-        # production 만, utilization 은 raw 보존 안 함). header_len 으로 판정.
+
+        # ── utilization 전용 branch (2026-06-01 신규) ────────────
+        # Hyundai 사업보고서 "(3) 가동률" 표 구조:
+        #   header: 사업부문 / 법인명 / 소재지 / 2023년(제56기) [COLSPAN=3]
+        #   subheader 행: 생산능력 / 생산실적 / 가동률(%)
+        #   data row (cells=6): 사업부문 [ROWSPAN] / 법인명 / 소재지 / capa / actual / util%
+        # 즉 header len=4 (year cell 1) 이지만 data row 는 6 cells.
+        if section == "utilization":
+            util_rows = _parse_utilization_table(data_rows, years)
+            out.extend(util_rows)
+            break
+
+        # header cell 수 = 사업부문 + 법인명 + 소재지 + year * N (capacity / production)
         expected_full = len(header)
-        # 가동률 표 (열이 5 미만이거나, '실가동시간' 등 컬럼) 는 skip.
-        # 실가동시간/가능가동시간 형식은 (법인명, 항목, year1, year2, year3) 5 컬럼.
-        if section == "utilization" and expected_full != 3 + len(years):
-            # 본 PR 은 가동률 raw 보존만 — value 없이 표시 행 1건 추가.
-            continue
         running: str | None = None
         for cells in data_rows:
             rows, running = _row_to_plant_rows(cells, years, running,

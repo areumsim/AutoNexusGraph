@@ -184,6 +184,65 @@ def test_parse_garbage_returns_empty():
     assert out == []
 
 
+# ── utilization 표 (Hyundai 가동률) — 2026-06-01 신규 ───────────
+_UTIL_XML = """<DOCUMENT>
+<P><SPAN>(3) 가동률</SPAN></P>
+<TABLE>
+  <TBODY>
+    <TR>
+      <TD>사업부문</TD><TD>법인명</TD><TD>소재지</TD>
+      <TD>2023년(제56기)</TD>
+    </TR>
+    <TR>
+      <TD>생산능력</TD><TD>생산실적</TD><TD>가동률(%)</TD>
+    </TR>
+    <TR>
+      <TD>차량부문(대수)</TD><TD>HMC</TD><TD>한국</TD>
+      <TD>1,670,690</TD><TD>1,947,351</TD><TD>116.6%</TD>
+    </TR>
+    <TR>
+      <TD>HMMA</TD><TD>북미</TD>
+      <TD>356,100</TD><TD>369,000</TD><TD>103.6%</TD>
+    </TR>
+    <TR>
+      <TD>HMMR</TD><TD>유럽</TD>
+      <TD>-</TD><TD>-</TD><TD>-</TD>
+    </TR>
+  </TBODY>
+</TABLE>
+</DOCUMENT>
+"""
+
+
+def test_parse_utilization_extracts_hmc():
+    rows = parse_section(_UTIL_XML, "utilization")
+    hmc = [r for r in rows if r.plant_code == "HMC"]
+    assert len(hmc) == 1
+    assert hmc[0].value == 116.6
+    assert hmc[0].extra["capacity_units"] == 1670690.0
+    assert hmc[0].extra["actual_units"] == 1947351.0
+    assert hmc[0].business_division == "차량부문(대수)"
+
+
+def test_parse_utilization_rowspan_inheritance():
+    """첫 행만 division — 후속 행도 같은 division 상속."""
+    rows = parse_section(_UTIL_XML, "utilization")
+    hmma = [r for r in rows if r.plant_code == "HMMA"]
+    assert len(hmma) == 1
+    assert hmma[0].business_division == "차량부문(대수)"
+    assert hmma[0].plant_region == "북미"
+
+
+def test_parse_utilization_handles_dashes():
+    """모든 값이 '-' 인 행 (HMMR) — 행은 보존되지만 모든 값 None."""
+    rows = parse_section(_UTIL_XML, "utilization")
+    hmmr = [r for r in rows if r.plant_code == "HMMR"]
+    assert len(hmmr) == 1
+    assert hmmr[0].value is None
+    assert hmmr[0].extra["capacity_units"] is None
+    assert hmmr[0].extra["actual_units"] is None
+
+
 def test_parse_section_without_header_returns_empty():
     """헤더 SPAN 없이 표만 있으면 빈 list (oversearch 방지)."""
     no_header_xml = """<DOCUMENT>

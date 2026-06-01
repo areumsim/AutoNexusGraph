@@ -180,6 +180,35 @@ def _upsert_capacity(cur, *, corp_code: str, rcept_no: str,
     return bool(cur.fetchone()[0])
 
 
+def _upsert_utilization(cur, *, corp_code: str, rcept_no: str,
+                        row: PlantRow) -> bool:
+    """Hyundai 가동률 표 — value=utilization_pct, extra 에 capa/actual."""
+    extra = row.extra or {}
+    cur.execute("""
+        INSERT INTO auto.plant_utilization
+          (corp_code, business_division, plant_code, snapshot_year,
+           utilization_pct, actual_hours, available_hours,
+           source_rcept_no, raw)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+        ON CONFLICT (corp_code, plant_code, snapshot_year) DO UPDATE SET
+          business_division = EXCLUDED.business_division,
+          utilization_pct   = EXCLUDED.utilization_pct,
+          actual_hours      = EXCLUDED.actual_hours,
+          available_hours   = EXCLUDED.available_hours,
+          source_rcept_no   = EXCLUDED.source_rcept_no,
+          raw               = EXCLUDED.raw,
+          updated_at        = now()
+        RETURNING (xmax = 0) AS is_new
+    """, (corp_code, row.business_division, row.plant_code,
+          row.year,
+          row.value,   # utilization_pct
+          extra.get("actual_units"),       # Hyundai 표 는 "시간" 단위 아닌 "대수"
+          extra.get("capacity_units"),     # — 같은 컬럼 재활용 (NUMERIC 호환)
+          rcept_no,
+          json.dumps({"util_pct": row.value, **extra}, ensure_ascii=False)))
+    return bool(cur.fetchone()[0])
+
+
 def _upsert_production(cur, *, corp_code: str, rcept_no: str,
                        row: PlantRow) -> bool:
     cur.execute("""
@@ -251,35 +280,53 @@ def _resolve_plant_node_code(corp_code: str, raw_plant_label: str
 
 
 def _merge_capa_and_actual(capacity_rows: list[PlantRow],
-                           production_rows: list[PlantRow]
+                           production_rows: list[PlantRow],
+                           utilization_rows: list[PlantRow] | None = None,
                            ) -> dict[tuple[str, int], dict]:
-    """(plant_code, year) 키로 capacity + production 합치기.
+    """(plant_code, year) 키로 capacity + production + utilization 합치기.
 
-    같은 plant·year 에 capa 한 행, actual 한 행 — Neo4j 엣지 한 줄로 표현.
+    같은 plant·year 에 capa/actual/util — Neo4j 엣지 한 줄로 표현.
+    utilization_rows 가 있으면 그 값을 우선 사용 (실측 가동률).
     """
     out: dict[tuple[str, int], dict] = {}
+
+    def _entry(key, plant_code, region, year):
+        return out.setdefault(key, {
+            "plant_code": plant_code,
+            "plant_region": region,
+            "snapshot_year": year,
+            "capa_units": None,
+            "actual_units": None,
+            "utilization_pct_explicit": None,   # 가동률 표 출처
+        })
+
     for r in capacity_rows:
         if r.year <= 0 or not r.plant_code:
             continue
         key = (r.plant_code, r.year)
-        out.setdefault(key, {
-            "plant_code": r.plant_code,
-            "plant_region": r.plant_region,
-            "snapshot_year": r.year,
-            "capa_units": None, "actual_units": None,
-        })
+        _entry(key, r.plant_code, r.plant_region, r.year)
         out[key]["capa_units"] = int(r.value) if r.value is not None else None
     for r in production_rows:
         if r.year <= 0 or not r.plant_code:
             continue
         key = (r.plant_code, r.year)
-        out.setdefault(key, {
-            "plant_code": r.plant_code,
-            "plant_region": r.plant_region,
-            "snapshot_year": r.year,
-            "capa_units": None, "actual_units": None,
-        })
+        _entry(key, r.plant_code, r.plant_region, r.year)
         out[key]["actual_units"] = int(r.value) if r.value is not None else None
+    for r in (utilization_rows or []):
+        if r.year <= 0 or not r.plant_code:
+            continue
+        key = (r.plant_code, r.year)
+        _entry(key, r.plant_code, r.plant_region, r.year)
+        out[key]["utilization_pct_explicit"] = r.value
+        # 가동률 표가 capa/actual 도 같이 노출 — 미설정 시 보강
+        if out[key]["capa_units"] is None and r.extra:
+            cu = r.extra.get("capacity_units")
+            if cu is not None:
+                out[key]["capa_units"] = int(cu)
+        if out[key]["actual_units"] is None and r.extra:
+            au = r.extra.get("actual_units")
+            if au is not None:
+                out[key]["actual_units"] = int(au)
     return out
 
 
@@ -299,9 +346,10 @@ RETURN count(edge) AS n
 
 def _sync_manufactured_at_to_neo4j(*, capacity_rows: list[PlantRow],
                                     production_rows: list[PlantRow],
+                                    utilization_rows: list[PlantRow] | None = None,
                                     corp_code: str,
                                     rcept_no: str) -> dict:
-    """PG 적재된 capacity + production → MANUFACTURED_AT 엣지.
+    """PG 적재된 capacity + production (+ utilization) → MANUFACTURED_AT 엣지.
 
     Returns ``{"edges_created":int, "plants_skipped":int}``.
     """
@@ -311,7 +359,8 @@ def _sync_manufactured_at_to_neo4j(*, capacity_rows: list[PlantRow],
                     "MANUFACTURED_AT skip", corp_code)
         return {"edges_created": 0, "plants_skipped": 0}
 
-    merged = _merge_capa_and_actual(capacity_rows, production_rows)
+    merged = _merge_capa_and_actual(capacity_rows, production_rows,
+                                      utilization_rows=utilization_rows)
     rows: list[dict] = []
     plants_skipped = 0
     for (raw_label, year), val in merged.items():
@@ -323,8 +372,9 @@ def _sync_manufactured_at_to_neo4j(*, capacity_rows: list[PlantRow],
             continue
         capa = val["capa_units"]
         actual = val["actual_units"]
-        utilization = None
-        if capa and actual and capa > 0:
+        # 가동률 우선순위: explicit (DART 가동률 표) > 계산값.
+        utilization = val.get("utilization_pct_explicit")
+        if utilization is None and capa and actual and capa > 0:
             utilization = round(actual / capa * 100, 2)
         rows.append({
             "manufacturer_id":  mfr_id,
@@ -358,6 +408,7 @@ def _process_one_zip(cur, *, corp_code: str, rcept_no: str, zip_path: Path,
     stats = {
         "capacity_inserted": 0, "capacity_updated": 0, "capacity_skipped": 0,
         "production_inserted": 0, "production_updated": 0, "production_skipped": 0,
+        "utilization_inserted": 0, "utilization_updated": 0, "utilization_skipped": 0,
         "neo4j_edges": 0, "neo4j_plants_skipped": 0,
     }
 
@@ -403,12 +454,31 @@ def _process_one_zip(cur, *, corp_code: str, rcept_no: str, zip_path: Path,
                         corp_code, row.plant_code, row.year, exc)
             stats["production_skipped"] += 1
 
-    # ── Neo4j sync ──
+    # ── utilization UPSERT (차량부문만, 2026-06-01 신규) ──
+    utilization_rows = [r for r in extract.utilization
+                         if _is_vehicle_division(r.business_division) and r.plant_code]
+    for row in utilization_rows:
+        cur.execute("SAVEPOINT sp_dart_util")
+        try:
+            if _upsert_utilization(cur, corp_code=corp_code,
+                                    rcept_no=rcept_no, row=row):
+                stats["utilization_inserted"] += 1
+            else:
+                stats["utilization_updated"] += 1
+            cur.execute("RELEASE SAVEPOINT sp_dart_util")
+        except Exception as exc:   # noqa: BLE001
+            cur.execute("ROLLBACK TO SAVEPOINT sp_dart_util")
+            log.warning("[dart_prod] utilization %s/%s/%s 실패: %s",
+                        corp_code, row.plant_code, row.year, exc)
+            stats["utilization_skipped"] += 1
+
+    # ── Neo4j sync (utilization 포함) ──
     if sync_neo4j:
         try:
             sync = _sync_manufactured_at_to_neo4j(
                 capacity_rows=capacity_rows,
                 production_rows=production_rows,
+                utilization_rows=utilization_rows,
                 corp_code=corp_code,
                 rcept_no=rcept_no,
             )
@@ -430,6 +500,7 @@ def run(*, corp_codes: list[str] | None = None,
         "corp_codes_seen": 0, "zips_seen": 0, "zips_parsed": 0,
         "capacity_inserted": 0, "capacity_updated": 0, "capacity_skipped": 0,
         "production_inserted": 0, "production_updated": 0, "production_skipped": 0,
+        "utilization_inserted": 0, "utilization_updated": 0, "utilization_skipped": 0,
         "neo4j_edges": 0, "neo4j_plants_skipped": 0,
     }
 
@@ -471,6 +542,8 @@ def run(*, corp_codes: list[str] | None = None,
                 for k in ("capacity_inserted", "capacity_updated",
                            "capacity_skipped", "production_inserted",
                            "production_updated", "production_skipped",
+                           "utilization_inserted", "utilization_updated",
+                           "utilization_skipped",
                            "neo4j_edges", "neo4j_plants_skipped"):
                     total[k] += stats[k]
                 # 중간 commit — 각 zip 마다 1 트랜잭션 (롤백 영향 최소화)
