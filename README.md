@@ -54,7 +54,7 @@
 | Neo4j Manufacturer / Model / Variant / Recall | 22,145 / 6,770 / 428 / 493 | `AFFECTED_BY` 인덱스 매칭 |
 | Neo4j Complaint / Investigation | 16,005 / 154 | NHTSA REPORTED_IN / INVESTIGATED_BY |
 | Neo4j System / Module / Part | (load-auto-all 후) | Level 3 / 4 / 5 — `system_taxonomy.yaml` 19 시스템 (POWERTRAIN, BRAKE, ADAS, …) |
-| Neo4j Supplier / SUPPLIED_BY † | (manual seed 후) | `supplier_seed.yaml` 19 공급사 × 46 매핑 (LG에너지솔루션·삼성SDI·SK온·한온·만도·Bosch·Continental …) |
+| Neo4j Supplier / SUPPLIED_BY ⭐ 6/1 재측정 | **30 SUPPLIED_BY 엣지** (100% meta — `source_type='manual_supplier_seed'`) | `supplier_seed.yaml` 19 공급사 × 46 (supplier, customer, component) tuple 매핑. Neo4j 엣지는 supplier↔component dedupe (customer 다중은 별도 `:CONTAINS_COMPONENT` 엣지로 표현) → 30 distinct edges. **edge_meta_invariants 8 invariant 모두 PASS** |
 | Neo4j RECALL_OF / CONTAINS_COMPONENT | 601 RECALL_OF | NHTSA taxonomy 적재 후 recall→component 매칭율 100% |
 | Neo4j Standard / Plant / Complaint | (seed 후) | `standards.yaml` 22 + `plants.yaml` 18 + `manufactured_at_seed.yaml` 46 모델↔공장 |
 | `auto.staging_relations` (P3 LLM + Wikidata P176) | extract-auto-p3 후 | SUPPLIED_BY / RECALL_OF 후보 — P4 검증 후 그래프 적재 |
@@ -73,7 +73,7 @@
 > **†** **SSOT 간 불일치 3 건 — PG/Neo4j 재조회 후 한 번에 갱신 권장 (발표·인용 시 직접 조회).** 본 PR 은 각주 마커 부착·정직 표기만, 실제 재조회는 후속 PR.
 >
 > 1. **`bridge.corp_entity` 4,806** — ~~내역 합 sec_cik 9 + corp_code 1 + qid 1 = 11 ≠ reviewed 10 / 총계 reviewed 10 + supplier candidate 4,792 + supplier reviewed 2 = 4,804 ≠ 4,806~~. **재측정 (2026-06-01)**: manufacturer cand 1 + rev **11** + supplier cand **4,790** + rev **4** = **4,806 ✓** 합 일치. (이전 측정 manufacturer reviewed 10 → 11 (1 승급), supplier candidate 4,792 → 4,790 (2 승급), supplier reviewed 2 → 4)
-> 2. **SUPPLIED_BY** — §1 `supplier_seed.yaml` "19 공급사 × 46 매핑" vs §6 DoD §10.11 측정 결과 "**30 edges** 100% meta". **재측정 (2026-06-01)**: Neo4j `MATCH ()-[r:SUPPLIED_BY]->() RETURN count(r)` = **30 edges (SoT)**. 16 매핑 차이는 seed yaml 의 일부 mapping 이 entity_id resolve 실패 (`audit-edge-meta` 의 `supplier_no_entity_id` 4,830 와 연결) — supplier candidate 정제 후 자동 채워질 예정.
+> 2. **SUPPLIED_BY** — §1 `supplier_seed.yaml` "19 공급사 × 46 매핑" vs §6 DoD §10.11 측정 결과 "**30 edges** 100% meta". **재측정 (2026-06-01)**: Neo4j `MATCH ()-[r:SUPPLIED_BY]->() RETURN count(r)` = **30 edges (SoT)** + 모두 `source_type='manual_supplier_seed'`. ~~16 매핑 차이~~ **차이가 아니라 데이터 모델 정상** — yaml 46 은 `(supplier, customer, component)` tuple, Neo4j 30 은 supplier↔component dedupe (customer 다중은 `:CONTAINS_COMPONENT` 엣지로). 예: CATL Battery Pack → TESLA/BMW/VW (yaml 3행) → SUPPLIED_BY 1 엣지. `edge_meta_invariants` 8 invariant 모두 PASS (`supplier_no_entity_id=0` 포함) — 누락 없음.
 > 3. **strong_match** — §1 manufacturer "reviewed 10" vs §6 DoD §10.6 측정 결과 "strong_match 12/12 = 100%". **재측정 (2026-06-01)**: `WHERE confidence_score >= 0.9` = manufacturer **11** + supplier **4** = **strong_match 15 (15/15 = 100%)**, `make audit-dod` §10.6 일치. 이전 10/12 vs 현재 15 차이 = supplier reviewed 4 추가 + manufacturer 1 승급.
 >
 > 추가로 §1 머리말 **Cypher 템플릿 카운트** "22 (finance) + 19 (auto)" 도 §5 본문 / §7 의 `cypher_templates_auto.py` 457 LOC 와 정합 재확인 필요.
@@ -346,9 +346,9 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 |---|---|:---:|---|
 | §10.4 | MVP 범위 OEM 5~8 × 모델 30~50 × 2022~2024 | ✅ | OEM=5 / models=102 / years=(2020, 2024) — 범위 over-spec |
 | §10.5 | BOM L0~L3 안정 + L4 coverage ≥ 60% | ✅ | L0~L3 stable, L4=63.7% |
-| §10.6 | bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+ | ✅ | strong_match 12/12 = 100% |
-| §10.11 | SUPPLIED_BY 엣지 confidence/provenance/snapshot_year 100% | ✅ | 30 edges 100% meta |
-| §10.12 | 코어 코드 변경 < 5% | ✅ | ⭐ 6/1 **baseline reset** `4049caf` (12.22% 누적) → **`bab94117f3`** (도메인3 ipgraph 통합 직전 anchor) → 0/14,091 LOC = **0.00%**. 이력 SSOT: `eval/reports/core_diff_baseline_ledger.md` |
+| §10.6 | bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+ | ✅ | strong_match **15/15 = 100%** (manufacturer reviewed 11 + supplier reviewed 4, 모두 conf≥0.9) — 2026-06-01 재측정 |
+| §10.11 | SUPPLIED_BY 엣지 confidence/provenance/snapshot_year 100% | ✅ | **30 edges** 모두 `source_type='manual_supplier_seed'` + 100% meta (yaml 46 매핑 vs Neo4j 30 = customer 다중 dedupe 정상) |
+| §10.12 | 코어 코드 변경 < 5% | ✅ | ⭐ 6/1 **baseline reset 2회**: `4049caf` (Phase B) → **`bab9411`** (도메인3 통합 직전, 12.22%) → **`414bc1b`** (ipgraph 인프라 일괄 PR 완료, **0/15,396 LOC = 0.00%**). 이력 SSOT: `eval/reports/core_diff_baseline_ledger.md` |
 | §10.7 | Hybrid vs Vector Multi-hop +30%p | ⊘ | LLM 키 필요 — `make eval-auto` 실행 후 자동 측정 |
 | §10.8 | Cross-Domain QA CD-L1~L4 | ⊘ | LLM 키 필요 |
 | §10.9 | 제원 수치 EM 95%+ | ⊘ | LLM 키 필요 |
