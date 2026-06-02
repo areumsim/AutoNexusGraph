@@ -1,0 +1,126 @@
+# Part (Level 5) manual seed — 한국어 부품 (NHTSA Module taxonomy 와 별도 canonical_name).
+#
+# PR-P2-A (옵션 AC) — NHTSA depth≥3 (31 row 자동 재분류 via load_parts_l5.py:_promote_depth3)
+# 와 함께 적재. 본 seed 는 한국 자동차 부품사 / 시장 친숙 명명 (배터리셀·BMS·인젝터 등).
+# parent_module_canonical_name 으로 Module(L4) lookup → parent_component_id 채움 (실패
+# 시 parent_component_id NULL — CONTAINED_IN 엣지 생성 안 됨, 노드만 적재).
+#
+# UNIQUE 제약: (canonical_name, system_code). NHTSA L4 row 와 canonical_name 중복 회피.
+
+version: 1
+schema_version: "v2.2"
+domain: automotive
+last_updated: 2026-06-02
+
+parts:
+  # ── 배터리/전동화 ──────────────────────────────────────────
+  - canonical_name: "배터리셀"
+    name_norm: "battery_cell"
+    system_code: "battery"
+    aliases: ["Battery Cell", "Lithium Cell", "Cell", "셀"]
+    parent_module_canonical_name: "Battery Pack"
+    wikidata_qid: null
+
+  - canonical_name: "배터리관리시스템(BMS)"
+    name_norm: "bms"
+    system_code: "battery"
+    aliases: ["BMS", "Battery Management System", "배터리관리시스템"]
+    parent_module_canonical_name: "Battery Pack"
+    wikidata_qid: "Q4868503"
+
+  # ── 엔진/연료 ──────────────────────────────────────────────
+  - canonical_name: "점화플러그"
+    name_norm: "spark_plug"
+    system_code: "engine"
+    aliases: ["Spark Plug", "Plug", "스파크 플러그"]
+    parent_module_canonical_name: "ENGINE"
+    wikidata_qid: "Q193395"
+
+  - canonical_name: "점화코일"
+    name_norm: "ignition_coil"
+    system_code: "engine"
+    aliases: ["Ignition Coil", "Coil"]
+    parent_module_canonical_name: "ENGINE"
+    wikidata_qid: "Q1322355"
+
+  - canonical_name: "산소센서"
+    name_norm: "oxygen_sensor"
+    system_code: "engine"
+    aliases: ["Oxygen Sensor", "O2 Sensor", "람다센서", "Lambda Sensor"]
+    parent_module_canonical_name: "ENGINE"
+    wikidata_qid: "Q1130645"
+
+  # ── 브레이크 ──────────────────────────────────────────────
+  - canonical_name: "브레이크패드"
+    name_norm: "brake_pad"
+    system_code: "BRAKE"
+    aliases: ["Brake Pad", "Pad", "브레이크 패드"]
+    parent_module_canonical_name: "Brake System"
+    wikidata_qid: "Q1058992"
+
+  - canonical_name: "브레이크디스크"
+    name_norm: "brake_disc"
+    system_code: "BRAKE"
+    aliases: ["Brake Disc", "Disc Rotor", "Brake Rotor", "디스크 로터"]
+    parent_module_canonical_name: "Brake System"
+    wikidata_qid: "Q1058820"
+
+  - canonical_name: "브레이크캘리퍼"
+    name_norm: "brake_caliper"
+    system_code: "BRAKE"
+    aliases: ["Brake Caliper", "Caliper"]
+    parent_module_canonical_name: "Brake System"
+    wikidata_qid: "Q908338"
+
+  # ── 전장 ──────────────────────────────────────────────────
+  - canonical_name: "알터네이터"
+    name_norm: "alternator"
+    system_code: "electrical_system"
+    aliases: ["Alternator", "Generator", "발전기"]
+    parent_module_canonical_name: "ELECTRICAL SYSTEM:ALTERNATOR/GENERATOR/REGULATOR"
+    wikidata_qid: "Q189257"
+
+  - canonical_name: "스타터모터"
+    name_norm: "starter_motor"
+    system_code: "electrical_system"
+    aliases: ["Starter Motor", "Starter", "스타터"]
+    parent_module_canonical_name: "ELECTRICAL SYSTEM:STARTER ASSEMBLY"
+    wikidata_qid: "Q749653"
+
+  # ── 냉각 ──────────────────────────────────────────────────
+  - canonical_name: "라디에이터"
+    name_norm: "radiator"
+    system_code: "engine_and_engine_cooling"
+    aliases: ["Radiator", "Cooling Radiator"]
+    parent_module_canonical_name: "ENGINE AND ENGINE COOLING:COOLING SYSTEM"
+    wikidata_qid: "Q193293"
+
+  - canonical_name: "워터펌프"
+    name_norm: "water_pump"
+    system_code: "engine_and_engine_cooling"
+    aliases: ["Water Pump", "Coolant Pump"]
+    parent_module_canonical_name: "ENGINE AND ENGINE COOLING:COOLING SYSTEM"
+    wikidata_qid: "Q637268"
+
+  # ── 조명/카메라 ───────────────────────────────────────────
+  - canonical_name: "헤드라이트"
+    name_norm: "headlight"
+    system_code: "exterior_lighting"
+    aliases: ["Headlight", "Headlamp", "전조등"]
+    parent_module_canonical_name: "EXTERIOR LIGHTING:HEADLIGHTS"
+    wikidata_qid: "Q187056"
+
+  - canonical_name: "후방카메라"
+    name_norm: "rear_camera"
+    system_code: "ADAS"
+    aliases: ["Rear Camera", "Backup Camera", "후방 카메라"]
+    parent_module_canonical_name: "Camera"
+    wikidata_qid: null
+
+  # ── 와이퍼 ──────────────────────────────────────────────
+  - canonical_name: "와이퍼모터"
+    name_norm: "wiper_motor"
+    system_code: "electrical_system"
+    aliases: ["Wiper Motor", "Windshield Wiper Motor"]
+    parent_module_canonical_name: null   # NHTSA 220 에 명시 Wiper Module 없음 (best-effort NULL)
+    wikidata_qid: null
