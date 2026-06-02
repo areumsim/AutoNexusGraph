@@ -81,12 +81,25 @@ def _upsert_chunk(cur, *, source: str, section: str, text: str,
           source, manufacturer_id, model_id, variant_id))
 
 
+_RECALL_SRC_MAP: dict[str, str] = {
+    "nhtsa":          "nhtsa_recall",
+    "datagokr_kotsa": "kotsa_recall",
+}
+
+
 def build_from_recalls() -> int:
+    """auto.events_recalls 모든 행 → vec.chunks.
+
+    source 별 chunk 라벨 (DEFECT_MATCHES 빌더가 이 라벨로 매칭):
+        nhtsa            → 'nhtsa_recall'   (영문)
+        datagokr_kotsa   → 'kotsa_recall'   (한국어, KOTSA)
+        그 외             → 'other_recall'
+    """
     conn = get_connection()
-    n = 0
+    n_by_src: dict[str, int] = {}
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT recall_id, source_recall_no, manufacturer_id, model_id, variant_id,
+            SELECT recall_id, source, source_recall_no, manufacturer_id, model_id, variant_id,
                    component_text, defect_summary, consequence, remedy_summary,
                    report_date
               FROM auto.events_recalls
@@ -94,8 +107,9 @@ def build_from_recalls() -> int:
         rows = cur.fetchall()
     with conn.cursor() as cur:
         for r in rows:
-            (recall_id, no, mfr_id, model_id, variant_id,
+            (recall_id, src, no, mfr_id, model_id, variant_id,
              comp, defect, conseq, remedy, rdate) = r
+            chunk_src = _RECALL_SRC_MAP.get(src, "other_recall")
             text_parts = []
             if comp:    text_parts.append(f"부품: {comp}")
             if defect:  text_parts.append(f"결함: {defect}")
@@ -106,23 +120,25 @@ def build_from_recalls() -> int:
                 continue
             try:
                 _upsert_chunk(cur,
-                    source="nhtsa_recall",
+                    source=chunk_src,
                     section="auto.recall",
                     text=text,
                     metadata={
-                        "uniq": f"nhtsa_recall::{no}",
+                        "uniq": f"{chunk_src}::{no}",
                         "source_recall_no": no,
+                        "recall_source": src,
                         "report_date": rdate.isoformat() if rdate else None,
                     },
                     manufacturer_id=mfr_id,
                     model_id=model_id,
                     variant_id=variant_id)
-                n += 1
+                n_by_src[chunk_src] = n_by_src.get(chunk_src, 0) + 1
             except Exception as e:  # noqa: BLE001
                 log.warning("[chunks:recall] %s: %s", no, e)
     conn.commit()
-    log.info("[chunks:recall] inserted=%d", n)
-    return n
+    total = sum(n_by_src.values())
+    log.info("[chunks:recall] inserted/updated=%d by_source=%s", total, n_by_src)
+    return total
 
 
 def build_from_complaints() -> int:
