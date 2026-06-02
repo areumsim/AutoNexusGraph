@@ -12,6 +12,8 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
 import json
 import logging
 import sys
@@ -87,6 +89,41 @@ def _iter_items(root: Path):
             yield f.name, item
 
 
+def _iter_csv_items(csv_path: Path):
+    """data.go.kr 3048950 — KOTSA '자동차결함 리콜현황' CSV (cp949) → item dict.
+
+    구 15089863 오픈API 폐기 대체본. 컬럼(6):
+        제작자 / 차명 / 생산기간(부터) / 생산기간(까지) / 리콜개시일 / 리콜사유.
+    리콜번호 컬럼이 **없어** (제작자+차명+생산기간+개시일+사유) sha1 으로 안정적·
+    멱등 합성 키를 만든다 (``csv:<개시일>:<16hex>`` ≤ 31자, source_recall_no(80) 적합).
+    """
+    with csv_path.open(encoding="cp949", newline="") as f:
+        reader = csv.DictReader(f)
+        for raw_row in reader:
+            row = {(k or "").strip(): (v or "").strip()
+                   for k, v in raw_row.items() if k}
+            maker = row.get("제작자")
+            reason = row.get("리콜사유")
+            if not (maker and reason):
+                continue
+            start = row.get("리콜개시일")
+            basis = "|".join([
+                maker, row.get("차명", ""),
+                row.get("생산기간(부터)", ""), row.get("생산기간(까지)", ""),
+                start or "", reason,
+            ])
+            digest = hashlib.sha1(basis.encode("utf-8")).hexdigest()[:16]
+            yield csv_path.name, {
+                "리콜번호":        f"csv:{start or 'na'}:{digest}",
+                "제작자":          maker,
+                "차명":            row.get("차명"),
+                "결함내용":        reason,        # run() → defect_summary
+                "리콜개시일":      start,         # run() → report_date
+                "생산기간(부터)":  row.get("생산기간(부터)"),
+                "생산기간(까지)":  row.get("생산기간(까지)"),
+            }
+
+
 def _ko_alias_lookup(raw_name: str, norm: str) -> str | None:
     """한국어 이름 → NHTSA 영문 정규형 1차 매핑."""
     if not raw_name:
@@ -150,17 +187,24 @@ def _resolve_manufacturer_id(cur, raw_name: str | None) -> int | None:
     return None
 
 
-def run() -> dict:
-    raw_root = get_settings().ingest_raw_dir / _SOURCE_PATH
-    if not raw_root.exists():
-        log.warning("[load:datagokr_recalls] %s 없음 — graceful skip", raw_root)
-        return {"inserted": 0, "updated": 0, "skipped": 0}
+def run(csv_path: Path | None = None) -> dict:
+    if csv_path is not None:
+        if not csv_path.exists():
+            log.warning("[load:datagokr_recalls] CSV %s 없음 — graceful skip", csv_path)
+            return {"inserted": 0, "updated": 0, "skipped": 0}
+        items_iter = _iter_csv_items(csv_path)
+    else:
+        raw_root = get_settings().ingest_raw_dir / _SOURCE_PATH
+        if not raw_root.exists():
+            log.warning("[load:datagokr_recalls] %s 없음 — graceful skip", raw_root)
+            return {"inserted": 0, "updated": 0, "skipped": 0}
+        items_iter = _iter_items(raw_root)
 
     conn = get_connection()
     inserted = updated = skipped = 0
 
     with conn.cursor() as cur:
-        for filename, item in _iter_items(raw_root):
+        for filename, item in items_iter:
             # 정확한 컬럼명은 data.go.kr 명세에 따라 다름 — 대표 키만.
             recall_no = (item.get("리콜번호") or item.get("recallNo")
                          or item.get("recall_no") or item.get("RECALL_NO"))
@@ -224,11 +268,14 @@ def run() -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--csv", default=None,
+                    help="KOTSA '자동차결함 리콜현황' CSV 경로 (data.go.kr 3048950). "
+                         "지정 시 JSON page 대신 CSV 적재.")
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
     logging.basicConfig(level=args.log_level,
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    run()
+    run(csv_path=Path(args.csv) if args.csv else None)
     return 0
 
 
