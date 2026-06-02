@@ -8,6 +8,64 @@
 
 ---
 
+## 2026-06-02 — v2.2-rev1: ProcessGraph (BoP) 축 격상 정책 통합 (PR-P0-A)
+
+산단공 자동차 부품 제조업 공정 합성데이터 (data.go.kr 15151075, `auto.processes` 550 row /
+410 공정명) 를 auto 도메인의 BoP (Bill of Process) 1급 축으로 격상하기 위한 **PRD 정책
+변경만 포함**. 실제 적재·로더·온톨로지·도구 작업은 후속 13 PR (P0-B 부터 P4-C 까지) 로
+분리. 본 commit 은 정책 게이트만 (코드·데이터 변경 0). [DoD §10.18~20 신설]
+
+### Added
+- **PRD §12.6** — "ProcessGraph — BoP 축 격상 (auto 도메인 심화)" 신설 (§12.5 IPGraph 패턴
+  미러). 설계 SSOT = `PRD_process_graph.md` (사용자 작성 중, `docs/process_graph.md` 로
+  이관 예정). 도메인 어댑터 슬롯 / 데이터 소스 (산단공·DART·팩토리온·KAMP·AI Hub·KOSIS) /
+  Cross-Domain CD-Process 시연 / 14 PR 작업 순서 (P0~P4) / 정량 게이트.
+- **PRD §10 DoD #18/#19/#20 신설** —
+  - #18: BoP 모델 안정 (5 노드 + 7 엣지: PRODUCED_BY/PRECEDES/INSTANTIATES/USES_EQUIPMENT/
+    CONSUMES_MATERIAL/PERFORMED_AT/CAUSED_BY_PROCESS, `make audit-ontology` PASS)
+  - #19: 회사 귀속 공정 인스턴스 (`PERFORMED_AT` ≥ 30, A/B 100%, 산단공/KAMP/AI Hub 위반 0건)
+  - #20: 공정 cross 시연 (AUTO 공정 문항 ≥ 10 + CD-Process ≥ 5 + 정확도 ≥ 50%)
+- **PRD §3.5.1 신설** — "row 단위 동적 confidence 격상 (C→B)". 정적 등급표 §3.5 본문 무변경
+  + `_confidence.py::SOURCE_TO_GRADE` 무변경 + `validator.py:LOW_CONFIDENCE_THRESHOLD=0.5`
+  무변경. 8 시그널 (M1~M7 + C1) 가중합산 → `clip(0.50 + Σ w·s·grade − 0.20·|conflicts|,
+  0.30, 1.00)`. 산단공 row 단독 운영. C 단독 격상은 `validated_status='candidate'` 유지
+  (§3.5 단독 근거 금지 원칙 보존).
+- **PRD §13 의사결정 로그 1행 추가** — "v2.2-rev1 ProcessGraph 격상" (대안: 새 도메인 /
+  단일 노드 단순 모델, 사유: BoM ⟂ BoP 직교 확장 + 회사 귀속 A/B 분리).
+
+### 후속 PR (`/root/.claude/plans/quiet-bubbling-wadler.md` SSOT, 14 PR / 약 4.5주)
+- **P0-B**: `ontology/auto/process.yaml` 신규 (Process / ProcessStep / Equipment) +
+  `relations.yaml` 7 엣지 추가 + `src/autograph/extractors/process_confidence.py` 시그니처
+- **P1-A~C**: `:Process` taxonomy (410 distinct, key=`SCREAMING_SNAKE(name_norm)`) +
+  `:ProcessStep` BoP 인스턴스 + `:Equipment` + PRODUCED_BY / PRECEDES / INSTANTIATES /
+  USES_EQUIPMENT 결정적 적재
+- **P2-A~D**: `:Part` L5 도입 (NHTSA recall + Wikidata P527, LLM 회피) + `:Material` L6
+  확장 (cathode chem → 합금/플라스틱 25+) + CONSUMES_MATERIAL + SUPPLIED_BY × Part +
+  KAMP 15089213 / AI Hub / KOSIS 풍부화 (회사 비귀속 통계 속성만)
+- **P3-A~C**: PERFORMED_AT (A/B 회사 귀속만, `load_performed_at.py` source allowlist
+  hard-check) + CAUSED_BY_PROCESS (NHTSA recall LLM P3 → P4 검증) + cross_validate 8
+  시그널 row 단위 격상 (`scripts/upgrade_processes_confidence.py` 1회 풀런 ≤ $2 + GPU 1분)
+- **P4-A~C**: `src/autograph/tools/process.py` 10 함수 + `auto_proc_*` Cypher 6 템플릿 +
+  Gold QA AUTO 공정 10+ / CD-Process 5+ + 문서 동기화 (data_lineage / data_sources /
+  data_inventory / autograph / README)
+
+### 보류 (사용자 작업 존중)
+- **`PRD_process_graph.md` → `docs/process_graph.md` 이관** — 사용자가 작성 중. P0-A 에서는
+  PRD §12.6 / §3.5.1 / §10 본문이 직접 `PRD_process_graph.md` 를 참조 (이관 후 사용자가
+  링크 갱신). PR-P4-C 의 문서 동기화 단계에서 이관 완료 가정.
+- **청사진 §1.1 line 25 "USES_PROCESS base" 잔존 표현** — 청사진 §3.2 엣지 리스트 (7개)
+  에 `USES_PROCESS` 부재 (`INSTANTIATES`/`PRODUCED_BY` 가 base). 구버전 표현 잔존
+  가능성이지만 사용자 작업 존중, 본 PR 에서 수정하지 않음.
+
+### 검토 회피 (사용자 강조)
+사용자가 본 세션에서 "에이전트 답변이 아니라 실제 코드 기반으로 꼼꼼히 검토" 를 명시
+요구. Plan agent 1차안의 9건 문제 (`:Process` 단일 노드 모델 / yaml `from: Module ∪ Part`
+문법 불가 / `_OPTIONAL_INDEXES` hardcoded 미인지 / `required_confidence_min` 기존 schema
+신설 주장 / 청사진 SSOT 무시 등) 를 실제 파일·라인 대조 후 모두 수정. 메모리
+`feedback_verify_real_code.md` 보강.
+
+---
+
 ## 2026-06-01 — 정합성 검토 + IPGraph (도메인3) 인프라 통합
 
 대형 검토·정리 PR. 본 세션 7 commit (`414bc1b` ~ `0066a19`) 으로 도메인3 (ip = 특허)
