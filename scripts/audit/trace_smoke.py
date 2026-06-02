@@ -39,11 +39,31 @@ log = logging.getLogger(__name__)
 
 
 def _ensure_keys() -> tuple[bool, str]:
-    """Langfuse 실측 가능 조건 — env 확인. (활성, 사유) 반환."""
-    if (os.getenv("TRACE_BACKEND") or "").strip().lower() != "langfuse":
+    """Langfuse 실측 가능 조건 — env 확인. (활성, 사유) 반환.
+
+    `.env` fallback: `_resolve_backend()` 가 `get_settings()` (pydantic-settings) 로
+    `.env` 의 `TRACE_BACKEND` 도 인식 — `os.getenv` 단독 검사 시 process env 만 보는
+    버그 회피.
+    """
+    from autonexusgraph.agents.tracing import _resolve_backend
+    if _resolve_backend() != "langfuse":
         return False, "TRACE_BACKEND != langfuse"
-    if not (os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY")):
+    # LANGFUSE_* 키도 동일하게 .env fallback. pydantic-settings 가 lower-case 로 노출.
+    pub = os.getenv("LANGFUSE_PUBLIC_KEY")
+    sec = os.getenv("LANGFUSE_SECRET_KEY")
+    if not (pub and sec):
+        try:
+            from autonexusgraph.config import get_settings
+            s = get_settings()
+            pub = pub or getattr(s, "langfuse_public_key", "")
+            sec = sec or getattr(s, "langfuse_secret_key", "")
+        except Exception:   # noqa: BLE001
+            pass
+    if not (pub and sec):
         return False, "LANGFUSE_PUBLIC_KEY/SECRET_KEY 미설정"
+    # process env 에 주입 — _get_langfuse_client 가 os.getenv 만 보는 호환성 유지.
+    os.environ.setdefault("LANGFUSE_PUBLIC_KEY", pub)
+    os.environ.setdefault("LANGFUSE_SECRET_KEY", sec)
     return True, "ok"
 
 

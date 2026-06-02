@@ -34,15 +34,17 @@ log = logging.getLogger(__name__)
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 
 # Cathode chemistry families — 배터리 cell 의 Wikidata Q-ID seed.
-# 더 넓은 SPARQL 쿼리는 본 모듈 확장 — 본 wire-up 단계는 seed 5종.
-CATHODE_QIDS = {
-    "Q899037":  "Lithium-ion battery",            # 상위 카테고리.
-    "Q1126478": "NCA cathode",                    # Nickel Cobalt Aluminum.
-    "Q900614":  "NCM cathode",                    # Nickel Cobalt Manganese.
-    "Q1411884": "LFP cathode",                    # Lithium iron phosphate.
-    "Q1142080": "LCO cathode",                    # Lithium cobalt oxide.
-    "Q900541":  "LMO cathode",                    # Lithium manganese oxide.
-}
+# **STALE / UNVERIFIED** (2026-06-02 실측):
+#   - Q899037 → "Toboliu" (루마니아 마을, NOT Lithium-ion battery)
+#   - Q900614 → "carbochemistry" (NOT NCM cathode)
+#   - Q1126478 → "Külsővat" (헝가리 마을, NOT NCA)
+# Wikidata QID 들은 시간 경과로 재할당되거나, 초기 시드가 잘못 추정된 것으로 보임.
+#
+# **SSOT 는 `ontology/auto/materials_seed.yaml`** — manual chemistry 정의 + minerals 매핑.
+# Wikidata 자동 보강은 manual QID 큐레이션이 선행되어야 의미 있음. 그때까지 본 dict 는
+# 빈 채 유지 (collect() 가 0 row 반환 + materials_seed 폴백을 그대로 사용).
+# 큐레이션 SOP: docs/autograph.md §2.5.4.
+CATHODE_QIDS: dict[str, str] = {}
 
 # SPARQL — cathode chemistry meta + 셀 제조사 매핑 (sparse).
 # 본 쿼리는 manufacturer 직접 매칭이 약함 (Wikidata 의 P176/manufacturer 부재).
@@ -84,6 +86,12 @@ def collect(*, limit: int | None = None, dry_run: bool = False) -> dict:
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     qids = list(CATHODE_QIDS.keys())[: limit] if limit else list(CATHODE_QIDS.keys())
+    if not qids:
+        log.warning("[wikidata_cell_chem] CATHODE_QIDS 빈 dict — manual 큐레이션 대기 "
+                     "(상단 주석 참조). materials_seed.yaml 폴백 사용 권장.")
+        return {"n_rows": 0, "source": "wikidata", "skipped": True,
+                "note": "CATHODE_QIDS 미큐레이션 — Wikidata 자동 보강 비활성"}
+
     qid_values = " ".join(f"wd:{q}" for q in qids)
     query = _CATHODE_QUERY_TEMPLATE.format(qid_values=qid_values)
 

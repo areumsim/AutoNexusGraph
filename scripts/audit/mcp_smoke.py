@@ -38,7 +38,7 @@ def _check_mcp_sdk() -> bool:
 
 
 def _check_server_boot() -> dict:
-    """SDK 설치 환경 — build_mcp_server 호출 실측."""
+    """SDK 설치 환경 — build_mcp_server 호출 + list_tools 핸들러 round-trip."""
     try:
         from autonexusgraph.mcp.server import build_mcp_server
     except ImportError as e:
@@ -47,8 +47,27 @@ def _check_server_boot() -> dict:
         server, specs = build_mcp_server("all")
     except Exception as e:   # noqa: BLE001
         return {"passed": False, "reason": f"build_mcp_server 실패: {e}"}
+
+    # list_tools 핸들러를 in-process 로 호출 — 외부 에이전트 (Claude Desktop / Cline)
+    # 가 receive 할 응답 shape 까지 실측. mcp SDK 1.x: ServerResult(root=ListToolsResult).
+    list_tools_count = -1
+    try:
+        import asyncio
+        from mcp.types import ListToolsRequest   # type: ignore[import-not-found]
+        handler = server.request_handlers.get(ListToolsRequest)
+        if handler is not None:
+            result = asyncio.run(
+                handler(ListToolsRequest(method="tools/list", params=None))
+            )
+            inner = getattr(result, "root", result)
+            tools = getattr(inner, "tools", None) or []
+            list_tools_count = len(tools)
+    except Exception as exc:   # noqa: BLE001
+        log.debug("list_tools round-trip 실패 (fail-soft): %s", exc)
+
     return {"passed": True, "n_tools": len(specs),
-            "server_name": getattr(server, "name", "?")}
+            "server_name": getattr(server, "name", "?"),
+            "list_tools_count": list_tools_count}
 
 
 def main() -> int:

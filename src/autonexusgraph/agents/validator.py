@@ -1,12 +1,17 @@
 """Validator 노드 + Replan 신호 — PRD §7.5.5.
 
-검증 항목:
-1. citation: 답변에 evidence 가 1건도 안 묻어있으면 fail
-2. grounding overlap: token overlap < HARD_FAIL 이면 fail (grounding.verify 결과 사용)
-3. language: 한국어 비율이 너무 낮으면 fail
-4. completeness: 답변이 너무 짧거나 빈 답이면 fail
-5. financial number safety: 답변에 등장한 큰 숫자가 도구 결과(tool_results)에서 나온 수치인지 cross-check —
-   환각 방지 (PRD §7.3 "재무 수치는 절대 LLM 이 생성하지 않는다")
+검증 항목 (6개):
+1. completeness (answer_too_short): 답변이 너무 짧거나 빈 답이면 fail (< _MIN_ANSWER_LENGTH)
+2. self-reported insufficient: 답변이 "정보 부족" / "데이터 없음" 자기 신고면 early pass
+   (replan 의미 없음 — 데이터 자체가 없는 상황)
+3. language (language_non_korean): 한국어 비율이 너무 낮으면 fail (language_guard.check_korean)
+4. grounding overlap: token overlap < HARD_FAIL 이면 fail (verify_answer_grounding 사용).
+   narrative / multi_hop 질문은 grounding warning 만 추가 (hard fail 아님)
+5. financial number safety (hallucinated_numbers): 답변에 등장한 큰 숫자가 도구 결과 / evidence
+   에서 나온 수치인지 cross-check — 환각 방지 (PRD §7.3 "재무 수치는 절대 LLM 이 생성하지 않는다").
+   number_guard 와 SSOT 공유 (_number_patterns.py)
+6. edge confidence (PRD §6.7 / §7.0): tool_results 의 graph 엣지 confidence 가 모두 < 0.5 면
+   hard fail (low_confidence_edges_only — 단독 근거 금지). 일부만 미달이면 soft warning.
 
 검증 실패 시 state["validation_status"]="failed", state["validation_issues"] 채움.
 graph.run_agent 가 n_replans < MAX 이면 planner 부터 재실행.
@@ -69,11 +74,14 @@ def validator_node(state: AgentState) -> AgentState:
     if not ok_ko:
         issues.append(f"language_non_korean_{ratio:.2f}")
 
-    # 4) Grounding (이미 synthesizer 가 채워둘 수 있음)
-    grounding = state.get("grounding") or verify_answer_grounding(
-        answer=answer,
-        evidence_chunks=state.get("evidence_chunks") or [],
-    )
+    # 4) Grounding (이미 synthesizer 가 채워둘 수 있음 — None 이면 직접 계산.
+    # 빈 dict {} 도 falsy 라 'or' 는 재계산 유발 → 'is None' 으로 명확화).
+    grounding = state.get("grounding")
+    if grounding is None:
+        grounding = verify_answer_grounding(
+            answer=answer,
+            evidence_chunks=state.get("evidence_chunks") or [],
+        )
     state["grounding"] = grounding
     if not grounding.get("ok"):
         # narrative / multi_hop 류 질문은 evidence 가 핵심. 도구 결과만 있고 evidence 없는

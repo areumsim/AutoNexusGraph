@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
+from autonexusgraph.loaders._edge_meta import edge_meta_set_clause
 
 
 UPSERT_ARTICLE = """
@@ -50,19 +51,23 @@ ON CONFLICT (article_hash, corp_code) DO UPDATE
    SET confidence = GREATEST(news.article_mentions.confidence, EXCLUDED.confidence)
 """
 
-NEO4J_UPSERT_NEWS = """
+NEO4J_UPSERT_NEWS = f"""
 UNWIND $rows AS r
-MERGE (n:NewsEvent {article_hash: r.article_hash})
-SET n.title       = r.title,
-    n.source      = r.source,
+MERGE (n:NewsEvent {{article_hash: r.article_hash}})
+SET n.title        = r.title,
+    n.source       = r.source,
     n.published_at = r.published_at,
-    n.url         = r.link
+    n.url          = r.link
 WITH n, r
 UNWIND r.corp_codes AS cc
-MATCH (c:Company {corp_code: cc})
+MATCH (c:Company {{corp_code: cc}})
 MERGE (n)-[m:MENTIONS]->(c)
 SET m.extracted_by = 'rule',
-    m.confidence = 0.8
+    m.confidence   = 0.8,
+{edge_meta_set_clause('m', source_type='news_yna', confidence_score=0.80,
+                       validated_status='candidate', extraction_method='rule_substring',
+                       snapshot_year_expr='CASE WHEN n.published_at IS NOT NULL THEN datetime(n.published_at).year ELSE date().year END',
+                       source_id_expr='r.article_hash')}
 """
 
 

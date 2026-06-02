@@ -263,6 +263,96 @@ relations:
       소재의 광물 derivation. NCM811 → Ni·Co·Mn / NCA → Ni·Co·Al / LFP → Fe·P /
       Graphite anode → Graphite. confidence 0.95 grade A (USGS MCS).
 
+  # ── BoP (공정 축) — ProcessGraph (PRD_process_graph §3.2) ──────────
+  # grade 는 confidence_default(float) 로만 인코딩 (A=0.95/B=0.80/C=0.50).
+  # 회사 귀속(PERFORMED_AT)은 DART/팩토리온(A/B)만 — 합성·익명 출처 금지.
+  PRODUCED_BY:                      # Part → ProcessStep (BoP 입력)
+    from: Part
+    to: ProcessStep
+    directed: true
+    cardinality: one-to-many
+    class: main_hop                 # BoP 경로 진입
+    provenance: deterministic       # DART 공정도설명 + 산단공 매칭 (Step 3)
+    pass: P2
+    confidence_default: 0.80         # B (DART 매칭) — 산단공 단독은 C 로 하향
+    enabled: false                  # Step 3 활성화 (인스턴스 적재 후)
+    notes: |
+      부품이 어떤 공정 단계로 만들어지는가. (:Part)-[:PRODUCED_BY]->(:ProcessStep).
+
+  PRECEDES:                         # ProcessStep → ProcessStep (공정 순서 routing)
+    from: ProcessStep
+    to: ProcessStep
+    directed: true
+    cardinality: one-to-many
+    class: main_hop
+    provenance: deterministic       # 산단공 process_order 순차 (합성·C)
+    pass: P2
+    confidence_default: 0.50         # C — 산단공 합성 순서. 적재 confidence_score=0.50.
+    enabled: true                   # Step 3 활성. 체인은 (factory,map) 내 선형 — 폭발 없음.
+    notes: |
+      (factory_manage_no, process_map_name) 그룹 내 process_order 인접 단계 연결.
+      선형 체인(분기 없음). 조회 폭발 방지 depth cap 은 auto_proc_route 템플릿의
+      ``PRECEDES*0..10`` literal 로 강제 (적재가 아니라 질의에서 제한).
+
+  INSTANTIATES:                     # ProcessStep → Process (단계→공정유형 사전)
+    from: ProcessStep
+    to: Process
+    directed: true
+    cardinality: many-to-one
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.50         # C — 산단공 합성 taxonomy 연결
+    enabled: true                   # Step 3 활성
+
+  USES_EQUIPMENT:                   # ProcessStep → Equipment (설비)
+    from: ProcessStep
+    to: Equipment
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.50
+    enabled: false                  # scaffold (인스턴스 미적재)
+
+  CONSUMES_MATERIAL:                # ProcessStep → Material (→ L6 Mineral 하향)
+    from: ProcessStep
+    to: Material
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic
+    pass: P2
+    confidence_default: 0.80
+    enabled: false                  # Step 5 활성화
+
+  PERFORMED_AT:                     # ProcessStep → Plant (★ 회사 귀속 — A/B 만)
+    from: ProcessStep
+    to: Plant
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic       # DART(B) / 팩토리온(A) — 합성·익명 출처 금지
+    pass: P2
+    confidence_default: 0.80
+    enabled: false                  # Step 2 — 직접 출처 coverage 확인 후 활성화
+    notes: |
+      회사 귀속 핵심 엣지. 공장(:Plant)은 real(A/B) 이나 어떤 공정이 도는지는
+      추론일 수 있음 — 추론분은 confidence 하향·validated_status='candidate' 로
+      등급 정합 유지. plant real 등급을 inferred 공정 엣지에 전가 금지 (PRD §8).
+
+  CAUSED_BY_PROCESS:                # Recall → Process (품질 이벤트 ↔ 공정, P3 후보)
+    from: Recall
+    to: Process
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: llm                 # P3 LLM 추출 → P4 cross-validate 필수
+    pass: P3
+    confidence_default: 0.50         # C — "후보" 표시, C 단독 근거 금지
+    enabled: false                  # Step 6 활성화 (비용 dry-run → P4 통과분만)
+
 # ── 명명 컨벤션 ─────────────────────────────────────────────────
 naming_conventions:
   entity_type:    PascalCase (VehicleModel, Supplier)

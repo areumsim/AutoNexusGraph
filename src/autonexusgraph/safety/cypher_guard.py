@@ -70,6 +70,12 @@ def assert_read_only(query: str) -> None:
 
     문자열 리터럴 안의 단어도 탐지될 수 있으나 보수적 운영을 위해 과탐 감수.
     LLM 프롬프트에 명시된 키워드는 답변에만 존재, Cypher 에는 없어야 정상.
+
+    False-positive 정책 (의도된 trade-off):
+    - property/alias 이름이 쓰기 키워드와 동일하면 차단됨 (예: ``RETURN n.set``,
+      ``AS create``). 템플릿 작성 시 이런 식별자 사용을 피한다.
+    - 문자열 리터럴 안의 단어도 매칭 (예: ``WHERE c.name = 'CREATE Inc'``) — 회피
+      불가하면 템플릿 등록 시 검토 후 화이트리스트 별도 처리.
     """
     if not isinstance(query, str) or not query.strip():
         raise CypherGuardError("빈 Cypher 쿼리")

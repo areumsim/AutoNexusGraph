@@ -86,6 +86,8 @@ make serve-ui           # Streamlit :31021 — st.status 노드 진행 표시
 
 ## 적재 순서 — 의존성 (DAG)
 
+### Finance 도메인
+
 ```
 ingest-corp     → load-companies      ─┐
 ingest-krx      ────────────────────────┤→ load-entity-map (시드)
@@ -104,6 +106,63 @@ ingest-gleif    → load-gleif           — entity_map 보강 (LEI)
 
 make migrate-schema                    — 1회 (Sector→Industry / Person birth_year)
 make validate-quality                  — 마지막에 매번 실행
+```
+
+### Auto 도메인 (`make load-auto-all` 내부 순차 강제)
+
+```
+neo4j-init                              # CONSTRAINT/INDEX 멱등
+   ↓
+pg                                      # NHTSA vPIC + Recalls + Complaints → auto.master_* / events_*
+   ↓
+specs                                   # NHTSA NCAP + EPA + Canadian → auto.spec_measurements
+   ↓
+neo4j                                   # PG → Neo4j MERGE (Manufacturer/Model/Variant/Recall)
+   ↓
+bridge                                  # bridge.corp_entity 매칭 (QID > LEI > sec_cik > business_no > name)
+   ↓
+standards / plants                      # standards.yaml + plants.yaml seed
+   ↓
+safety / epa                            # SAFETY_RATED_BY 엣지 + EPA spec 보강
+   ↓
+aihub                                   # AI Hub 71347 + 578 → auto.components (L4 부분)
+   ↓
+nhtsa-taxonomy                          # NHTSA recall taxonomy 178 raw → 176 normalized module
+   ↓
+supplier-edges                          # supplier_seed.yaml 19 공급사 46 매핑 → SUPPLIED_BY 30 distinct edges
+   ↓ (이 순서가 강제 — aihub 선행 없으면 component foreign key 위반)
+complaints-neo4j                        # auto.events_complaints → Neo4j REPORTED_IN
+   ↓
+recall-components / complaint-components  # component 매칭 → RECALL_OF 601 edges
+   ↓
+investigations                          # NHTSA ODI 154 → INVESTIGATED_BY
+   ↓
+oem-sec                                 # SEC EDGAR 글로벌 OEM XBRL → auto.oem_financials_sec
+   ↓
+derive-contains-system                  # System taxonomy 19 → CONTAINS_SYSTEM
+   ↓
+wikidata-part-supplies                  # Wikidata P176 staging (rate-limit 로 0 row — `docs/data_inventory.md §3 B-issue`)
+   ↓
+manufactured-at                         # plants_seed + DART 사업보고서 → MANUFACTURED_AT 99 edges
+   ↓
+build-chunks-auto                       # NHTSA complaint/recall/tsb + Wikipedia → vec.chunks (manufacturer/model/variant 메타)
+```
+
+### IP 도메인 (실제 Makefile 타깃 — `ip` prefix 없음 정정 2026-06-02)
+
+```
+PG schema (18_ipgraph + 19_ipgraph_bridge + 22_ip_works + 23_ip_cpc — hot-apply)
+   ↓
+load-cpc                                # ✅ 적재 완료 — CPC scheme bulk 10,695 (무인증, 1회)
+   ↓
+ingest-openalex → load-openalex         # ✅ 적재 완료 — works 629 / institution 38 / work_institution 638
+                                        #   (OpenAlex 무료 키 — `OPENALEX_EMAIL` ENV)
+   ↓
+(대기) ingest-uspto-odp                 # USPTO Open Data Portal bulk dataset (PatentsView 후속, 무인증 bulk)
+   ↓
+(대기) ingest-kipris                    # KIPRIS_API_KEY 발급 후
+   ↓
+(대기) load-assignee-corp-map           # assignee → corp_code 매핑 (supplier candidate SOP 재사용)
 ```
 
 ## 자주 쓰는 명령
@@ -162,8 +221,9 @@ make validate-quality         # 매핑 커버리지 점검
 
 ## 수동 자료 적재 — car.go.kr / KNCAP (by design)
 
-두 source 모두 **공식 Open API 미공개** (2026-05 기준). PRD §3.2 가 자동 수집을 명시
-했으나 실제 채널이 없어 **수동 CSV 모드를 정식 운영 방식으로 채택**.
+두 source 모두 **공식 Open API 미공개**. PRD §3.2 가 자동 수집을 명시했으나 실제 채널이
+없어 **수동 CSV 모드를 정식 운영 방식으로 채택** (의도된 fallback). 대안 채널은 NHTSA
+자동수집이 KR-only 리콜의 80% 를 보강 — 본 절 끝 "대체안" 참조.
 
 ### car.go.kr (KR 리콜)
 
@@ -194,34 +254,57 @@ NHTSA 에 등재되어 있어 KNCAP 의존도 낮음.
 
 | Tier | 예시 source | 본문 저장 |
 |---|---|---|
-| public_domain | dart, sec_edgar, kosis | OK |
-| cc0 | wikidata | OK |
+| public_domain | dart, sec_edgar, kosis, nhtsa_*, epa, usgs_mcs, uspto_odp, cpc_scheme | OK |
+| cc0 | wikidata, openalex | OK |
 | cc_by_sa | wikipedia | OK (출처표기) |
 | cc_by_4_0 | gleif | OK (출처표기) |
-| kogl_type1 | fss_press, ftc, kipris | OK |
-| copyrighted | news_yonhap, news_hankyung | 제목+요약+URL 만 |
-| metadata_only | bigkinds | 본문 X |
+| kogl_type1 | fss_press, ftc, kipris, datagokr (KOTSA / 산단공 / KAMA 등) | OK |
+| **kogl_type1_by_nc** | (일부 공공 데이터의 비상업 한정) | OK (비상업 사용 한정 + 출처표기) |
+| cc_by_nc_sa | namuwiki (CC BY-NC-SA 2.0 KR — **out-of-scope**) | **본 시스템 사용 금지** |
+| copyrighted | news_yonhap, news_hankyung, oem_news (Hyundai/Kia IR/뉴스룸 본문) | 제목+요약+URL 만 (metadata_only 자동 게이트) |
+| metadata_only | bigkinds, kia_kr_news (robots Disallow), mobis_kr_news (SPA) | 본문 X |
+| share_alike | opencorporates | OK (cc_by_sa 게이트 + `require_share_alike()` helper) |
+
+코드 SSOT = `src/autonexusgraph/ingestion/_license.py` 의 `LICENSE_POLICY` dict. 신규 source 추가 시 정책 미등록이면 `tests/test_license.py` invariant test (`PASS — 15/15`) 가 fail.
 
 ## 점검 쿼리
 
 ```sql
--- PG 적재량 한눈에
-SELECT 'master.companies' tbl, count(*) FROM master.companies UNION ALL
-SELECT 'entity_map',          count(*) FROM master.entity_map UNION ALL
-SELECT 'persons',              count(*) FROM master.persons UNION ALL
-SELECT 'vec.chunks',           count(*) FROM vec.chunks UNION ALL
-SELECT 'vec.chunks (embedded)',count(*) FROM vec.chunks WHERE embedding IS NOT NULL;
+-- PG 적재량 한눈에 (3 도메인 통합)
+SELECT 'master.companies'        tbl, count(*) FROM master.companies UNION ALL
+SELECT 'master.entity_map',           count(*) FROM master.entity_map UNION ALL
+SELECT 'master.persons',              count(*) FROM master.persons UNION ALL
+SELECT 'fin.financials',              count(*) FROM fin.financials UNION ALL
+SELECT 'fin.filings',                 count(*) FROM fin.filings UNION ALL
+SELECT 'auto.master_manufacturers',   count(*) FROM auto.master_manufacturers UNION ALL
+SELECT 'auto.master_vehicle_models',  count(*) FROM auto.master_vehicle_models UNION ALL
+SELECT 'auto.events_recalls',         count(*) FROM auto.events_recalls UNION ALL
+SELECT 'auto.events_complaints',      count(*) FROM auto.events_complaints UNION ALL
+SELECT 'auto.components',             count(*) FROM auto.components UNION ALL
+SELECT 'bridge.corp_entity',          count(*) FROM bridge.corp_entity UNION ALL
+SELECT 'ip.cpc_scheme',               count(*) FROM ip.cpc_scheme UNION ALL
+SELECT 'ip.works',                    count(*) FROM ip.works UNION ALL
+SELECT 'vec.chunks',                  count(*) FROM vec.chunks UNION ALL
+SELECT 'vec.chunks (embedded)',       count(*) FROM vec.chunks WHERE embedding IS NOT NULL;
 
--- ID 커버리지
+-- ID 커버리지 (finance entity_map)
 SELECT id_type, count(*) FROM master.entity_map GROUP BY 1 ORDER BY 2 DESC;
+
+-- bridge 매칭 분포
+SELECT entity_type, reviewed_status, count(*)
+  FROM bridge.corp_entity GROUP BY 1, 2 ORDER BY 1, 2;
 ```
 
 ```cypher
-// Neo4j 상태
+// Neo4j 상태 (3 도메인 통합)
 MATCH (n) RETURN labels(n)[0] AS label, count(n) AS c ORDER BY c DESC;
 MATCH ()-[r]->() RETURN type(r) AS rel, count(r) AS c ORDER BY c DESC;
 
-// 동명이인 분리 검증
+// 동명이인 분리 검증 (finance Person)
 MATCH (p:Person) WITH p.name AS name, collect(DISTINCT p.birth_year) AS years
 WHERE size(years) > 1 RETURN name, years LIMIT 10;
+
+// 7키 의무 메타 누락 엣지 (audit-edge-meta 와 동일 invariant)
+MATCH ()-[r]->() WHERE r.source_type IS NULL OR r.confidence_score IS NULL
+RETURN type(r), count(*) ORDER BY count(*) DESC LIMIT 20;
 ```

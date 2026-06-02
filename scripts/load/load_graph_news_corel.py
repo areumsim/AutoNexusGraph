@@ -16,15 +16,19 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.db.postgres import get_pool
+from autonexusgraph.loaders._edge_meta import edge_meta_set_clause
 
 
-CYPHER = """
+CYPHER = f"""
 UNWIND $rows AS r
-MATCH (a:Company {corp_code: r.a})
-MATCH (b:Company {corp_code: r.b})
+MATCH (a:Company {{corp_code: r.a}})
+MATCH (b:Company {{corp_code: r.b}})
 MERGE (a)-[rel:CO_MENTIONED_WITH]-(b)
 ON CREATE SET rel.count = r.count, rel.last_seen = r.last_seen, rel.sources = r.sources
 ON MATCH  SET rel.count = r.count, rel.last_seen = r.last_seen, rel.sources = r.sources
+SET
+{edge_meta_set_clause('rel', source_type='news_yna_cooccur', confidence_score=0.70,
+                       validated_status='candidate', extraction_method='rule_aggregate')}
 """
 
 

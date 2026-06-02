@@ -180,6 +180,38 @@ relations:
     pass: P3
     confidence: ">= 0.60 적재 (Product 는 자유도 높음)"
 
+  # ── P2 (뉴스 룰 기반 — LLM 0%, news 도메인) ──────────────────
+  MENTIONS:                    # NewsEvent → Company (룰 substring 매칭)
+    from: NewsEvent
+    to: Company
+    directed: true
+    cardinality: many-to-many
+    properties:
+      - { name: extracted_by, type: string }     # 'rule' / 'llm_ner'
+      - { name: confidence, type: float }        # 룰: 0.80, LLM: 산출값
+    provenance: deterministic
+    pass: P2
+    confidence: 0.80
+    notes: |
+      뉴스 RSS → 회사명·alias 정규화 후 기사 제목/요약에서 substring 매칭.
+      너무 짧은 이름(2자 이하) 은 오탐 多 → loader 측에서 제외.
+
+  CO_MENTIONED_WITH:           # Company ↔ Company (NewsEvent 공동 언급 집계)
+    from: Company
+    to: Company
+    directed: false              # 양방향 — count/last_seen 공유
+    cardinality: many-to-many
+    properties:
+      - { name: count, type: int, required: true }      # 공동 등장 기사 수
+      - { name: last_seen, type: date }                  # 가장 최근 공동 언급일
+      - { name: sources, type: array<string> }           # 매체 다양성 신호
+    provenance: deterministic
+    pass: P2
+    confidence: 0.70
+    notes: |
+      MENTIONS 집계로부터 파생. min-count 임계 (기본 2) 미만은 노이즈로 제외.
+      방향 정규화: 사전순 정렬 후 (a, b) 보관.
+
   # ── P4 (cross-validate 후 활성화/폐기) ──────────────────────
   # P3 산출을 P1/P2 정형 데이터와 대조:
   #   예) LLM 이 "A is subsidiary of B" 추출 → P2 의 SUBSIDIARY_OF 에 이미 있으면 redundant,

@@ -46,6 +46,7 @@ from autonexusgraph.db.postgres import get_connection
 
 from ..ontology import canonical_system_code, load_system_taxonomy
 from ._neo4j_helpers import run_batched
+from .load_auto_process_nodes import _fetch_processes, merge_processes
 
 
 log = logging.getLogger(__name__)
@@ -359,6 +360,7 @@ def load_all(batch: int = 500) -> dict:
         modules  = _fetch_components_by_level(cur, 4)
         parts    = _fetch_components_by_level(cur, 5)
         suppliers = _fetch_suppliers(cur)
+        processes = _fetch_processes(cur)          # BoP taxonomy (:Process)
     pg.commit()
 
     systems = _fetch_systems_from_taxonomy()
@@ -377,6 +379,8 @@ def load_all(batch: int = 500) -> dict:
         out["modules"]       = run_batched(session, MERGE_MODULE, modules, batch=batch)
         out["parts"]         = run_batched(session, MERGE_PART, parts, batch=batch)
         out["suppliers"]     = run_batched(session, MERGE_SUPPLIER, suppliers, batch=batch)
+        # BoP taxonomy: 산단공 합성 공정사전 → :Process (grade C, 노드만).
+        out["processes"]     = merge_processes(session, processes, batch=batch)
 
     log.info("[neo4j] loaded %s", out)
     return out

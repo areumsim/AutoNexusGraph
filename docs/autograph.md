@@ -1,19 +1,25 @@
 # AutoGraph — 자동차 도메인 GraphRAG (PRD v2.1)
 
-AutoNexusGraph(금융) 코어 위에 **자동차 제품·부품·리콜·공급망 GraphRAG**를 얹은 추가 도메인.
+AutoNexusGraph(금융) 코어 위에 **자동차 제품·부품·리콜·공급망 GraphRAG**를 얹은 도메인 plug-in.
 LangGraph multi-agent, PG/Neo4j/pgvector, cost/number/cypher guard 등 핵심 인프라는 그대로
 재사용한다. 새 코드는 `src/autograph/` 별도 패키지로 격리.
 
 > 전체 시스템 구조 (3 패키지 토폴로지 · LangGraph 노드 · SSOT 색인) 는
 > [docs/architecture.md](./architecture.md) 가 SSOT. 본 문서는 **auto 도메인 단독 가이드**.
 
-> **본 패치 (2026-05-28) 요약 — §7 참조**
-> ① ontology/auto/*.yaml SSOT 도입 → Neo4j 제약·LLM 프롬프트·검증기 동시 구동.
-> ② BOM 라벨 정상화: `:Component` → `:Module`(level=4) / `:Part`(level=5) 분리,
->    `:System` 코드 SCREAMING_SNAKE 통일, `:Supplier.entity_id` 식별 일관성 복구.
-> ③ 새 deterministic 엣지: `RECALL_OF` (component_text 정규화 매칭) + `SUPPLIED_BY` (manual seed).
-> ④ LLM P3 + P4 cross-validate 신설 — auto.staging_relations 경유, confidence-gate 적재.
-> ⑤ §0 12 개 버그(:Supplier 식별 / ghost MERGE / snapshot_year NULL / 라벨 컨벤션 충돌 / …) 해소.
+> **v2.1 핵심 변경 요약 — §7 참조**
+> ① `ontology/auto/*.yaml` SSOT 도입 → Neo4j 제약·LLM 프롬프트·검증기 동시 구동.
+> ② BOM 라벨 정상화: `:Component` → `:Module` (level=4) / `:Part` (level=5) 분리, `:System` 코드 SCREAMING_SNAKE 통일, `:Supplier.entity_id` 식별 일관성 복구.
+> ③ deterministic 엣지: `RECALL_OF` (component_text 정규화 매칭) + `SUPPLIED_BY` (manual seed).
+> ④ LLM P3 + P4 cross-validate — `auto.staging_relations` 경유, confidence-gate 적재.
+> ⑤ §0 12 개 버그 (`:Supplier` 식별 / ghost MERGE / `snapshot_year` NULL / 라벨 컨벤션 충돌 …) 해소.
+
+> **데이터 적재 현재 상태 (정확성 명시):**
+> - **NHTSA / EPA / Wikidata 마스터** — ✅ 적재 완료
+> - **NHTSA Recalls / Complaints / Investigations** — ✅ 적재 완료 (493 / 16,005 / 154)
+> - **Wikidata P176 (manufactured by)** — ⚠️ **rate-limit (1 req/min, 429)** 로 `auto.staging_relations` **0 row**. P3 LLM 추출 + manual `supplier_seed.yaml` 19 공급사 46 매핑 (Neo4j `SUPPLIED_BY` **30 distinct edges** — customer 다중은 `:CONTAINS_COMPONENT` 로 분리) 으로 우회. 자세한 사유는 `docs/data_inventory.md §2.1` B-issue 참조
+> - **BOM Level 5 (`:Part`) / Level 6 (`:Material` / `:Process`)** — ⚠️ Level 5 `:Part` 노드 **0** (리콜·LLM 추출에서만 자연 발생). Level 6 은 **부분 진입** — `:Material` 6 (cathode chem: NCM811/622/523/NCA/LFP/GRAPHITE_ANODE) / `:Mineral` 5 (Li/Ni/Co/Mn/Graphite, USGS MCS 2024) / `DERIVED_FROM` 17 / `MADE_OF` 8. §2.5.4 다이어그램 참조
+> - **`:Supplier` Neo4j 9,642 vs PG `auto.master_suppliers` 4,812** — ⚠️ 약 2배 차이는 `supplier_seed.yaml` + `auto.suppliers_edges` loader 의 중복 적재 의심. `data_inventory.md §3 B10` 추적 중
 
 ## 1. 구조
 
@@ -204,7 +210,7 @@ flowchart TD
     L3["Level 3: System<br/>파워트레인 · 브레이크 · 안전"]
     L4["Level 4: Module<br/>배터리팩 · ECU · 에어백"]
     L5["Level 5: Part (post-MVP)<br/>셀 · 센서 · 인플레이터"]
-    L6["Level 6: Material/Process (post-MVP)<br/>NCM · 알루미늄 · 단조"]
+    L6["Level 6: Material/Process (부분 적재)<br/>Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8"]
 
     L0 -->|MANUFACTURES| L1
     L1 -->|HAS_VARIANT| L2
@@ -217,9 +223,9 @@ flowchart TD
     style L6 stroke-dasharray: 5 5
 ```
 
-#### 부록 — 배터리·소재 L5/L6 확장 (예정, auto 도메인 BOM 하향)
+#### 부록 — 배터리·소재 L5/L6 확장 (곁가지 — 부분 적재, auto 도메인 BOM 하향)
 
-> ip 도메인(특허) 아님. auto 의 BOM 을 셀·화학조성·핵심광물까지 내림. 상세 데이터 소스는 README §4 "배터리·소재 보완" 표 참조.
+> ip 도메인(특허) 아님. auto 의 BOM 을 셀·화학조성·핵심광물까지 내림. **현 적재 상태 (2026-06-01)**: `:Material` 6 (cathode chem: NCM811/622/523/NCA/LFP/GRAPHITE_ANODE) / `:Mineral` 5 (Li/Ni/Co/Mn/Graphite, USGS MCS 2024) / `DERIVED_FROM` 17 (7-key 100%) / `MADE_OF` 8 (기존 :Module name 매칭). 회사단위 셀↔OEM 소싱은 grade C candidate (sparse). 상세 데이터 소스는 README §4 "배터리·소재 보완" 표 참조.
 
 ```
 (:Module {name:'배터리팩'})
@@ -391,12 +397,38 @@ make eval-auto
 - **NCAP / IIHS / Euro NCAP** — 별도 수집 미구현. NHTSA NCAP 만 구현됨.
 - **Level 5(Part)는 부분 커버** — Module 은 AI Hub / supplier_seed 기반으로 다수 등록되지만,
   Part 은 ontology 및 MERGE 경로만 준비. 실데이터는 LLM P3 의 RECALL_OF 추출에서 자연 발생.
-- **Level 6 (Material/Process)** — PRD 명시적 non-goal.
-- **Wikidata P176 자동 SUPPLIED_BY** — `loaders.load_wikidata_part_supplies` 가 staging 까지
-  적재. P4 cross-validate 가 Neo4j 로 promote (manual seed 와 병행).
+- **Level 6 (Material/Process)** — v2.2 부분 진입 (USGS MCS 5 mineral + materials_seed 6 cathode chem). 회사단위 셀↔OEM 소싱은 grade C candidate.
 - **MANUFACTURED_AT (모델↔공장 구체)** — `ontology/auto/manufactured_at_seed.yaml` 46 매핑
   + `loaders.load_manufactured_at`. 한국 OEM 12 모델 + Tesla/BMW/VW/Toyota 등 글로벌 대표.
 - **임베딩** — 자동차 청크의 embedding 백필은 동일하게 별도 `embed-chunks` 필요.
+
+### 5.1 SUPPLIED_BY 의 manual seed 의존도 — 정직 표시 (P1-6)
+
+> 본 절은 시스템의 "공급망 추론" 자랑이 실제로 어디까지 자동인지를 솔직히 정리. cold review ([docs/system_review.md](system_review.md)) 의 P1-(6) 항목.
+
+**현재 사실**:
+- Neo4j `SUPPLIED_BY` 30 distinct edges — **거의 100% manual `supplier_seed.yaml` 출처**
+- `auto.staging_relations` (Wikidata P176 자동 추출 후보 staging) — **0 row**
+- 이유: Wikidata SPARQL endpoint 의 1 req/min rate-limit (429) — `docs/data_inventory.md §3 B7`
+
+**즉**:
+- 시스템의 "공급망 추론" 가치는 **manual yaml 한 줄 한 줄 의 품질** 에 종속
+- 새 공급사 추가 = `supplier_seed.yaml` 수동 수정 (`(supplier, customer, component)` tuple) + PR
+- LLM P3 추출 + P4 cross-validate 경로는 **wired-but-disabled** — 비용·환각 위험 vs 가치 검증 미실시
+- 확장성: 19 공급사 → 50+ 늘리려면 yaml 50+ 줄 수기 작성 — 자동화 routine 부재
+
+**왜 이 의존을 감수하나 (의도된 트레이드오프)**:
+- (a) 자동 채널 (Wikidata P176 / OpenAlex assignee / LLM 추출) 모두 **정확도 불충분** — manual seed 의 90~95% confidence 보다 낮음
+- (b) bridge.corp_entity 의 supplier candidate 4,790 row 와 일관성 — strong_match (≥0.9) 만 인용하는 정책
+- (c) 본 PR 의 PRD §10.11 측정 (SUPPLIED_BY 100% 7키 메타) 은 이 manual 30 edges 로 달성 — 정량 증명 자체는 정합
+
+**우회 옵션 (P1 백로그)**:
+1. **Wikidata bulk dump** — 90 GB+ 다운, P176 관계만 추출. 운영 비용 큼.
+2. **OpenAlex assignee → supplier inference** — 특허 assignee 가 부품사인 경우 자동 supplier 후보 (정확도 낮음, candidate 등급)
+3. **수동 SPARQL batch** — Wikidata Query Service 의 웹 UI 에서 직접 실행 + CSV 다운로드 (rate-limit 회피)
+4. **DART 사업보고서 본문 LLM P3 확장** — 현대모비스/한온/만도/현대위아 사업보고서 narrative 에서 SUPPLIED_BY 관계 추출 (현재 IRRelationExtractor wired)
+
+**결론**: 현재 SUPPLIED_BY 30 edges 는 **"공급망 추론" 시연용 seed 로는 정합** 하나, **시스템 차원 자랑 ("자동 공급망 추출") 은 정직히 보강 필요**. 본 한계는 README §1 / PRD §10.11 자랑 표기에 cross-link 권장.
 
 ## 6. 회귀 안전
 

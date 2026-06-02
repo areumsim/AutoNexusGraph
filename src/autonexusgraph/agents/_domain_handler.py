@@ -85,8 +85,11 @@ DomainRouter = Callable[[str, "str | None"], "str | None"]
 
 
 # ── Registry (모듈 전역 싱글톤) ────────────────────────────────────
+# register / unregister / list 가 같은 dict·list 를 만지므로 thread-safe 보장.
+# discover_plugins 의 `_DISCOVERY_LOCK` 과 일관성 — 모든 registry mutation 은 락 안.
 _HANDLERS: dict[str, DomainHandler] = {}
 _ROUTERS: list[DomainRouter] = []
+_REGISTRY_LOCK = threading.Lock()
 
 # ── Plugin auto-discovery ──────────────────────────────────────────
 # core 는 ``from autograph`` 0건 (§10.12) 을 유지하지만, 런타임에 정작 아무도
@@ -164,12 +167,14 @@ def register_handler(handler: DomainHandler) -> None:
     domain = getattr(handler, "domain", None)
     if not isinstance(domain, str) or not domain:
         raise ValueError(f"handler.domain must be a non-empty str: got {domain!r}")
-    _HANDLERS[domain] = handler
+    with _REGISTRY_LOCK:
+        _HANDLERS[domain] = handler
 
 
 def unregister_handler(domain: str) -> None:
     """테스트용 — 등록 해제."""
-    _HANDLERS.pop(domain, None)
+    with _REGISTRY_LOCK:
+        _HANDLERS.pop(domain, None)
 
 
 def get_handler(domain: str) -> DomainHandler | None:
@@ -180,17 +185,62 @@ def get_handler(domain: str) -> DomainHandler | None:
     """
     if not _DISCOVERY_DONE:
         discover_plugins()
-    return _HANDLERS.get(domain)
+    with _REGISTRY_LOCK:
+        return _HANDLERS.get(domain)
 
 
 def list_handlers() -> list[str]:
     """등록된 도메인 키 목록 (디버그용)."""
-    return sorted(_HANDLERS.keys())
+    with _REGISTRY_LOCK:
+        return sorted(_HANDLERS.keys())
 
 
 def register_router(fn: DomainRouter) -> None:
     """질문 → domain 자동 판정 라우터 추가. 등록 순서대로 시도."""
-    _ROUTERS.append(fn)
+    with _REGISTRY_LOCK:
+        _ROUTERS.append(fn)
+
+
+def call_handler_method(
+    state: AgentState,
+    handler: Any,
+    method_name: str,
+    *args: Any,
+    signal_extra: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """``handler.<method_name>(*args, **kwargs)`` 안전 호출 — 호출 패턴 SSOT.
+
+    handler 가 ``None`` 또는 메서드 미존재 → ``None`` 반환 (호출처가 자기
+    fallback 적용). 호출 실패 → ``log.warning`` + ``state['safety_signals']``
+    에 한 줄 적재 + ``None`` 반환. 호출처는 ``None`` 일 때 자기 fallback 분기.
+
+    safety_signals 형식 (handler 호출 6 사이트 통일):
+        ``f"{domain}_{method_name}_failed:[{signal_extra}:]{type(exc).__name__}"``
+
+    Args:
+        state: AgentState (실패 시 safety_signals append 대상)
+        handler: DomainHandler 또는 None
+        method_name: 호출할 메서드 이름
+        signal_extra: 신호 키에 포함할 부가 정보 (예: allowed_intents 의 kind)
+        *args / **kwargs: 메서드에 전달할 인자
+
+    Returns:
+        method 반환값 또는 None (handler/method 없거나 예외 발생).
+    """
+    if handler is None or not hasattr(handler, method_name):
+        return None
+    d = getattr(handler, "domain", "unknown")
+    try:
+        return getattr(handler, method_name)(*args, **kwargs)
+    except Exception as exc:   # noqa: BLE001 — finance/기본 폴백.
+        log.warning("[handler:%s] %s failed: %s", d, method_name, exc)
+        signal = f"{d}_{method_name}_failed:"
+        if signal_extra:
+            signal += f"{signal_extra}:"
+        signal += type(exc).__name__
+        state.setdefault("safety_signals", []).append(signal)
+        return None
 
 
 def auto_detect_domain(question: str, hint: str | None = None) -> str:
@@ -224,4 +274,5 @@ __all__ = [
     "register_router",
     "auto_detect_domain",
     "discover_plugins",
+    "call_handler_method",
 ]

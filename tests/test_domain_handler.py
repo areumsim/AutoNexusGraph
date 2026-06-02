@@ -17,6 +17,7 @@ import pytest
 from autonexusgraph.agents._domain_handler import (
     DomainHandler,
     auto_detect_domain,
+    call_handler_method,
     get_handler,
     list_handlers,
     register_handler,
@@ -210,3 +211,57 @@ def test_planner_node_falls_through_when_no_handler(monkeypatch):
     # 가 비어있지 않거나 (factual) 또는 plan list 가 작성됨.
     assert out is not None
     assert "tasks" in out
+
+
+# ── 6) call_handler_method 헬퍼 — handler 6 호출 사이트 SSOT ──────
+class _StubHandler:
+    domain = "__stub__"
+
+    def good(self) -> str:
+        return "ok"
+
+    def with_args(self, kind: str) -> set[str]:
+        return {f"intent_{kind}"}
+
+    def boom(self) -> None:
+        raise RuntimeError("intentional")
+
+
+def test_call_handler_method_none_handler_returns_none():
+    state: dict = {}
+    assert call_handler_method(state, None, "good") is None
+    assert state.get("safety_signals") is None   # 적재 안 됨.
+
+
+def test_call_handler_method_missing_method_returns_none():
+    state: dict = {}
+    assert call_handler_method(state, _StubHandler(), "no_such_method") is None
+    assert state.get("safety_signals") is None
+
+
+def test_call_handler_method_success_passes_args_and_no_signal():
+    state: dict = {}
+    assert call_handler_method(state, _StubHandler(), "good") == "ok"
+    assert call_handler_method(
+        state, _StubHandler(), "with_args", "graph"
+    ) == {"intent_graph"}
+    assert state.get("safety_signals") is None
+
+
+def test_call_handler_method_exception_records_signal_and_returns_none():
+    state: dict = {}
+    assert call_handler_method(state, _StubHandler(), "boom") is None
+    signals = state.get("safety_signals")
+    assert isinstance(signals, list) and len(signals) == 1
+    # 키 형식: f"{domain}_{method_name}_failed:{type}"
+    assert signals[0] == "__stub___boom_failed:RuntimeError"
+
+
+def test_call_handler_method_signal_extra_included():
+    state: dict = {}
+    # signal_extra 가 키에 포함되는지 (allowed_intents 의 kind 보존 시나리오).
+    assert call_handler_method(
+        state, _StubHandler(), "boom", signal_extra="graph"
+    ) is None
+    signals = state.get("safety_signals") or []
+    assert signals == ["__stub___boom_failed:graph:RuntimeError"]

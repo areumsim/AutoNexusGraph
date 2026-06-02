@@ -177,7 +177,9 @@ smoke-e2e:
 	$(MAKE) audit-mcp
 	$(MAKE) audit-ipgraph
 	$(MAKE) audit-trace
-	$(PYTHON) scripts/audit/validate_gold_qa.py --no-db eval/qa_gold/*.jsonl
+	# validate-gold-qa: DB 가용 시 evidence_corp_codes 실재 검증 포함 (2026-06-02 추가),
+	# DB 미가용 환경은 validator 가 자동 skip + stderr warning — pre-push 게이트 차단 없음.
+	$(PYTHON) scripts/audit/validate_gold_qa.py eval/qa_gold/*.jsonl
 	@echo "[smoke-e2e] ✅ 모든 mock-mode 검증 통과"
 
 up:
@@ -288,6 +290,10 @@ ingest-openalex:     ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.openalex 
 ingest-openalex-dry: ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.openalex --dry-run --qids Q20718,Q59243,Q497534
 load-openalex:       ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_openalex
 ingest-kipris:        ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.kipris
+# KIPRIS XML → PG + Neo4j (source_type='kipris', jurisdiction='KR'). 7-key meta 100%.
+# raw XML 이 raw/ip/kipris/*.xml 있거나, KIPRIS_API_KEY 설정 시 fetch + 적재.
+load-kipris:          ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_kipris
+load-kipris-dry:      ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_kipris --dry-run
 # CPC scheme bulk (USPTO+EPO 공동, 무인증) → PG ip.cpc_scheme + Neo4j :CPCCode + :SUBCLASS_OF.
 load-cpc:             ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_cpc
 load-cpc-dry:         ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_cpc --skip-neo4j --sections A
@@ -295,7 +301,11 @@ load-cpc-dry:         ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_cpc -
 load-assignee-corp-map:     ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map
 load-assignee-corp-map-dry: ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_assignee_corp_map --dry-run
 # USPTO Open Data Portal bulk (PatentsView 후속) — raw/ip/uspto_odp/ 에 jsonl 있으면 적재.
+# ingestion: parse only. loader: PG + Neo4j 7-key edge meta 100%. raw 미존재 시 graceful skip.
 ingest-uspto-odp:     ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.ingestion.uspto_odp
+load-uspto-odp:       ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_uspto_odp
+load-uspto-odp-dry:   ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_uspto_odp --dry-run
+load-uspto-odp-smoke: ; PYTHONPATH=src:. $(PYTHON) -m ipgraph.loaders.load_uspto_odp --limit 100
 ingest-law:           ; $(PYTHON) scripts/ingest/download_law.py
 ingest-kcgs:          ; $(PYTHON) scripts/ingest/download_kcgs.py --with-body
 
@@ -593,6 +603,32 @@ audit-ipgraph:
 	# PRD §10 DoD #15/#16 — IPGraph (도메인3) 의 plug-in wire-up.
 	# handler/router/ontology/cypher_templates(25)/gold(ip=30+cross=8) 검증.
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/ipgraph_smoke.py
+
+audit-calibrate:
+	# PRD §3.5 P1-(4) confidence calibration 실측 — Platt scaling + reliability diagram.
+	# 최신 eval/reports/<run>/ 자동 선택. EM=0 인 LLM-broken 데이터셋 시 --metric f1 시도 권장.
+	# sklearn/matplotlib 미설치 시 graceful skip. 정답 클래스 단일이면 SKIPPED.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/calibrate_confidence.py $(ARGS)
+
+audit-external-ratio:
+	# P1-(7) 외부 큐레이터 비율 측정 — PRD §11.6 / gold_qa_guide §6 KPI.
+	# tags / notes / qid 의 external_curator/allganize_external/academic 마크 검출.
+	# `--strict` 옵션 시 30% 미달 → exit 1 (CI 게이트). 기본은 보고만.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/external_curator_ratio.py $(ARGS)
+
+audit-b-issues:
+	# P2-(10) data_inventory.md §3 B-issue 미해결 4 건 (B6/B7/B10/B11) 의 실시간 상태.
+	# 진단 SOP (SQL/cypher) 를 runnable Python 으로 응축. RESOLVED/ACTIVE/MONITORING 분류.
+	# `--strict` 옵션 시 ACTIVE 또는 ERROR 있으면 exit 1 (CI 게이트).
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/b_issues.py $(ARGS)
+
+convert-allganize:
+	# Allganize RAG-Evaluation-Dataset-KO → 본 시스템 스키마 변환.
+	# ARGS 로 --src / --domain / --out 지정. 예:
+	#   make convert-allganize ARGS="--src data/external/allganize-rag-kor/finance \
+	#                                  --domain finance \
+	#                                  --out eval/qa_gold/staging/gold_qa_allganize_v0.jsonl"
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/convert_allganize_gold.py $(ARGS)
 
 # ── 제조 데이터 끝까지 (M-11~M-14) — 정형, LLM 0% ─────────────
 load-factoryon:

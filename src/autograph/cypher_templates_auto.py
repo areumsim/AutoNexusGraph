@@ -14,11 +14,12 @@
 
 from __future__ import annotations
 
+# 공용 LIMIT/YEAR 상수는 core SSOT (autonexusgraph.tools.cypher_templates) 에서 import.
+from autonexusgraph.tools.cypher_templates import LIMIT_500 as _LIMIT_500
+from autonexusgraph.tools.cypher_templates import YEAR_RANGE as _YEAR
 
-# 자주 쓰는 LIMIT 범위 (0=무제한 비허용).
-_INT_PK    = (int, ("range", 1, 9223372036854775000))
-_LIMIT_500 = (int, ("range", 1, 500))
-_YEAR      = (int, ("range", 1990, 2099))
+# auto 전용 (PK = bigint upper bound) — core 에 올릴 만큼 일반적이지 않아 로컬 유지.
+_INT_PK = (int, ("range", 1, 9223372036854775000))
 
 
 AUTO_TEMPLATES: dict[str, dict] = {
@@ -465,6 +466,58 @@ AUTO_TEMPLATES: dict[str, dict] = {
         }
         for h in range(1, 5)
     },
+
+    # ── BoP 공정 경로 (PRECEDES 체인, depth cap=10 literal — 폭발 방지) ──
+    # 시작 ProcessStep 에서 PRECEDES 후속 체인. 회사 비귀속(산단공 합성·C).
+    "auto_proc_route": {
+        "cypher": """
+        MATCH p = (s:ProcessStep {step_id: $step_id})-[:PRECEDES*0..10]->(e:ProcessStep)
+        OPTIONAL MATCH (e)-[:INSTANTIATES]->(proc:Process)
+        WITH p, e, proc
+        ORDER BY length(p)
+        RETURN [n IN nodes(p) | n.process_name_norm] AS route,
+               length(p)                              AS hops,
+               e.step_id                              AS end_step,
+               proc.process_name_norm                 AS end_process,
+               e.confidence_score                     AS confidence
+        LIMIT $limit
+        """,
+        "required_params": ["step_id", "limit"],
+        "param_schema": {"step_id": (str, None), "limit": _LIMIT_500},
+    },
+
+    # :Process taxonomy 단건 정보 + 인스턴스(ProcessStep) 수.
+    "auto_proc_info": {
+        "cypher": """
+        MATCH (p:Process {process_name_norm: $process_name_norm})
+        OPTIONAL MATCH (st:ProcessStep)-[:INSTANTIATES]->(p)
+        RETURN p.process_name_norm AS process_name_norm,
+               p.process_name      AS process_name,
+               p.process_map_name  AS process_map_name,
+               p.industry_code     AS industry_code,
+               p.confidence_score  AS confidence,
+               count(st)           AS step_count
+        """,
+        "required_params": ["process_name_norm"],
+        "param_schema": {"process_name_norm": (str, None)},
+    },
+
+    # 공정유형 → 그 유형을 인스턴스화한 ProcessStep 들 (INSTANTIATES 역방향).
+    "auto_proc_steps_of_process": {
+        "cypher": """
+        MATCH (st:ProcessStep)-[:INSTANTIATES]->(p:Process {process_name_norm: $process_name_norm})
+        RETURN st.step_id AS step_id, st.seq AS seq,
+               st.confidence_score AS confidence
+        ORDER BY st.seq
+        LIMIT $limit
+        """,
+        "required_params": ["process_name_norm", "limit"],
+        "param_schema": {"process_name_norm": (str, None), "limit": _LIMIT_500},
+    },
+
+    # NOTE: auto_proc_plants(PERFORMED_AT) / auto_proc_materials(CONSUMES_MATERIAL) 템플릿은
+    # 해당 엣지가 enabled:true + 데이터 적재될 때 추가한다. ontology_validate 는
+    # enabled:false 엣지를 쓰는 템플릿을 거부(의도적 미사용 규칙) — 출처 확보 전 미등록.
 }
 
 

@@ -61,6 +61,15 @@ from .bridge import (
     cross_query,
     get_oem_financials_sec,
 )
+from .process import (
+    get_process_info,
+    get_process_metrics,
+    list_materials_of_process,
+    list_plants_of_process,
+    list_process_route,
+    list_steps_of_process,
+    lookup_process,
+)
 
 __all__ = [
     # spec
@@ -99,4 +108,12 @@ __all__ = [
     "bridge_entity_to_sec_cik",
     "get_oem_financials_sec",
     "cross_query",
+    # BoP 공정 (ProcessGraph — :Process/:ProcessStep/PRECEDES)
+    "lookup_process",
+    "get_process_info",
+    "list_process_route",
+    "list_steps_of_process",
+    "list_plants_of_process",
+    "list_materials_of_process",
+    "get_process_metrics",
 ]

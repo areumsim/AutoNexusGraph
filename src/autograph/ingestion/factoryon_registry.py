@@ -71,7 +71,7 @@ def _fetch(endpoint: str, params: dict, *, return_xml: bool = False) -> bytes | 
         "Accept": "application/xml" if return_xml else "application/json",
         "User-Agent": "AutoGraph-Research/0.1",
     })
-    _LIMITER.wait()
+    _LIMITER.acquire()
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             raw = resp.read()

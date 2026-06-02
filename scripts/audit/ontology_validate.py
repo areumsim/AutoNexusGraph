@@ -60,8 +60,12 @@ _CYPHER_EDGE_RE = re.compile(r"-\[[a-zA-Z0-9_]*:([A-Z][A-Z0-9_]*)")
 
 
 # 도메인별 cypher templates 모듈·dict 위치 — yaml ↔ cypher cross-check 에 사용.
+# finance 의 ``TEMPLATES`` 는 자체 정의분만 (autograph/ipgraph 가 register_templates 로
+# 머지하기 전 import). 그대로 비교 가능.
 CYPHER_TEMPLATE_REGISTRIES: list[tuple[str, str, str, Path]] = [
     # (domain, import_path, dict_name, relations_yaml_path)
+    ("finance", "autonexusgraph.tools.cypher_templates", "TEMPLATES",
+     ROOT / "ontology" / "relations.yaml"),
     ("auto", "autograph.cypher_templates_auto",  "AUTO_TEMPLATES",
      ROOT / "ontology" / "auto" / "relations.yaml"),
     ("ip",   "ipgraph.cypher_templates_ip",      "IP_TEMPLATES",

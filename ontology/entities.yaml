@@ -122,7 +122,18 @@ entities:
     sql_table: null
     provenance_src: [dart_major_event_report_llm]
 
+  NewsEvent:
+    description: 뉴스 이벤트 (RSS 기사 단위 — article_hash 가 자연 키)
+    key: article_hash
+    required: [article_hash]
+    optional:
+      - title
+      - source                # 매체명 (yna / chosun / ...)
+      - published_at          # ISO8601
+      - url
+    sql_table: news.articles
+    provenance_src: [rss_yna]
+
   # ── 후속 도입 후보 ─────────────────────────────────────────────
   # Region:    지역 (사업장 위치)
-  # Patent:    특허 (KIPRIS 연동 시)
-  # NewsEvent: 뉴스 이벤트 (뉴스 RSS 연동 시)
+  # Patent:    특허 (ip 도메인은 ontology/ip/entities.yaml::Patent SoT)

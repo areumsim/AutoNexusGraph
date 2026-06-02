@@ -2,7 +2,7 @@
 
 본 문서는 AutoNexusGraph 의 LangGraph 기반 에이전트 계층 (PRD §7.5 / §7.6) 의 구조·진입점·
 운영 절차를 정리한다. 데이터 적재는 [`data_pipeline.md`](./data_pipeline.md), 도구 API
-스펙은 [`rag_tools.md`](./rag_tools.md) 참조.
+스펙은 [`docs/api_reference.md`](../api_reference.md) (3 도메인 통합 SSOT) 참조.
 
 ## 1. 계층 구조 (단방향 의존)
 
@@ -46,12 +46,18 @@
   autograph/tools/spec.py        — auto PG: lookup_vehicle, get_spec, compare_vehicles, …
   autograph/tools/graph.py       — auto Neo4j: list_recalls_affecting, list_components, …
   autograph/tools/retrieve.py    — pgvector + mfr/model/variant meta: search_documents_auto
-  autograph/tools/bridge.py      — cross-domain: bridge_corp_to_entity, …
+  autograph/tools/bridge.py      — cross-domain: bridge_corp_to_entity, bridge_sec_cik_to_entity, …
+  ipgraph/tools/patents.py       — ip PG: lookup_patent, get_patent_info, list_patents_by_assignee, …
+  ipgraph/tools/graph.py         — ip Neo4j: list_patents_in_cpc, get_citation_network (cap 강제), …
+  ipgraph/tools/retrieve.py      — pgvector + assignee/cpc/jurisdiction 메타: search_patents
+  ipgraph/tools/bridge.py        — ip↔corp: bridge_assignee_to_corp (via ip.assignee_corp_map join)
         │
         ▼
 [저장소]
-  Neo4j 5.18 + PostgreSQL 16 (pgvector) + (옵션) Qdrant
+  Neo4j 5.18 + PostgreSQL 16 (pgvector 내장) — 청크 ≥ 100만 도달 시 Qdrant 분리 옵션
 ```
+
+> 3 도메인 통합 도구 시그니처·반환 스키마 SSOT 는 [docs/api_reference.md](../api_reference.md).
 
 ## 1.5. 도메인 라우팅 (`finance` / `auto` / `cross_domain`)
 
@@ -100,11 +106,13 @@ PRD v2.1 부터 단일 에이전트가 **금융 (AutoNexusGraph) + 자동차 (Au
           intent ∈ _FIN_*   → from autonexusgraph.tools  import {intent}
 ```
 
-**Cypher 템플릿 통합**: `autograph.cypher_templates_auto.AUTO_TEMPLATES`
-(`auto_*` 접두사 22개) 는 `autograph.tools` import 시 **1회 side-effect** 로
-`autonexusgraph.tools.cypher_templates.TEMPLATES` 에 병합. 따라서 worker 는
-`render_template("auto_recalls_by_variant", ...)` 와 `render_template("list_subsidiaries", ...)`
-를 동일 함수로 호출 — 같은 cypher_guard / param schema 검증 통과.
+**Cypher 템플릿 통합**: 3 도메인의 템플릿 dict 가 `tools` import 시 **side-effect** 로 코어 `autonexusgraph.tools.cypher_templates.TEMPLATES` 에 병합.
+
+- finance: `TEMPLATES` **22** (정적 14 + 동적 `find_paths_{1..5}hops` 5 + `get_subgraph_d{1..3}` 3) — `tools/cypher_templates.py:89, list_templates()`
+- auto: `AUTO_TEMPLATES` **24** (정적 20 + 동적 `auto_find_paths_{1..4}hops` 4) — `src/autograph/cypher_templates_auto.py`
+- ip: `IP_TEMPLATES` **25** — `src/ipgraph/cypher_templates_ip.py`
+
+worker 는 `render_template("auto_recalls_by_variant", ...)` / `render_template("list_subsidiaries", ...)` / `render_template("ip_lookup_patent", ...)` 를 **동일 함수** 로 호출 — 같은 cypher_guard / param schema 검증 통과. 총 71 템플릿.
 
 **회귀 안전성**: domain 미지정 finance gold (기존 `eval/qa_gold/gold_qa_v0.jsonl`) 는
 `route_domain` 이 키워드 부재로 `"finance"` 반환 → 기존 finance planner 동일 경로.
@@ -403,7 +411,16 @@ TTL 3600s, LRU 256 (env `FINGRAPH_SESSION_TTL` / `_MAX` 로 조정).
 | **cypher templates** | `tests/test_cypher_templates.py` | 레지스트리 무결성 / param schema (type/range/regex) / hops·depth 변형 / bool reject |
 | **number guard** | `tests/test_number_guard.py` | 화이트리스트 수집 / 라벨링 / 원본 불변 / cap·text_max / prompt 형식 |
 
-`make test` (integration 제외) — **245 passed**.
+`make test` (integration 제외) — **245 passed** (작성 시점 측정. 실제 카운트는 PR 단위 변동 — `make test 2>&1 | tail -3` 으로 현재값 확인).
+
+**IPGraph 도메인 추가 테스트** (도메인3, 코드 완료):
+
+| 모듈 | 테스트 | 케이스 |
+|---|---|---|
+| ipgraph routing | `tests/test_ipgraph_routing.py` (또는 `test_autograph_routing.py` 의 ip 케이스) | `route_domain_ip` 키워드 (특허·patent·CPC·출원·인용·R&D) / cross_domain 조합 |
+| ipgraph handler | `tests/test_ipgraph_handler.py` | `IPGraphHandler.identify_targets / plan_tasks / toolbox_modules / allowed_intents (16 intents)` |
+| ipgraph audit | `make audit-ipgraph` | handler + router + ontology + 25 Cypher + gold (ip 30 + cross_ip 8) wire-up |
+| ipgraph cypher | `tests/test_cypher_templates.py` 의 `ip_*` 케이스 | 25 template param schema (cpc enum / depth range / direction enum) |
 
 ## 12. 운영 체크리스트
 

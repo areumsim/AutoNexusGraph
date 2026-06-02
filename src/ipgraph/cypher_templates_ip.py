@@ -14,13 +14,17 @@ cap 강제 — get_citation_network 가 depth ≤ 2 + max_total ≤ 1000.
 
 from __future__ import annotations
 
+# 공용 LIMIT/YEAR 상수는 core SSOT (autonexusgraph.tools.cypher_templates) 에서 import.
+from autonexusgraph.tools.cypher_templates import (
+    LIMIT_50 as _LIMIT_50,
+    LIMIT_100 as _LIMIT_100,
+    LIMIT_500 as _LIMIT_500,
+    YEAR_RANGE as _YEAR,
+)
 
-_LIMIT_500    = (int, ("range", 1, 500))
-_LIMIT_100    = (int, ("range", 1, 100))
-_LIMIT_50     = (int, ("range", 1, 50))
-_LIMIT_TOPK   = (int, ("range", 1, 50))
-_DEPTH_2      = (int, ("range", 1, 2))
-_YEAR         = (int, ("range", 1990, 2099))
+# ip 전용 — topk 는 _LIMIT_50 alias, depth 는 citation 그래프 폭발 cap.
+_LIMIT_TOPK = _LIMIT_50
+_DEPTH_2    = (int, ("range", 1, 2))
 
 
 IP_TEMPLATES: dict[str, dict] = {

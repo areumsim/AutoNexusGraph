@@ -152,7 +152,9 @@ def test_wikidata_cell_chem_module_importable():
     from autograph.ingestion import wikidata_cell_chem
     assert hasattr(wikidata_cell_chem, "collect")
     assert hasattr(wikidata_cell_chem, "collect_oem_supplier_candidates")
-    assert "Q899037" in wikidata_cell_chem.CATHODE_QIDS
+    # CATHODE_QIDS 는 manual 큐레이션 대기로 의도적 빈 dict — 이전 QID 가 오류였음
+    # (Q899037=루마니아 마을 Toboliu, Q900614=carbochemistry). 빈 dict 가 정상 계약.
+    assert isinstance(wikidata_cell_chem.CATHODE_QIDS, dict)
 
 
 def test_wikidata_cell_chem_oem_candidates_grade_c():

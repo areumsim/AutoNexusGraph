@@ -20,6 +20,7 @@ import logging
 from typing import Any
 
 from . import session
+from ._domain_handler import call_handler_method, get_handler
 from .policy import classify_question, select_tools, turn_budget_exceeded
 from .state import AgentState
 from .temporal import normalize_temporal_terms, extract_year_hint
@@ -120,7 +121,8 @@ def triage_node(state: AgentState) -> AgentState:
                         state["pending_interrupt"] = {}
                         continue
                 except InterruptUnavailable:
-                    # 폴백 체인 — 1순위 자동 선택 + 경고
+                    # 폴백 체인 — 1순위 자동 선택 + 경고. (H4 fix) pending_interrupt
+                    # 잔존 시 UI/API 가 "interrupt 진행 중" 오인 → 자동 해결 시 비움.
                     cc = str(hits[0].get("corp_code") or "")
                     if cc:
                         targets.append(cc)
@@ -128,6 +130,7 @@ def triage_node(state: AgentState) -> AgentState:
                             f"ambiguous_company_auto_resolved:{word}->{cc}"
                         )
                         log.warning("[triage] interrupt 미지원 — '%s' 1순위(%s) 자동 선택", word, cc)
+                    state["pending_interrupt"] = {}
                 continue
             # 모호 X → 1순위 채택
             cc = str(hits[0].get("corp_code") or "")
@@ -150,18 +153,15 @@ def triage_node(state: AgentState) -> AgentState:
     # finance 외 도메인 (auto/cross_domain) 의 entity 식별은 외부 패키지(autograph)
     # 가 _domain_handler 에 등록한 handler.identify_targets 가 처리. core 는 외부
     # 패키지를 알지 못함. 미등록 도메인은 finance 만 진행.
-    from ._domain_handler import get_handler
     domain = str(state.get("domain") or "finance").lower()
     handler = get_handler(domain)
+    # N3 fix: 원래 의도 복구 — handler 등록 ✓ + identify_targets 구현 ✓ 인 도메인만
+    # carry-over 실행. identify_targets 미구현 도메인은 entity 식별 자체가 없어
+    # carry-over 적용 의미 없음.
     if handler is not None and hasattr(handler, "identify_targets"):
-        try:
-            handler.identify_targets(state, question=q)
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[triage:%s] handler.identify_targets failed: %s",
-                        domain, exc)
-            state.setdefault("safety_signals", []).append(
-                f"{domain}_identify_failed:{type(exc).__name__}"
-            )
+        # handler.identify_targets 는 state 를 mutate 하므로 반환값 무시.
+        # 실패 시 call_handler_method 가 None 반환 + signals 기록.
+        call_handler_method(state, handler, "identify_targets", state, question=q)
 
         # 도메인 entity (vehicle/model/make) session carry-over — handler 가
         # 채우지 못한 경우 이전 turn 의 값을 빌림 (PRD §7.6.2).
@@ -228,18 +228,10 @@ def planner_node(state: AgentState) -> AgentState:
     # finance 외 도메인은 외부 패키지가 등록한 handler.plan_tasks 가 task list 반환.
     # core 는 어떤 도메인이 있는지 알지 못함. autograph 미설치 시 등록 0건 → 아래
     # finance 룰 기반 planner 로 자연 폴백.
-    from ._domain_handler import get_handler
     domain = str(state.get("domain") or "finance").lower()
     handler = get_handler(domain)
     if handler is not None and hasattr(handler, "plan_tasks"):
-        try:
-            tasks = handler.plan_tasks(state, question=q)
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[planner:%s] handler.plan_tasks failed: %s", domain, exc)
-            state.setdefault("safety_signals", []).append(
-                f"{domain}_plan_failed:{type(exc).__name__}"
-            )
-            tasks = []
+        tasks = call_handler_method(state, handler, "plan_tasks", state, question=q)
         state["tasks"] = tasks or []
         state["task_results"] = {}
         state["plan"] = [
@@ -414,6 +406,8 @@ def _request_cost_approval(state: "AgentState", kind: str, targets: list,
             state["aborted_reason"] = "cost_rejected"
             log.info("[planner] cost_approval 거절 — turn 종료")
     except InterruptUnavailable:
+        # (H4 fix) 폴백 시 pending_interrupt 비움 — UI/API 오인 회피.
+        state["pending_interrupt"] = {}
         state.setdefault("safety_signals", []).append(
             f"cost_approval_auto_passed:${est.estimated_cost_usd:.4f}"
         )
@@ -478,24 +472,19 @@ def executor_node(state: AgentState) -> AgentState:
         searched_tools = {"search_documents", "search_documents_auto"}
         already_searched = any(r["tool"] in searched_tools for r in results)
         if all_empty and not already_searched and state.get("question"):
-            from ._domain_handler import get_handler
             domain = str(state.get("domain") or "finance").lower()
             q_text = state.get("question_rewritten") or state["question"]
             fb_tool: str | None = None
             fb_fn = None
             fb_args: dict = {}
-            handler = get_handler(domain)
-            if handler is not None and hasattr(handler, "fallback_search"):
-                try:
-                    fb = handler.fallback_search(state, query=q_text)
-                except Exception as e:   # noqa: BLE001
-                    log.warning("[executor:%s] handler.fallback_search 실패: %s",
-                                domain, e)
-                    fb = None
-                if fb is not None:
-                    fb_tool, fb_fn, fb_args = fb
-                    log.info("[executor:%s] fallback via handler — tool=%s",
-                             domain, fb_tool)
+            # call_handler_method 가 log + safety_signals 적재 (이전엔 log 만,
+            # signals 누락 — L1 통일로 자동 보강).
+            fb = call_handler_method(state, get_handler(domain),
+                                     "fallback_search", state, query=q_text)
+            if fb is not None:
+                fb_tool, fb_fn, fb_args = fb
+                log.info("[executor:%s] fallback via handler — tool=%s",
+                         domain, fb_tool)
             if fb_fn is None:   # handler 미등록 or None 반환 → finance 기본
                 fb_tool = "search_documents"
                 fb_fn = getattr(toolbox, "search_documents", None)
@@ -675,6 +664,52 @@ def synthesizer_node(state: AgentState,
     state["grounding"] = grounding
     if not grounding["ok"]:
         log.warning(f"[synth] grounding failed: {grounding['warnings']}")
+
+    # === sensitive_decision 게이트 (PRD §7.5.6 + §9 비목표 인접) ===
+    # 키워드 휴리스틱 (interrupts.SENSITIVE_KEYWORDS) — 매칭 시 사용자 승인 요청.
+    # interrupt 미지원 환경 (폴백 체인) 은 보수적 거절 → 답변 차단 메시지로 교체.
+    # N2 fix: LLM 실패 fallback 답변 (build_deterministic_brief 결과) 은 게이트 skip
+    # — synth_status.fallback_used 가 set 이면 LLM 이 생성한 답이 아닌 결정적 brief.
+    from .interrupts import (
+        InterruptUnavailable,
+        coerce_sensitive_response,
+        detect_sensitive_keyword,
+        make_sensitive_decision_payload,
+        request_interrupt,
+    )
+    _synth_status = state.get("synth_status") or {}
+    _fb_used = _synth_status.get("fallback_used")
+    hit = None
+    if not _fb_used:
+        hit = detect_sensitive_keyword(
+            state.get("answer", ""), state.get("question", "")
+        )
+    if hit:
+        payload = make_sensitive_decision_payload(
+            answer_preview=str(state.get("answer", ""))[:500],
+            plan_summary=f"sensitive_keyword={hit}",
+            thread_id=str(state.get("thread_id", "")),
+        )
+        try:
+            resp = request_interrupt(payload)
+            approved = coerce_sensitive_response(resp)
+        except InterruptUnavailable:
+            # 폴백 환경 — 보수적 거절 (외부 노출 회피).
+            approved = False
+            state.setdefault("safety_signals", []).append(
+                f"sensitive_blocked_fallback:{hit}"
+            )
+        if not approved:
+            log.warning("[synth] sensitive answer blocked — hit=%r", hit)
+            state["answer"] = (
+                f"민감/외부 보고 인접 답변으로 분류 ('{hit}') — 공개 보류됨. "
+                "공시 또는 공식 IR 자료를 직접 참조하시길 권장합니다."
+            )
+            state["sensitive_blocked"] = True
+            state.setdefault("safety_signals", []).append(
+                f"sensitive_blocked:{hit}"
+            )
+
     return state
 
 

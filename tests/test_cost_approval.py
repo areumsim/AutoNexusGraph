@@ -111,6 +111,8 @@ def test_planner_fallback_on_interrupt_unavailable(monkeypatch):
     assert state.get("aborted_reason") is None
     signals = state.get("safety_signals") or []
     assert any("cost_approval_auto_passed" in s for s in signals)
+    # (H4 fix) 폴백 자동 통과 후 pending_interrupt 가 비워져야 함.
+    assert state.get("pending_interrupt") in ({}, None)
 
 
 def test_planner_skips_approval_during_replan(monkeypatch):

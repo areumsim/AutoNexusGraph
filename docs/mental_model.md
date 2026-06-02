@@ -17,7 +17,7 @@
 | 두 패키지의 책임 분리와 한 turn 흐름 (요약) | **구조 SSOT (패키지 토폴로지·LangGraph 노드·SSOT 색인) → `docs/architecture.md`** |
 | **설계 의도와 그 트레이드오프 / 대안** | 데이터 소스 라이선스 전수 표 → `README §4`, `docs/data_sources.md` |
 | **확정 / 잠정 / 미정** 의 명시적 구분 | autograph 도메인 단독 가이드 → `docs/autograph.md` / ipgraph (도메인3) → `docs/ipgraph.md` |
-| 열린 질문·숨은 가정·위험 | PRD 의 완전한 요구사항·DoD 트래픽라이트 → `PRD.md` |
+| 열린 질문·숨은 가정·위험 | 완전한 요구사항·DoD 트래픽라이트 → [README §10 DoD 20항](../README.md#10-dod-definition-of-done--20-항) |
 | (결정 카탈로그 — *무엇이* 어디에 왜) | 평가 결과 / 비교 매트릭스 실측값 → `eval/reports/*` / 이론 교재 → `docs/learning_guide.md` |
 
 ### 0.2 라벨 컨벤션 (가장 중요)
@@ -42,8 +42,7 @@
 ### 0.4 인용 규약
 
 - `path/file.py:LINE` — 코드 위치. Read 도구로 즉시 확인 가능.
-- `PRD §X.Y` — PRD.md 의 절 번호.
-- `README §N` — README.md 의 절 번호.
+- `README §N` — README.md (통합 SSOT v3.0) 의 절 번호. (구 `PRD §X.Y` 인용은 README §10 DoD 20항 + §3.X 아키텍처 sub-section 흡수 후 폐기 — 2026-06-02)
 - 본 문서의 "확정/잠정/미정 라벨"은 작성 시점(2026-05-29) 기준이며, 코드 변경 시 함께 갱신되어야 한다.
 
 ---
@@ -52,7 +51,7 @@
 
 ### 1.1 출발 인식: 단일 도메인 Vector RAG 의 한계
 
-`PRD.md:30-36` 에 명시된 진단 — finance 단독으로 검증된 AutoNexusGraph 의 한계:
+finance 단독으로 검증된 AutoNexusGraph 의 한계 (구 PRD.md §1.1 → README v3.0 흡수):
 
 | 한계 | 의미 |
 |---|---|
@@ -119,9 +118,9 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 #### 2.1.2 Bridge (`bridge.corp_entity`)
 
 - **정의**: 두 도메인의 ID 를 묶는 다리. `corp_code (finance) ↔ entity_id (auto)` 매칭 테이블.
-- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (`PRD §4.6`, `docs/autograph.md §3` 의 "Cross-Domain bridge" 라인, `src/autograph/loaders/load_bridge.py`).
-- **신뢰도 라벨링**: 자동 매칭은 `candidate`. 사람이 검토하면 `reviewed` / `rejected`. 신뢰도 0.95 (QID 일치 시) 부터 시작.
-- **현황** (`README §1.1`): 4,833 행 — Wikidata QID 1, name 2, supplier 4,830 (그중 4 개가 corp_code 직접 매핑).
+- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (`PRD §4.6`, `docs/autograph.md §3`, `src/autograph/loaders/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
+- **신뢰도 라벨링**: 자동 매칭은 `candidate`. 사람이 검토하면 `reviewed` / `rejected`. 신뢰도 0.95 (QID 일치 시) 부터 시작. `match_method` 6종 enum: `qid_exact | lei_exact | business_no_exact | corp_code_exact | fuzzy_name | manual` (`PRD §4.6` SQL schema).
+- **현황** (`README §1.1`): **4,806 행** — manufacturer cand 1 + rev 11 + supplier cand 4,790 + rev 4. `strong_match` (confidence ≥ 0.9) = 15/15 = 100%.
 - [확정] Bridge 분리 테이블 도입 — 도메인 직접 FK 가 아닌 별도 테이블에 confidence·reviewed_status·source_type 보유.
 - [잠정] 자동 매칭 결과의 **검토 프로세스** — `reviewed_status='rejected'` 운영 절차가 코드로 강제되지 않음. **[의도 확인 필요]**.
 - **열린 질문**: name 단독 매칭은 false-positive 위험. 영구 candidate 누적이 graph 폭발로 번지는 시나리오 (`§5.3` 참조).
@@ -568,7 +567,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 | 연합뉴스 RSS | finance | [확정] 활성 (메타+요약만, 저작권) | `news.articles` 338 |
 | SEC EDGAR | finance | [확정] 활성 (한국 ADR 한정) | `sec.filings` 1,857 |
 | GLEIF | finance | [확정] 활성 | `sec.lei` 2,700 (LEI 매칭 120) |
-| KCGS ESG | finance | [잠정] 수동 CSV (회원 라이선스) | `docs/data_catalog.md#kcgs-esg` |
+| KCGS ESG | finance | [잠정] 수동 CSV (회원 라이선스) | `docs/data_lineage.md §1.8 KCGS ESG` |
 | 공정위 기업집단 (data.go.kr) | finance | [미정] 키 확보 후 | `README §4` |
 | KOSIS 산업통계 | finance | [미정] 키 확보 후 | `README §4` |
 | KIPRIS 특허 | finance | [미정] 키 확보 후 | `README §4` |
@@ -596,9 +595,10 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 #### 3.7.1 Gold QA
 
-- `eval/qa_gold/gold_qa_v0.jsonl` — finance, seed 30 ([잠정] 목표 100, `README §6`).
-- `eval/qa_gold/gold_qa_auto_v0.jsonl` — auto, seed 42 ([잠정] 목표 100).
-- `eval/qa_gold/gold_qa_cross_v0.jsonl` — Cross-Domain, CD-L1 10 / L2 8 / L3 8 / L4 4 ([잠정] 30 row seed 완료, 확장 대기).
+- `eval/qa_gold/gold_qa_v0.jsonl` — finance, **seed 30** ([잠정] 목표 100, `README §6`).
+- `eval/qa_gold/gold_qa_auto_v0.jsonl` — auto, **seed 46** ([잠정] 목표 100).
+- `eval/qa_gold/gold_qa_cross_v0.jsonl` — Cross-Domain, **44 row** (level 기준 CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형. qid prefix 기준은 CD-L3- 15 / CD-L4- 11) ([잠정] 확장 대기).
+- `eval/qa_gold/gold_qa_ip_v0.jsonl` — ip, **seed 30** (IP-L1/L2/L3 각 10. gold_answer 채우기는 KIPRIS/USPTO 적재 후).
 - lint: `make validate-gold-qa` (`scripts/audit/validate_gold_qa.py`).
 
 #### 3.7.2 메트릭
@@ -860,13 +860,73 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 - DomainHandler 의 메서드 누락 허용 (`_domain_handler.py:40-42`) — 디자인 의도인가 임시 구현인가.
 - `agent_handler.py:99-100` 의 "target_makes/vehicles 는 호환 시그니처가 없어 미적용" — TODO 인가 의도된 보수성인가.
 
-### 5.11 우선순위가 큰 미정 사항 5개 (세미나 토론용)
+### 5.11 우선순위가 큰 미정 사항 5개 (세미나 토론용 — §5.12 production ordering 과 분리)
+
+> **본 절 = 세미나 토론용 historical snapshot**. 운영용 11 건 우선순위는 [§5.12 통합표](#512-11-열린-질문--우선순위진행-상태-통합표-p1-7-p2-9) (2026-06-02 갱신). 본 §5.11 의 5 개 ≠ §5.12 의 P0 3 개. 차이 사유는 §5.12.1.
 
 1. 코어와 finance 어댑터의 분리 (§3.1.4) — **v2.2 옵션 B (baseline reset 정책) 채택**. ipgraph 머지 후 누적 변경량이 임계 초과 시 옵션 A (pure core 분리) 재고.
 2. confidence_score 의 calibration (§5.2) — 평가 메트릭이 신뢰 가능한지의 전제.
 3. Bridge candidate 의 검토 운영 (§5.3) — graph quality 가 시간이 갈수록 떨어짐.
 4. BOM Level 5 의 채널 정책 (§5.4) — non-goal vs deferred 의 경계.
 5. 외부 작성 gold QA (§5.7) — 평가 자기충족 위험.
+
+### 5.12 11 열린 질문 — 우선순위·진행 상태 통합표 (P1-7, P2-9)
+
+> 사용자 cold review (2026-06-02) P1-(7) + P2-(9) 항목 반영. §5.1~§5.10 의 11 열린 질문을 (a) 시급도, (b) 진행 상태, (c) cross-link (data_inventory B-issue / README §11 백로그 / system_review.md) 와 함께.
+
+| 우선순위 | 질문 | 정의 절 | 진행 상태 | cross-link | 해결 가능 시점 |
+|---:|---|---|---|---|---|
+| ⭐⭐⭐ P0 | confidence_score calibration | [§5.2](#52-confidence_score-의-정량성) | **미실행** — 측정 가능 (gold QA 120 row 충족) | learning_guide §11.4.0 (Platt routine) + PRD §3.5 (cross-link 완료 2026-06-02) | LLM 키 활성 + `make eval-full` 후 5분 |
+| ⭐⭐⭐ P0 | 외부 작성 gold QA (자기충족 위험) | [§5.7](#57-평가셋의-자기충족-위험) | **wired (2026-06-02)** — 측정 routine `make audit-external-ratio` (실측 0/150 = 0.0%) + 변환 routine `make convert-allganize` 신규. **Allganize 흡수 후 즉시 30%+ 가능** | gold_qa_guide.md §6.3-6.4 (wired) + `scripts/audit/{convert_allganize_gold,external_curator_ratio}.py` | (a) `git clone allganize/RAG-Evaluation-Dataset-KO` → `make convert-allganize` 5분, (b) 별도 외부 큐레이터 발주는 후속 |
+| ⭐⭐⭐ P0 | Bridge candidate 검토 운영 SOP | [§5.3](#53-bridge-자동-매칭의-false-positive) | **미설계** (4,790 supplier candidate 영속 누적) | README §11.4 (P1 운영) / data_inventory §3 B10 | Streamlit 검토 UI + 6개월 자동 만료 정책 |
+| ⭐⭐ P1 | Cross-Domain QA "정답" 정의 | [§5.8](#58-cross-domain-qa-의-정답-정의) | **부분** — `snapshot_year` 필드 강제로 일부 해소 | gold_qa_guide §2.3 (정답 무결성 표) | snapshot_year 필드 추가 + valid_until 도입 |
+| ⭐⭐ P1 | LLM 비용 가드 실측 한계 | [§5.5](#55-llm-비용-가드의-실측-한계) | **wired** — `agents/cost_estimator.py` 측정 routine 있음 | README §11.1 (P0+ 상용 신호) | `make eval-full` 후 cost_estimator ±20% 정확도 검증 |
+| ⭐⭐ P1 | 코어와 finance 어댑터 분리 (P0+) | [§5.1](#51-도메인-일반성-가정의-미검증), [§5.9](#59-코어와-도메인의-진짜-경계) | **옵션 B (baseline reset) 채택** — 정직 review 추가 완료 | `eval/reports/core_diff_baseline_ledger.md §D` (정직 review 신설 2026-06-02) | ipgraph 후 도메인4 추가 시 inflection 비교 |
+| ⭐⭐ P1 | 동명이인 / 다중 식별자 충돌 | [§5.6](#56-동명이인--다중-식별자-충돌) | **부분** — (name, birth_year) 키 사용, HITL clarification interrupt 활성 | api_reference.md §1.2 (lookup_person), faq.md Q6.3 | (name, birth_year, 회사) 보조 키 추가 |
+| ⭐⭐ P1 | BOM L5/L6 채널 정책 | [§5.4](#54-bom-level-56-데이터-본질-문제) | **L6 부분 진입** (USGS MCS 5 + materials 6 + DERIVED_FROM 17) / L5 sparse | README §10.2 / autograph.md §2.5.4 (배터리·소재 부록) | data.go.kr 키 발급 + Wikipedia plant 문서 ingestion |
+| ⭐ P2 | 도메인 일반성 가정의 미검증 | [§5.1](#51-도메인-일반성-가정의-미검증) | **부분** — ip 도메인 적용 후 §10.15 코어 변경 0% 측정 완료 | README §10.15 / core_diff_baseline_ledger | ip + 4번째 도메인 (Phase D/E) 측정 후 |
+| ⭐ P2 | DomainHandler 메서드 누락 허용 정책 | [§5.10](#510-의도-확인-필요-리스트-코드만으론-안-풀림) | **[의도 확인 필요]** — 핸들러가 일부 메서드만 구현해도 동작 | architecture.md §6 plug-in 등록 메커니즘 | 의도 확정 + 테스트 추가 |
+| ⭐ P2 | 추출 파이프라인 LLM 비활성 P3 4종 | [§5.10](#510-의도-확인-필요-리스트-코드만으론-안-풀림) | **wired-but-disabled** (COMPETES_WITH 등 4종) | README §7 미구현 표 / autograph.md §5.1 SUPPLIED_BY 정직 표시 | 비용·환각 위험 검증 후 selective 활성 |
+
+**B-issue (`data_inventory.md §3`) cross-link**:
+- B7 (Wikidata P176 rate-limit) ↔ §5.3 (Bridge candidate) ↔ §5.4 (BOM L5/L6) — **공급망 자동 추출 부재의 뿌리**
+- B10 (Supplier 중복) ↔ §5.3 (Bridge candidate 누적) — **같은 뿌리 = name_norm dedup 정책 부재**
+- B11 (NHTSA complaint 짧은 카테고리) — §5.4 (BOM 채널 정책) 와 partial 관련
+
+**README §11 백로그 cross-link**:
+- §11.1 상용 신호 (P0+) — MCP / Langfuse / SHACL / 축소 평가 매트릭스 = §5.5 (비용 가드), §5.7 (gold QA) 연결
+- §11.4 데이터 품질·운영 (P1) — §5.3 (Bridge candidate SOP), §5.6 (동명이인 충돌)
+- §11.6 평가·신뢰성 (P1) — §5.7 (자기충족), §5.8 (Cross-Domain 정답 정의)
+
+**시급도 종합** (2026-06-02):
+- 측정 가능한데 미실행: **3 건 (P0)** — calibration / 외부 gold / Bridge candidate SOP
+- 진행 중 / 부분 해결: **6 건 (P1)**
+- 장기 / 측정 대기: **2 건 (P2)**
+- 진행률: 3/11 = 27% 가 즉시 실행 가능. 통합 우선순위 표 + 자랑 vs 실제 → [system_review.md](system_review.md) (이미 존재 — §1.2 한계 통합표 / §2 B-issue / §3 자랑 vs 실제 / §4 시급도 매트릭스).
+
+### 5.12.1 각 row 의 rationale — 왜 이 우선순위? (P2-9)
+
+> 사용자 cold review (2026-06-02) P2-(9) 항목 반영: §5.11 의 5 개 vs §5.12 의 P0 3 개 차이 정합화 + 후순위 6 개의 강등 사유 명시. 우선순위 판정 기준 = **(영향 × 즉시 실행 가능성)** — 영향 크고 즉시 측정 가능하면 P0, 영향 작거나 외부 의존이면 P1/P2.
+
+| 순번 | 항목 | 우선순위 판단 사유 |
+|---:|---|---|
+| P0-1 | **confidence calibration** | 가장 자주 인용되는 시스템 자랑 (PRD §3.5) 의 정량 근거. 측정 도구 wired (`calibrate_confidence.py`), 데이터 충족 (gold 120 row), LLM 키만 있으면 5 분 — **즉시 실행성 최고** |
+| P0-2 | **외부 작성 gold QA** | 평가 매트릭스 전체의 신뢰성을 좌우. 현재 0% 외부 = sanity check 수준 (gold_qa_guide §6.1). 변환 routine wired (2026-06-02), `git clone allganize/...` + `make convert-allganize` 1 회로 30%+ 가능 — **즉시 실행성 최고** |
+| P0-3 | **Bridge candidate 운영 SOP** | 4,790 row supplier candidate 가 영구 누적 (data_inventory §3 B10). 시간이 지날수록 graph quality 저하 — **방치 시 시스템 가치 자체 위협**. 단 Streamlit UI 필요 = 즉시 실행 못함 → P0 이지만 "측정/디자인 우선" |
+| P1-1 | **Cross-Domain QA "정답" 정의** | snapshot_year 필드로 일부 해소 (gold_qa_guide §2.3). 완전 해소엔 `valid_until` 등 시계열 정합 추가 필요 — 외부 데이터 의존 (재무·리콜 시점 매칭). 즉시 실행 불가 → P1 |
+| P1-2 | **LLM 비용 가드 실측 한계** | `cost_estimator.py` wired, 측정 routine 도 wired. 단 ±20% 정확도 검증은 `eval-full` 결과 필요 — LLM 키 의존 → P0 가 아닌 P1 |
+| P1-3 | **코어 ↔ finance 분리** | baseline reset (옵션 B) 채택 완료 + 정직 review (`core_diff_baseline_ledger §D`) 추가 완료. 추가 작업 = 도메인4 추가 후 inflection 재측정 = **외부 도메인 추가 의존** → P1 |
+| P1-4 | **동명이인 / 다중 식별자** | `(name, birth_year)` 키 + HITL clarification 으로 부분 해소 (faq.md Q6.3). 완전 해소엔 (name, birth_year, 회사) 보조 키 + DB 마이그레이션 필요 — 작은 인프라 변경 → P1 (작업량 < P0 이지만 영향도 작음) |
+| P1-5 | **BOM L5/L6** | L6 부분 진입 완료 (USGS 5 + materials 6 + DERIVED_FROM 17). **§5.11 에 P0 로 표기되었지만 §5.12 에선 P1 로 강등 사유**: (a) data.go.kr 키 + Wikipedia plant ingestion 등 **외부 데이터 의존**, (b) PRD v2.2 §2.3 명시 "회사단위 셀↔OEM 소싱은 sparse → grade C candidate 만" — **본 단계 비목표**. §5.11 의 "BOM Level 5 = 우선순위 큰 미정" 표현은 v2.1 시점 — v2.2 의사결정 (PRD §13 의사결정 표) 으로 강등됨 |
+| P2-1 | **도메인 일반성 가정** | ip 도메인 적용 후 §10.15 코어 변경 0% 측정 완료 → 부분 해소. 완전 해소엔 **도메인4** (의약품/전자/에너지/식품) 측정 필요 — PRD v2.2 §2.3 "본 단계 비목표" → P2 (장기) |
+| P2-2 | **DomainHandler 메서드 누락 허용 정책** | `[의도 확인 필요]` (code-derived 아닌 설계 의도 문제). 영향 작음 (현재 작동 중) + 즉시성 없음 → P2 |
+| P2-3 | **추출 P3 LLM 비활성 4종** | wired-but-disabled 상태로 안정. 활성 시 비용·환각 위험 → 보수적 결정. 영향 작음 (P2 LLM 0% 추출이 메인) → P2 |
+
+**§5.11 vs §5.12 차이 — 4 건 분류 변경 (2026-06-02)**:
+- §5.11 #1 (코어-finance 분리) → §5.12 P1 강등 (baseline reset 옵션 B 채택으로 결정됨)
+- §5.11 #4 (BOM Level 5) → §5.12 P1 강등 (PRD v2.2 비목표 결정 + 외부 의존)
+- §5.12 신규 P0-3 (Bridge candidate SOP) — §5.11 미언급 (영향 평가가 v2.2 검토에서 격상됨)
+- §5.12 신규 P0 = (calibration / 외부 gold) — 둘 다 §5.11 #2/#5 와 동일하지만 wired 상태 갱신됨
 
 ---
 
@@ -1021,7 +1081,7 @@ from . import agent_handler  # 등록 부작용
 | **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `PRD §7.5.6` |
 | **idempotent (멱등) 파이프라인** | 재실행해도 같은 결과. raw → DB 모든 단계 | `README §2` |
 | **KATRI** | 자동차안전연구원. bigdata-tic.kr OAuth | `docs/autograph.md §5` |
-| **KCGS** | 한국기업지배구조원. ESG 등급 공급 | `docs/data_catalog.md#kcgs-esg` |
+| **KCGS** | 한국기업지배구조원. ESG 등급 공급 | `docs/data_lineage.md §1.8 KCGS ESG` |
 | **KNCAP** | 한국 신차 안전도 평가. car.go.kr | `PRD §3.2`, `docs/autograph.md §5` |
 | **KOTSA** | 한국교통안전공단. 수리검사 데이터 | `README §4`, `docs/autograph.md §5` |
 | **LangGraph** | Multi-agent StateGraph 프레임워크 | `PRD §7.5` |

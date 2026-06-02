@@ -13,7 +13,11 @@
 설계 메모:
 - 라벨은 ontology/entities.yaml 의 Industry / Market 와 일치 (이전 'Sector' 명칭은 폐기).
 - 인덱스는 module-level constant 로 두고 idempotent 하게 매 적재마다 보장.
-- 관계 MERGE 시점에 source 속성을 부여해 다중 출처 충돌 시 추적 가능.
+- 관계 MERGE 시점에 PRD §6.7 7키 의무 메타 (source_type / source_id /
+  confidence_score / validated_status / snapshot_year / extraction_method /
+  schema_version) 를 `_edge_meta.edge_meta_set_clause()` 헬퍼로 일관 부여.
+  KRX/DART 마스터 = grade A (confidence_score=0.95) / DART CEO = 0.90.
+  기존 ``source`` 속성도 하위 호환을 위해 그대로 유지.
 """
 
 from __future__ import annotations
@@ -23,12 +27,14 @@ from typing import Any
 
 from ..config import get_settings
 from ._common import LoadStats
+from ._edge_meta import edge_meta_set_clause
 
 
 # 회사 + 시장 — UNWIND 배치, MERGE 기반 멱등.
-CYPHER_COMPANIES = """
+# 엣지 메타 7키 (PRD §6.7): edge_meta_set_clause 헬퍼가 coalesce 절 생성.
+CYPHER_COMPANIES = f"""
 UNWIND $rows AS r
-MERGE (c:Company {corp_code: r.corp_code})
+MERGE (c:Company {{corp_code: r.corp_code}})
 SET c.name = r.name,
     c.stock_code = r.stock_code,
     c.market_cap = r.market_cap,
@@ -36,30 +42,33 @@ SET c.name = r.name,
     c.updated_at = datetime()
 WITH c, r
   WHERE r.market IS NOT NULL
-MERGE (m:Market {name: r.market})
+MERGE (m:Market {{name: r.market}})
 MERGE (c)-[rel:LISTED_IN]->(m)
-SET rel.source = 'krx'
+SET rel.source = 'krx',
+{edge_meta_set_clause('rel', source_type='krx_master', confidence_score=0.95)}
 """
 
 # 산업 분류: DART induty_code / KSIC 코드를 키로. ontology 명칭은 Industry.
-CYPHER_INDUSTRIES = """
+CYPHER_INDUSTRIES = f"""
 UNWIND $rows AS r
-MATCH (c:Company {corp_code: r.corp_code})
-MERGE (s:Industry {code: r.sector_code})
+MATCH (c:Company {{corp_code: r.corp_code}})
+MERGE (s:Industry {{code: r.sector_code}})
 MERGE (c)-[rel:IN_INDUSTRY]->(s)
-SET rel.source = 'dart'
+SET rel.source = 'dart',
+{edge_meta_set_clause('rel', source_type='dart_induty_code', confidence_score=0.95)}
 """
 
 # CEO: company.json 의 ceo_nm 콤마 분리 → Person 노드 + HAS_CEO.
 # 임원 전체는 graph_structural.py 의 EXECUTIVE_OF 가 SSOT.
-CYPHER_CEOS = """
+CYPHER_CEOS = f"""
 UNWIND $rows AS r
-MATCH (c:Company {corp_code: r.corp_code})
+MATCH (c:Company {{corp_code: r.corp_code}})
 UNWIND r.ceos AS name
-MERGE (p:Person {name: name})
+MERGE (p:Person {{name: name}})
 ON CREATE SET p.source = 'dart_ceo'
 MERGE (c)-[rel:HAS_CEO]->(p)
-SET rel.source = 'dart'
+SET rel.source = 'dart',
+{edge_meta_set_clause('rel', source_type='dart_ceo', confidence_score=0.90)}
 """
 
 # 인덱스 — idempotent. 첫 적재 시 자동 생성.

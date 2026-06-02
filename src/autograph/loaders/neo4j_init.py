@@ -66,6 +66,7 @@ _OPTIONAL_INDEXES: list[tuple[str, str, str]] = [
     ("Standard",       "agency",      "auto_standard_agency"),
     ("Plant",          "country",     "auto_plant_country"),
     ("Complaint",      "filed_date",  "auto_complaint_date"),
+    ("Process",        "industry_code", "auto_process_industry"),  # BoP taxonomy 조회
 ]
 
 

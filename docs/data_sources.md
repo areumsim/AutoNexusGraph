@@ -290,9 +290,9 @@
 | **L1 VehicleModel** | 모델 | NHTSA vPIC, Wikidata, Wikipedia, DBpedia | ✅ |
 | **L2 Trim/Year (Variant)** | 트림·연식 | NHTSA vPIC GetModelsForMakeYear, Canadian Specs | ✅ |
 | **L3 System** | 시스템 (powertrain, brake, body…) | ontology system_taxonomy.yaml (SSOT) | ✅ (derived `CONTAINS_SYSTEM` 완료) |
-| **L4 Module** | 모듈 (Motor-Reducer, Battery Pack, Door…) | AI-Hub 71347/578, Wikidata P176 후보, LLM P3 | ⚠️ 부분 — AI-Hub 외 sparse |
-| **L5 Part** | 부품 (셀·센서·인플레이터) | 리콜 본문 LLM 추출만 (P3 RECALL_OF) | ❌ 매우 sparse |
-| **L6 Material/Process** | 소재·공법 | PRD 명시적 non-goal | ❌ post-MVP |
+| **L4 Module** | 모듈 (Motor-Reducer, Battery Pack, Door…) | NHTSA component taxonomy 176 + AI-Hub 578 22 + manual supplier seed 18 + AI-Hub 71347 4 = **`auto.components` 220 row 전부 L4** | ⚠️ 부분 — L4 coverage **63.7%** (60% 목표 over). Wikidata P176 staging 은 rate-limit (429) 로 0 row |
+| **L5 Part** | 부품 (셀·센서·인플레이터) | 리콜 본문 LLM 추출만 (P3 RECALL_OF) | ❌ 매우 sparse — Neo4j `:Part` 노드 **0**. 리콜·LLM 출처에서만 자연 발생 |
+| **L6 Material/Process** | 소재·공법 | (v2.2 부분 진입) USGS MCS + Wikidata cell chem | ⚠️ 부분 — `:Material` 6 / `:Mineral` 5 / `DERIVED_FROM` 17 / `MADE_OF` 8 (`autograph.md §2.5.4`) |
 
 ---
 

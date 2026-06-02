@@ -209,3 +209,49 @@ entities:
       - aliases
     pg_table: auto.master_minerals
     provenance_src: [usgs_mcs]
+
+  # ── BoP (공정 축) — ProcessGraph (PRD_process_graph §3.1) ────────────
+  # BoM ⟂ BoP 직교 확장. Process=공정유형(taxonomy, 산단공 합성·grade C),
+  # ProcessStep=부품별 공정 단계(인스턴스), Equipment=설비. Material/Plant 는
+  # 위에 이미 정의 — 재정의 금지. 회사 귀속 엣지(PERFORMED_AT)는 DART/팩토리온만.
+  Process:
+    description: |
+      제조 공정 유형 (taxonomy) — 전처리/도장/용접/조립/검사 등. 산단공 합성
+      공정사전(datagokr 15151075) 의 정규화 공정명(process_name_norm) 1 건 = 1 노드.
+      grade C (합성·0.50) — taxonomy 전용, 확정 사실 금지.
+    key: process_name_norm     # auto.processes.process_name_norm (정규형, ≈410 distinct)
+    required: [process_name, process_name_norm]
+    optional:
+      - process_map_name       # 공정도명 (예: '자동차 내장 부품 제조 생산공정')
+      - industry_code          # KSIC
+      - category               # casting|forging|stamping|welding|coating|machining|assembly|inspection
+    pg_table: auto.processes
+    provenance_src: [datagokr_15151075]
+
+  ProcessStep:
+    description: |
+      부품별 공정 단계 (순서 있음) — BoP 인스턴스. (:Part)-[:PRODUCED_BY]->(:ProcessStep)
+      -[:PRECEDES]->... 경로가 "이 부품을 만드는 공정 순서". cycle_time/yield 통계는
+      KAMP/AI Hub(익명·B) 출처 — 회사 비귀속.
+    key: step_id               # 인공 키 (part_id + seq + process_name_norm 합성)
+    required: [step_id]
+    optional:
+      - seq                    # 공정 순서 (process_order)
+      - process_name_norm      # INSTANTIATES 대상 Process 키
+      - part_id                # PRODUCED_BY 대상 Part
+      - cycle_time             # 패턴(익명) — 회사 비귀속
+      - yield_rate             # 패턴(익명) — 회사 비귀속
+    pg_table: null             # 인스턴스 (DART 공정도설명 + 산단공 매칭, Step 3)
+    provenance_src: [dart_business_report, datagokr_15151075]
+
+  Equipment:
+    description: |
+      설비/장비 (로봇팔·용접기·도장시설 등). ProcessStep 이 사용하는 자원(side hop).
+      본 단계는 스키마만 — 인스턴스 적재는 후속(scaffold).
+    key: code                  # 'WELDING_ROBOT' 같은 인공 코드
+    required: [code, name]
+    optional:
+      - type
+      - ksic_code
+    pg_table: null
+    provenance_src: [process_seed]

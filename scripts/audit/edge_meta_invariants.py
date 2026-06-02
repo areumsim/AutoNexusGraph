@@ -41,9 +41,10 @@ _CHECKS: list[tuple[str, str, int, str]] = [
             OR r.schema_version IS NULL)
        AND any(l IN labels(a) WHERE l IN
             ['Manufacturer','VehicleModel','VehicleVariant',
-             'Module','Part','Supplier','Recall','Complaint','Plant','Standard','System'])
+             'Module','Part','Supplier','Recall','Complaint','Plant','Standard','System',
+             'Process','ProcessStep','Equipment'])
      RETURN count(*) AS n
-     """, 0, "PRD §6.7 — auto 엣지 7대 의무 메타 결손 row 수 (schema_version 포함)"),
+     """, 0, "PRD §6.7 — auto 엣지 7대 의무 메타 결손 (BoP Process/ProcessStep/Equipment 포함)"),
 
     # SUPPLIED_BY 엣지 메타 100% — DoD #11.
     ("supplied_by_missing_meta",

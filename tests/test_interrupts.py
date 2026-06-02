@@ -6,9 +6,13 @@ import pytest
 
 from autonexusgraph.agents.interrupts import (
     InterruptUnavailable,
+    SENSITIVE_KEYWORDS,
     coerce_clarification_response,
+    coerce_sensitive_response,
+    detect_sensitive_keyword,
     is_ambiguous_company,
     make_clarification_payload,
+    make_sensitive_decision_payload,
     request_interrupt,
 )
 
@@ -109,6 +113,88 @@ def test_coerce_invalid_returns_none():
 
 
 # ── request_interrupt ───────────────────────────────────────
+# ── sensitive_decision payload + coerce ─────────────────────
+def test_sensitive_decision_payload_structure():
+    p = make_sensitive_decision_payload(
+        answer_preview="삼성전자 영업이익 ...",
+        plan_summary="finance+graph 2-hop",
+        thread_id="t-1",
+    )
+    assert p["kind"] == "sensitive_decision"
+    assert p["answer_preview"].startswith("삼성전자")
+    assert p["plan_summary"] == "finance+graph 2-hop"
+    assert p["thread_id"] == "t-1"
+    assert "민감" in p["prompt"]
+
+
+def test_sensitive_decision_truncates_preview_500():
+    p = make_sensitive_decision_payload(answer_preview="가" * 600)
+    assert len(p["answer_preview"]) == 500
+
+
+def test_coerce_sensitive_bool_dict():
+    assert coerce_sensitive_response(True) is True
+    assert coerce_sensitive_response(False) is False
+    assert coerce_sensitive_response(None) is False
+    assert coerce_sensitive_response({"approved": True}) is True
+    assert coerce_sensitive_response({"approved": False}) is False
+
+
+def test_coerce_sensitive_string_korean_english():
+    assert coerce_sensitive_response("yes") is True
+    assert coerce_sensitive_response("공개") is True
+    assert coerce_sensitive_response("승인") is True
+    assert coerce_sensitive_response("no") is False
+    assert coerce_sensitive_response("비공개") is False
+    assert coerce_sensitive_response("거절") is False
+
+
+def test_coerce_sensitive_unknown_defaults_to_false():
+    # PRD §7.5.6 보수 정책 — 인식 불가는 미공개 (False).
+    assert coerce_sensitive_response("maybe") is False
+    assert coerce_sensitive_response(123) is False
+    assert coerce_sensitive_response({"other_key": True}) is False
+
+
+# ── detect_sensitive_keyword 휴리스틱 ────────────────────────
+def test_detect_sensitive_empty_returns_none():
+    assert detect_sensitive_keyword("") is None
+    assert detect_sensitive_keyword("", "어떤 질문") is None
+
+
+def test_detect_sensitive_investment_keyword():
+    # PRD §9 영구 비목표 — 투자 자문 인접
+    assert detect_sensitive_keyword("이 주식은 강력한 매매 신호입니다") == "매매 신호"
+    assert detect_sensitive_keyword("추천 종목 3선") == "추천 종목"
+
+
+def test_detect_sensitive_legal_keyword():
+    assert detect_sensitive_keyword("이는 법적 조언이 아닙니다") == "법적 조언"
+
+
+def test_detect_sensitive_prediction_keyword():
+    assert detect_sensitive_keyword("내일 주가 예측") == "주가 예측"
+
+
+def test_detect_sensitive_question_text_also_matched():
+    # 질문에 키워드 있으면 답변 정상이어도 게이트 발동.
+    assert detect_sensitive_keyword(
+        "삼성전자 매출은 300조원입니다",
+        question="투자 자문 부탁드립니다",
+    ) == "투자 자문"
+
+
+def test_detect_sensitive_clean_answer_returns_none():
+    assert detect_sensitive_keyword(
+        "삼성전자 2024 매출은 약 300조원입니다 [출처:00126380,2024]"
+    ) is None
+
+
+def test_sensitive_keywords_constant_non_empty():
+    # 정책 회귀 가드 — 상수가 비어있으면 게이트가 무력화됨.
+    assert isinstance(SENSITIVE_KEYWORDS, tuple) and len(SENSITIVE_KEYWORDS) >= 5
+
+
 def test_request_interrupt_raises_when_langgraph_missing(monkeypatch):
     """langgraph.types.interrupt import 막아서 fallback 환경 시뮬."""
     import sys

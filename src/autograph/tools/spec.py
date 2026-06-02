@@ -220,7 +220,11 @@ def list_plants_by_oem(corp_code: str) -> list[dict]:
 
 
 def search_processes(query: str, limit: int = 20) -> list[dict]:
-    """auto.processes 의 process_name_norm ILIKE 검색 (산단공 합성).
+    """auto.processes 의 process_name_norm ILIKE 검색 (산단공 합성) — **row 단위**.
+
+    동일 공정명이 여러 factory_manage_no / process_order 조합에 반복되면 row 모두 반환
+    (≈550 행 상한). cf. ``autograph.tools.process.lookup_process`` 는 distinct
+    ``process_name_norm`` 단위 (GROUP BY, ``:Process`` taxonomy 노드 매칭에 적합).
 
     빈 query → 빈 list short-circuit. confidence 0.50 (C 등급 — 합성 데이터).
     """

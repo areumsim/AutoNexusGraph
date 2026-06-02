@@ -40,11 +40,6 @@ FIN_SQL_ALLOWED = {
 }
 FIN_RESEARCH_INTENTS = {"search_documents", "search_by_metadata", "get_chunk"}
 
-# 하위호환 alias — 외부 코드가 import 하는 경우 대비.
-_FIN_GRAPH_ALLOWED = FIN_GRAPH_ALLOWED
-_FIN_SQL_ALLOWED = FIN_SQL_ALLOWED
-_FIN_RESEARCH_INTENTS = FIN_RESEARCH_INTENTS
-
 
 def _domain(state: AgentState) -> str:
     return str(state.get("domain") or "finance").lower()
@@ -52,15 +47,16 @@ def _domain(state: AgentState) -> str:
 
 def _toolbox_for(state: AgentState):
     """도메인별 tool 함수 풀. handler 등록 도메인은 handler.toolbox_modules,
-    그 외 (또는 finance) 는 core 의 tools 패키지만."""
-    from ._domain_handler import get_handler
+    그 외 (또는 finance) 는 core 의 tools 패키지만.
+
+    handler 호출 실패는 ``call_handler_method`` 가 log + safety_signals 적재
+    후 None 반환 → finance 폴백.
+    """
+    from ._domain_handler import call_handler_method, get_handler
     d = _domain(state)
-    handler = get_handler(d)
-    if handler is not None and hasattr(handler, "toolbox_modules"):
-        try:
-            return handler.toolbox_modules()
-        except Exception:   # noqa: BLE001 — handler 실패는 finance 폴백.
-            pass
+    result = call_handler_method(state, get_handler(d), "toolbox_modules")
+    if result is not None:
+        return result
     from .. import tools as fin_tb
     return [fin_tb]
 
@@ -75,15 +71,17 @@ def _resolve_tool(state: AgentState, intent: str):
 
 
 def _allowed_intents(state: AgentState, kind: str) -> set[str]:
-    """kind 별 (graph|sql|research) 화이트리스트 — handler 가 자기 분량 보유."""
-    from ._domain_handler import get_handler
+    """kind 별 (graph|sql|research) 화이트리스트 — handler 가 자기 분량 보유.
+
+    handler 호출 실패는 ``call_handler_method`` 가 log + safety_signals 적재.
+    signal_extra=kind 로 어떤 kind 에서 실패했는지 보존.
+    """
+    from ._domain_handler import call_handler_method, get_handler
     d = _domain(state)
-    handler = get_handler(d)
-    if handler is not None and hasattr(handler, "allowed_intents"):
-        try:
-            return handler.allowed_intents(kind)
-        except Exception:   # noqa: BLE001
-            pass
+    result = call_handler_method(state, get_handler(d), "allowed_intents", kind,
+                                 signal_extra=kind)
+    if result is not None:
+        return result
     # finance 기본 화이트리스트.
     if kind == "graph":
         return FIN_GRAPH_ALLOWED
@@ -109,25 +107,20 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
 
     # 도메인 handler 의 retrieve 모듈에 해당 intent 가 있으면 그쪽 위임.
     # (autograph 의 search_documents_auto / search_by_metadata_auto / get_chunk_auto 등)
-    from ._domain_handler import get_handler
-    handler = get_handler(domain)
-    if handler is not None and hasattr(handler, "retrieve_module"):
+    from ._domain_handler import call_handler_method, get_handler
+    retrieve_mod = call_handler_method(state, get_handler(domain), "retrieve_module")
+    fn = getattr(retrieve_mod, intent, None) if retrieve_mod else None
+    if fn is not None:
+        args.setdefault("query", state.get("question_rewritten") or state.get("question", ""))
         try:
-            retrieve_mod = handler.retrieve_module()
-        except Exception:   # noqa: BLE001
-            retrieve_mod = None
-        fn = getattr(retrieve_mod, intent, None) if retrieve_mod else None
-        if fn is not None:
-            args.setdefault("query", state.get("question_rewritten") or state.get("question", ""))
-            try:
-                out = fn(**args)
-                _record(state, task, status="done", result=out)
-                if isinstance(out, list):
-                    state.setdefault("evidence_chunks", []).extend(out)
-            except Exception as exc:   # noqa: BLE001
-                log.warning("[research:%s] %s failed: %s", domain, intent, exc)
-                _record(state, task, status="failed", result={"error": str(exc)})
-            return state
+            out = fn(**args)
+            _record(state, task, status="done", result=out)
+            if isinstance(out, list):
+                state.setdefault("evidence_chunks", []).extend(out)
+        except Exception as exc:   # noqa: BLE001
+            log.warning("[research:%s] %s failed: %s", domain, intent, exc)
+            _record(state, task, status="failed", result={"error": str(exc)})
+        return state
 
     # finance (또는 unknown intent) — 기존 동작 보존.
     try:

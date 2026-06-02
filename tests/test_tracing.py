@@ -23,7 +23,12 @@ def setup_function(_):
 
 # ── backend 결정 ──────────────────────────────────────────────────
 def test_backend_unset_returns_empty(monkeypatch):
-    monkeypatch.delenv("TRACE_BACKEND", raising=False)
+    # `monkeypatch.delenv` 는 process env 만 무력화 — pydantic-settings 가 .env
+    # 파일을 직접 로드하므로 settings fallback (line 50-52) 이 `.env` 의
+    # `TRACE_BACKEND` 회수. "off" 명시 + cache_clear 로 정확히 빈 backend 강제.
+    monkeypatch.setenv("TRACE_BACKEND", "off")
+    from autonexusgraph import config
+    config.get_settings.cache_clear()
     assert tracing._resolve_backend() == ""
 
 
@@ -42,7 +47,10 @@ def test_backend_normalizes_case_and_off(monkeypatch):
 
 # ── describe_backend — 실측 진단 ──────────────────────────────────
 def test_describe_off(monkeypatch):
-    monkeypatch.delenv("TRACE_BACKEND", raising=False)
+    # 동일한 .env 우회 패턴 — "off" 명시 + cache_clear.
+    monkeypatch.setenv("TRACE_BACKEND", "off")
+    from autonexusgraph import config
+    config.get_settings.cache_clear()
     desc = tracing.describe_backend()
     assert "OFF" in desc
 

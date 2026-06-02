@@ -3,7 +3,7 @@
 측정 일자: **2026-06-01** (산단공 공정 + KAMA macro + DART production 신규 채널 추가)
 측정 도구: `find`, `wc`, `psql via psycopg`, `cypher-shell via neo4j driver`, `eval/metrics/prd_dashboard`, `make audit-data-channels`
 
-본 문서는 `data/raw/auto/**` (raw files), PG `auto/bridge/vec` 스키마, Neo4j 라벨/관계의 **실시간 측정값**. `docs/data_sources.md` 가 후보 카탈로그, `docs/data_catalog.md` 가 구현된 채널 운영 가이드라면, 이건 **현재 디스크·DB 에 들어와 있는 사실**.
+본 문서는 `data/raw/auto/**` (raw files), PG `auto/bridge/vec` 스키마, Neo4j 라벨/관계의 **실시간 측정값**. `docs/data_sources.md` 가 후보 카탈로그, `docs/data_lineage.md` 가 채널별 end-to-end 추적 (raw→PG→Neo4j→tool) 이라면, 이건 **현재 디스크·DB 에 들어와 있는 사실**.
 
 PRD §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/5 measurable pass, §10.4/§10.6/§10.11/§10.12 ✅).
 
@@ -93,7 +93,7 @@ vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 | aihub_71347 | 4 | 4 |
 | **합** | **220** | (모두 L4) |
 
-→ `load_nhtsa_component_taxonomy.py` 가 events_recalls 의 distinct component_text (178 카테고리) 를 직접 module 로 등록. recall→component 매칭율 0 → 100% (no_match=0). 결과 RECALL_OF 39 → **601 edges**.
+→ `load_nhtsa_component_taxonomy.py` 가 events_recalls 의 distinct component_text (178 raw 카테고리) 를 normalize·dedupe 한 뒤 module 로 등록 → **176 row** (2 row 는 정규화 후 동일 module 로 흡수). recall→component 매칭율 0 → 100% (no_match=0). 결과 RECALL_OF 39 → **601 edges**.
 
 ### 1.3 `auto.events_investigations` 분포 (4 OEM filter — 24,128/154,019 = 15.7%)
 
@@ -258,9 +258,40 @@ PRD §6.7 의무 메타 6개 (source_type/source_id/confidence_score/validated_s
 - 71347 의 `IONIQ` / `KONA` / `NIRO` 가 vPIC `Ioniq` / `Ioniq 5/6` 등 prefix 매치.
 - 24 CONTAINS_COMPONENT edge 생성 (model 단위 fan-out OK).
 
+**🔍 진단 SOP** (2026-06-02 보강):
+```sql
+-- AI-Hub source 의 모델 매핑 분포 확인
+SELECT name, source, level, manufacturer_id
+  FROM auto.components
+ WHERE source IN ('aihub_578', 'aihub_71347')
+ ORDER BY name;
+```
+**해결 후보**: prefix 매칭 정합 → 추가 작업 불필요. 단 model 명 변경 시 routine 재실행 필요.
+**우선순위**: 낮음 (현재 정합 양호).
+
+---
+
 ### 🟡 B7. Wikidata SPARQL 1 req/min rate-limit (유지)
 
 - `SPARQL_PART_SUPPLIES` (P176) 429. **part_supplies.jsonl 미생성** → staging_relations 0. 추후 재시도.
+
+**🔍 진단 SOP**:
+```bash
+# 마지막 시도 timestamp 확인
+ls -la data/state/ingest/wikidata_part_supplies.* 2>/dev/null
+# 가장 최근 429 응답
+grep -E "429|rate.*limit" data/raw/wikidata/part_supplies/*.log 2>/dev/null | tail -5
+```
+
+**해결 후보 (우선순위 순)**:
+1. **수동 P176 batch** — Wikidata Query Service 의 웹 UI 에서 SPARQL 직접 실행 + CSV 다운로드 (rate-limit 회피). 결과를 `data/raw/wikidata/part_supplies/manual_<date>.csv` 저장 후 `loaders/load_wikidata_p176.py` (미구현 → 수동 변환) 실행.
+2. **OpenAlex assignee → supplier inference** — 특허 assignee 가 부품사인 경우 → 자동 supplier 후보 (정확도 낮음, candidate 로만).
+3. **manual seed 확장** — 현재 `supplier_seed.yaml` 19 공급사 → 50+ 로 확장 (PR 단위 수기 작업).
+4. **장기**: Wikidata bulk dump 다운로드 (P176 관계 만 추출) — 90 GB+ 로 운영 비용 큼.
+
+**우선순위**: 중간 (시스템 차원 "공급망 추론" 자랑이 manual seed 의존이라는 정직성 영향 — [docs/system_review.md §P1-(6)](system_review.md) 참조).
+
+---
 
 ### 🟡 B10. `:Supplier` Neo4j 노드 중복 (신규 인지, 5/29)
 
@@ -268,11 +299,77 @@ PRD §6.7 의무 메타 6개 (source_type/source_id/confidence_score/validated_s
 - 의심: supplier_seed loader 가 manual seed 19 → Neo4j 9,642 fan-out 또는 supplier_id 다른 다중 적재.
 - 영향 범위: 매칭 정확도 — name_norm 기준 dedup 안 됐을 가능성. 별도 진단 필요.
 
+**🔍 진단 SOP**:
+```cypher
+// (1) 중복 패턴 식별 — 같은 name_norm 으로 묶이는 Supplier 노드
+MATCH (s:Supplier)
+WITH s.name_norm AS norm, count(*) AS cnt, collect(s.entity_id)[..5] AS sample_ids
+WHERE cnt > 1
+RETURN norm, cnt, sample_ids
+ORDER BY cnt DESC LIMIT 20;
+
+// (2) Neo4j 의 :Supplier 와 PG 의 master_suppliers 매핑률
+MATCH (s:Supplier)
+RETURN count(s) AS neo4j_count,
+       count(DISTINCT s.entity_id) AS distinct_entity_id;
+```
+
+```sql
+-- (3) PG 측 manual_supplier_seed source 분포
+SELECT source_type, count(*)
+  FROM auto.master_suppliers
+ GROUP BY 1 ORDER BY 2 DESC;
+```
+
+**해결 후보**:
+1. **중복 제거 routine** — `loaders/_neo4j_helpers.py` 에 `dedupe_suppliers_by_name_norm()` 함수 추가 + `make load-auto-all` 끝에 1회 실행
+2. **load_supplier_edges 의 fan-out 패턴 review** — 같은 supplier 가 multi-customer 일 때 노드 중복 생성하는지 확인
+3. **단기 우회**: 답변 시 `WHERE confidence_score >= 0.9 AND reviewed_status = 'reviewed'` 필터 적용 (강제)
+
+**우선순위**: 중간 (정확도 영향이지만 strong_match (≥0.9) 만 인용하면 회피 가능).
+
+---
+
 ### 🟡 B11. NHTSA complaint 의 짧은 카테고리 매칭 누락 (5/29 인지)
 
 - 16,005 complaint 중 10,390 (65%) 가 'POWER TRAIN' 같은 단순 카테고리라 NHTSA recall taxonomy ('POWER TRAIN:DRIVELINE:...' 같은 세분화) 와 매칭 실패.
 - 결과: COMPLAINT_OF 4,793 edges (5,615 후보 중 PG 매칭 가능한 것만).
 - 추가 보강: complaint 의 distinct category 도 components 에 등록하면 +10k edges 기대. 단 PRD L4 (module) 분류상 'POWER TRAIN' 은 L3 (system) 이라 진단/분류 별도 작업 필요.
+
+**🔍 진단 SOP**:
+```sql
+-- (1) complaint 의 매칭 실패 분포
+SELECT component_text, count(*) AS cnt
+  FROM auto.events_complaints
+ WHERE component_text NOT IN (SELECT name FROM auto.components)
+ GROUP BY 1 ORDER BY 2 DESC LIMIT 20;
+
+-- (2) L3 system vs L4 module 분류 — 단순 카테고리는 system 가능
+SELECT system_code, count(*)
+  FROM auto.master_systems
+ WHERE name ILIKE '%power train%' OR name ILIKE '%powertrain%';
+```
+
+**해결 후보**:
+1. **L3 system 매칭 추가** — recall taxonomy 의 prefix (`POWER TRAIN`) 가 system 분류 (`POWERTRAIN`) 와 매칭되면 system-level COMPLAINT_OF edge 생성. ontology/auto/relations.yaml 에 새 edge type 또는 기존 `COMPLAINT_OF` 의 target 을 (`:Module` ∪ `:System`) 으로 확장
+2. **complaint 의 짧은 카테고리만 components 에 source='nhtsa_complaint_short' 로 등록** — +10k component (그러나 L3 module L4 혼동 위험)
+
+**우선순위**: 낮음 (현재 COMPLAINT_OF 4,793 edges 가 PRD §10 DoD 에 명시 임계 없음 — 측정 보강 후 결정).
+
+---
+
+> **B-issue 전체 진행률 (2026-06-02)**: 8 해결 + 4 미해결 = 67% 해결률.
+> 미해결 4 건 (B6/B7/B10/B11) 의 우선순위 종합 표는 [docs/system_review.md §2 B-issue](system_review.md).
+>
+> **실시간 측정 (P2-10 보강)**: `make audit-b-issues` 1줄로 4 건 모두 측정 + RESOLVED/ACTIVE/MONITORING 자동 분류. 데이터 의존이라 미해결 → 해결 전이는 진단 SOP 실행 (각 B-issue 의 "해결 후보" 항목) → 본 audit 재실행 → status 갱신 흐름.
+>
+> 실측 (2026-06-02 baseline):
+> - B6 `aihub_component_rows` = 26 (MONITORING — 정합 양호)
+> - B7 `staging_wikidata_p176_rows` = 0 (ACTIVE — rate-limit 우회 routine 적용 후 > 0 이 목표)
+> - B10 `supplier_duplicate_extra_nodes` = 1 (ACTIVE — dedupe routine 적용 후 = 0)
+> - B11 `complaint_unmatched_ratio` = 0.682 (ACTIVE — L3 system 매칭 추가 후 < 0.30)
+>
+> 산출: `data/reports/b_issues.json` — 향후 변동 추적용.
 
 ---
 

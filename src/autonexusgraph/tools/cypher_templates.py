@@ -26,6 +26,15 @@ import re
 from typing import Any
 
 
+# ── 공용 param_schema 상수 (도메인 import 용) ────────────────
+# autograph / ipgraph 가 같은 정의를 반복하지 않도록 core 에 SSOT.
+# (int, ("range", min, max)) 튜플은 validate_template_spec 의 ("range",) 분기 사용.
+LIMIT_50:  tuple = (int, ("range", 1, 50))
+LIMIT_100: tuple = (int, ("range", 1, 100))
+LIMIT_500: tuple = (int, ("range", 1, 500))
+YEAR_RANGE: tuple = (int, ("range", 1990, 2099))
+
+
 # ── 검증 타입 헬퍼 ──────────────────────────────────────────
 class TemplateError(ValueError):
     """템플릿 검증 실패."""

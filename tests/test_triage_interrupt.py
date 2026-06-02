@@ -43,6 +43,8 @@ def test_fallback_auto_resolves_ambiguous_with_signal():
     signals = state.get("safety_signals") or []
     assert any("ambiguous_company_auto_resolved" in s for s in signals)
     assert state.get("interrupt_handled") is not True
+    # (H4 fix) 폴백 자동 해결 후 pending_interrupt 가 비워져야 함 — UI/API 오인 회피.
+    assert state.get("pending_interrupt") in ({}, None)
 
 
 def test_prompt_injection_short_circuits_triage():

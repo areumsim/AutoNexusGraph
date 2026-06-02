@@ -87,7 +87,7 @@ dev = [
 ]
 
 all = [
-    "autonexusgraph[ingest,llm,db,agent,ui,dev]",
+    "autonexusgraph[ingest,llm,db,agent,mcp,ui,dev]",
 ]
 
 [tool.setuptools.packages.find]

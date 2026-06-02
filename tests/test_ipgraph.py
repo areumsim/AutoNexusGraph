@@ -242,10 +242,12 @@ def test_ip_tools_importable():
 def test_kipris_collect_without_key_skips():
     from ipgraph.ingestion.kipris import collect
     import os
-    # 환경에 키 없다고 가정 — 환경에 있으면 skip 안 됨 (정상).
+    # 키 없으면 fetch skip — raw XML 도 없으면 0 row (graceful, parse-raw-anyway 설계).
     if not os.getenv("KIPRIS_API_KEY"):
         result = collect()
-        assert result.get("skipped") is True
+        assert result["key_present"] is False
+        assert result["n_patents"] >= 0   # raw 미존재 환경 — 0, raw 있으면 parse
+        assert result["n_assignees"] >= 0
 
 
 def test_uspto_odp_collect_without_files_returns_zero():

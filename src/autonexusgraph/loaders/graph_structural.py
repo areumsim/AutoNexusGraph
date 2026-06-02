@@ -4,9 +4,14 @@
 출력: Neo4j 관계
 
 설계:
-- 각 연도별 snapshot — relation 속성에 snapshot_date 보관
+- 각 연도별 snapshot — relation 속성에 snapshot_date / snapshot_year / rcept_year 보관
 - 정합성: ownership_pct, role 등은 회사·연도 별로 다를 수 있음
 - 멀티-edge 허용 (같은 (a, b) 가 연도 다르면 별도 edge)
+- PRD §6.7 7키 의무 메타 (source_type / source_id / confidence_score /
+  validated_status / snapshot_year / extraction_method / schema_version) 를
+  `_edge_meta.edge_meta_set_clause()` 헬퍼로 일관 부여. DART 공시 = grade A
+  (confidence_score=0.95, validated_status='verified', extraction_method='deterministic').
+  snapshot_year 는 rcept_year → snapshot_date.year 순으로 fallback.
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from pathlib import Path
 
 from ..config import get_settings
 from ._common import LoadStats
+from ._edge_meta import edge_meta_set_clause
 
 
 # ── 자회사 / 관계회사 ─────────────────────────────────────────────
@@ -28,25 +34,29 @@ from ._common import LoadStats
 #   acqs_dispsl_inv_qy      : ...
 # 매핑: bsis_blce_qota_rt ≥ 50 → SUBSIDIARY_OF, 10 ≤ pct < 50 → RELATED_TO
 
-CYPHER_SUBSIDIARIES = """
+CYPHER_SUBSIDIARIES = f"""
 UNWIND $rows AS r
-MERGE (parent:Company {corp_code: r.parent_corp_code})
-MERGE (child:Company {name: r.child_name})
+MERGE (parent:Company {{corp_code: r.parent_corp_code}})
+MERGE (child:Company {{name: r.child_name}})
 ON CREATE SET child.created_at = datetime(),
               child.source     = 'dart_subsidiary_external'
 WITH parent, child, r
 FOREACH (_ IN CASE WHEN r.ownership_pct >= 50 THEN [1] ELSE [] END |
-  MERGE (child)-[rel:SUBSIDIARY_OF {snapshot_date: date(r.snapshot_date)}]->(parent)
+  MERGE (child)-[rel:SUBSIDIARY_OF {{snapshot_date: date(r.snapshot_date)}}]->(parent)
   SET rel.ownership_pct = r.ownership_pct,
       rel.rcept_year    = r.rcept_year,
       rel.source        = 'dart_otr_cpr_invstmnt',
-      rel.extracted_at  = datetime()
+      rel.extracted_at  = datetime(),
+{edge_meta_set_clause('rel', source_type='dart_otr_cpr_invstmnt', confidence_score=0.95,
+                       snapshot_year_expr='coalesce(r.rcept_year, date(r.snapshot_date).year)')}
 )
 FOREACH (_ IN CASE WHEN r.ownership_pct < 50 AND r.ownership_pct >= 5 THEN [1] ELSE [] END |
-  MERGE (child)-[rel:RELATED_TO {snapshot_date: date(r.snapshot_date)}]->(parent)
+  MERGE (child)-[rel:RELATED_TO {{snapshot_date: date(r.snapshot_date)}}]->(parent)
   SET rel.ownership_pct = r.ownership_pct,
       rel.source        = 'dart_otr_cpr_invstmnt',
-      rel.extracted_at  = datetime()
+      rel.extracted_at  = datetime(),
+{edge_meta_set_clause('rel', source_type='dart_otr_cpr_invstmnt', confidence_score=0.95,
+                       snapshot_year_expr='date(r.snapshot_date).year')}
 )
 """
 
@@ -60,22 +70,24 @@ FOREACH (_ IN CASE WHEN r.ownership_pct < 50 AND r.ownership_pct >= 5 THEN [1] E
 #   birth_ym               : 출생연월
 #   tenure_end_on          : 임기만료일
 
-CYPHER_EXECUTIVES = """
+CYPHER_EXECUTIVES = f"""
 UNWIND $rows AS r
-MERGE (c:Company {corp_code: r.corp_code})
+MERGE (c:Company {{corp_code: r.corp_code}})
 // Person 자연키 = (name, birth_year). birth_year 미상은 -1 로 정규화 → 동명이인 안전 분리.
-MERGE (p:Person {name: r.name, birth_year: coalesce(r.birth_year, -1)})
+MERGE (p:Person {{name: r.name, birth_year: coalesce(r.birth_year, -1)}})
 ON CREATE SET p.created_at = datetime(),
               p.source     = 'dart_executive'
 SET p.gender = coalesce(r.gender, p.gender)
 WITH p, c, r
-MERGE (p)-[rel:EXECUTIVE_OF {role: r.role, snapshot_year: r.year}]->(c)
-SET rel.registered    = r.registered,
-    rel.full_time     = r.full_time,
-    rel.duty          = r.duty,
-    rel.tenure_end    = r.tenure_end,
-    rel.source        = 'dart_exctv_sttus',
-    rel.extracted_at  = datetime()
+MERGE (p)-[rel:EXECUTIVE_OF {{role: r.role, snapshot_year: r.year}}]->(c)
+SET rel.registered   = r.registered,
+    rel.full_time    = r.full_time,
+    rel.duty         = r.duty,
+    rel.tenure_end   = r.tenure_end,
+    rel.source       = 'dart_exctv_sttus',
+    rel.extracted_at = datetime(),
+{edge_meta_set_clause('rel', source_type='dart_exctv_sttus', confidence_score=0.95,
+                       snapshot_year_expr='r.year')}
 """
 
 # ── 최대주주 ───────────────────────────────────────────────────────
@@ -88,31 +100,35 @@ SET rel.registered    = r.registered,
 #   trmend_posesn_stock_co       : 기말 보유 주식 수
 #   trmend_posesn_stock_qota_rt  : 기말 지분율
 
-CYPHER_SHAREHOLDERS = """
+CYPHER_SHAREHOLDERS = f"""
 UNWIND $rows AS r
-MERGE (c:Company {corp_code: r.corp_code})
+MERGE (c:Company {{corp_code: r.corp_code}})
 // 법인 주주 vs 개인 주주 구분 — 끝에 ㈜/주식회사/법인 이면 법인, 아니면 자연인
 WITH c, r,
      CASE WHEN r.name =~ '.*(㈜|주식회사|\\\\(주\\\\)|Corp|Inc|Ltd|법인).*'
           THEN 'company' ELSE 'person' END AS holder_kind
 FOREACH (_ IN CASE WHEN holder_kind = 'person' THEN [1] ELSE [] END |
   // 최대주주 보고서엔 birth_year 가 거의 없어 -1 로 정규화. 후속 ER 단계에서 보강.
-  MERGE (h:Person {name: r.name, birth_year: -1})
+  MERGE (h:Person {{name: r.name, birth_year: -1}})
   ON CREATE SET h.source = 'dart_shareholder'
-  MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {snapshot_year: r.year, relation: r.relation}]->(c)
+  MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {{snapshot_year: r.year, relation: r.relation}}]->(c)
   SET rel.ownership_pct = r.ownership_pct,
       rel.stock_count   = r.stock_count,
       rel.source        = 'dart_hyslr_sttus',
-      rel.extracted_at  = datetime()
+      rel.extracted_at  = datetime(),
+{edge_meta_set_clause('rel', source_type='dart_hyslr_sttus', confidence_score=0.95,
+                       snapshot_year_expr='r.year')}
 )
 FOREACH (_ IN CASE WHEN holder_kind = 'company' THEN [1] ELSE [] END |
-  MERGE (h:Company {name: r.name})
+  MERGE (h:Company {{name: r.name}})
   ON CREATE SET h.source = 'dart_shareholder_external'
-  MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {snapshot_year: r.year, relation: r.relation}]->(c)
+  MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {{snapshot_year: r.year, relation: r.relation}}]->(c)
   SET rel.ownership_pct = r.ownership_pct,
       rel.stock_count   = r.stock_count,
       rel.source        = 'dart_hyslr_sttus',
-      rel.extracted_at  = datetime()
+      rel.extracted_at  = datetime(),
+{edge_meta_set_clause('rel', source_type='dart_hyslr_sttus', confidence_score=0.95,
+                       snapshot_year_expr='r.year')}
 )
 """
 

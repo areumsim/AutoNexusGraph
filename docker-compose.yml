@@ -1,4 +1,8 @@
-# FinGraph DB 스택 — PostgreSQL + Neo4j (minimal)
+# AutoNexusGraph DB 스택 — PostgreSQL + Neo4j (minimal)
+#
+# 본 compose 는 DB 2개만 활성. 앱 컨테이너 (api/web/ingestion-worker) 는 후속 슬롯
+# (주석 처리됨) — 현재는 dev container 안에서 직접 실행 (`make serve-api` / `make serve-ui`).
+# 본 파일에 매핑된 31020/31021 슬롯은 비활성 — `make serve-api` 가 직접 31020 포트 사용.
 #
 # 벡터: pgvector 확장 (init SQL 에서 자동 활성화) → Qdrant 별도 X.
 # 캐싱/Redis: 단일 worker 단계엔 in-process 디셔너리. 분산 가면 추가.

@@ -26,8 +26,8 @@ Qdrant/Redis 는 옵션 (compose 에 주석으로 슬롯만 남김).
 | PostgreSQL | `ar-postgres` | 31011 → 5432 | `${DB_DATA_ROOT}/postgres` → `/var/lib/postgresql/data` (실데이터는 `…/postgres/pgdata/`) |
 | Neo4j | `ar-neo4j` | 31009 → 7474 (HTTP)<br>31010 → 7687 (Bolt) | `${DB_DATA_ROOT}/neo4j/data` → `/data`<br>`${DB_DATA_ROOT}/neo4j/logs` → `/logs`<br>`${DB_DATA_ROOT}/neo4j/import` → `/var/lib/neo4j/import`<br>`${DB_DATA_ROOT}/neo4j/plugins` → `/plugins` |
 
-`DB_DATA_ROOT` 기본값: `/home/user/arsim/DB_ANX` (AutoNexusGraph 전용 — 다른 프로젝트와 분리).
-historic `DB_FG` 경로를 그대로 쓰는 경우, docker-compose 의 volume mount 만 일치하면 이름과 무관하게 동작 (실 데이터 보존).
+`DB_DATA_ROOT` 기본값: `/home/user/arsim/DB_FG` (README §13 Quickstart 의 `mkdir -p ~/arsim/DB_FG/{...}` 와 정합. 일부 환경은 `DB_ANX` 명명을 쓰지만 본 문서·README·docker-compose 는 모두 `DB_FG` 로 통일).
+historic 경로를 그대로 쓰는 경우, docker-compose 의 volume mount 만 일치하면 폴더 이름과 무관하게 동작 (bind mount 라 실 데이터 보존).
 
 ## 시나리오 A: 호스트에서 직접
 
@@ -180,6 +180,22 @@ make load-all
 ```
 
 idempotent (UPSERT) — 여러 번 실행 안전.
+
+---
+
+## 알려진 한계 / 주의 사항 (2026-06-02 검토)
+
+본 절은 docker-compose.yml 검토 후 명시. 외부 평가자 / 신규 합류자 솔직 표시.
+
+| # | 한계 / 주의 | 영향 | 우회 |
+|---:|---|---|---|
+| 1 | **NEO4J_PLUGINS = `["apoc"]` 만** — GDS (Graph Data Science) 미포함 | learning_guide §11.1.3 HippoRAG PageRank (`gds.pageRank`) / community detection 같은 알고리즘 적용 불가. enterprise 라이선스 별도 필요 | (a) 현재 본 시스템은 GDS 미사용 — 한계 아님. (b) 적용 검토 시 docker-compose.yml 의 NEO4J_PLUGINS 에 `"graph-data-science"` 추가 + 라이선스 |
+| 2 | Neo4j memory: heap_max=2g + pagecache=1g ≈ **약 4g + JVM overhead 필요** | dev 환경 RAM 4GB 미만 시 OOMKilled | docker stats 확인. 부족 시 docker-compose.yml 의 `NEO4J_dbms_memory_heap_max__size` 줄임 (`512m` ~ `1g`) |
+| 3 | **`DB_DATA_ROOT` 기본값 `/home/user/arsim/DB_FG`** — 하드코딩된 사용자명 `user` | macOS / Windows / 다른 사용자명 환경 fail | `.env` 에 `DB_DATA_ROOT=~/your/path` 명시 (compose 가 변수 치환). 또는 export ENV |
+| 4 | **첫 부팅 init SQL 25개 적용 시간** — healthcheck timeout 100초 (10s × 10) 안에 안 끝날 가능성 | `make health` 가 일시 fail | 첫 부팅 5분 대기 후 재시도. `docker compose logs postgres` 로 init 진행 확인 |
+| 5 | **앱 컨테이너 (api/web/ingestion-worker) 모두 주석** — compose 로는 DB 2개만 활성 | 직접 실행 모드만 — `make serve-api` / `make serve-ui` (31020/31021 포트). 컨테이너화는 후속 | OK (의도된 설계 — dev container 환경 가정) |
+| 6 | **GPU 임베딩 (BGE-M3/Reranker) 도 주석** — 옵션 2 (dev container 직접 실행) 채택 | `scripts/serve_embeddings.py` 가 호스트/dev container 안에서 직접. compose 통합 안 됨 | OK (의도) — GPU 분리 시 옵션 1 (TEI) 활성화 |
+| 7 | **Qdrant / Redis 옵션** 모두 주석 | 청크 ≥ 100만 시 Qdrant 분리 필요, 분산 worker 시 Redis 필요 | 현재 청크 750K 이내 → pgvector 단독. Redis 미필요 — 단일 worker |
 
 ---
 

@@ -4,19 +4,48 @@
 때만 자동 적용된다. 데이터가 이미 존재하는 환경에서는 새 `.sql` 파일을 추가해도 자동으로
 실행되지 않으므로 **수동 hot-apply 절차** 가 필요하다.
 
-본 가이드는 본 PR 가 추가한 세 마이그레이션의 안전 적용 순서를 다룬다.
+## 0. 전체 마이그레이션 목록 (총 25개 — 01~24 + 12a/b 별도)
 
-- `10_autograph_bom.sql` — `auto.components` 에 `level / parent_component_id / snapshot_year`
-  컬럼 추가 + 기존 row backfill + 인덱스.
-- `11_autograph_staging.sql` — 신규 테이블 `auto.master_suppliers`, `auto.staging_relations`.
-- `12a_autograph_inspections.sql` — 신규 테이블 `auto.events_inspections`
-  (data.go.kr 15155857 KOTSA 수리검사내역 적재용).
-- `12b_autograph_investigations.sql` — 신규 테이블 `auto.events_investigations`
-  (NHTSA ODI 결함 조사 적재용).
+```text
+01_schema.sql                       # core 기본 메타·스키마 (master / fin / wiki / vec / news / sec / esg)
+02_entity_resolution.sql            # master.entities 다형 ER (entity_id + entity_type)
+03_news_articles.sql                # 뉴스·보도자료
+04_external_data.sql                # ESG / KOSIS / 특허 슬롯 / 운영 메트릭
+05_vec_chunks_meta.sql              # vec.chunks 메타 (corp_code / fiscal_year / source)
+06_llm_usage.sql                    # ops.llm_usage (turn별 token/cost/replan)
+07_autograph.sql                    # auto.* 핵심 스키마 (manufacturers / models / variants)
+08_bridge.sql                       # bridge.corp_entity (finance ↔ auto)
+09_vec_chunks_auto_meta.sql         # vec.chunks 에 manufacturer_id / model_id / variant_id
+10_autograph_bom.sql                # auto.components 에 level / parent_component_id / snapshot_year
+11_autograph_staging.sql            # auto.master_suppliers + auto.staging_relations (P3 LLM staging)
+12a_autograph_inspections.sql       # auto.events_inspections (data.go.kr 15155857 KOTSA)
+12b_autograph_investigations.sql    # auto.events_investigations (NHTSA ODI)
+13_autograph_oem_sec.sql            # auto.oem_financials_sec (글로벌 OEM SEC XBRL)
+14_master_entities.sql              # master.entities 보강 (auto 도메인 통합)
+15_autograph_production.sql         # auto.plant_capacity / plant_production / plant_utilization (DART)
+16_autograph_kama_macro.sql         # auto.macro_production_yearly / macro_industry_monthly (KAMA)
+17_autograph_oem_news.sql           # auto.events_oem_news (IR / 뉴스룸 sitemap crawler)
+18_ipgraph.sql                      # ip.patents / assignees / inventors / citations / cpc_scheme / 등 12 테이블
+19_ipgraph_bridge.sql               # ip.assignee_corp_map (bridge.corp_entity 직접 변경 없이 join)
+20_auto_minerals.sql                # auto.master_minerals (USGS MCS L6 소재)
+21_auto_ev_chargers.sql             # auto.ev_chargers + ev_charger_usage (data.go.kr B552584/B553530)
+22_ip_works.sql                     # ip.works / institution / work_institution (OpenAlex)
+23_ip_cpc.sql                       # ip.cpc_scheme (CPC bulk 10,695)
+24_auto_factoryon.sql               # auto.factoryon_registry (DATA_GO_KR_API_KEY 발급 후)
+```
 
-> 두 마이그레이션 모두 **멱등** (`ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`)
-> 이라서 재실행해도 무해. 단 `ALTER COLUMN SET NOT NULL` / `ADD CONSTRAINT` 는 backfill 직후
-> 실행되므로 순서를 지킬 것.
+본 가이드는 **개별 파일의 hot-apply 절차** 와 그 중 backfill 이 필요한 ALTER 마이그레이션 (10번) 의 안전 순서를 다룬다.
+
+> 모든 마이그레이션은 **멱등** (`ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS`)
+> 으로 작성되어 재실행해도 무해. 단 `ALTER COLUMN SET NOT NULL` / `ADD CONSTRAINT` (10번) 은
+> backfill 직후 실행되므로 순서를 지킬 것.
+
+> **확인 명령** — 어느 마이그레이션이 적용됐는지:
+> ```bash
+> # 현재 모든 auto.* / bridge.* / ip.* 테이블 목록 — 위 파일들과 매핑
+> psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
+>   -c "SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('auto', 'bridge', 'ip', 'master', 'fin', 'wiki', 'vec', 'news', 'sec', 'esg', 'ops', 'macro') ORDER BY 1, 2;"
+> ```
 
 ---
 

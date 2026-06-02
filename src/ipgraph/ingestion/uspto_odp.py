@@ -113,6 +113,29 @@ def collect_assignees(*, limit: int | None = None) -> list[dict]:
     return out
 
 
+def collect_inventors(*, limit: int | None = None) -> list[dict]:
+    """``raw/ip/uspto_odp/inventors.jsonl`` 의 발명자 stream."""
+    raw_dir = _ensure_raw_dir()
+    fp = raw_dir / "inventors.jsonl"
+    if not fp.exists():
+        log.warning("[uspto_odp] inventors.jsonl 없음 (%s) — bulk download 필요", fp)
+        return []
+    out: list[dict] = []
+    for i, r in enumerate(_iter_jsonl(fp)):
+        if limit and i >= limit:
+            break
+        name = r.get("name_first") and r.get("name_last") and \
+               f"{r['name_first']} {r['name_last']}" or r.get("name") or ""
+        out.append({
+            "inventor_id":    r.get("inventor_id") or r.get("id"),
+            "name":           name,
+            "name_norm":      name.lower().strip() if name else None,
+            "country":        r.get("country"),
+            "schema_version": "v2.2",
+        })
+    return out
+
+
 def collect_citations(*, limit: int | None = None) -> list[dict]:
     """``raw/ip/uspto_odp/citations.jsonl`` 의 인용 stream."""
     raw_dir = _ensure_raw_dir()
@@ -135,16 +158,84 @@ def collect_citations(*, limit: int | None = None) -> list[dict]:
     return out
 
 
+def collect_patent_assignees(*, limit: int | None = None) -> list[dict]:
+    """``raw/ip/uspto_odp/patent_assignees.jsonl`` — Patent↔Assignee 다대다 link.
+
+    각 row: {pub_no, assignee_id, sequence}. sequence 는 USPTO 의 출원인 순서.
+    """
+    raw_dir = _ensure_raw_dir()
+    fp = raw_dir / "patent_assignees.jsonl"
+    if not fp.exists():
+        log.warning("[uspto_odp] patent_assignees.jsonl 없음 (%s)", fp)
+        return []
+    out: list[dict] = []
+    for i, r in enumerate(_iter_jsonl(fp)):
+        if limit and i >= limit:
+            break
+        out.append({
+            "pub_no":      r.get("pub_no") or r.get("publication_number"),
+            "assignee_id": r.get("assignee_id"),
+            "sequence":    r.get("sequence"),
+        })
+    return out
+
+
+def collect_patent_inventors(*, limit: int | None = None) -> list[dict]:
+    """``raw/ip/uspto_odp/patent_inventors.jsonl`` — Patent↔Inventor 다대다 link."""
+    raw_dir = _ensure_raw_dir()
+    fp = raw_dir / "patent_inventors.jsonl"
+    if not fp.exists():
+        log.warning("[uspto_odp] patent_inventors.jsonl 없음 (%s)", fp)
+        return []
+    out: list[dict] = []
+    for i, r in enumerate(_iter_jsonl(fp)):
+        if limit and i >= limit:
+            break
+        out.append({
+            "pub_no":      r.get("pub_no") or r.get("publication_number"),
+            "inventor_id": r.get("inventor_id"),
+            "sequence":    r.get("sequence"),
+        })
+    return out
+
+
+def collect_patent_cpc(*, limit: int | None = None) -> list[dict]:
+    """``raw/ip/uspto_odp/patent_cpc.jsonl`` — Patent ↔ CPC 코드 link."""
+    raw_dir = _ensure_raw_dir()
+    fp = raw_dir / "patent_cpc.jsonl"
+    if not fp.exists():
+        log.warning("[uspto_odp] patent_cpc.jsonl 없음 (%s)", fp)
+        return []
+    out: list[dict] = []
+    for i, r in enumerate(_iter_jsonl(fp)):
+        if limit and i >= limit:
+            break
+        out.append({
+            "pub_no":       r.get("pub_no") or r.get("publication_number"),
+            "cpc_code":     r.get("cpc_code") or r.get("code"),
+            "primary_flag": bool(r.get("primary_flag", False)),
+        })
+    return out
+
+
 def collect(*, limit: int | None = None, dry_run: bool = False) -> dict[str, Any]:
-    """USPTO ODP bulk 일괄 수집 — patents + assignees + citations."""
+    """USPTO ODP bulk 일괄 수집 — 7 table 전 종류."""
     patents = collect_patents(limit=limit)
     assignees = collect_assignees(limit=limit)
+    inventors = collect_inventors(limit=limit)
     citations = collect_citations(limit=limit)
+    patent_assignees = collect_patent_assignees(limit=limit)
+    patent_inventors = collect_patent_inventors(limit=limit)
+    patent_cpc = collect_patent_cpc(limit=limit)
     out: dict[str, Any] = {
-        "n_patents":   len(patents),
-        "n_assignees": len(assignees),
-        "n_citations": len(citations),
-        "raw_dir":     str(RAW_DIR),
+        "n_patents":          len(patents),
+        "n_assignees":        len(assignees),
+        "n_inventors":        len(inventors),
+        "n_citations":        len(citations),
+        "n_patent_assignees": len(patent_assignees),
+        "n_patent_inventors": len(patent_inventors),
+        "n_patent_cpc":       len(patent_cpc),
+        "raw_dir":            str(RAW_DIR),
     }
     if dry_run:
         out["patents_head"]   = patents[:3]
