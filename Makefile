@@ -1,4 +1,5 @@
 .PHONY: help install fmt lint test test-int smoke-e2e up down logs health clean \
+        bridge-kpi bridge-expire \
         ingest-corp ingest-krx ingest-ecos ingest-targets ingest-bulk \
         ingest-structural ingest-wikidata ingest-wikipedia \
         ingest-news ingest-fss ingest-ftc ingest-kosis \
@@ -245,6 +246,13 @@ load-graph:
 
 migrate-schema:                                      # Neo4j 스키마 정합성 마이그레이션 (README §11.6)
 	$(PYTHON) scripts/migrate_neo4j_schema.py
+
+# ── Bridge candidate 검토 운영 (Q-1) ──────────────────────────────────
+bridge-kpi:                                          # 검토 진행률 KPI (JSON)
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.bridge_review kpi
+
+bridge-expire:                                       # N일 미검토 candidate 자동 거부 (dry-run; ARGS="--days 180 --apply")
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.bridge_review expire $(ARGS)
 
 # ── PG hot-apply (운영 중 컨테이너에 신규 init/*.sql 멱등 적용) ────────────
 # docker-entrypoint-initdb.d 는 빈 볼륨 첫 기동 시에만 실행되므로, 신규
