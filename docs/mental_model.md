@@ -60,7 +60,7 @@ finance 단독으로 검증된 AutoNexusGraph 의 한계 (구 PRD.md §1.1 → R
 | 이벤트 빈도 낮음 | 공시·뉴스는 분기/월 단위 — 실시간성 검증 어려움. |
 | 물리적 계층 부재 | 모든 엔티티가 법인 — 제품·소재·공정 같은 물리적 계층 없음. |
 
-[확정] 이 4가지 한계를 풀기 위해 자동차 도메인을 추가한다 — 자동차의 **명시적 BOM 계층**(Manufacturer→Model→Variant→System→Module→Part)은 "메인 홉"을 자연스럽게 도입하며, NHTSA 리콜·결함은 일·주 단위 이벤트를 제공한다 (`PRD §1.1`, `PRD §2.1`).
+[확정] 이 4가지 한계를 풀기 위해 자동차 도메인을 추가한다 — 자동차의 **명시적 BOM 계층**(Manufacturer→Model→Variant→System→Module→Part)은 "메인 홉"을 자연스럽게 도입하며, NHTSA 리콜·결함은 일·주 단위 이벤트를 제공한다 (README §0 축 위계 + §1 현황).
 
 ### 1.2 시스템의 가치 제안 — 한 줄
 
@@ -68,7 +68,7 @@ finance 단독으로 검증된 AutoNexusGraph 의 한계 (구 PRD.md §1.1 → R
 
 > 자동차 제품·부품·리콜·공급망 (auto) + 한국 상장사 공시·재무 (finance) 두 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 멀티도메인 GraphRAG 에이전트.
 
-[확정] 사용자 시나리오 예시 (`PRD §2.1`):
+[확정] 사용자 시나리오 예시 (README §1 + §11.3 추론 가치):
 
 1. 도메인 내 멀티홉: "현대 쏘나타의 에어백 리콜과 관련된 공급사는?"
 2. Cross-Domain: "현대모비스 매출과 모비스가 공급하는 차종의 최근 리콜은?"
@@ -78,22 +78,22 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 ### 1.3 비목표 (Non-Goals)
 
-[확정] 다음은 명시적으로 안 한다 (`README §9`, `PRD §2.3`):
+[확정] 다음은 명시적으로 안 한다 (README §9):
 
 - 실시간 주가 예측 / 매매 신호 생성 / 투자 자문
 - 비상장사 데이터 (DART 미제공)
 - 영문 글로벌 기업 (1차 범위 외; SEC 한국 ADR 은 제한적 보강만)
 - 차량 가격 예측 / 중고차 시세
-- **공정·라인·설비·원가·생산량** — "제조" 라는 표현이 기대하게 하지만 공개 데이터 없음. v2.1 에서 "제품·부품·리콜·공급망" 으로 포지셔닝 재정의 (`PRD §1.2`).
+- **공정·라인·설비·원가·생산량** — v3.0 에서 부분 진입 (auto 수직 심화 = ProcessGraph BoP, README §0 축 위계 + §10.18~20 DoD). 회사 귀속 인스턴스는 데이터 대기 (BACKLOG PG-1).
 - 비공개 OEM 내부 BOM / 자율주행 안전성 인증 대체 / 실시간 텔레매틱스
-- **BOM Level 6 (소재·공법)** MVP 포함 — 장기 확장 (`PRD §3.4`).
+- **BOM Level 6 (소재·공법)** MVP 포함 — v3.0 부분 적재 (곁가지: Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8, README §11.2 가용성 매트릭스).
 
 ### 1.4 시스템 이름의 의미 — FinGraph → AutoNexusGraph
 
 [잠정] 2026 년 초 리네이밍 (커밋 `10680a4`). 의미:
 
 - finance 단일 도메인 시스템이 아니라 **여러 도메인을 묶는 우산** 으로 포지셔닝.
-- 현재는 finance + auto 두 도메인. **[확정 — 2026-06-01 PRD v2.2]** 도메인3 = 특허 (IPGraph) 정식 흡수 — `docs/ipgraph.md` SSOT + PRD §12.5 + DoD #15~#17. 4번째~ (의약품/전자제품/에너지/식품) 는 §2.3 영구 비목표 강등.
+- 현재는 finance + auto 두 도메인 + ip 보조축. **[확정 — 2026-06-02 README v3.0]** ip = 수평 cross 진입 어댑터 (corp_entity 브리지 전용) — `docs/ipgraph.md` SSOT + README §11.1 Phase C + DoD §10.15~17. 4번째~ (의약품/전자제품/에너지/식품) 는 README §9 비목표 강등.
 
 **[의도 확인 필요]**: "AutoNexusGraph" 가 영구적 우산 이름인지, 다음 리브랜딩 가능성이 있는지 — 코드/PRD 만으론 확인 불가. 단, `src/autonexusgraph/__init__.py:1` 가 "finance 코어" 로 자기 정의하고 있어 패키지 이름과 도메인 명칭이 완전히 정합되진 않음 (§3.1 의 [의도 확인 필요] 항목 참조).
 
@@ -109,7 +109,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 - **정의**: 모든 엔티티(법인·차량·부품·인물 등)에 단일 ID 공간을 부여하는 SSOT.
 - **왜 필요**: 같은 회사가 DART 의 `corp_code`, Wikidata 의 `QID`, GLEIF 의 `LEI`, NHTSA 의 `manufacturer_id` 등 여러 식별자를 가짐. 도메인 간 join 을 위해 통합 키 필요.
-- **위치**: v2.1 에서 `corp_code` 단일 중심키 → `entity_id + entity_type` 다형 키로 일반화 (`PRD §1.3`, `PRD §4.5`). 스키마 파일은 `infra/postgres/init/*.sql`.
+- **위치**: v2.1 에서 `corp_code` 단일 중심키 → `entity_id + entity_type` 다형 키로 일반화 (README §3.4 ER 마스터 + §3.4.1 마이그레이션 1:1 매핑). 스키마 파일은 `infra/postgres/init/*.sql`.
 - **확장 인덱스 테이블**: `master.entity_map` 에 ticker / QID / LEI / CIK / ISIN / 사업자번호 / 법인등록번호 / NHTSA mfr_id / wikipedia_title 등을 매핑 (`README §1.1`).
 - [확정] v2.1 에서 entity_id 다형 키 도입.
 - [잠정] 현재 finance 엔티티(Company) 와 auto 엔티티(Manufacturer/Supplier) 의 entity_type 분리 — 인물(Person) 통합 여부는 미정 (auto 측 인물 엔티티가 없음).
@@ -118,8 +118,8 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 #### 2.1.2 Bridge (`bridge.corp_entity`)
 
 - **정의**: 두 도메인의 ID 를 묶는 다리. `corp_code (finance) ↔ entity_id (auto)` 매칭 테이블.
-- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (`PRD §4.6`, `docs/autograph.md §3`, `src/autograph/loaders/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
-- **신뢰도 라벨링**: 자동 매칭은 `candidate`. 사람이 검토하면 `reviewed` / `rejected`. 신뢰도 0.95 (QID 일치 시) 부터 시작. `match_method` 6종 enum: `qid_exact | lei_exact | business_no_exact | corp_code_exact | fuzzy_name | manual` (`PRD §4.6` SQL schema).
+- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (README §3.5 Bridge 일반화 명세, `docs/autograph.md §3`, `src/autograph/loaders/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
+- **신뢰도 라벨링**: 자동 매칭은 `candidate`. 사람이 검토하면 `reviewed` / `rejected`. 신뢰도 0.95 (QID 일치 시) 부터 시작. `match_method` 6종 enum: `qid_exact | lei_exact | business_no_exact | corp_code_exact | fuzzy_name | manual` (README §3.5 SQL schema).
 - **현황** (`README §1.1`): **4,806 행** — manufacturer cand 1 + rev 11 + supplier cand 4,790 + rev 4. `strong_match` (confidence ≥ 0.9) = 15/15 = 100%.
 - [확정] Bridge 분리 테이블 도입 — 도메인 직접 FK 가 아닌 별도 테이블에 confidence·reviewed_status·source_type 보유.
 - [잠정] 자동 매칭 결과의 **검토 프로세스** — `reviewed_status='rejected'` 운영 절차가 코드로 강제되지 않음. **[의도 확인 필요]**.
@@ -127,8 +127,8 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 #### 2.1.3 BOM 계층 (Level 0 ~ 6)
 
-- **정의**: 자동차 도메인의 메인 홉 척추. `Manufacturer (L0) → VehicleModel (L1) → VehicleVariant (L2) → System (L3) → Module (L4) → Part (L5) → Material/Process (L6)` (`PRD §3.4`, `docs/autograph.md §2.5.4`).
-- **MVP 가용성** (`PRD §3.4`):
+- **정의**: 자동차 도메인의 메인 홉 척추. `Manufacturer (L0) → VehicleModel (L1) → VehicleVariant (L2) → System (L3) → Module (L4) → Part (L5) → Material/Process (L6)` (`README §11.2`, `docs/autograph.md §2.5.4`).
+- **MVP 가용성** (`README §11.2`):
   - L0~L2: **높음** [확정]. NHTSA vPIC + Wikidata 로 채움.
   - L3: **중간** [확정]. `ontology/auto/system_taxonomy.yaml` 19 시스템 코드 (POWERTRAIN, BRAKE, ADAS, …).
   - L4: **낮음~중간** [잠정 — 부분 포함]. AI Hub + 공급사 시드 + LLM P3.
@@ -139,7 +139,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 #### 2.1.4 `edge_required_meta` — 모든 엣지가 가져야 할 메타
 
-- **정의**: auto 도메인의 모든 그래프 엣지에 강제되는 6개 메타 (`PRD §6.7`, `ontology/auto/relations.yaml:19-26`):
+- **정의**: auto 도메인의 모든 그래프 엣지에 강제되는 6개 메타 (`README §3.7`, `ontology/auto/relations.yaml:19-26`):
 
   | 키 | 의미 | 예 |
   |---|---|---|
@@ -158,7 +158,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 #### 2.1.5 출처 신뢰도 등급 (A / B / C)
 
-- **정의**: 모든 그래프 엣지의 `confidence_score` 기본값을 출처에 따라 결정 (`PRD §3.5`):
+- **정의**: 모든 그래프 엣지의 `confidence_score` 기본값을 출처에 따라 결정 (`README §4.0`):
 
   | 출처 | 등급 | 기본 confidence | 적용 |
   |---|---|---|---|
@@ -225,12 +225,12 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
   register_router(route_domain)            # 키워드 룰 라우터
   ```
 - **의존 방향**: autograph → core (반대 아님). `import autograph` 가 발생하지 않으면 core 는 finance 만 동작 (라우터 등록 없으니 자동 라우팅이 finance 로 폴백 — `_domain_handler.py:117-130`).
-- [확정] DomainHandler Protocol + register_handler 가 PRD §10.12 의 의도 ("core 변경량 < 5%") 인프라.
+- [확정] DomainHandler Protocol + register_handler 가 README §10.12 의 의도 ("core 변경량 < 5%") 인프라.
 - **열린 질문 / [의도 확인 필요]**: agent_handler.py 가 protocol 의 메서드를 *모두* 구현하지 않아도 동작 (`_domain_handler.py:40-42`). 핸들러가 어떤 메서드를 누락해도 core 가 깨지지 않는다는 보장이 테스트로 검증되는지.
 
 #### 2.2.3 사전 정의 도구 풀 — LLM 의 권한 경계
 
-- **정의**: LLM 은 함수명 + 파라미터만 결정. SQL/Cypher 직접 생성 금지 (`PRD §7.5.10`, `README:160`).
+- **정의**: LLM 은 함수명 + 파라미터만 결정. SQL/Cypher 직접 생성 금지 (`docs/operations/agents.md (구 PRD §7.5).10`, `README:160`).
 - **목록**:
   - `autonexusgraph.tools.financials` — PG 정형 (lookup_company, get_revenue, compare_companies, …)
   - `autonexusgraph.tools.graph` — Neo4j 탐색 (list_subsidiaries, get_executives, find_paths, …)
@@ -253,7 +253,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 #### 2.2.5 P1 ~ P4 추출 파이프라인
 
-- **정의**: 데이터 → 그래프 적재의 4단계 (`PRD §6.5/§6.6`, `docs/operations/data_pipeline.md`, `docs/autograph.md §7.4`):
+- **정의**: 데이터 → 그래프 적재의 4단계 (`README §3.6 (4-Pass)/§6.6`, `docs/operations/data_pipeline.md`, `docs/autograph.md §7.4`):
   - **P1 — 정형 직매핑**: raw → PG (XBRL, NHTSA vPIC 표). LLM 0%.
   - **P2 — Deterministic relation**: PG FK / 룰 / 코드 매칭으로 그래프 엣지 (`SUBSIDIARY_OF`, `MANUFACTURES`, `RECALL_OF` 일부 등). 0% LLM.
   - **P3 — Selective LLM**: 서술형 텍스트(리콜 본문, IR, 매뉴얼)에서 관계 추출 (`SUPPLIED_BY`, `COMPETES_WITH` 후보 등). Schema-aware. `auto.staging_relations` 에 적재.
@@ -285,7 +285,7 @@ Triage → Planner(DAG) → Supervisor(Send 병렬) → Workers(4종) → Synthe
 ```
 
 - **Triage** (`agents/nodes.py:32`): 안전 가드 + coreference 해소 + 시간 정규화 + question_kind 분류 + 1차 회사/차량 식별. LLM 0건 (룰).
-- **Planner** (`agents/nodes.py` 의 planner_node): DAG `tasks` 생성. 룰 기반 (PRD §7.5.3) — 향후 LLM 업그레이드 가능 (`agents/nodes.py:12`).
+- **Planner** (`agents/nodes.py` 의 planner_node): DAG `tasks` 생성. 룰 기반 (docs/operations/agents.md (구 PRD §7.5).3) — 향후 LLM 업그레이드 가능 (`agents/nodes.py:12`).
 - **Supervisor** (`agents/supervisor.py`): 의존성·순환 검증, budget guard, LangGraph `Send` API 로 worker 병렬 디스패치.
 - **Workers 4종** (`agents/workers.py`):
   - `research_worker` — pgvector 검색
@@ -295,7 +295,7 @@ Triage → Planner(DAG) → Supervisor(Send 병렬) → Workers(4종) → Synthe
 - **Synthesizer** — 답변 합성. `number_guard` 통과한 수치만 인용.
 - **Validator** (`agents/validator.py`) — 출처·환각 검증. 실패 시 replan (최대 2회 — `state.py:71`).
 
-[확정] 5단계 + 4 worker + Send 병렬 + replan ≤ 2. PRD §7.5 가 SSOT.
+[확정] 5단계 + 4 worker + Send 병렬 + replan ≤ 2. docs/operations/agents.md (구 PRD §7.5) 가 SSOT.
 
 ---
 
@@ -374,7 +374,7 @@ autonexusgraph         autonexusgraph ──┐
 - 현재 구조에서 `autonexusgraph/tools/{financials,graph,retrieve}.py` 는 finance 데이터에 강하게 의존 (corp_code 등). agents/ 안의 fallback 도 `lookup_company` 를 직접 import (`agents/nodes.py:34`).
 - 즉 **"코어 = 코어 인프라 + finance 어댑터"** 가 한 패키지에 묶여 있다.
 - [잠정 / 가능성] 다음 단계에서 `autonexusgraph` = pure core, `fingraph` = finance 어댑터로 분리하는 그림. 현재 그 분리가 안 됨.
-- **[확정 — 2026-06-01 PRD v2.2]** 도메인3 (IPGraph, PRD §12.5) 정식 흡수로 인해 **"코어/finance 분리" 결정 압력 실제 도래**. PRD §10.12 는 여전히 "코어 변경 < 5%" 만 측정하지만, **DoD #15 (ip 추가 후 baseline reset → 재측정 < 5%)** 가 새 게이트. 따라서:
+- **[확정 — 2026-06-01 PRD v2.2]** 도메인3 (IPGraph, README §11.1 (구 PRD §12.5)) 정식 흡수로 인해 **"코어/finance 분리" 결정 압력 실제 도래**. README §10.12 는 여전히 "코어 변경 < 5%" 만 측정하지만, **DoD #15 (ip 추가 후 baseline reset → 재측정 < 5%)** 가 새 게이트. 따라서:
   - 옵션 A — pure core 분리 (3분할: `autonexusgraph` + `fingraph` + `autograph` + `ipgraph`) 로 가야 "코어 변경" 의 의미가 명확해짐.
   - 옵션 B — 2분할 유지 + baseline reset 정책으로 누적 변화 추적 (현 v2.2 결정).
   - **v2.2 는 옵션 B 채택 (§11.1 baseline reset 정책 본문 승격).** 옵션 A 는 ipgraph 머지 후 누적 변경량이 너무 커지면 재고.
@@ -535,7 +535,7 @@ NHTSA Recalls                 ──→   auto.events_recalls + (P2) :Recall + A
 NHTSA Complaints              ──→   auto.events_complaints + (P2) :Complaint + REPORTED_IN
 NHTSA SafetyRatings           ──→   spec_measurements.safety.* + SAFETY_RATED_BY
 Wikidata (auto)               ──→   master.entity_map + (B0.80) :Manufacturer/:Model
-data.go.kr 15089863           ──→   auto.events_recalls (보강) — [잠정 — key 필요]
+data.go.kr 3048950 (CSV)      ──→   auto.events_recalls (941 row) — [확정 — 구 15089863 API 폐기]
 data.go.kr 15155857 (CSV)     ──→   auto.events_inspections — [잠정 — manual]
 KATRI (bigdata-tic OAuth)     ──→   auto.cert_* — [잠정 — credentials 필요]
 KNCAP / Euro NCAP / IIHS      ──→   spec_measurements + :Standard — [부분 — KNCAP만 인터페이스]
@@ -553,7 +553,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 [확정] raw 만 있으면 processed + DB 재생성 가능. raw 는 보존.
 
-[잠정 — 외부 의존] data.go.kr (15089863/15155857) / KATRI / KNCAP — 인터페이스만 깔리고 키/raw 부재 시 graceful skip (`docs/autograph.md §5`).
+[잠정 — 외부 의존] data.go.kr 15155857 / KATRI / KNCAP — 인터페이스만 깔리고 키/raw 부재 시 graceful skip (`docs/autograph.md §5`). (구 15089863 한국 리콜은 폐기 → 3048950 CSV 로 적재 완료 = 확정)
 
 ### 3.6 외부 데이터 통합 매트릭스 (확정 / 잠정 / 미정)
 
@@ -577,7 +577,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 | NHTSA Complaints | auto | [확정] 활성 | 16,005 (97% 매핑) |
 | NHTSA SafetyRatings | auto | [확정] 활성 | `spec_measurements.safety.ncap.*` |
 | AI Hub (부품 결함 71347, 자율 578) | auto | [확정] 활성 | `:Module` + CONTAINS_COMPONENT |
-| data.go.kr 15089863 (한국 리콜) | auto | [잠정] 인터페이스 wired, 키 필요 | `ingestion/datagokr_recalls.py` |
+| data.go.kr 3048950 (한국 리콜 CSV) | auto | [확정] 941 row 적재 (구 15089863 API 폐기) | `loaders/load_datagokr_recalls.py --csv` |
 | data.go.kr 15155857 (수리검사 CSV) | auto | [잠정] 인터페이스 wired, raw 수동 | `ingestion/datagokr_inspections.py` |
 | car.go.kr | auto | [잠정] CSV 파서만, 공식 API 미정 | `ingestion/car_go_kr_recalls.py` |
 | KATRI (bigdata-tic) | auto | [잠정] OAuth 인터페이스, credentials 필요 | `ingestion/katri_tic.py` |
@@ -670,7 +670,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **AutoGen / CrewAI** — agent 추상화는 비슷하지만 state 가 implicit.
   - **자체 구현** — LangGraph 의 checkpoint·SSE streaming 을 재구현해야 함.
 - **대안 트레이드오프**: ReAct → 추적성 손실. AutoGen → 디버깅 시 state 흐름 불투명.
-- [확정] LangGraph 선택. PRD §7.5 가 SSOT.
+- [확정] LangGraph 선택. docs/operations/agents.md (구 PRD §7.5) 가 SSOT.
 - **열린 질문**: LangGraph 의 lock-in. 만일 LangChain 생태가 stale 되면? — 추상화 깊이가 얕아서 교체 가능성 [잠정].
 
 ### 4.2 왜 3-Store 하이브리드
@@ -694,7 +694,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **LLM 자유 SQL/Cypher 생성** — 유연하지만 모든 보안 가드를 LLM 뒤에서 사후 검증해야 함.
   - **DSL 중간층** — LLM 이 DSL 생성 → DSL 컴파일러가 SQL/Cypher 생성. 표현력은 사전 정의보다 높고 자유 SQL 보다 안전.
 - **대안 트레이드오프**: 자유 SQL → 1건의 prompt injection 이 전체 DB 노출. DSL → 컴파일러 자체가 또 하나의 시스템.
-- [확정] 사전 정의만. PRD §7.5.10.
+- [확정] 사전 정의만. docs/operations/agents.md (구 PRD §7.5).10.
 
 ### 4.4 왜 Deterministic-first 추출 (LLM 은 selective)
 
@@ -705,19 +705,19 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **LLM full-pass** — 모든 데이터를 LLM 으로 그래프 추출. 빠르지만 confidence 약함, P4 검증 없으면 환각 누적.
   - **Knowledge Distillation** — LLM 으로 생성 후 사람 검토로 룰 학습. 초기 비용 큼.
 - **대안 트레이드오프**: full-pass → 비용 + 환각. KD → MVP 속도 저하.
-- [확정] PRD §6.5 의 "Deterministic-first + Selective LLM" 가 SSOT.
+- [확정] README §3.6 (4-Pass) 의 "Deterministic-first + Selective LLM" 가 SSOT.
 
 ### 4.5 왜 별도 `autograph` 패키지
 
 - **결정**: auto 도메인을 별도 패키지로. import 시 자동 등록.
-- **이득**: 코어 ↔ 도메인 의존 방향 정상화 (autograph → core). autograph 미설치 시 core 는 finance 만 동작. PRD §10.12 "core 변경 < 5%".
+- **이득**: 코어 ↔ 도메인 의존 방향 정상화 (autograph → core). autograph 미설치 시 core 는 finance 만 동작. README §10.12 "core 변경 < 5%".
 - **비용**: import 시점 부작용(side effect)에 의존. 테스트 격리 어려움 (`import autograph` 만 해도 레지스트리 변경).
 - **대안**:
-  - **단일 패키지** — `autonexusgraph` 안에 finance / auto 분리. 의존 방향 양방향. PRD §10.12 미달.
+  - **단일 패키지** — `autonexusgraph` 안에 finance / auto 분리. 의존 방향 양방향. README §10.12 미달.
   - **core / finance / auto 3분할** — `autonexusgraph_core` + `fingraph` + `autograph`. 깔끔하지만 패키지 3개 운영.
 - **대안 트레이드오프**: 단일 → core 무수정 도메인 추가 불가. 3분할 → finance 어댑터 분리 비용 발생 (3.1.4 의 [의도 확인 필요]).
 - [확정 — 현재 구조] 2분할 (autonexusgraph + autograph), import 자동 등록. **v2.2 IPGraph 흡수 후 = 2분할 + ipgraph (코어/finance 는 여전히 미분리, §3.1.4 의 옵션 B 채택).**
-- [잠정] 3분할 (pure core 분리) 가능성 — PRD v2.2 §12.5 본문 + §11.1 baseline reset 정책으로 "옵션 B 우선" 결정. 누적 변경량이 임계 초과 시 옵션 A 재고 (§3.1.4 참조).
+- [잠정] 3분할 (pure core 분리) 가능성 — README §11.1 (구 PRD v2.2 §12.5) 본문 + §11.1 baseline reset 정책으로 "옵션 B 우선" 결정. 누적 변경량이 임계 초과 시 옵션 A 재고 (§3.1.4 참조).
 
 ### 4.6 왜 ER 마스터 + Bridge
 
@@ -728,7 +728,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **도메인 직접 FK** — `auto.manufacturer.corp_code` 같이 직접 참조. 1 hop 절감. 하지만 매칭 confidence 표현 불가, 도메인 N 일 때 FK N(N-1)/2.
   - **글로벌 single graph** — 모든 엔티티가 Neo4j 단일 그래프. 도메인 경계 흐려짐. 권한·테스트 격리 어려움.
 - **대안 트레이드오프**: 직접 FK → 다도메인 확장 어려움. single graph → 격리·관리 어려움.
-- [확정] Bridge 분리. PRD §4.6.
+- [확정] Bridge 분리. README §3.5.
 
 ### 4.7 왜 한국어 자체 BGE-M3
 
@@ -761,7 +761,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **단일 정답률 목표** — 간단. 하지만 난이도 분포에 따라 의미 변형.
   - **연속 난이도 점수** — hop 수·필요 도구 수 가중. 사람이 분류 안 해도 됨. 그러나 자동 점수의 신뢰성.
 - **대안 트레이드오프**: 단일 → 평가 신뢰도 손실. 연속 → 자동 점수가 정답률과 단조가 맞는지 검증 필요.
-- [확정] 4단계 층화. PRD §8.1.
+- [확정] 4단계 층화. README §6 (4단계 층화).
 
 ### 4.10 왜 `confidence_score` 0.40~1.00 스칼라 (vs A/B/C 카테고리)
 
@@ -784,13 +784,13 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 ### 5.1 도메인 일반성 가정의 미검증
 
 - **[가정]** 3번째 도메인 추가 비용 < 5% 코어 변경.
-- 자동차 추가 시 코어 변경 4.47% — 5% 미만 (`PRD §10.12 회귀 논쟁`). 그러나 그 안에 `agents/nodes.py` 가 `autograph.policy` 를 import 한 흔적 — 진짜 "코어 = autograph 무지" 상태인가? `_domain_handler.py:117-130` 의 자동 폴백이 정말 finance 무지 상태로 동작하는지 통합 테스트 없음 (`docs/autograph.md §6` 의 "통합 테스트(pytest -m integration)는 마커가 부여된 케이스가 코드베이스에 없어 0개 실행").
+- 자동차 추가 시 코어 변경 4.47% — 5% 미만 (`README §10.12 회귀 논쟁`). 그러나 그 안에 `agents/nodes.py` 가 `autograph.policy` 를 import 한 흔적 — 진짜 "코어 = autograph 무지" 상태인가? `_domain_handler.py:117-130` 의 자동 폴백이 정말 finance 무지 상태로 동작하는지 통합 테스트 없음 (`docs/autograph.md §6` 의 "통합 테스트(pytest -m integration)는 마커가 부여된 케이스가 코드베이스에 없어 0개 실행").
 - **[위험]** 3번째 도메인 추가 시 비슷한 4% 가 추가로 발생 → 누적 9% → 5% 가정 깨짐.
 - **[열린 질문]** "코어 변경 0%" 가 가능한 인터페이스 (e.g. handler 가 더 많은 메서드 보유) 가 무엇인가?
 
 ### 5.2 confidence_score 의 정량성
 
-- **[가정]** 0.40 / 0.50 / 0.70 / 0.80 / 0.95 가 실제 정답률과 단조 관계 (`PRD §3.5`).
+- **[가정]** 0.40 / 0.50 / 0.70 / 0.80 / 0.95 가 실제 정답률과 단조 관계 (`README §4.0`).
 - 출처 등급은 "전문가 직관" 으로 정해짐. 검증된 적 없음.
 - **[위험]** LLM-extracted edge (C, 0.50) 와 deterministic edge (A, 0.95) 가 같은 척도 (scalar 0~1) 로 비교돼도 되는가? 두 분포는 의미가 다를 수 있다 (deterministic 의 0.95 ≠ LLM 의 0.95).
 - **[열린 질문]** confidence_score 의 사후 검증 — gold QA 정답 ↔ 사용된 edge 의 confidence 분포로 calibration 가능. `confidence_weighted_accuracy` 메트릭이 이걸 측정할 수 있는가?
@@ -822,7 +822,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 - **[가정]** `cost_estimator` 의 사전 추정이 실제 비용과 ±20% 이내. 검증 없음.
 - **[열린 질문]** budget guard 가 turn 중간에 발동하면 — 이미 시작된 worker 의 sunk cost 처리?
 - **[열린 질문]** HARD_LIMIT 도달 시 사용자 경험 — "예산 초과로 답변 불가" 가 신뢰를 어떻게 깎는가?
-- 관련: `agents/cost_estimator.py`, `llm/budget_aware.py`, `PRD §7.5.6`.
+- 관련: `agents/cost_estimator.py`, `llm/budget_aware.py`, `docs/operations/agents.md (구 PRD §7.5).6`.
 
 ### 5.6 동명이인 / 다중 식별자 충돌
 
@@ -1066,37 +1066,37 @@ from . import agent_handler  # 등록 부작용
 | **AutoNexusGraph** | 우산 시스템 이름 + finance 코어 패키지 (`src/autonexusgraph/`) | `README.md`, `PRD §1.3` |
 | **BGE-M3** | 한국어 임베딩 모델 1024d cosine | `README §8` |
 | **BGE-Reranker** | 한국어 재랭킹 모델 (옵션) | `README §8` |
-| **BOM** | Bill of Materials. 자동차 도메인의 계층 척추 (L0~L6) | `PRD §3.4`, `docs/autograph.md §2.5.4` |
-| **Bridge** | Cross-domain 매칭 테이블 `bridge.corp_entity` | `PRD §4.6` |
+| **BOM** | Bill of Materials. 자동차 도메인의 계층 척추 (L0~L6) | `README §11.2`, `docs/autograph.md §2.5.4` |
+| **Bridge** | Cross-domain 매칭 테이블 `bridge.corp_entity` | `README §3.5` |
 | **CD-L1~L4** | Cross-Domain QA 난이도 4단계 | `PRD §2.2` |
 | **Cypher template registry** | 사전 정의 22개 Cypher | `src/autonexusgraph/tools/cypher_templates.py` |
-| **DAG** | Directed Acyclic Graph. Planner 가 만드는 task 의존 그래프 | `PRD §7.5.3` |
+| **DAG** | Directed Acyclic Graph. Planner 가 만드는 task 의존 그래프 | `docs/operations/agents.md (구 PRD §7.5).3` |
 | **DART** | 대한민국 금융감독원 전자공시. corp_code SSOT | `README §4` |
 | **DoD** | Definition of Done. 14항 트래픽라이트 | `PRD §10` |
 | **DomainHandler** | 코어가 도메인을 위임하는 Protocol | `src/autonexusgraph/agents/_domain_handler.py:36` |
-| **edge_required_meta** | auto 엣지 의무 7키 (source_type, confidence_score, …) | `PRD §6.7`, `ontology/auto/relations.yaml:19` |
+| **edge_required_meta** | auto 엣지 의무 7키 (source_type, confidence_score, …) | `README §3.7`, `ontology/auto/relations.yaml:19` |
 | **Entity Resolution (ER) 마스터** | `master.entities` + `master.entity_map`. 다형 ID 공간 | `PRD §4.5` |
 | **GLEIF** | Global Legal Entity Identifier Foundation. LEI 공급 | `README §4` |
 | **gold QA** | 평가용 정답 큐레이션 데이터 | `eval/qa_gold/README.md` |
-| **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `PRD §7.5.6` |
+| **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `docs/operations/agents.md (구 PRD §7.5).6` |
 | **idempotent (멱등) 파이프라인** | 재실행해도 같은 결과. raw → DB 모든 단계 | `README §2` |
 | **KATRI** | 자동차안전연구원. bigdata-tic.kr OAuth | `docs/autograph.md §5` |
 | **KCGS** | 한국기업지배구조원. ESG 등급 공급 | `docs/data_lineage.md §1.8 KCGS ESG` |
 | **KNCAP** | 한국 신차 안전도 평가. car.go.kr | `PRD §3.2`, `docs/autograph.md §5` |
 | **KOTSA** | 한국교통안전공단. 수리검사 데이터 | `README §4`, `docs/autograph.md §5` |
-| **LangGraph** | Multi-agent StateGraph 프레임워크 | `PRD §7.5` |
+| **LangGraph** | Multi-agent StateGraph 프레임워크 | `docs/operations/agents.md (구 PRD §7.5)` |
 | **LEI** | Legal Entity Identifier (GLEIF 발급) | `README §4` |
 | **MERGE (Cypher)** | Neo4j 의 upsert. 멱등 적재의 핵심 | `loaders/load_*_neo4j.py` |
 | **NHTSA** | National Highway Traffic Safety Administration (US). vPIC/Recalls/Complaints | `README §4` |
 | **number_guard** | synth 입력 큰 수치를 PG 결과만 인용 가능하게 화이트리스트 | `src/autonexusgraph/agents/number_guard.py` |
-| **P1/P2/P3/P4** | 추출 단계: 정형 직매핑 / deterministic 엣지 / LLM 추출 / cross-validate | `PRD §6.5/§6.6`, `docs/autograph.md §7.4` |
+| **P1/P2/P3/P4** | 추출 단계: 정형 직매핑 / deterministic 엣지 / LLM 추출 / cross-validate | `README §3.6 (4-Pass)/§6.6`, `docs/autograph.md §7.4` |
 | **pgvector** | PostgreSQL 의 벡터 인덱스 확장 | `README §3` |
 | **prompt_safety** | injection 신호 감지 + XML 경계 escape | `src/autonexusgraph/safety/prompt_safety.py` |
 | **QID** | Wikidata 의 엔티티 ID (Q123…) | `PRD §3.2` |
 | **RAG** | Retrieval-Augmented Generation | `PRD §1` |
-| **replan** | Validator 실패 시 Planner 로 복귀. 최대 2회 | `state.py:71`, `PRD §7.5.5` |
+| **replan** | Validator 실패 시 Planner 로 복귀. 최대 2회 | `state.py:71`, `docs/operations/agents.md (구 PRD §7.5).5` |
 | **route_domain** | finance/auto/cross_domain 키워드 룰 라우터 | `src/autograph/policy.py:87` |
-| **Send (LangGraph)** | Supervisor 의 worker 병렬 디스패치 API | `PRD §7.5.7` |
+| **Send (LangGraph)** | Supervisor 의 worker 병렬 디스패치 API | `docs/operations/agents.md (구 PRD §7.5).7` |
 | **snapshot_year** | 엣지의 기준 연도 메타. 시점 분리 | `ontology/auto/relations.yaml:23` |
 | **SSOT** | Single Source of Truth | 전반 |
 | **stage_relations** | P3 LLM 산출 임시 테이블 (`auto.staging_relations`) | `docs/autograph.md §7.4` |

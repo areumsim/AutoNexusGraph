@@ -118,7 +118,7 @@ python scripts/audit/validate_gold_qa.py eval/qa_gold/staging/external_curator_f
 
 # 5. 외부 비율 추적 — notes 에 "external_curator" 태그
 jq -r '.[] | select(.notes | contains("external_curator")) | .qid' eval/qa_gold/gold_qa_v0.jsonl | wc -l
-# → 외부 큐레이터 row 수 / 전체 row 수 비율이 30% 이상인지 확인 (PRD §11.6)
+# → 외부 큐레이터 row 수 / 전체 row 수 비율이 30% 이상인지 확인 (README §12.6 / BACKLOG E-5)
 
 # 6. (필수) regression 평가 — 머지 후 점수 변화 확인
 make eval-full
@@ -308,7 +308,7 @@ eval/qa_gold/*.jsonl  ─┬─→  scripts/audit/validate_gold_qa.py  ─→  l
                               ├─ DoD #8 (CD-L1 80%+ / L2 70%+ / L3 50%+ / L4 40%+)
                               ├─ DoD #9 (Exact Match 95%+)
                               ├─ DoD #10 (Faithfulness 90%+)
-                              └─ eval/reports/dod_v2.2.md 트래픽라이트
+                              └─ eval/reports/prd_dashboard_latest.md 트래픽라이트 (= README §10 DoD 20항)
 ```
 
 ### 5.2 어떤 메트릭이 어느 필드 사용
@@ -335,7 +335,7 @@ gold_qa_v0.jsonl (finance 30)
    ├─→ hybrid_adapter      → predictions_hybrid.jsonl     → 점수 H
    └─→ sql_vec_adapter     → predictions_sql_vec.jsonl    → 점수 S
 
-PRD §10.7 = "Hybrid > Vector +30%p (multi-hop subset)" 가 thesis headline
+README §10.7 = "Hybrid > Vector +30%p (multi-hop subset)" 가 thesis headline
 ```
 
 축소 매트릭스 (DoD #17 (d)): 4 어댑터 × FAST tier 1종 × rerank{on/off} = **8 cells**. `make audit-eval-matrix simulation` 으로 cell wire-up 확인, `--full` 로 LLM 실측 (비용 발생).

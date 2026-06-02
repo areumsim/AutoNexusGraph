@@ -2,7 +2,7 @@
 
 작성일: 2026-05-28 · 조사 방식: web search + 공식 문서 + 학술 논문 + 기존 코드 비교
 
-본 문서는 AutoGraph 도메인 (자동차 제품·부품·리콜·공급망 GraphRAG) 의 **모든 후보 데이터 소스**를 정리한다. 각 소스는 (1) 키/인증 요구, (2) 코드 적용 상태, (3) 어떤 PRD 항목·테이블·관계를 채우는지, (4) 미수집·미구현 사유, (5) 라이선스를 명시한다.
+본 문서는 AutoGraph 도메인 (자동차 제품·부품·리콜·공급망 GraphRAG) 의 **모든 후보 데이터 소스**를 정리한다. 각 소스는 (1) 키/인증 요구, (2) 코드 적용 상태, (3) 어떤 README §1 현황표·테이블·관계를 채우는지, (4) 미수집·미구현 사유, (5) 라이선스를 명시한다.
 
 ---
 
@@ -16,7 +16,7 @@
 | **C** | 스크래핑 또는 PDF 파싱 필요 | 5 |
 | **D** | 상용/협의 필요 (제외) | 3 |
 
-**PRD 의 BOM Level 0~4 / 출처 등급 A·B·C** 기준 매트릭스는 §6 참조.
+**README §11.2 BOM Level 0~4 / §4.0 출처 등급 A·B·C** 기준 매트릭스는 §6 참조.
 
 ---
 
@@ -27,7 +27,7 @@
 - **무엇**: 차량 제조사·모델·연식·트림 마스터 + Canadian Vehicle Specs (제원)
 - **포맷**: JSON REST · 키 불필요 · User-Agent 권장
 - **채우는 곳**: `auto.master_manufacturers`, `auto.master_vehicle_models`, `auto.master_vehicle_variants`, `auto.spec_measurements` (dim/weight)
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_vpic` + `loaders.load_auto_pg.load_vpic` + `loaders.load_auto_specs`
 - **갱신**: NHTSA 가 모델년도 단위 갱신 (연 1회)
 - **누락**: US 시장 한정 — 한국 전용 트림·국내명은 미포함 (Wikidata 보강 필요)
@@ -37,7 +37,7 @@
 - **무엇**: 차종별 NHTSA 리콜 캠페인
 - **포맷**: JSON · 키 불필요
 - **채우는 곳**: `auto.events_recalls`, Neo4j `(VehicleVariant)-[:AFFECTED_BY]->(:Recall)`
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_recalls` + `loaders.load_auto_pg.load_recalls`
 - **누락**: US 시장만. 한국 리콜은 §B2 (data.go.kr).
 
@@ -46,7 +46,7 @@
 - **무엇**: 결함 신고 (소비자 불만)
 - **포맷**: JSON · 키 불필요
 - **채우는 곳**: `auto.events_complaints`, `vec.chunks` (`source='nhtsa_complaint'`), Neo4j `:Complaint`
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_complaints` + `loaders.load_auto_pg.load_complaints` + `build_chunks_auto`
 
 ### S4. **NHTSA SafetyRatings API** (P0 추가 완료)
@@ -54,7 +54,7 @@
 - **무엇**: NCAP 5-star 전체·정면·측면·전복·폴 등급 + ESC/FCW/LDW 기능 유무
 - **포맷**: JSON · 키 불필요
 - **채우는 곳**: `auto.spec_measurements.safety.ncap.*`, Neo4j `(VehicleVariant)-[:SAFETY_RATED_BY]->(:Standard {code:'NCAP_US'})`
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_safety_ratings` + `loaders.load_auto_safety`
 - **누락**: NHTSA NCAP 만 (US). KNCAP/EuroNCAP 별도 필요 (§C2, §C4).
 
@@ -63,7 +63,7 @@
 - **무엇**: 제조사 / 모델 / 공급사 마스터 + QID (글로벌 ID) + LEI (P1278) + 한국 사업자번호 (P3320) + 부품→공급사 P176
 - **포맷**: SPARQL · 키 불필요 · User-Agent 필수
 - **채우는 곳**: `auto.master_manufacturers/wikidata_qid`, `bridge.corp_entity`, `auto.master_suppliers`, `auto.staging_relations` (SUPPLIED_BY)
-- **PRD §3.5 등급**: **B** (0.80)
+- **README §4.0 등급**: **B** (0.80)
 - **모듈**: `autograph.ingestion.wikidata_auto` + `loaders.load_bridge` + `loaders.load_wikidata_part_supplies` (P4 완료)
 - **누락**: Wikidata 자동차 부품 P176 sparse — 큰 OEM 의 메이저 부품 외엔 거의 없음. LLM P3 가 보완.
 
@@ -72,7 +72,7 @@
 - **무엇**: 자동차 모델/제조사 본문 + Infobox 구조 데이터
 - **포맷**: JSON · 키 불필요 · CC BY-SA 4.0
 - **채우는 곳**: `vec.chunks` (`source='wikipedia_auto'`), narrative QA 검색
-- **PRD §3.5 등급**: **B~C** (0.70)
+- **README §4.0 등급**: **B~C** (0.70)
 - **모듈**: `autograph.ingestion.wikipedia_auto` + `loaders.build_chunks_auto.build_from_wikipedia`
 - **누락**: 한국어판은 모델 detail 적음 → 영어판 fallback + (옵션) 나무위키 보강 (§C5).
 
@@ -94,7 +94,7 @@
 - **무엇**: 리콜 전단계 **결함 조사** history (NHTSA ODI 가 개시·종료한 조사) — recall 보다 깊은 결함 패턴
 - **포맷**: SODA REST (Socrata) · 키 불필요 (rate-limit 있음, app token 권장)
 - **채우는 곳**: `auto.events_investigations` (신규 테이블 필요) 또는 events_recalls 확장
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~120 LOC (recalls 패턴 복제)
 - **누락 보강**: 진행 중 조사 → 향후 리콜 예측 신호
 
@@ -104,7 +104,7 @@
 - **포맷**: ZIP CSV (`FLAT_TSBS.zip`) · 키 불필요
 - **갱신**: 일 단위
 - **채우는 곳**: `vec.chunks` (신규 source='nhtsa_tsb') — narrative 검색
-- **PRD §3.5 등급**: **A** (0.90)
+- **README §4.0 등급**: **A** (0.90)
 - **작업량**: ~100 LOC (CSV downloader + chunker)
 
 ### A3. **NHTSA FARS / Crash data (FTP + Crash API)**
@@ -112,7 +112,7 @@
 - **무엇**: 미국 치명사고 데이터 (1975~현재) — 차종별 안전성 사후 신호
 - **포맷**: CSV/SAS · 키 불필요
 - **채우는 곳**: 신규 `auto.events_crashes` 또는 `spec_measurements.safety.fars_*`
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **누락 보강**: 충돌 통계 — recall 빈도가 적은 차종에도 신호 제공
 - **작업량**: ~150 LOC
 
@@ -122,16 +122,16 @@
 - **무엇**: US 차량 MPG (city/highway/combined), 엔진·변속기 spec, 배출가스 등급, GHG score, SmartWay
 - **포맷**: CSV/XML · 키 불필요
 - **채우는 곳**: `auto.spec_measurements.spec.efficiency.*`, `spec.emissions.*`, `spec.engine.*`
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~150 LOC (CSV downloader + variant 매칭)
-- **누락 보강**: PRD §10.9 "제원 수치 EM 95%+" 직접 기여
+- **누락 보강**: README §10.9 "제원 수치 EM 95%+" 직접 기여
 
 ### A5. **EPA Annual Certification Data**
 - **URL**: `https://www.epa.gov/compliance-and-fuel-economy-data/annual-certification-data-vehicles-engines-and-equipment`
 - **무엇**: 차량/엔진 제조사 인증 자료 — Tier 3 emissions, Federal/CARB 인증
 - **포맷**: XLSX (CSV 변환 필요) · 키 불필요
 - **채우는 곳**: `auto.spec_measurements.spec.emissions.tier3_*`, Standard 노드 enrichment
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~120 LOC
 
 ### A6. **DBpedia SPARQL**
@@ -139,7 +139,7 @@
 - **무엇**: Wikipedia 추출 구조 데이터 — `dbo:Automobile`, `dbo:manufacturer`, `dbo:parentCompany`, `dbp:assembly`, `productionStartYear` 등
 - **포맷**: SPARQL · 키 불필요 · User-Agent 권장
 - **채우는 곳**: `auto.master_*` wikidata_qid 부족분, Neo4j Manufacturer parent 관계
-- **PRD §3.5 등급**: **B** (0.80) — Wikipedia 파생
+- **README §4.0 등급**: **B** (0.80) — Wikipedia 파생
 - **작업량**: ~120 LOC (wikidata_auto 패턴 복제)
 - **누락 보강**: Wikidata 가 부족한 textual properties (model 설명·생산국·플랫폼 코드)
 
@@ -149,7 +149,7 @@
 - **포맷**: JSON · 키 불필요 · User-Agent 필수 (`"App Name email@..."`)
 - **Rate**: 10 req/s SEC 전체
 - **채우는 곳**: `master.financial_*` (finance), `bridge.corp_entity` 강화 — cross_domain QA 의 핵심
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~80 LOC (finance `sec_client.py` 가 이미 있어 OEM CIK 리스트만 추가)
 - **누락 보강**: 한국 OEM 은 KOSDAQ/KOSPI → DART 측 finance 모듈이 처리. 글로벌 OEM 만 SEC.
 
@@ -158,7 +158,7 @@
 - **무엇**: 전세계 EV 충전소 위치·전력·운영자
 - **포맷**: JSON/XML · 무키도 호출 가능 (live 데이터는 키 권장)
 - **채우는 곳**: 신규 `auto.charging_stations`, EV 모델 컨텍스트 (subgraph)
-- **PRD §3.5 등급**: **B** (0.80)
+- **README §4.0 등급**: **B** (0.80)
 - **작업량**: ~100 LOC
 - **누락 보강**: 전기차 모델의 인프라 신호 (현지 보급 추세)
 
@@ -174,14 +174,14 @@
 
 ## 3. Tier B — 키 발급 필요, 무료
 
-### B1. **공공데이터포털 (data.go.kr) — 국토교통부 자동차 리콜정보 API**
-- **URL**: `https://www.data.go.kr/data/15089863/openapi.do`
-- **무엇**: **국내 출시 승용차 리콜 + 무상수리** — NHTSA 가 못 보는 한국 시장
-- **포맷**: REST · **인증키 필요 (포털 회원가입 후 즉시 무료 발급)**
-- **채우는 곳**: `auto.events_recalls` (source='molit_kr'), Neo4j AFFECTED_BY
-- **PRD §3.5 등급**: **A** (0.95)
-- **작업량**: ~120 LOC (nhtsa_recalls 패턴)
-- **누락**: 현재 `car_go_kr_recalls.py` 는 manual CSV 모드만 — 키 발급 시 API 호출로 전환
+### B1. **공공데이터포털 (data.go.kr) — KOTSA 자동차결함 리콜현황 (3048950, CSV)**
+- **URL**: `https://www.data.go.kr/data/3048950/fileData.do`  (구 오픈API `15089863` 은 **폐기** → CSV 파일데이터로 대체)
+- **무엇**: **국내 차량 리콜현황** (제작자·차명·생산기간·리콜개시일·리콜사유) — NHTSA 가 못 보는 한국 시장
+- **포맷**: **CSV 파일데이터 (cp949)** · **키 불필요** · 수동 다운로드 (로그인 불필요)
+- **채우는 곳**: `auto.events_recalls` (source='datagokr_kotsa') — **941 row 적재 완료** (85% 제조사 매핑)
+- **README §4.0 등급**: **A** (0.95)
+- **모듈**: `loaders.load_datagokr_recalls --csv <path>` (`_iter_csv_items` cp949, 리콜번호 부재 → sha1 합성키)
+- **누락**: 2023-12-31 스냅샷(실시간성 없음) · 미해석 15% 는 상용·이륜 브랜드(승용 OEM 마스터 외)
 
 ### B2. **공공데이터포털 — 국토교통부 자동차종합정보 API** (`15071233`)
 - **URL**: `https://www.data.go.kr/data/15071233/openapi.do`
@@ -195,7 +195,7 @@
 - **무엇**: 등록년·등록월·차종코드·지역코드별 신규등록 통계
 - **포맷**: REST · 인증키 (무료)
 - **채우는 곳**: 신규 `auto.market_registrations` (시계열 통계) — 시장 점유율 분석
-- **PRD §3.5 등급**: **A** (0.95)
+- **README §4.0 등급**: **A** (0.95)
 
 ### B4. **KOSIS 공유서비스 (통계청)**
 - **URL**: `https://kosis.kr/openapi/`
@@ -237,7 +237,7 @@
 - **무엇**: 유럽 차량 안전 등급 — 정면·측면·아이·보행자·SA(Safety Assist) 별점
 - **포맷**: HTML · robots.txt 허용 · 스크래핑 가능 (rate-limit 보수)
 - **채우는 곳**: `auto.spec_measurements.safety.euroncap.*`, Neo4j SAFETY_RATED_BY (Standard='EURO_NCAP')
-- **PRD §3.5 등급**: **A** (0.95) — 공식 기관
+- **README §4.0 등급**: **A** (0.95) — 공식 기관
 - **작업량**: ~150 LOC (BeautifulSoup + 페이지 구조 변경 대응)
 - **대안 API**: `regcheck.org.uk/api/bespokeapi.asmx` SOAP — 회원가입 무료 무비용 (UK)
 
@@ -292,7 +292,7 @@
 | **L3 System** | 시스템 (powertrain, brake, body…) | ontology system_taxonomy.yaml (SSOT) | ✅ (derived `CONTAINS_SYSTEM` 완료) |
 | **L4 Module** | 모듈 (Motor-Reducer, Battery Pack, Door…) | NHTSA component taxonomy 176 + AI-Hub 578 22 + manual supplier seed 18 + AI-Hub 71347 4 = **`auto.components` 220 row 전부 L4** | ⚠️ 부분 — L4 coverage **63.7%** (60% 목표 over). Wikidata P176 staging 은 rate-limit (429) 로 0 row |
 | **L5 Part** | 부품 (셀·센서·인플레이터) | 리콜 본문 LLM 추출만 (P3 RECALL_OF) | ❌ 매우 sparse — Neo4j `:Part` 노드 **0**. 리콜·LLM 출처에서만 자연 발생 |
-| **L6 Material/Process** | 소재·공법 | (v2.2 부분 진입) USGS MCS + Wikidata cell chem | ⚠️ 부분 — `:Material` 6 / `:Mineral` 5 / `DERIVED_FROM` 17 / `MADE_OF` 8 (`autograph.md §2.5.4`) |
+| **L6 Material/Process** | 소재·공법 | (부분 적재 — 곁가지) USGS MCS + materials_seed manual | ⚠️ 부분 — `:Material` 6 / `:Mineral` 5 / `DERIVED_FROM` 17 / `MADE_OF` 8 (`autograph.md §2.5.4`). Wikidata 자동 보강은 비활성 (BACKLOG L6-1) |
 
 ---
 
@@ -345,7 +345,7 @@
 
 ---
 
-## 10. 데이터 GAP 분석 (PRD §3.4 기준)
+## 10. 데이터 GAP 분석 (README §11.2 BOM 가용성 매트릭스 기준)
 
 ### 🟢 충분 (현재 인프라로 채워짐)
 - **L0 Manufacturer**: NHTSA + Wikidata 가 글로벌 커버. KAMA 가 한국 보강.
@@ -356,7 +356,7 @@
 ### 🟡 부분 부족
 - **L4 Module**: AI-Hub 71347/578 만 deterministic. 일부 카테고리 (Motor-Reducer / Battery / Door / Bumper …) 만. 나머지는 LLM P3 추출 의존 → confidence 0.50~0.80 가 다수.
   - **Gap 해소**: Wikidata P176 자동 추출 확장 (§S5 staging 완료) + DBpedia P527 (§A6) + EPA 인증 데이터 (§A5) 보완.
-- **시계열 / 시점 메타**: PRD §6.7 의 `snapshot_year` 가 NHTSA recalls 에는 잘 채워지지만 manufacturer/model 마스터에는 sparse.
+- **시계열 / 시점 메타**: README §3.7 의 `snapshot_year` 가 NHTSA recalls 에는 잘 채워지지만 manufacturer/model 마스터에는 sparse.
   - **Gap 해소**: KOSIS 신규등록 통계 (§B4) + 국토부 통계누리 (§B7) 가 시계열 모집단 제공.
 - **안전 등급**: NHTSA NCAP 만 (US). EuroNCAP / KNCAP 미통합.
   - **Gap 해소**: §C2 EuroNCAP, §C4 KNCAP 스크래핑.
@@ -364,7 +364,7 @@
 ### 🔴 큰 부족
 - **L5 Part**: PRD MVP 제외 (post-MVP). 리콜 LLM 추출만 진입.
 - **한국 시장 리콜**: API 키 발급 전까지 manual CSV (§B1, §C1).
-- **자기인증 / 형식승인**: KATRI 키 부재 — PRD §3.2 에 `events.certifications` 명시되지만 스키마·loader 모두 미구현.
+- **자기인증 / 형식승인**: KATRI 키 부재 — README §4 에 `events.certifications` 명시되지만 스키마·loader 모두 미구현.
 - **부품사 IR**: 개별 부품사 (현대모비스, 만도, 한온시스템 …) IR 본문 미수집. DART 측에 finance 가 있지만 자동차 도메인 cross-reference 안 됨.
 - **글로벌 OEM 재무**: SEC EDGAR 미통합 (§A7) — Tesla/Ford/GM/Toyota cross_domain QA 가 한국 OEM 한정.
 
@@ -377,7 +377,7 @@
 ## 11. 결론 및 우선순위 권장 (재정리)
 
 ### 즉시 가능 (Tier A — 코드만)
-1. **§A4 EPA fueleconomy.gov** — `spec.efficiency.*` + `spec.engine.*` 풍부화. PRD §10.9 직격.
+1. **§A4 EPA fueleconomy.gov** — `spec.efficiency.*` + `spec.engine.*` 풍부화. README §10.9 직격.
 2. **§A1 NHTSA Investigations** — 결함 시계열 깊이 보강.
 3. **§A2 NHTSA TSB Socrata** — narrative 청크 추가.
 4. **§A7 SEC EDGAR (글로벌 OEM)** — cross_domain QA 의 글로벌 확장.
@@ -399,7 +399,7 @@
 
 ---
 
-## 12. IPGraph 도메인 데이터 소스 (도메인3 — PRD v2.2 §12.5)
+## 12. IPGraph 도메인 데이터 소스 (보조축 — README §11.1 Phase C + §10.15~17 DoD)
 
 > 2026-06-01 신설. 상세 설계·온톨로지·gold QA SSOT 는 [docs/ipgraph.md](./ipgraph.md). 본 §는 데이터 소스 후보 카탈로그 분담만.
 
@@ -411,7 +411,7 @@
 | 라이선스 | 공공 |
 | 인증 | 불필요 |
 | 등급 | **A** (0.95) — 정식 분류 계층 (section A~H+Y → class → subclass → maingroup → subgroup, depth ≥ 4) |
-| 채울 PRD 항목 | PRD §12.5 — `ip.cpc_scheme` + Neo4j `CPCCode/SUBCLASS_OF` |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `ip.cpc_scheme` + Neo4j `CPCCode/SUBCLASS_OF` |
 | 작업 상태 | (예정) — 무인증 즉시 가능, 작업 순서 1번 |
 | 미수집 사유 | `src/ipgraph/*` 실제 코드 미머지 |
 
@@ -423,7 +423,7 @@
 | 라이선스 | 공공 (US Gov) |
 | 인증 | 무인증 (bulk dataset) |
 | 등급 | **A** (0.95) — 공식 특허청. 미국 특허 + 인용 + assignee 정규화 |
-| 채울 PRD 항목 | PRD §12.5 — `ip.patents` (US) + `ip.citations` + `ip.assignee_corp_map` (strong 매칭) |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `ip.patents` (US) + `ip.citations` + `ip.assignee_corp_map` (strong 매칭) |
 | 작업 상태 | (예정) — REST 가정 코드 모두 폐기, bulk dataset 기반 ingestion |
 | 미수집 사유 | REST 종료로 인한 ingestion 전략 전환 필요. 작업 순서 2번 |
 
@@ -435,7 +435,7 @@
 | 라이선스 | CC0 |
 | 인증 | 불필요 (mailto 헤더 권장, rate limit) |
 | 등급 | **A** (0.95) — 글로벌·연구 확장. 특허는 부분 커버 |
-| 채울 PRD 항목 | PRD §12.5 옵션 — `ip.works` (R&D ↔ 특허 cross-reference 보강) |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) 옵션 — `ip.works` (R&D ↔ 특허 cross-reference 보강) |
 | 작업 상태 | (예정, 옵션) |
 | 미수집 사유 | 핵심 ingestion (CPC + USPTO ODP + KIPRIS) 후 보강 |
 
@@ -447,7 +447,7 @@
 | 라이선스 | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원 / 일부 비공개**) |
 | 인증 | `KIPRIS_API_KEY` (공공데이터포털 발급) |
 | 등급 | **A** (0.95) — 한국 특허·출원 |
-| 채울 PRD 항목 | PRD §12.5 — `ip.patents` (KR) + assignee→corp_code 매칭 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `ip.patents` (KR) + assignee→corp_code 매칭 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) |
 | 작업 상태 | (예정) — 키 발급 + `src/autonexusgraph/ingestion/_license.py` 에 KIPRIS 게이트 추가 (commit `b70527a` IR/뉴스룸 license-gate 패턴 재사용) |
 | 미수집 사유 | 키 발급 + 라이선스 게이트 |
 
@@ -468,7 +468,7 @@
 - [fueleconomy.gov Web Services](https://www.fueleconomy.gov/feg/ws/)
 - [EPA Annual Certification Data](https://www.epa.gov/compliance-and-fuel-economy-data/annual-certification-data-vehicles-engines-and-equipment)
 - [SEC EDGAR APIs](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)
-- [국토교통부_자동차 리콜정보 API](https://www.data.go.kr/data/15089863/openapi.do)
+- [KOTSA_자동차결함 리콜현황 (CSV — 구 15089863 API 폐기)](https://www.data.go.kr/data/3048950/fileData.do)
 - [국토교통부_자동차종합정보 API](https://www.data.go.kr/data/15071233/openapi.do)
 - [KOSIS 공유서비스](https://kosis.kr/openapi/)
 - [KOTSA TS 데이터 개방센터](https://www.kotsa.or.kr/portal/contents.do?menuCode=03030200)

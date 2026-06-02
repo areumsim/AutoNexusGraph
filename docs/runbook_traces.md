@@ -2,7 +2,7 @@
 
 > **본 문서의 위치**: 8 개 대표 질문이 시스템 안에서 **어떤 tool 호출 sequence + replan 발생 여부 + 실패 가능 지점** 으로 처리되는지 의도된 trace.
 >
-> **주의 — 시뮬레이션 trace**: 본 문서는 PRD §10.7/§10.13/§10.14 의 실측 (LLM 키 활성 후 측정) 이 아직 미실시이므로, **의도된 호출 흐름** (code-derived) 만 trace. 실측은 `make eval-full` / `eval-auto` / `eval-cross` 실행 후 `eval/reports/<run>/manifest.json` 으로 본 문서 갱신.
+> **주의 — 시뮬레이션 trace**: 본 문서는 README §10.7/§10.13/§10.14 의 실측 (LLM 키 활성 후 측정) 이 아직 미실시이므로, **의도된 호출 흐름** (code-derived) 만 trace. 실측은 `make eval-full` / `eval-auto` / `eval-cross` 실행 후 `eval/reports/<run>/manifest.json` 으로 본 문서 갱신.
 >
 > **목적**: 시스템 자랑 ("3 도메인 한 turn 묶기") 의 실제 작동 메커니즘 시연. cold review ([docs/system_review.md](system_review.md)) 의 P0-(2) 항목 해소.
 >
@@ -20,7 +20,7 @@
 - **planner DAG** — task list (id / agent / intent / depends_on)
 - **호출 sequence** — supervisor round 별 worker dispatch
 - **예상 cost (USD)** — `cost_estimator.py` 추정 (FAST tier 기준)
-- **예상 latency** — PRD §10.14 목표 (도메인내 <8초 / Cross <12초)
+- **예상 latency** — README §10.14 목표 (도메인내 <8초 / Cross <12초)
 - **실패 가능 지점** — 어디서 깨질 수 있는지
 - **gold QA 매핑** — 본 trace 가 어느 gold row 와 대응
 
@@ -143,11 +143,11 @@
 | supervisor round 3 | t3 + t4 (2 병렬) |
 | supervisor round 4 | t5 |
 | cost | ~$0.040 |
-| latency | ~12초 (PRD §10.14 Cross 12초 임계 한계) |
+| latency | ~12초 (README §10.14 Cross 12초 임계 한계) |
 | 실패 지점 | (a) **`ip.patents` 0 row** — KIPRIS/USPTO 미적재 → `list_patents_in_cpc` 빈 결과 → "정보 부족" 응답. **현재 본 시나리오는 wire-up 만 완료**. (b) bridge_corp_to_assignee 의 `ip.assignee_corp_map` 도 0 row — assignee 적재 후 매핑. (c) 4 단계 의존 chain — 1 단계 실패 시 전체 실패. (d) latency 12초 임계 — N 차종 별 recall 조회가 N>5 면 timeout |
 | gold QA | `gold_qa_cross_v0.jsonl` CD-L3-IP / CD-L4-IP 6 row (IP 결합 변형) |
 
-> **현재 본 시나리오는 PRD §10.16 의 wire-up 완료 + 측정 대기 상태**. KIPRIS/USPTO 적재 후 실측 → 본 trace 갱신.
+> **현재 본 시나리오는 README §10.16 의 wire-up 완료 + 측정 대기 상태**. KIPRIS/USPTO 적재 후 실측 → 본 trace 갱신.
 
 ---
 

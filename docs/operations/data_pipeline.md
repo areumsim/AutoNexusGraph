@@ -1,5 +1,7 @@
 # 데이터 파이프라인 운영 가이드
 
+> **인용 규약**: 본 문서의 `PRD §6.5` 등 인용은 **구 PRD 표기** — README v3.0 통합 후 README §3.6 (4-Pass + Bridge Pass) / §4 (데이터 소스) 가 새 SSOT.
+
 본 문서는 AutoNexusGraph 의 raw → processed → DB 3-tier 멱등 파이프라인을 단계별로 안내한다.
 각 단계는 앞 단계의 raw 가 있다면 언제든 재실행 가능 (멱등). 도중 끊겨도 `state/` 의 done/failed
 체크포인트로 이어받기. 모든 적재 PG `INSERT ... ON CONFLICT DO UPDATE`, Neo4j `MERGE`.
@@ -44,7 +46,7 @@ data/
 
 각 ingest 스크립트는 `--resume` / `--retry-failed` / `--force` / `--limit N` / `--dry-run` 옵션을 표준화.
 
-## 추출 4-pass (PRD §6.5)
+## 추출 4-pass (README §3.6 4-Pass + Bridge Pass)
 
 수집·청크·임베딩이 끝나면 다음 4-pass 로 관계·수치를 추출한다. P1/P2 는 deterministic
 (0% LLM) — 항상 안전. P3 는 selective LLM — 비용 게이트 통과 후. P4 는 P3 결과를 P2 SSOT 로
@@ -221,7 +223,7 @@ make validate-quality         # 매핑 커버리지 점검
 
 ## 수동 자료 적재 — car.go.kr / KNCAP (by design)
 
-두 source 모두 **공식 Open API 미공개**. PRD §3.2 가 자동 수집을 명시했으나 실제 채널이
+두 source 모두 **공식 Open API 미공개**. README §4 가 자동 수집을 명시했으나 실제 채널이
 없어 **수동 CSV 모드를 정식 운영 방식으로 채택** (의도된 fallback). 대안 채널은 NHTSA
 자동수집이 KR-only 리콜의 80% 를 보강 — 본 절 끝 "대체안" 참조.
 

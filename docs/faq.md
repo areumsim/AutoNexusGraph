@@ -173,9 +173,9 @@ ORDER BY total DESC;
 
 ### Q5.2 `make audit-dod` 의 일부 항목이 `⊘`
 
-**의미**: LLM 키 필요 / 외부 자원 필요 — 사용자 액션 대기. PRD §10 의 17항 중 5~7항이 ⊘ (LLM 실측 + 외부 trace).
+**의미**: LLM 키 필요 / 외부 자원 필요 — 사용자 액션 대기. README §10 의 20항 중 7~10항이 ⊘ (LLM 실측 + 외부 trace).
 
-**해결**: 해당 항목의 "필요 작업" 컬럼 (`eval/reports/dod_v2.2.md`) 참조. 예: `§10.7 Hybrid vs Vector +30%p` → `make eval-auto` 실행 후 자동 측정.
+**해결**: 해당 항목의 "필요 작업" 컬럼 ([README §10 DoD 20항](../README.md#10-dod-definition-of-done--20-항) + `eval/reports/prd_dashboard_latest.md`) 참조. 예: `§10.7 Hybrid vs Vector +30%p` → `make eval-auto` 실행 후 자동 측정.
 
 ### Q5.3 `audit-edge-meta --strict` 가 fail
 

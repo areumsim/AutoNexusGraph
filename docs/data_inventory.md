@@ -5,7 +5,7 @@
 
 본 문서는 `data/raw/auto/**` (raw files), PG `auto/bridge/vec` 스키마, Neo4j 라벨/관계의 **실시간 측정값**. `docs/data_sources.md` 가 후보 카탈로그, `docs/data_lineage.md` 가 채널별 end-to-end 추적 (raw→PG→Neo4j→tool) 이라면, 이건 **현재 디스크·DB 에 들어와 있는 사실**.
 
-PRD §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/5 measurable pass, §10.4/§10.6/§10.11/§10.12 ✅).
+README §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/5 measurable pass, §10.4/§10.6/§10.11/§10.12 ✅).
 
 ---
 
@@ -35,12 +35,12 @@ PRD §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 (4/
 | **KOTSA 수리검사 (15155857)** ⭐ 6/1 | 1.4 MB | 1 CSV | **events_inspections 47,171 row 적재 완료** | — |
 | **Wikipedia plants** ⭐ 6/1 | 0.5 MB | 30 plant raw | **vec.chunks 38** (ko 18 + en 20 / fuzzy match 12 miss) | :Plant 노드 속성 보강 (후속) |
 | 팩토리온 (15087611) | 0 | 0 | 0 | 키 발급 대기 |
-| 한국 리콜 (15089863) | 0 | 0 | 0 | 키 발급 대기 |
+| **한국 리콜 (3048950 CSV)** ⭐ 6/2 | 0.26 MB | 1 CSV | **events_recalls 941 row 적재 완료** (85% 제조사 매핑) | (P3) CAUSED_BY_PROCESS 추출 |
 | **plants.yaml** ⭐ 6/1 | — | 30 plant | (Neo4j seed 적재 후) `:Plant` 29 노드 | `_DART_PLANT_CODE_MAP` 17 raw → :Plant.code 매핑 (100% 매핑, plants_skipped=0) |
 | **합계** | **~3.8 GB** | **~618k files + 6 신규 CSV** | **+48k 신규 행 (KOTSA 47k 우세)** + **vec.chunks +257** | **+99 MANUFACTURED_AT 시계열 edges** |
 
 진행 단계 (2026-06-01 갱신):
-- ✅ PRD §3.3 MVP 범위 OEM 5사 (HYUNDAI/KIA/GENESIS/TESLA/FORD) × 5 year (2020-24) NHTSA 채워짐.
+- ✅ MVP 범위 (구 PRD §3.3 → README §1 현황표) OEM 5사 (HYUNDAI/KIA/GENESIS/TESLA/FORD) × 5 year (2020-24) NHTSA 채워짐.
 - ✅ 제조 공정·생산 신규 채널 3 종 raw 보유 — Phase A 코드 인프라 완성 (parser + loader + agent tool + Neo4j sync + chain). 적재 대기 명령:
   ```
   make migrate-auto-production
@@ -81,7 +81,7 @@ vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 | epa_fueleconomy | 1,426 | A (0.95) |
 | nhtsa_canspec | 223 | A (0.95) |
 
-→ PRD §10.9 "제원 수치 EM 95%+" 의 정량 측정값 source. 합 **3,329 row**.
+→ README §10.9 "제원 수치 EM 95%+" 의 정량 측정값 source. 합 **3,329 row**.
 
 ### 1.2 `auto.components` source/level 분포 (5/29 NHTSA taxonomy 적재 후)
 
@@ -109,7 +109,7 @@ vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 
 variant 매칭: 31 / 모델 매칭: 154 / campno (조사→리콜 종결) 보유: 62.
 
-### 1.4 `bridge.corp_entity` 4,806 row 의 품질 (PRD §10.6)
+### 1.4 `bridge.corp_entity` 4,806 row 의 품질 (README §10.6)
 
 마이그레이션 (`scripts/migrate/migrate_bridge_supplier_qid_to_id.py`) 으로
 supplier entity_id legacy QID (4,830) → numeric supplier_id 변환 완료 (5/28).
@@ -123,7 +123,7 @@ supplier entity_id legacy QID (4,830) → numeric supplier_id 변환 완료 (5/2
 | supplier | reviewed | 2 | 1 | 1 | 1 | 2 |
 | **합** | — | **4,806** | **10** | **7** | **4,794** | **12** |
 
-**PRD §10.6 정확한 모수** ("Wikidata QID + LEI 매칭 confidence ≥ 0.9 비율 80%+") — fuzzy
+**README §10.6 정확한 모수** ("Wikidata QID + LEI 매칭 confidence ≥ 0.9 비율 80%+") — fuzzy
 name match 는 본래 candidate 라 모수 외. deterministic match (wikidata_qid /
 lei / business_no / corp_code / sec_cik) 만:
 
@@ -192,7 +192,7 @@ manufacturer QID 보유율 **45.3%** (10,027/22,145). supplier QID 보유율 **9
 :System                 25
 ```
 
-PRD §4.4 라벨 12종 중 **12종 채워짐**. `:Part` 만 0 (AI-Hub 가 Level=4 만 적재, Part 는 LLM P3 추출 기대).
+README §11.2 라벨 12종 중 **12종 채워짐**. `:Part` 만 0 (AI-Hub 가 Level=4 만 적재, Part 는 LLM P3 추출 기대).
 
 ### 2.2 관계
 
@@ -213,12 +213,12 @@ PRD §4.4 라벨 12종 중 **12종 채워짐**. `:Part` 만 0 (AI-Hub 가 Level=
 -[:SUPPLIED_BY         ]     30      Module → Supplier                 ⭐5/29 0→30 (B1 해결)
 ```
 
-PRD §4.4 의 14 관계 중 **14종 채워짐**. 추가 누락:
+README §11.2 의 14 관계 중 **14종 채워짐**. 추가 누락:
 - `:COMPLIES_WITH` — 데이터 없음 (KATRI/KMVSS 인증 키 부재)
 - `:MANUFACTURED_AT` — model↔plant 매핑 데이터 없음
 - `:COMPETES_WITH` — segment 매핑 데이터 없음
 
-PRD §6.7 의무 메타 6개 (source_type/source_id/confidence_score/validated_status/snapshot_year/extraction_method) — `SUPPLIED_BY` 30/30 = **100% ✅** (`eval/metrics/edge_meta_completeness.py` 측정).
+README §3.7 의무 메타 6개 (source_type/source_id/confidence_score/validated_status/snapshot_year/extraction_method) — `SUPPLIED_BY` 30/30 = **100% ✅** (`eval/metrics/edge_meta_completeness.py` 측정).
 
 ---
 
@@ -354,7 +354,7 @@ SELECT system_code, count(*)
 1. **L3 system 매칭 추가** — recall taxonomy 의 prefix (`POWER TRAIN`) 가 system 분류 (`POWERTRAIN`) 와 매칭되면 system-level COMPLAINT_OF edge 생성. ontology/auto/relations.yaml 에 새 edge type 또는 기존 `COMPLAINT_OF` 의 target 을 (`:Module` ∪ `:System`) 으로 확장
 2. **complaint 의 짧은 카테고리만 components 에 source='nhtsa_complaint_short' 로 등록** — +10k component (그러나 L3 module L4 혼동 위험)
 
-**우선순위**: 낮음 (현재 COMPLAINT_OF 4,793 edges 가 PRD §10 DoD 에 명시 임계 없음 — 측정 보강 후 결정).
+**우선순위**: 낮음 (현재 COMPLAINT_OF 4,793 edges 가 README §10 DoD 에 명시 임계 없음 — 측정 보강 후 결정).
 
 ---
 
@@ -373,7 +373,7 @@ SELECT system_code, count(*)
 
 ---
 
-## 4. PRD §10 성공 기준 (자동 측정)
+## 4. README §10 성공 기준 (자동 측정)
 
 전체 결과: `eval/reports/prd_dashboard_latest.md` 참조. 측정 명령:
 ```bash

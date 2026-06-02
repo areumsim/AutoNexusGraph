@@ -1,8 +1,8 @@
 # 에이전트 운영 가이드
 
-본 문서는 AutoNexusGraph 의 LangGraph 기반 에이전트 계층 (PRD §7.5 / §7.6) 의 구조·진입점·
-운영 절차를 정리한다. 데이터 적재는 [`data_pipeline.md`](./data_pipeline.md), 도구 API
-스펙은 [`docs/api_reference.md`](../api_reference.md) (3 도메인 통합 SSOT) 참조.
+본 문서는 AutoNexusGraph 의 LangGraph 기반 에이전트 계층의 구조·진입점·운영 절차를 정리한다. 데이터 적재는 [`data_pipeline.md`](./data_pipeline.md), 도구 API 스펙은 [`docs/api_reference.md`](../api_reference.md) (3 도메인 통합 SSOT) 참조.
+
+> **인용 규약**: 본 문서의 `PRD §7.X / §6.X / §4.X` 인용은 모두 **구 PRD 표기** — README v3.0 (2026-06-02) 통합 후 본 문서가 에이전트 운영 SSOT. 새 SSOT 인용은 [README §3 아키텍처](../../README.md#3-아키텍처) / [README §10 DoD](../../README.md#10-dod-definition-of-done--20-항) / [docs/architecture.md](../architecture.md).
 
 ## 1. 계층 구조 (단방향 의존)
 

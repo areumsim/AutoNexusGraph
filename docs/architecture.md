@@ -79,7 +79,7 @@ flowchart TD
 
 **의존 방향 (검증)**: `grep -rn '^from autograph\|^import autograph' src/autonexusgraph/` → 0 건.
 `grep -rn '^from ipgraph\|^import ipgraph' src/autonexusgraph/ src/autograph/` → 0 건.
-**코어는 plug-in 을 모른다.** 코어 변경 없이 새 도메인 추가 가능 (PRD §10.15 baseline reset).
+**코어는 plug-in 을 모른다.** 코어 변경 없이 새 도메인 추가 가능 (README §10.15 baseline reset).
 
 ---
 
@@ -98,9 +98,9 @@ flowchart TD
 | **cross_domain QA** | `eval/qa_gold/gold_qa_cross_v0.jsonl` (44 실측. level: CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형) — 공통 영역 |||
 
 **onlogy SSOT**: `ontology/<domain>/relations.yaml` 헤더 1곳에 `schema_version` 정의. 로더는
-`default_schema_version()` 로 동적 회수 — 코드에 박지 않는다 (PRD §6.7).
+`default_schema_version()` 로 동적 회수 — 코드에 박지 않는다 (README §3.7).
 
-**의무 메타 강제** (PRD §6.7): 모든 Neo4j 엣지 적재 시 `source_type` / `source_id` /
+**의무 메타 강제** (README §3.7): 모든 Neo4j 엣지 적재 시 `source_type` / `source_id` /
 `confidence_score` / `snapshot_year` / `schema_version` 필수. `_neo4j_helpers.py:edge_meta_cypher()`
 가 통합 진입점. `scripts/audit/edge_meta_invariants.py` 가 사후 검증.
 
@@ -211,7 +211,7 @@ MIGRATE_FILE=<파일>` 으로 hot-apply ([docs/operations/migrations.md](operati
 
 - `eval/runners/run_qa_eval.py` — full QA 평가 (LLM 실호출, predictions.jsonl, manifest.json,
   cost 누적, em/f1/hits@k/cypher_execution_accuracy 산정)
-- `eval/runners/run_matrix_smoke.py` — PRD §10.17(d) 축소 매트릭스 (4 어댑터 × rerank{on/off} = 8 셀,
+- `eval/runners/run_matrix_smoke.py` — README §10.17(d) 축소 매트릭스 (4 어댑터 × rerank{on/off} = 8 셀,
   simulation/full 모드, thesis headline 자동 계산)
 
 ---
@@ -262,7 +262,7 @@ flowchart TD
 
 **도메인 라우팅**: `triage` 노드가 `_domain_handler.auto_detect_domain(question)` 호출 (`_domain_handler.py:196`) → 등록된 라우터 (autograph: `route_domain_auto`, ipgraph: `route_domain_ip`, finance: 코어 기본) 가 순차 평가 → 최초 match 되는 도메인의 `DomainHandler` 가 worker 호출 시 사용됨.
 
-**Tracing**: `agents/tracing.py` `start_turn_context(thread_id, state)` 가 ContextVar 로 turn 단위 격리. cost_tracker 통합 (PRD §10.17(b)).
+**Tracing**: `agents/tracing.py` `start_turn_context(thread_id, state)` 가 ContextVar 로 turn 단위 격리. cost_tracker 통합 (README §10.17(b)).
 
 **PG checkpoint**: `chat` 스키마에 langgraph state 저장 (PRD §7.5.8). multi-turn thread 보존.
 
@@ -289,7 +289,7 @@ flowchart TD
 **(c) 왜 plug-in ENV-based discover (vs setuptools entry_points)?**
 
 - **대안 1 — `setuptools entry_points`**: 표준이지만 패키지 설치 (pip install) 필요. 개발·테스트 환경에서 ENV 만 바꾸는 게 빠름. CI/CD 통합 복잡. **기각**.
-- **대안 2 — Hard-coded import (`from autograph import ...`)**: 코어가 도메인을 알아야 함 — 역의존 0건 정책 위배. PRD §10.15 "core 변경 < 5%" 위배. **기각**.
+- **대안 2 — Hard-coded import (`from autograph import ...`)**: 코어가 도메인을 알아야 함 — 역의존 0건 정책 위배. README §10.15 "core 변경 < 5%" 위배. **기각**.
 - **대안 3 — Plugin discovery via filesystem scan**: `src/*graph/` 패턴 scan. 명시성 부족 (왜 이 도메인이 import 되었는가 불명). **기각**.
 - **선택 = ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV)** — 명시적 (`.env` 에 적힌 도메인만 활성), 운영자 친화적 (KIPRIS 키 없으면 ip 빼면 됨), CI 친화적 (테스트는 finance 만으로 가능). 코드: `_domain_handler.py:130 os.getenv("AUTONEXUSGRAPH_DOMAIN_PLUGINS", DEFAULT_DOMAIN_PLUGINS)`.
 
@@ -342,7 +342,7 @@ flowchart TD
 | `infra/postgres/init/<NN>_<domain>.sql` | 새 스키마 prefix 부여 |
 | `eval/qa_gold/gold_qa_<domain>_v0.jsonl` | 30+ 문항 seed |
 | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` | csv 에 추가 |
-| **코어 변경** | **0건이 목표** — PRD §10.15 baseline reset 후 측정 |
+| **코어 변경** | **0건이 목표** — README §10.15 baseline reset 후 측정 |
 
 ---
 

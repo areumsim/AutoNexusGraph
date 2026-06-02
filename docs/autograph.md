@@ -1,4 +1,4 @@
-# AutoGraph — 자동차 도메인 GraphRAG (PRD v2.1)
+# AutoGraph — 자동차 도메인 GraphRAG (README v3.0 auto 도메인 단독 가이드)
 
 AutoNexusGraph(금융) 코어 위에 **자동차 제품·부품·리콜·공급망 GraphRAG**를 얹은 도메인 plug-in.
 LangGraph multi-agent, PG/Neo4j/pgvector, cost/number/cypher guard 등 핵심 인프라는 그대로
@@ -200,7 +200,7 @@ flowchart TD
     SYN --> ANS["Answer + citations"]
 ```
 
-### 2.5.4 BOM 계층 (PRD §4.4)
+### 2.5.4 BOM 계층 (README §11.2 가용성 매트릭스)
 
 ```mermaid
 flowchart TD
@@ -272,7 +272,7 @@ flowchart TD
 | 정량 수치는 PG 조회 결과만 | `autograph.tools.spec.get_spec` / `compare_vehicles` 결과 → `number_guard` 화이트리스트 |
 | 자유 SQL/Cypher 금지 | 모든 Cypher 는 `cypher_templates_auto.AUTO_TEMPLATES` 레지스트리 경유. SQL 은 사전 정의 함수만 |
 | 관계 source/confidence/validated_status/snapshot_year 필수 | `load_auto_neo4j` 의 MERGE 모두 동봉. candidate 는 0.5~0.8 confidence + `validated_status='candidate'` |
-| LLM 이 부품/공급사 관계 생성 금지 | loader 는 PG SSOT 데이터만 사용. Wikidata 후보도 명시적으로 candidate. synthesizer 프롬프트에 강제 (PRD §7.5.x) |
+| LLM 이 부품/공급사 관계 생성 금지 | loader 는 PG SSOT 데이터만 사용. Wikidata 후보도 명시적으로 candidate. synthesizer 프롬프트에 강제 (README §5 도구 화이트리스트 + §3.6 Deterministic-first 추출) |
 | Cross-Domain bridge | `bridge.corp_entity` — Wikidata QID > LEI > 사업자번호 > name 매칭. 자동 매칭은 `candidate`, 검토 후 `reviewed` |
 
 ## 4. 실행 순서
@@ -382,8 +382,8 @@ make eval-auto
 
 2026-05-28 (Phase B) 패치로 **인터페이스까지 깔린 외부 의존** (키만 채우면 즉시 활성):
 
-- **data.go.kr 15089863 한국 리콜** — `ingestion.datagokr_recalls` + `loaders.load_datagokr_recalls`.
-  `DATA_GO_KR_API_KEY` 미설정 시 graceful skip.
+- **data.go.kr 3048950 한국 리콜 (KOTSA CSV)** — `loaders.load_datagokr_recalls --csv`.
+  구 오픈API `15089863` **폐기** → 파일데이터 CSV 로 전환. **941 row 적재 완료** (CSV 부재 시 graceful skip).
 - **data.go.kr 15155857 수리검사** — `ingestion.datagokr_inspections` + `loaders.load_datagokr_inspections`.
   CSV 수동 다운 후 normalize → `auto.events_inspections` (`infra/postgres/init/12a_autograph_inspections.sql`).
 - **car.go.kr** — `ingestion.car_go_kr_recalls` 가 CSV 파서 제공. 공식 API 미정.
@@ -397,7 +397,7 @@ make eval-auto
 - **NCAP / IIHS / Euro NCAP** — 별도 수집 미구현. NHTSA NCAP 만 구현됨.
 - **Level 5(Part)는 부분 커버** — Module 은 AI Hub / supplier_seed 기반으로 다수 등록되지만,
   Part 은 ontology 및 MERGE 경로만 준비. 실데이터는 LLM P3 의 RECALL_OF 추출에서 자연 발생.
-- **Level 6 (Material/Process)** — v2.2 부분 진입 (USGS MCS 5 mineral + materials_seed 6 cathode chem). 회사단위 셀↔OEM 소싱은 grade C candidate.
+- **Level 6 (Material/Process)** — 부분 적재 (곁가지): `:Material` 6 (manual seed: NCM811/622/523/NCA/LFP/GRAPHITE_ANODE) + `:Mineral` 5 (USGS MCS 2024: Li/Ni/Co/Mn/Graphite) + `DERIVED_FROM` 17 + `MADE_OF` 8. 회사단위 셀↔OEM 소싱은 grade C candidate. **Wikidata 자동 보강은 비활성** — `wikidata_cell_chem.py::CATHODE_QIDS` 빈 dict (BACKLOG L6-1).
 - **MANUFACTURED_AT (모델↔공장 구체)** — `ontology/auto/manufactured_at_seed.yaml` 46 매핑
   + `loaders.load_manufactured_at`. 한국 OEM 12 모델 + Tesla/BMW/VW/Toyota 등 글로벌 대표.
 - **임베딩** — 자동차 청크의 embedding 백필은 동일하게 별도 `embed-chunks` 필요.
@@ -420,7 +420,7 @@ make eval-auto
 **왜 이 의존을 감수하나 (의도된 트레이드오프)**:
 - (a) 자동 채널 (Wikidata P176 / OpenAlex assignee / LLM 추출) 모두 **정확도 불충분** — manual seed 의 90~95% confidence 보다 낮음
 - (b) bridge.corp_entity 의 supplier candidate 4,790 row 와 일관성 — strong_match (≥0.9) 만 인용하는 정책
-- (c) 본 PR 의 PRD §10.11 측정 (SUPPLIED_BY 100% 7키 메타) 은 이 manual 30 edges 로 달성 — 정량 증명 자체는 정합
+- (c) 본 PR 의 README §10.11 측정 (SUPPLIED_BY 100% 7키 메타) 은 이 manual 30 edges 로 달성 — 정량 증명 자체는 정합
 
 **우회 옵션 (P1 백로그)**:
 1. **Wikidata bulk dump** — 90 GB+ 다운, P176 관계만 추출. 운영 비용 큼.
@@ -428,7 +428,7 @@ make eval-auto
 3. **수동 SPARQL batch** — Wikidata Query Service 의 웹 UI 에서 직접 실행 + CSV 다운로드 (rate-limit 회피)
 4. **DART 사업보고서 본문 LLM P3 확장** — 현대모비스/한온/만도/현대위아 사업보고서 narrative 에서 SUPPLIED_BY 관계 추출 (현재 IRRelationExtractor wired)
 
-**결론**: 현재 SUPPLIED_BY 30 edges 는 **"공급망 추론" 시연용 seed 로는 정합** 하나, **시스템 차원 자랑 ("자동 공급망 추출") 은 정직히 보강 필요**. 본 한계는 README §1 / PRD §10.11 자랑 표기에 cross-link 권장.
+**결론**: 현재 SUPPLIED_BY 30 edges 는 **"공급망 추론" 시연용 seed 로는 정합** 하나, **시스템 차원 자랑 ("자동 공급망 추출") 은 정직히 보강 필요**. 본 한계는 README §1 / §10.11 자랑 표기에 cross-link 권장.
 
 ## 6. 회귀 안전
 

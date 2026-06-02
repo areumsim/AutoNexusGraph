@@ -24,7 +24,7 @@
 | 한계 표현 | 뿌리 | 출처 (한계 정의 문서) | 출처 (해결 후보 문서) | 시급도 |
 |---|---|---|---|---|
 | `SUPPLIED_BY` 30 edges 가 manual seed (P176 rate-limit) | 데이터 | [autograph.md §5.1](autograph.md) / data_inventory §3 B7 | [data_inventory.md §3 B7 해결 후보 4개](data_inventory.md) + system_review §3 (자랑 vs 실제) | ⭐⭐⭐ P0 |
-| `confidence_score` 정량 calibration 미검증 | 설계 | mental_model §5.2 + §5.12 | [learning_guide §11.4.0 Platt routine](learning_guide.md) + PRD §3.5 (cross-link 완료) | ⭐⭐⭐ P0 |
+| `confidence_score` 정량 calibration 미검증 | 설계 | mental_model §5.2 + §5.12 | [learning_guide §11.4.0 Platt routine](learning_guide.md) + README §4.0 (cross-link 완료) | ⭐⭐⭐ P0 |
 | gold QA 자기충족 (외부 큐레이터 0%) | 설계 + 운영 | mental_model §5.7 + §5.12 | [gold_qa_guide §6 외부 큐레이터 30% 정책](gold_qa_guide.md) | ⭐⭐⭐ P0 |
 | Bridge candidate 4,790 영속 누적 (검토 SOP 미설계) | 운영 | mental_model §5.3 + §5.12 + data_inventory §3 B10 | README §11.4 P1 | ⭐⭐⭐ P0 |
 | `:Supplier` Neo4j 노드 중복 (PG 4,812 vs Neo4j 9,642) | 운영 | data_inventory §3 B10 | data_inventory §3 B10 해결 후보 3개 | ⭐⭐ P1 |
@@ -64,43 +64,43 @@
 
 | 자랑 | 실제 |
 |---|---|
-| README §1 + PRD §1.2 — "finance + auto + ip 3 도메인을 bridge.corp_entity 로 한 turn 안에 묶는 GraphRAG" | ✅ **개념·코드 수준 정합** — runbook_traces.md §5 (CD-L1) / §6 (CD-L3) 시연. ⚠️ **단, ip 도메인 cross-domain (§7 CD-L4-IP) 은 wire-up 만 완료 — 실제 답변 불가** (ip.patents 0 row). 실제 작동하는 cross-domain 은 finance+auto 2 도메인 한정 |
+| README §1 + README §1 / §3.4.1 — "finance + auto + ip 3 도메인을 bridge.corp_entity 로 한 turn 안에 묶는 GraphRAG" | ✅ **개념·코드 수준 정합** — runbook_traces.md §5 (CD-L1) / §6 (CD-L3) 시연. ⚠️ **단, ip 도메인 cross-domain (§7 CD-L4-IP) 은 wire-up 만 완료 — 실제 답변 불가** (ip.patents 0 row). 실제 작동하는 cross-domain 은 finance+auto 2 도메인 한정 |
 
 ### 3.2 "공급망 추론" (SUPPLIED_BY)
 
 | 자랑 | 실제 |
 |---|---|
-| README §1.2 + PRD §6.6 — "공급망 그래프 추론" 이 시스템 핵심 가치 | ⚠️ **manual `supplier_seed.yaml` 19 공급사 × 46 매핑 의존** — Wikidata P176 rate-limit 으로 자동 추출 0 row. 새 공급사 추가 = yaml 수기. 시스템 차원 "자동 공급망 추출" 자랑은 정직히 보강 필요 ([autograph.md §5.1](autograph.md)) |
+| README §1.2 + README §3.6 — "공급망 그래프 추론" 이 시스템 핵심 가치 | ⚠️ **manual `supplier_seed.yaml` 19 공급사 × 46 매핑 의존** — Wikidata P176 rate-limit 으로 자동 추출 0 row. 새 공급사 추가 = yaml 수기. 시스템 차원 "자동 공급망 추출" 자랑은 정직히 보강 필요 ([autograph.md §5.1](autograph.md)) |
 
-### 3.3 "코어 변경 < 5%" (PRD §10.15)
-
-| 자랑 | 실제 |
-|---|---|
-| PRD §10.15 / README §10.12 — "ip 도메인 추가 후 baseline reset 414bc1b 후 0/15,396 LOC = 0.00% ✅" | ⚠️ **baseline reset 정책의 산물** — bab9411 → 414bc1b 의 1,877 LOC (13.32%) 가 의도된 inflection 으로 reset. **자랑할 만한 메커니즘은 plug-in 패턴 자체** (`register_handler` 부작용 + `discover_plugins`). "0%" 단독은 정의 의존. 정직 review 는 [core_diff_baseline_ledger.md §D](../eval/reports/core_diff_baseline_ledger.md) (완료) |
-
-### 3.4 "confidence calibration" (PRD §3.5)
+### 3.3 "코어 변경 < 5%" (README §10.15)
 
 | 자랑 | 실제 |
 |---|---|
-| PRD §3.5 — confidence A=0.95 / B=0.80 / C=0.50, validator 임계 0.5 | ⚠️ **calibration 미실측** — A/B/C 가 실제 정답률과 단조 관계인지 미검증. `eval/metrics/confidence_weighted.py` 측정 도구만 있고 실행 안 됨. 즉 시스템 신뢰성 자랑이 이론적. 5분 routine 은 [learning_guide §11.4.0 Platt scaling](learning_guide.md) (완료) — LLM 키 활성 + `make eval-full` 후 5분 |
+| README §10.15 / README §10.12 — "ip 도메인 추가 후 baseline reset 414bc1b 후 0/15,396 LOC = 0.00% ✅" | ⚠️ **baseline reset 정책의 산물** — bab9411 → 414bc1b 의 1,877 LOC (13.32%) 가 의도된 inflection 으로 reset. **자랑할 만한 메커니즘은 plug-in 패턴 자체** (`register_handler` 부작용 + `discover_plugins`). "0%" 단독은 정의 의존. 정직 review 는 [core_diff_baseline_ledger.md §D](../eval/reports/core_diff_baseline_ledger.md) (완료) |
 
-### 3.5 "축소 평가 매트릭스 thesis" (PRD §10.7, DoD #17 (d))
+### 3.4 "confidence calibration" (README §4.0)
 
 | 자랑 | 실제 |
 |---|---|
-| PRD §10.7 — Hybrid vs Vector multi-hop +30%p, DoD #17 (d) | ⚠️ **실측 미실시** — `make audit-eval-matrix` simulation 모드 wire-up 만 완료 (LLM 비용 0). full 모드 (`--full`) 사용자 환경 별도 트리거. 즉 "thesis headline" 이 아직 정량 증거 부재. 즉시 실행 가능 (gold QA 120 row 충족, LLM 키 + 비용 ~$5~20) |
+| README §4.0 — confidence A=0.95 / B=0.80 / C=0.50, validator 임계 0.5 | ⚠️ **calibration 미실측** — A/B/C 가 실제 정답률과 단조 관계인지 미검증. `eval/metrics/confidence_weighted.py` 측정 도구만 있고 실행 안 됨. 즉 시스템 신뢰성 자랑이 이론적. 5분 routine 은 [learning_guide §11.4.0 Platt scaling](learning_guide.md) (완료) — LLM 키 활성 + `make eval-full` 후 5분 |
+
+### 3.5 "축소 평가 매트릭스 thesis" (README §10.7, DoD #17 (d))
+
+| 자랑 | 실제 |
+|---|---|
+| README §10.7 — Hybrid vs Vector multi-hop +30%p, DoD #17 (d) | ⚠️ **실측 미실시** — `make audit-eval-matrix` simulation 모드 wire-up 만 완료 (LLM 비용 0). full 모드 (`--full`) 사용자 환경 별도 트리거. 즉 "thesis headline" 이 아직 정량 증거 부재. 즉시 실행 가능 (gold QA 120 row 충족, LLM 키 + 비용 ~$5~20) |
 
 ### 3.6 "gold QA 평가셋"
 
 | 자랑 | 실제 |
 |---|---|
-| README §6 / PRD §8.1 — finance 30 / auto 46 / cross 44 / ip 30 = 150 row | ⚠️ 4 중 정직 표기 필요 (2026-06-02 실측):<br>(a) **모든 row 가 시스템 작성자 작성** — 외부 큐레이터 비율 **0%**. 정책 30% 미달.<br>(b) **refusal row (is_answerable=false) 평균 5.3%** (finance 3.3% / auto 4.3% / cross 9.1% / ip 0%). 정책 10% 미달.<br>(c) **`gold_answer_text` paraphrase 평균 = finance 0.23 / auto 0.41 / cross 0.00** — 정책 3개 미달. EM/F1 매우 엄격 → 점수 낮아질 가능성 큼.<br>(d) **ip 30 row 의 gold_answer_text 모두 비어있음** — KIPRIS/USPTO 적재 후 채움.<br>→ 평가 점수는 **sanity check 수준** — 정량 증거로 활용 시 본 한계 명시 필수 (mental_model §5.7 / learning_guide §8.2.1 / gold_qa_guide §2.2 인지) |
+| README §6 / README §6 — finance 30 / auto 46 / cross 44 / ip 30 = 150 row | ⚠️ 4 중 정직 표기 필요 (2026-06-02 실측):<br>(a) **모든 row 가 시스템 작성자 작성** — 외부 큐레이터 비율 **0%**. 정책 30% 미달.<br>(b) **refusal row (is_answerable=false) 평균 5.3%** (finance 3.3% / auto 4.3% / cross 9.1% / ip 0%). 정책 10% 미달.<br>(c) **`gold_answer_text` paraphrase 평균 = finance 0.23 / auto 0.41 / cross 0.00** — 정책 3개 미달. EM/F1 매우 엄격 → 점수 낮아질 가능성 큼.<br>(d) **ip 30 row 의 gold_answer_text 모두 비어있음** — KIPRIS/USPTO 적재 후 채움.<br>→ 평가 점수는 **sanity check 수준** — 정량 증거로 활용 시 본 한계 명시 필수 (mental_model §5.7 / learning_guide §8.2.1 / gold_qa_guide §2.2 인지) |
 
-### 3.7 "MCP / Langfuse / SHACL / 평가 매트릭스" (PRD §10.17 = 4 상용 신호)
+### 3.7 "MCP / Langfuse / SHACL / 평가 매트릭스" (README §10.17 = 4 상용 신호)
 
 | 자랑 | 실제 |
 |---|---|
-| PRD §10.17 — 4 상용 신호 모두 (wired) 또는 (wired, partial) | (a) **MCP** — typed tool pool 52 tools + JSON Schema 자동 변환 + stdio server. 외부 (Claude Desktop / Cursor / Cline) 호출 가능. ✅ 정합. (b) **Langfuse 실측 ON** — OTEL native + ContextVar 격리 + meta JSONB 적재. ✅ 정합. (c) **SHACL** — pydantic v2 로 대체 (`make audit-ontology`). 의도된 trade-off (PRD §11.1). (d) **축소 평가 매트릭스** — wire-up 완료, **실측 미실시** (§3.5 와 같은 한계) |
+| README §10.17 — 4 상용 신호 모두 (wired) 또는 (wired, partial) | (a) **MCP** — typed tool pool 52 tools + JSON Schema 자동 변환 + stdio server. 외부 (Claude Desktop / Cursor / Cline) 호출 가능. ✅ 정합. (b) **Langfuse 실측 ON** — OTEL native + ContextVar 격리 + meta JSONB 적재. ✅ 정합. (c) **SHACL** — pydantic v2 로 대체 (`make audit-ontology`). 의도된 trade-off (PRD §11.1). (d) **축소 평가 매트릭스** — wire-up 완료, **실측 미실시** (§3.5 와 같은 한계) |
 
 ---
 

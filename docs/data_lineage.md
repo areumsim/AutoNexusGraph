@@ -68,7 +68,7 @@
 | **7키 메타** | `source_type='dart_xbrl' / 'dart_business_report'`, `source_id=rcept_no`, `extraction_method='deterministic'` (P1), `confidence_score=0.95` (A 등급), `validated_status='validated'`, `snapshot_year=fiscal_year`, `schema_version="v2.2"` |
 | **추출 Pass** | P1 (deterministic, LLM 0%) — XBRL 직매핑. P2 (deterministic) — 정형 지배구조 |
 | **Tool 진입점** | `tools/financials.py`: `lookup_company / get_revenue / get_operating_income / get_balance_sheet_item / compare_companies`. `tools/graph.py`: `list_subsidiaries / get_executives / get_major_shareholders` |
-| **답변 시나리오** | "삼성전자 2023년 매출은?" → `lookup_company('삼성전자')` → corp_code=00126380 → `get_revenue('00126380', 2023)` → PG fin.financials 조회 → **6.5분 latency 추정** (PRD §10.14 미실측) |
+| **답변 시나리오** | "삼성전자 2023년 매출은?" → `lookup_company('삼성전자')` → corp_code=00126380 → `get_revenue('00126380', 2023)` → PG fin.financials 조회 → **6.5분 latency 추정** (README §10.14 미실측) |
 | **알려진 한계** | (a) **재무제표 IFRS 별도/연결 혼동** — 같은 회사 동일 항목이 보고 기준에 따라 다른 값. gold QA 에서 명시 필요. (b) 분기·반기 보고서는 fiscal_year 가 아닌 보고 시점 기준 — 적재 시 정규화 필요. (c) **사업보고서 본문 P3 LLM 추출** (COMPETES_WITH 등) 은 wired-but-disabled (`ontology/relations.yaml:226`) — 비용/환각 위험 |
 
 ---
@@ -362,7 +362,7 @@
 | **Ingestion** | `usgs_mcs` PDF parser |
 | **PG** | `auto.master_minerals` 5 row (2024 snapshot) — world_production·world_reserves·import_reliance·price |
 | **Neo4j** | `:Material` 6 (cathode chem NCM811/622/523/NCA/LFP/GRAPHITE_ANODE) / `:Mineral` 5 / `DERIVED_FROM` 17 (7-key 100%) / `MADE_OF` 8 |
-| **알려진 한계** | 연 1회 PDF — parser 가 PDF 변경에 fragile. 회사단위 셀↔OEM 소싱은 grade C candidate (sparse, 정직 표기 — PRD §2.3) |
+| **알려진 한계** | 연 1회 PDF — parser 가 PDF 변경에 fragile. 회사단위 셀↔OEM 소싱은 grade C candidate (sparse, 정직 표기 — README §9) |
 
 ---
 
@@ -514,7 +514,7 @@ data/raw/wikidata/    — 6.4 MB
                             (planner → supervisor → workers → synthesizer)
 ```
 
-**의무 메타 7키** (PRD §6.7 — `EDGE_REQUIRED_META_KEYS` SSOT, `src/autonexusgraph/ontology/schema.py:28-36`):
+**의무 메타 7키** (README §3.7 — `EDGE_REQUIRED_META_KEYS` SSOT, `src/autonexusgraph/ontology/schema.py:28-36`):
 
 | # | 키 | 의미 |
 |---:|---|---|
@@ -552,13 +552,13 @@ make audit-data-channels    # eval/reports/data_channels_latest.md 생성
 
 ## 5.4 더 필요한 데이터 — 우선순위 백로그
 
-PRD §3.4 BOM 가용성 매트릭스 + 사용자 의제 ("크롤링이 진짜 가치") 기준.
+README §11.2 BOM 가용성 매트릭스 + 사용자 의제 ("크롤링이 진짜 가치") 기준.
 
 ### 🔴 P0 — 즉시 활성화 가능 (키 발급만)
 
 1. **DATA_GO_KR_API_KEY 발급** — 한 키로 4 endpoint 활성:
-   - 15089863 한국 리콜 (KOTSA)
-   - 15087611 팩토리온 (plant↔생산품 매핑)
+   - ~~15089863 한국 리콜 (KOTSA)~~ → **오픈API 폐기. 3048950 CSV 로 대체** (키 불필요, events_recalls 941 row 적재 완료)
+   - 15087611 팩토리온 (plant↔생산품 매핑) — **키 발급+적재 완료**
    - 15051116/15051118 KAMA (이미 CSV 로 받음 — 키 있으면 자동 갱신)
    - 활용 신청: data.go.kr → 회원가입 → 활용신청 (자동 승인 ~1일)
 

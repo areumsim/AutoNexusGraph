@@ -1,6 +1,6 @@
 # qa_gold — 평가용 정답 데이터셋
 
-PRD v2.2 §8.1 의 도메인 내 100문항 + Cross-Domain 30~50문항 + IP 30 + 외부 벤치 (Allganize) 평가셋 큐레이션 가이드.
+[README v3.0 §6 평가 전략 / Cross-Domain QA 4단계 층화](../../README.md#6-평가-전략) 의 도메인 내 100문항 + Cross-Domain 30~50문항 + IP 30 + 외부 벤치 (Allganize) 평가셋 큐레이션 가이드. (구 README §6 — README v3.0 흡수.)
 
 > **운영 가이드 (사용자가 새로 추가/수정·시스템 흡수 절차) 는** [docs/gold_qa_guide.md](../../docs/gold_qa_guide.md). 본 파일은 **스키마·큐레이션 빠른 가이드** SSOT.
 
@@ -20,7 +20,7 @@ PRD v2.2 §8.1 의 도메인 내 100문항 + Cross-Domain 30~50문항 + IP 30 + 
 
 ---
 
-## 1. 스키마 (PRD §8.1 확장)
+## 1. 스키마 (README §6 확장)
 
 ```json
 {
@@ -30,7 +30,7 @@ PRD v2.2 §8.1 의 도메인 내 100문항 + Cross-Domain 30~50문항 + IP 30 + 
                               // single_entity | multi_entity | relation
                               // | aggregation | ranking | comparison
   "complexity":            "easy",            // easy | medium | hard
-  "requires_multi_hop":    false,             // PRD §2.2 multi-hop 75%+ 측정
+  "requires_multi_hop":    false,             // README §6 (multi-hop 75%+ 목표) multi-hop 75%+ 측정
   "hop_count":             1,                 // 그래프 hop 수 (정량)
   "domain":                "finance",         // finance | auto | cross_domain
   "level":                 "L1",              // L1 | L2 | L3 (도메인 내) — 또는
@@ -47,14 +47,14 @@ PRD v2.2 §8.1 의 도메인 내 100문항 + Cross-Domain 30~50문항 + IP 30 + 
   "scenario_id":           null,              // 옵션 — 시나리오 집계 키
   "tags":                  ["sql_only", "revenue"],
 
-  // PRD §8.1 추가 메타.
+  // README §6 추가 메타.
   "required_stores":         ["AutoNexusGraph.SQL"],
                               // 어느 저장소가 풀이에 필요한가
                               // AutoNexusGraph.SQL / AutoNexusGraph.Graph
                               // AutoGraph.SQL / AutoGraph.Graph / AutoGraph.Vector
                               // Bridge
   "required_confidence_min": 0.7,             // 답변 근거 엣지 confidence 최소
-  "main_hop_path":           ["Company"],     // 메인 홉 경로 (PRD §4.4 / §10.13)
+  "main_hop_path":           ["Company"],     // 메인 홉 경로 (README §11.2 / §10.13)
   "side_hops":               [],              // 보조 홉 (Standard / Plant / Supplier ...)
   "source_citations":        [],              // 정답을 직접 뒷받침하는 chunk_id / row_id
 
