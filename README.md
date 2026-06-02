@@ -1091,7 +1091,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | **12 조합 매트릭스 실측** | 인프라 완성, LLM 키 필요 | `make eval-full / eval-auto / eval-cross` 풀 실행 + `eval/reports/<run>/summary.md` PR 첨부 |
 | **gold QA 확장** | finance 30 / auto 46 / cross 44 / ip 30 seed | 각각 100 row + CD-L1~L4 라벨 + 외부 큐레이터 30% (자기충족성 완화 — `docs/mental_model.md §5.7`) |
 | **§10.12 baseline 이동 정책** | dod_audit 가 baseline (`4049caf856`) 고정. 실제 코어 변경량은 baseline 갱신 시점에 reset | "baseline 은 도메인 추가 마다 reset" 또는 "월 단위 reset" 같은 명시 정책 + 누적 차분 표 |
-| **§10.13/14 trace 메트릭** | `eval/runners/run_qa_eval.py` 가 latency 수집하나 hop 수 미구현 | per-turn trace 에 cypher hop count + tool call sequence 기록 → `eval/metrics/main_hop_efficiency.py` 활성 |
+| **§10.13/14 trace 메트릭** | ✅ **구현 (E-3)** — `agents/hop_metrics.py` 가 per-turn cypher hop 수 + tool 호출 sequence 를 trace(Langfuse + PG `agent_trace`)에 기록 + eval pred_row `hop_count` + `main_hop_efficiency` 실제 hop 경로(`hybrid_vs_vector_hops`) | §10.13 ✅ 전환은 LLM eval 1회 실행 후 (현재 manifest 는 simulation) |
 | **답변 사용자 피드백 루프** | UI 에 👍/👎/📝 wiring, 저장소 정의 없음 | `chat.feedback` 스키마 + 저주파 retraining loop |
 | **Vector RAG 공정성 검증** | 매트릭스 내 Vector adapter 단독 측정 | gold QA 의 "Vector 도 풀 수 있는 질문" 비율 측정 — 작성자 편향 완화 |
 

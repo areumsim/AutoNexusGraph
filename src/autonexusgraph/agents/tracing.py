@@ -34,6 +34,7 @@ from ..llm.cost_tracker import (
     current_tracker,
     set_current_tracker,
 )
+from .hop_metrics import trace_hop_summary
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,15 @@ def start_turn_context(thread_id: str, state: dict, *,
         extra: dict = {}
         if question_kind:
             extra["question_kind"] = question_kind
+        # E-3 (DoD §10.13): per-turn cypher hop 수 + tool 호출 sequence 기록.
+        try:
+            hop = trace_hop_summary(turn.state)
+            extra["hop_count"] = hop["hop_count"]
+            extra["max_hop_depth"] = hop["max_hop_depth"]
+            extra["tool_sequence"] = hop["tool_sequence"]
+        except Exception as exc:   # noqa: BLE001
+            logger.debug("hop_metrics 계산 실패 (skip): %s", exc)
+            hop = None
         try:
             tracker.finalize(status, n_replans=n_replans,
                              extra_meta=extra or None)
@@ -288,6 +298,10 @@ def start_turn_context(thread_id: str, state: dict, *,
             }
             if question_kind:
                 end_meta["question_kind"] = question_kind
+            if hop is not None:
+                end_meta["hop_count"] = hop["hop_count"]
+                end_meta["max_hop_depth"] = hop["max_hop_depth"]
+                end_meta["tool_sequence"] = hop["tool_sequence"]
             try:
                 client.update_current_span(
                     metadata=end_meta,

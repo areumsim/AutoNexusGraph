@@ -126,7 +126,7 @@
 |---|---|---|:---:|---|---|
 | E-1 | **12 조합 매트릭스 실측** (4 어댑터 × 3 LLM) | 측정 대기 | P1 | `make eval-full / eval-auto / eval-cross` 풀 실행 + LLM 키 + `eval/reports/<run>/summary.md` PR 첨부 | README §12.6 |
 | E-2 | **gold QA 확장** — finance 30 / auto 46 / cross 44 / ip 30 → 각 100 row + 외부 큐레이터 30% | seed 적재 완료 | P1 | 사람 라벨링 + 외부 큐레이터 채널 확보 (Allganize 흡수 워크플로 포함) | README §12.6, docs/gold_qa_guide.md |
-| E-3 | **§10.13/14 trace 메트릭** — hop 수 + tool call sequence | latency 수집됨 / hop 수 미구현 | P2 | per-turn trace 에 cypher hop count + tool call sequence 기록 → `eval/metrics/main_hop_efficiency.py` 활성 | README §12.6 |
+| E-3 | **§10.13/14 trace 메트릭** — hop 수 + tool call sequence | ✅ **구현** — `agents/hop_metrics.py` (tool_results→hop/seq 파생) → per-turn trace 기록 (Langfuse `end_meta` + PG `chat.messages.agent_trace`) + eval pred_row `hop_count`(cypher 파생) + `main_hop_efficiency` 실제 hop 경로(`hybrid_vs_vector_hops`). 테스트 15건. **잔여**: §10.13 ✅ 전환은 LLM eval 1회 실행 후(현재 manifest 는 simulation) | (도구 완료) | LLM 키 → `make eval-auto` | README §12.6 |
 | E-4 | **답변 사용자 피드백 루프** — 👍/👎/📝 → 저장소 | UI wiring 완료, 저장소 정의 없음 | P2 | `chat.feedback` 스키마 + 저주파 retraining loop | README §12.6 |
 | E-5 | **Vector RAG 공정성 검증** — gold QA "Vector 도 풀 수 있는 질문" 비율 | 매트릭스 내 Vector adapter 단독 측정 | P2 | 작성자 편향 완화 — 사람 검증 또는 외부 큐레이터 | README §12.6 |
 | E-6 | **performance benchmark** — p50/p95/p99 latency + 평균 토큰·cost/turn | PRD 목표만, 실측 미수행 | P3 | E-1 풀 실측 후 dashboard 구축 | README §12.7 |

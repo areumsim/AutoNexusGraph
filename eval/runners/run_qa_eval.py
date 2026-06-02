@@ -147,6 +147,15 @@ class CostBudget:
 
 
 # ─── adapter 실행 (resume 지원) ─────────────────────────────
+def _hops_from_cypher(cypher) -> int:
+    """E-3 — cypher → hop 깊이 (fail-soft). main_hop_efficiency 실제 hop 경로용."""
+    try:
+        from autonexusgraph.agents.hop_metrics import hops_from_cypher
+        return hops_from_cypher(cypher)
+    except Exception:   # noqa: BLE001
+        return 0
+
+
 def _record_from_response(qid: str, adapter_name: str, resp) -> dict:
     return {
         "qid": qid,
@@ -157,6 +166,7 @@ def _record_from_response(qid: str, adapter_name: str, resp) -> dict:
         "answer_entities": resp.answer_entities,
         "evidence": [dataclasses.asdict(e) for e in resp.evidence],
         "cypher": resp.cypher,
+        "hop_count": _hops_from_cypher(resp.cypher),   # E-3 — main_hop_efficiency 실제 hop
         "question_kind": resp.question_kind,
         "answer_confidence": resp.answer_confidence,
         "data_completeness": resp.data_completeness,

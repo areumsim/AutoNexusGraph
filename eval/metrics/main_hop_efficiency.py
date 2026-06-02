@@ -28,6 +28,17 @@ def _evidence_count(pred_row: dict) -> int:
     return len(ev)
 
 
+def _hop_count(pred_row: dict) -> int | None:
+    """E-3: 어댑터가 노출한 실제 cypher hop 수 (per-turn trace 파생). 없으면 None.
+
+    있으면 evidence-count 프록시보다 직접적 — `hybrid_vs_vector_hops` 로 비교.
+    """
+    h = pred_row.get("hop_count")
+    if isinstance(h, bool) or not isinstance(h, (int, float)):
+        return None
+    return int(h)
+
+
 def main_hop_efficiency(pred_rows: Iterable[dict],
                         per_q_metrics: Iterable[dict] | None = None) -> dict[str, Any]:
     """adapter 별 main-hop 효율 프록시.
@@ -42,12 +53,17 @@ def main_hop_efficiency(pred_rows: Iterable[dict],
         target_ratio = 0.7 (=30% 감소) — vector adapter 대비 hybrid 가 0.7 배
         이하 evidence 면 PRD §10.13 통과.
     """
+    pred_rows = list(pred_rows)
     by_adapter: dict[str, list[int]] = {}
+    hop_by_adapter: dict[str, list[int]] = {}   # E-3 — 실제 hop 수 (있는 row 만)
     for r in pred_rows:
         a = r.get("adapter", "")
         if not a:
             continue
         by_adapter.setdefault(a, []).append(_evidence_count(r))
+        hc = _hop_count(r)
+        if hc is not None:
+            hop_by_adapter.setdefault(a, []).append(hc)
 
     # 정답 row 한정 평균.
     correct_by_adapter: dict[str, list[int]] = {}
@@ -76,6 +92,10 @@ def main_hop_efficiency(pred_rows: Iterable[dict],
         if cc is not None:
             rec["n_correct"]      = len(cc)
             rec["ev_avg_correct"] = round(fmean(cc), 3) if cc else 0.0
+        hops = hop_by_adapter.get(a)
+        if hops:
+            rec["hop_avg"]   = round(fmean(hops), 3)
+            rec["n_hop"]     = len(hops)
         out[a] = rec
 
     # vector vs hybrid 비교 — PRD §10.13.
@@ -88,6 +108,15 @@ def main_hop_efficiency(pred_rows: Iterable[dict],
             "hybrid_ev_avg": h["ev_avg"],
             "ratio":         round(ratio, 3),
             "target_met":    ratio > 0.0 and ratio <= MAIN_HOP_TARGET_RATIO,
+        }
+    # E-3: 실제 hop 수가 있으면 직접 비교 (evidence 프록시보다 우선 신호).
+    if v.get("hop_avg") and h.get("hop_avg") is not None:
+        hratio = float(h["hop_avg"]) / float(v["hop_avg"]) if v["hop_avg"] else 0.0
+        out["hybrid_vs_vector_hops"] = {
+            "vector_hop_avg": v["hop_avg"],
+            "hybrid_hop_avg": h["hop_avg"],
+            "ratio":          round(hratio, 3),
+            "target_met":     hratio > 0.0 and hratio <= MAIN_HOP_TARGET_RATIO,
         }
     return out
 

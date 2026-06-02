@@ -32,6 +32,7 @@ from ..agents import (
     run_agent_resume_stream,
     run_agent_stream,
 )
+from ..agents.hop_metrics import trace_hop_summary
 from ..db.postgres import get_pool
 from .auth import authenticate
 
@@ -39,6 +40,17 @@ log = logging.getLogger(__name__)
 
 
 app = FastAPI(title="AutoNexusGraph Agent API", version="0.1")
+
+
+def _hop_fields(state: dict) -> dict:
+    """E-3 — per-turn trace 에 hop_count / tool_sequence 부착 (fail-soft)."""
+    try:
+        h = trace_hop_summary(state)
+        return {"hop_count": h["hop_count"],
+                "max_hop_depth": h["max_hop_depth"],
+                "tool_sequence": h["tool_sequence"]}
+    except Exception:   # noqa: BLE001
+        return {}
 
 
 # ── Request/Response 모델 ───────────────────────────────────
@@ -86,7 +98,8 @@ def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse
                           "domain": state.get("domain"),
                           "n_tool_results": len(state.get("tool_results") or []),
                           "cost_usd": state.get("llm_usage_usd"),
-                          "aborted_reason": state.get("aborted_reason")})
+                          "aborted_reason": state.get("aborted_reason"),
+                          **_hop_fields(state)})
 
     return ChatResponse(
         thread_id=req.thread_id,
@@ -156,7 +169,8 @@ def chat_stream(req: ChatRequest, user_id: str = Depends(authenticate)) -> Strea
                                           "n_tool_results": payload["n_tool_results"],
                                           "cost_usd": payload["cost_usd"],
                                           "n_replans": payload["n_replans"],
-                                          "validation_status": payload["validation_status"]})
+                                          "validation_status": payload["validation_status"],
+                                          **_hop_fields(st)})
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as exc:   # noqa: BLE001
@@ -213,7 +227,8 @@ def chat_resume(req: ResumeRequest, user_id: str = Depends(authenticate)) -> Str
                                           "target_companies": payload["target_companies"],
                                           "cost_usd": payload["cost_usd"],
                                           "validation_status": payload["validation_status"],
-                                          "resumed_from": "interrupt"})
+                                          "resumed_from": "interrupt",
+                                          **_hop_fields(st)})
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         except RuntimeError as exc:
