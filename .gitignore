@@ -2,6 +2,9 @@
 .env
 .env.local
 .env.*.local
+# .env.prod 등 모든 환경별 시크릿 (O-2 production 배포). placeholder 만 추적.
+.env.*
+!.env.example
 
 # === Python ===
 __pycache__/

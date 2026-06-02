@@ -1,0 +1,81 @@
+# AutoNexusGraph — production 오버레이 (O-2). base docker-compose.yml 위에 겹쳐 사용.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# base 와의 차이 (dev → prod):
+# - app 서비스 (api / web) 활성 — base 는 주석. 빌드 이미지 사용 (소스 bind-mount 없음, --reload 없음).
+# - DB 비밀번호를 env 필수 주입으로 강제 (dev 기본값 autonexusgraph_dev 덮어씀).
+# - healthcheck 기반 depends_on (DB 준비 후 app 기동).
+# - 자세한 절차·k8s·TLS·blue-green 은 docs/operations/production_deploy.md.
+#
+# 선행: .env.prod 에 POSTGRES_PASSWORD / NEO4J_PASSWORD / API_KEYS / LLM 키 등 설정.
+
+services:
+
+  # DB 비밀번호를 dev 기본값 대신 env 필수값으로 — 미설정 시 compose 가 거부.
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 필수 (.env.prod)}
+
+  neo4j:
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?NEO4J_PASSWORD 필수 (.env.prod)}"
+
+  # ── API (FastAPI /chat) ──────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    image: autonexusgraph:${IMAGE_TAG:-latest}
+    container_name: ar-api
+    restart: unless-stopped
+    command: ["sh", "-c", "uvicorn autonexusgraph.api.main:app --host 0.0.0.0 --port 8000 --workers ${API_WORKERS:-2}"]
+    env_file: [.env.prod]
+    environment:
+      APP_ENV: production
+    ports:
+      - "127.0.0.1:8000:8000"   # reverse proxy (TLS) 뒤에만 노출 — 직접 외부 X
+    networks: [autonexusgraph_net]
+    depends_on:
+      postgres: { condition: service_healthy }
+      neo4j: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 2g }
+
+  # ── Web (Streamlit UI) ───────────────────────────────────────────
+  web:
+    image: autonexusgraph:${IMAGE_TAG:-latest}
+    container_name: ar-web
+    restart: unless-stopped
+    command: ["streamlit", "run", "src/autonexusgraph/ui/app.py",
+              "--server.port", "8501", "--server.address", "0.0.0.0",
+              "--server.headless", "true"]
+    env_file: [.env.prod]
+    ports:
+      - "127.0.0.1:8501:8501"   # reverse proxy 뒤에만
+    networks: [autonexusgraph_net]
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1g }
+
+  # ── 선택: Caddy reverse proxy (자동 TLS) ─────────────────────────
+  # docs/operations/production_deploy.md §5 참조. Caddyfile 작성 후 주석 해제.
+  # caddy:
+  #   image: caddy:2
+  #   container_name: ar-caddy
+  #   restart: unless-stopped
+  #   ports: ["80:80", "443:443"]
+  #   volumes:
+  #     - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - ${DB_DATA_ROOT:-/home/user/arsim/DB_FG}/caddy:/data
+  #   networks: [autonexusgraph_net]
+  #   depends_on: [api, web]

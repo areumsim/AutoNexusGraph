@@ -100,7 +100,7 @@
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
 | O-1 | **API 인증 / Rate limit** | ✅ **구현** (`api/auth.py` + `test_api_auth.py` 12건) — API key 헤더 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 403) + per-identity in-memory rate limit. **잔여 (P2)**: OAuth2/OIDC 발급기관 연동, multi-instance 분산 (redis/reverse proxy) | ~~P0~~ → **P2** (잔여) | (잔여) 외부 IdP 통합 시 | README §12.2 |
-| O-2 | **Production 배포 가이드** — `docs/operations/production_deploy.md` | 미작성 | **P0** | k8s / compose prod profile / health probe / blue-green / canary. dev Quickstart 와 분리 | README §12.3 |
+| O-2 | **Production 배포 가이드** — `docs/operations/production_deploy.md` | ✅ **작성** (+ `infra/Dockerfile` + `docker-compose.prod.yml` 실행 가능) — 이미지 빌드 / compose prod 오버레이 / health probe / reverse proxy·TLS / k8s / blue-green·canary / 멀티 인스턴스 주의점. dev Quickstart 분리. `.gitignore` `.env.*` 보강. **잔여**: 백업·DR 자동화(O-3) / 모니터링(O-5) | (완료) | — | README §12.3 |
 | O-3 | **백업·DR** — PG dump + Neo4j backup + 재생성 RPO/RTO | 없음 | P1 | PG dump 스케줄 + `neo4j-admin backup` cron + vec.chunks embedding 재생성 시간 측정 (finance 748K + auto 16K 추정 수 시간) | README §12.3 |
 | O-4 | **CI/CD 파이프라인** — `.github/workflows/` 부재 | 없음 | P1 | unit test + lint + `make audit-dod --strict` + (옵션) ephemeral PG/Neo4j 통합테스트 | README §12.3 |
 | O-5 | **모니터링·알람** — Prometheus + Grafana | 없음 (Langfuse fail-soft만) | P2 | Prometheus exporter (node count / chunk count / cost / error rate) + Grafana 대시보드 + 알람 (PG 끊김 / Neo4j disk full / LLM cost spike) | README §12.3 |
