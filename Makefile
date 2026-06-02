@@ -1,5 +1,5 @@
 .PHONY: help install fmt lint test test-int smoke-e2e up down logs health clean \
-        bridge-kpi bridge-expire persons-collision backup restore \
+        bridge-kpi bridge-expire persons-collision freshness backup restore \
         ingest-corp ingest-krx ingest-ecos ingest-targets ingest-bulk \
         ingest-structural ingest-wikidata ingest-wikipedia \
         ingest-news ingest-fss ingest-ftc ingest-kosis \
@@ -263,6 +263,9 @@ bridge-expire:                                       # N일 미검토 candidate 
 
 persons-collision:                                   # master.persons 동명·동년생 충돌 측정 (Q-3, read-only; --json)
 	PYTHONPATH=src $(PYTHON) -m autonexusgraph.persons_collision $(ARGS)
+
+freshness:                                           # source별 데이터 freshness + stale 판정 (Q-5, read-only; stale 시 exit 1)
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.freshness $(ARGS)
 
 # ── PG hot-apply (운영 중 컨테이너에 신규 init/*.sql 멱등 적용) ────────────
 # docker-entrypoint-initdb.d 는 빈 볼륨 첫 기동 시에만 실행되므로, 신규
