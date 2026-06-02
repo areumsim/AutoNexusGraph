@@ -1099,7 +1099,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
-| **CONTRIBUTING.md / SECURITY.md** | 없음 | 코드 스타일 / PR 절차 / 보안 보고 채널 |
+| **CONTRIBUTING.md / SECURITY.md** | ✅ **작성** ([CONTRIBUTING.md](./CONTRIBUTING.md) / [SECURITY.md](./SECURITY.md)) | 개발환경·smoke-e2e 게이트·도메인 불변식 8항·PR 절차 / 비공개 보고 채널·구현 통제·알려진 한계 정직표기 |
 | **`docs/design/` 빈 디렉토리** | placeholder | 핵심 컴포넌트 (LangGraph 노드 / DomainHandler / Bridge / P3-P4) ADR + diagrams |
 | **`_legacy/` 정책** | 보존 (v1/v2 KGQA Agent) | (a) deprecate notice + 일정 (b) 마이그레이션 가이드 (c) 또는 archived branch 로 이동 |
 | **architecture diagram 통합** | `docs/autograph.md §2.5` mermaid 만 | README 본문에 1장 핵심 다이어그램 (현재 텍스트 박스만) |
@@ -1123,6 +1123,8 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 - **본 문서** — README + PRD 통합 SSOT v3.0 (요구사항·DoD·로드맵·의사결정 로그 일체)
 - **[BACKLOG.md](./BACKLOG.md)** — **전수 미완료 항목 SSOT** (83 항목 / 15 카테고리 / P0~P3 트래픽라이트 + 활성화 트리거)
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — 내부 기여 가이드 (개발환경 · `make smoke-e2e` 게이트 · 도메인 불변식 8항 · PR 절차)
+- [SECURITY.md](./SECURITY.md) — 보안 정책 (비공개 취약점 보고 · 구현된 통제 · 알려진 한계 정직표기)
 - [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 33 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
 - [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 33 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트

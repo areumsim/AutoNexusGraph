@@ -137,7 +137,7 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| F-1 | **CONTRIBUTING.md / SECURITY.md** | 없음 | P2 | 코드 스타일 + PR 절차 + 보안 보고 채널 | README §12.7 |
+| F-1 | **CONTRIBUTING.md / SECURITY.md** | ✅ **작성** — 루트 `CONTRIBUTING.md`(개발환경·smoke-e2e 게이트·도메인 불변식 8항·PR 절차) + `SECURITY.md`(비공개 보고 채널·구현 통제·알려진 한계 정직표기) | (완료) | — | README §12.7 |
 | F-2 | **TROUBLESHOOTING.md** | 없음 | P2 | 흔한 실패 (LLM rate limit / pgvector 미설치 / Neo4j auth / DART 키 만료) 진단 트리. **단일 SSOT 신설 권장** — docs/faq.md 와 통합 또는 분리 | README §12.7 |
 | F-3 | **`docs/design/`** 빈 디렉토리 | placeholder | P3 | 핵심 컴포넌트 (LangGraph 노드 / DomainHandler / Bridge / P3-P4) ADR + diagrams | README §12.7 |
 | F-4 | **GitHub Issue/PR template** | 없음 | P3 | bug / feature / data-source 템플릿 | README §12.7 |
