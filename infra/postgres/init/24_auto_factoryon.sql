@@ -17,15 +17,20 @@ CREATE TABLE IF NOT EXISTS auto.factoryon_registry (
     business_no       VARCHAR,                         -- 사업자등록번호
     representative    VARCHAR,
     address           TEXT,
-    industrial_complex VARCHAR,                        -- 단지명
-    industry_code     VARCHAR,                         -- KSIC 분류
-    industry_name     VARCHAR,
-    products          TEXT,                            -- 생산품 — comma-separated
-    capacity          TEXT,                            -- 생산능력 (원문 — 단위 다양)
-    employees         INT,
-    land_area_m2      NUMERIC,                         -- 부지면적
-    building_area_m2  NUMERIC,                         -- 건축면적
-    registered_at     DATE,                            -- 등록일
+    industrial_complex VARCHAR,                        -- 단지명 (irsttNm)
+    industry_code     VARCHAR,                         -- 대표 업종코드 (rprsntvIndutyCode)
+    industry_codes    VARCHAR,                         -- 전체 업종코드 목록 (indutyCodes, comma-separated)
+    industry_name     VARCHAR,                         -- 업종명 (indutyNm)
+    products          TEXT,                            -- 주생산품 (mainProductCn)
+    capacity          TEXT,                            -- 생산능력 (원문 — 단위 다양; API 미제공)
+    employees         INT,                             -- 종업원수 (allEmplyCo)
+    land_area_m2      NUMERIC,                         -- 부지면적 (API 미제공)
+    building_area_m2  NUMERIC,                         -- 건축면적 (API 미제공)
+    registered_at     DATE,                            -- 최초공장등록일 (frstFctryRegistDe, YYYYMMDD→DATE)
+    charge_org        VARCHAR,                         -- 민원담당기관 (cvplChrgOrgnztNm)
+    tel               VARCHAR,                         -- 회사 전화 (cmpnyTelno)
+    fax               VARCHAR,                         -- 회사 팩스 (cmpnyFxnum)
+    homepage          VARCHAR,                         -- 홈페이지 (hmpadr)
     -- corp_entity 브리지 진입점 (있을 때만).
     corp_code         VARCHAR,
     -- 메타.
@@ -37,6 +42,14 @@ CREATE TABLE IF NOT EXISTS auto.factoryon_registry (
     created_at        TIMESTAMPTZ DEFAULT now(),
     updated_at        TIMESTAMPTZ DEFAULT now()
 );
+
+-- 기존 DB 멱등 보강 — CREATE TABLE IF NOT EXISTS 는 컬럼을 추가하지 않으므로,
+-- 실측 필드(2026-06, getFctry*Service_v2) 기준 신규 컬럼을 개별 ADD.
+ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS industry_codes VARCHAR;
+ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS charge_org     VARCHAR;
+ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS tel            VARCHAR;
+ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS fax            VARCHAR;
+ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS homepage       VARCHAR;
 
 CREATE INDEX IF NOT EXISTS idx_factoryon_company
     ON auto.factoryon_registry(company_name);

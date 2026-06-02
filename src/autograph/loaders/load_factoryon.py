@@ -72,21 +72,37 @@ def _normalize_row(item: dict, endpoint: str, *,
         except (TypeError, ValueError):
             return None
 
+    def _date(*keys) -> str | None:
+        v = _i(*keys)
+        if not v:
+            return None
+        d = str(v).strip()
+        if len(d) == 8 and d.isdigit():        # YYYYMMDD → ISO YYYY-MM-DD
+            return f"{d[0:4]}-{d[4:6]}-{d[6:8]}"
+        return d
+
+    # 키 우선순위: 실제 API 필드(2026-06 실측, getFctry*Service_v2) 를 1순위로,
+    # 과거 추정 키는 호환용 fallback. 실측 필드는 docs/data_lineage.md 팩토리온 절 참조.
     return {
         "factory_no":         _i("fctryManageNo", "factoryNo", "fctry_no"),
         "company_name":       _i("cmpnyNm", "companyName", "cmpny_nm") or "",
         "business_no":        _i("brno", "bsnsno", "businessNo"),
         "representative":     _i("rprsntvNm", "ceoNm"),
-        "address":            _i("adres", "rdnmadr", "lnmAdres"),
+        "address":            _i("rnAdres", "adres", "rdnmadr", "lnmAdres"),
         "industrial_complex": _i("irsttNm", "complexNm"),
-        "industry_code":      _i("indstyClCd", "ksicCd"),
-        "industry_name":      _i("indstyClNm", "ksicNm"),
-        "products":           _i("prdctnPdct", "prdctnPrdct", "items"),
+        "industry_code":      _i("rprsntvIndutyCode", "indstyClCd", "ksicCd"),
+        "industry_codes":     _i("indutyCodes"),
+        "industry_name":      _i("indutyNm", "indstyClNm", "ksicNm"),
+        "products":           _i("mainProductCn", "prdctnPdct", "prdctnPrdct"),
         "capacity":           _i("prdctnCpct", "capacity"),
-        "employees":          _int("emplyCnt", "emplyeeCnt"),
+        "employees":          _int("allEmplyCo", "emplyCnt", "emplyeeCnt"),
         "land_area_m2":       _num("site_area", "lndAr"),
         "building_area_m2":   _num("bldng_area", "bldngAr"),
-        "registered_at":      _i("rgstdt", "registDate"),
+        "registered_at":      _date("frstFctryRegistDe", "rgstdt", "registDate"),
+        "charge_org":         _i("cvplChrgOrgnztNm"),
+        "tel":                _i("cmpnyTelno"),
+        "fax":                _i("cmpnyFxnum"),
+        "homepage":           _i("hmpadr"),
         "source_endpoint":    endpoint,
         "snapshot_year":      snapshot_year,
         "schema_version":     schema_version,
@@ -128,13 +144,15 @@ def upsert_pg(rows: list[dict]) -> int:
     sql = """
     INSERT INTO auto.factoryon_registry (
         factory_no, company_name, business_no, representative, address,
-        industrial_complex, industry_code, industry_name, products, capacity,
+        industrial_complex, industry_code, industry_codes, industry_name, products, capacity,
         employees, land_area_m2, building_area_m2, registered_at,
+        charge_org, tel, fax, homepage,
         source_endpoint, snapshot_year, schema_version, raw_payload
     ) VALUES (
         %(factory_no)s, %(company_name)s, %(business_no)s, %(representative)s, %(address)s,
-        %(industrial_complex)s, %(industry_code)s, %(industry_name)s, %(products)s, %(capacity)s,
+        %(industrial_complex)s, %(industry_code)s, %(industry_codes)s, %(industry_name)s, %(products)s, %(capacity)s,
         %(employees)s, %(land_area_m2)s, %(building_area_m2)s, %(registered_at)s,
+        %(charge_org)s, %(tel)s, %(fax)s, %(homepage)s,
         %(source_endpoint)s, %(snapshot_year)s, %(schema_version)s, %(raw_payload)s::jsonb
     )
     ON CONFLICT (factory_no) DO UPDATE SET
@@ -144,6 +162,7 @@ def upsert_pg(rows: list[dict]) -> int:
         address            = COALESCE(EXCLUDED.address, auto.factoryon_registry.address),
         industrial_complex = COALESCE(EXCLUDED.industrial_complex, auto.factoryon_registry.industrial_complex),
         industry_code      = COALESCE(EXCLUDED.industry_code, auto.factoryon_registry.industry_code),
+        industry_codes     = COALESCE(EXCLUDED.industry_codes, auto.factoryon_registry.industry_codes),
         industry_name      = COALESCE(EXCLUDED.industry_name, auto.factoryon_registry.industry_name),
         products           = COALESCE(EXCLUDED.products, auto.factoryon_registry.products),
         capacity           = COALESCE(EXCLUDED.capacity, auto.factoryon_registry.capacity),
@@ -151,6 +170,10 @@ def upsert_pg(rows: list[dict]) -> int:
         land_area_m2       = COALESCE(EXCLUDED.land_area_m2, auto.factoryon_registry.land_area_m2),
         building_area_m2   = COALESCE(EXCLUDED.building_area_m2, auto.factoryon_registry.building_area_m2),
         registered_at      = COALESCE(EXCLUDED.registered_at, auto.factoryon_registry.registered_at),
+        charge_org         = COALESCE(EXCLUDED.charge_org, auto.factoryon_registry.charge_org),
+        tel                = COALESCE(EXCLUDED.tel, auto.factoryon_registry.tel),
+        fax                = COALESCE(EXCLUDED.fax, auto.factoryon_registry.fax),
+        homepage           = COALESCE(EXCLUDED.homepage, auto.factoryon_registry.homepage),
         snapshot_year      = EXCLUDED.snapshot_year,
         schema_version     = EXCLUDED.schema_version,
         raw_payload        = EXCLUDED.raw_payload,

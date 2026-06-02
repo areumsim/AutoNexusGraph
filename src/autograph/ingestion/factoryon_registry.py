@@ -30,8 +30,10 @@ import argparse
 import json
 import logging
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 
 from autonexusgraph.ingestion._common import (
     CheckpointStore,
@@ -57,33 +59,67 @@ ENDPOINTS = {
 }
 
 
-def _fetch(endpoint: str, params: dict, *, return_xml: bool = False) -> bytes | dict:
-    """단일 GET. 키 미설정 시 빈 dict."""
+def _fetch(endpoint: str, params: dict) -> dict:
+    """단일 GET → 표준 응답을 dict 로 정규화.
+
+    2026-06 실측: 본 서비스(B550624/fctryRegistInfo)는 ``type``/``_type``/``dataType``
+    등 포맷 파라미터를 모두 무시하고 **항상 XML** 을 반환한다. 따라서 XML 만 받아
+    파싱한다. 페이지네이션은 data.go.kr 표준 ``pageNo``/``numOfRows`` 를 사용
+    (``page``/``perPage`` 는 무시되어 기본 10건이 반환됨 — 실측 확인).
+
+    반환: ``{resultCode, resultMsg, totalCount, pageNo, numOfRows, items:[...]}``.
+    키 미설정·HTTP 오류·비정상 resultCode·파싱 실패 시 빈 dict.
+    """
     s = get_auto_settings()
     if not s.data_go_kr_api_key:
         return {}
     full = dict(params)
     full["serviceKey"] = s.data_go_kr_api_key
-    full.setdefault("type", "xml" if return_xml else "json")
     qs = urllib.parse.urlencode(full, quote_via=urllib.parse.quote)
     url = f"{_BASE}{endpoint}?{qs}"
     req = urllib.request.Request(url, headers={
-        "Accept": "application/xml" if return_xml else "application/json",
+        "Accept": "application/xml",
         "User-Agent": "AutoGraph-Research/0.1",
     })
     _LIMITER.acquire()
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            raw = resp.read()
-            if return_xml:
-                return raw
-            return json.loads(raw.decode("utf-8"))
+            raw = resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         log.error("[factoryon] %s HTTP %s: %s", endpoint, e.code, e.reason)
-        return b"" if return_xml else {}
+        return {}
     except Exception as e:   # noqa: BLE001
         log.error("[factoryon] %s 실패: %s", endpoint, e)
-        return b"" if return_xml else {}
+        return {}
+    return _parse_xml(raw, endpoint)
+
+
+def _parse_xml(raw: str, endpoint: str) -> dict:
+    """data.go.kr 표준 XML → dict. ``<response><header/><body><items><item/></items></body>``."""
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as e:
+        log.error("[factoryon] %s XML 파싱 실패: %s — %.160s", endpoint, e, raw)
+        return {}
+    code = root.findtext("./header/resultCode")
+    msg = root.findtext("./header/resultMsg")
+    if code not in (None, "00"):
+        log.warning("[factoryon] %s 비정상 응답 code=%s msg=%s", endpoint, code, msg)
+        return {}
+    items = [
+        {child.tag: (child.text or "").strip() for child in item}
+        for item in root.findall("./body/items/item")
+    ]
+    body = root.find("./body")
+    bt = (lambda tag: body.findtext(tag)) if body is not None else (lambda tag: None)
+    return {
+        "resultCode": code,
+        "resultMsg": msg,
+        "totalCount": bt("totalCount"),
+        "pageNo": bt("pageNo"),
+        "numOfRows": bt("numOfRows"),
+        "items": items,
+    }
 
 
 def _normalize_label(s: str) -> str:
@@ -107,12 +143,11 @@ def by_company(company_name: str, *, max_pages: int = 10,
         if ckpt.is_done(key):
             continue
         payload = _fetch(ENDPOINTS["by_company"],
-                         {"page": page, "perPage": per_page,
+                         {"pageNo": page, "numOfRows": per_page,
                           "cmpnyNm": company_name})
         if not payload:
             break
-        items = (payload.get("data") or payload.get("items")
-                 or payload.get("response", {}).get("body", {}).get("items") or [])
+        items = payload.get("items") or []
         if not items:
             break
         save_raw(_SOURCE, f"by_company/{label}_page_{page:03d}.json", payload)
@@ -137,7 +172,7 @@ def by_factory_no(factory_no: str) -> int:
         return 0
     payload = _fetch(ENDPOINTS["by_factory_no"],
                      {"fctryManageNo": factory_no})
-    if not payload:
+    if not payload or not payload.get("items"):
         return 0
     save_raw(_SOURCE, f"by_factory_no/{_normalize_label(factory_no)}.json", payload)
     ckpt.mark_done(key)
@@ -160,12 +195,11 @@ def by_industrial_complex(complex_name: str, *,
         if ckpt.is_done(key):
             continue
         payload = _fetch(ENDPOINTS["by_industrial_complex"],
-                         {"page": page, "perPage": per_page,
+                         {"pageNo": page, "numOfRows": per_page,
                           "irsttNm": complex_name})
         if not payload:
             break
-        items = (payload.get("data") or payload.get("items")
-                 or payload.get("response", {}).get("body", {}).get("items") or [])
+        items = payload.get("items") or []
         if not items:
             break
         save_raw(_SOURCE,
