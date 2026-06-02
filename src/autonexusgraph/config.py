@@ -175,6 +175,16 @@ class Settings(BaseSettings):
     app_env: Literal["local", "server", "production"] = "local"
     log_level: str = "INFO"
 
+    # === API 보안 (O-1 — BACKLOG §5, README §12.2) ===
+    # API key 인증. comma-separated 토큰 목록. 항목은 ``token:user_id`` 또는 bare
+    # ``token`` (bare 면 user_id 는 토큰 해시로 자동 도출). **비워두면 open 모드**
+    # (dev Quickstart 보존, 첫 요청에서 1회 경고). production 은 반드시 설정.
+    api_keys: str = ""
+    # per-identity (인증 시 user_id / open 모드는 client IP) 분당 요청 한도.
+    # 0 = 비활성. **in-memory** — 단일 인스턴스 한정, multi-instance 는 reverse
+    # proxy / redis 필요 (README §12.3).
+    api_rate_limit_per_min: int = 0
+
     @field_validator("ingest_raw_dir", "ingest_processed_dir", mode="before")
     @classmethod
     def _resolve_path(cls, v: str | Path) -> Path:

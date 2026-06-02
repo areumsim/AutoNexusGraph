@@ -7,6 +7,11 @@
 
 응답 메타에 cost_usd / tokens 포함 (사용자 명시 — 모든 호출 비용 가시화).
 
+인증 (O-1): /chat · /chat/stream · /chat/resume · /threads/{id} 는
+``Depends(authenticate)`` 로 API key 필요 (``X-API-Key`` / ``Authorization: Bearer``).
+``API_KEYS`` env 미설정 시 open 모드 (dev). thread_id 는 user_id 에 바인딩되어
+타인 히스토리 조회는 403. /health 는 인증 없음 (probe). 상세는 ``api/auth.py``.
+
 기동:
     uvicorn autonexusgraph.api.main:app --host 0.0.0.0 --port 8000
 """
@@ -18,7 +23,7 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -28,7 +33,7 @@ from ..agents import (
     run_agent_stream,
 )
 from ..db.postgres import get_pool
-
+from .auth import authenticate
 
 log = logging.getLogger(__name__)
 
@@ -59,8 +64,9 @@ class ChatResponse(BaseModel):
 
 # ── chat endpoint ───────────────────────────────────────────
 @app.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
+def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse:
     """단일 대화 turn — agent 실행 + history 적재."""
+    _assert_thread_owner(req.thread_id, user_id)
     history = _load_history(req.thread_id) if req.use_history else []
     try:
         state = run_agent(req.message, thread_id=req.thread_id,
@@ -70,9 +76,11 @@ def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(500, f"agent failed: {e}")
 
     # PG chat.messages 에 user + assistant 두 turn 적재
-    _persist_turn(req.thread_id, "user", req.message, citations=None, trace=None)
+    _persist_turn(req.thread_id, "user", req.message, citations=None, trace=None,
+                   user_id=user_id)
     _persist_turn(req.thread_id, "assistant", state.get("answer", ""),
                    citations=state.get("citations"),
+                   user_id=user_id,
                    trace={"question_kind": state.get("question_kind"),
                           "target_companies": state.get("target_companies"),
                           "domain": state.get("domain"),
@@ -95,7 +103,7 @@ def chat(req: ChatRequest) -> ChatResponse:
 
 # ── chat stream (SSE — PRD §7.6.5) ──────────────────────────
 @app.post("/chat/stream")
-def chat_stream(req: ChatRequest) -> StreamingResponse:
+def chat_stream(req: ChatRequest, user_id: str = Depends(authenticate)) -> StreamingResponse:
     """SSE — 노드 진입마다 partial state 한 줄. 마지막에 data: [DONE].
 
     이벤트 형태:
@@ -104,6 +112,7 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
         data: {"node": "__final__", "answer": "...", "citations": [...], "cost_usd": ...}\\n\\n
         data: [DONE]\\n\\n
     """
+    _assert_thread_owner(req.thread_id, user_id)
     history = _load_history(req.thread_id) if req.use_history else []
 
     def _gen():
@@ -127,7 +136,7 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
                     payload["pending_interrupt"] = st.get("pending_interrupt") or {}
                     if not user_msg_logged:
                         _persist_turn(req.thread_id, "user", req.message,
-                                       citations=None, trace=None)
+                                       citations=None, trace=None, user_id=user_id)
                         user_msg_logged = True
                 if node == "__final__":
                     payload["answer"] = st.get("answer", "")
@@ -137,10 +146,11 @@ def chat_stream(req: ChatRequest) -> StreamingResponse:
                     # 최종 적재 — user + assistant 두 turn (user 는 처음 한 번만)
                     if not user_msg_logged:
                         _persist_turn(req.thread_id, "user", req.message,
-                                       citations=None, trace=None)
+                                       citations=None, trace=None, user_id=user_id)
                         user_msg_logged = True
                     _persist_turn(req.thread_id, "assistant", payload["answer"],
                                    citations=payload["citations"],
+                                   user_id=user_id,
                                    trace={"question_kind": payload["question_kind"],
                                           "target_companies": payload["target_companies"],
                                           "n_tool_results": payload["n_tool_results"],
@@ -169,12 +179,14 @@ class ResumeRequest(BaseModel):
 
 
 @app.post("/chat/resume")
-def chat_resume(req: ResumeRequest) -> StreamingResponse:
+def chat_resume(req: ResumeRequest, user_id: str = Depends(authenticate)) -> StreamingResponse:
     """interrupt 후 사용자가 응답한 값으로 graph 재개. SSE 스트림.
 
     LangGraph + langgraph.types.Command 필요. 폴백 환경에서는 클라이언트가
     응답을 새 /chat 호출에 합쳐 보내는 패턴 권장 (UI 가 처리).
     """
+    _assert_thread_owner(req.thread_id, user_id)
+
     def _gen():
         try:
             for node, st in run_agent_resume_stream(req.thread_id, req.response):
@@ -196,6 +208,7 @@ def chat_resume(req: ResumeRequest) -> StreamingResponse:
                     payload["validation_issues"] = st.get("validation_issues") or []
                     _persist_turn(req.thread_id, "assistant", payload["answer"],
                                    citations=payload["citations"],
+                                   user_id=user_id,
                                    trace={"question_kind": payload["question_kind"],
                                           "target_companies": payload["target_companies"],
                                           "cost_usd": payload["cost_usd"],
@@ -223,8 +236,9 @@ def chat_resume(req: ResumeRequest) -> StreamingResponse:
 
 # ── threads endpoints ───────────────────────────────────────
 @app.get("/threads/{thread_id}")
-def get_thread(thread_id: str) -> dict:
-    """대화 히스토리 조회."""
+def get_thread(thread_id: str, user_id: str = Depends(authenticate)) -> dict:
+    """대화 히스토리 조회 — 소유자만 (thread_id ↔ user_id 바인딩)."""
+    _assert_thread_owner(thread_id, user_id)
     messages = _load_history(thread_id, limit=200)
     return {"thread_id": thread_id, "messages": messages}
 
@@ -247,6 +261,32 @@ def health() -> dict:
     except Exception as e:
         out["neo4j"] = f"error: {e}"
     return out
+
+
+# ── thread ownership (O-1 — thread_id ↔ user_id 바인딩) ──────
+def _fetch_conv_owner(thread_id: str) -> tuple[bool, str | None]:
+    """(존재여부, user_id). 분리된 함수 — 테스트에서 monkeypatch 용이."""
+    with get_pool().connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM chat.conversations WHERE thread_id = %s",
+                    (thread_id,))
+        row = cur.fetchone()
+    if row is None:
+        return (False, None)
+    return (True, row[0])
+
+
+def _assert_thread_owner(thread_id: str, user_id: str) -> None:
+    """thread 가 caller 소유인지 검증. 위반 시 403.
+
+    - 존재하지 않는 thread → 통과 (첫 적재에서 caller 가 소유).
+    - 소유자 NULL (legacy 미바인딩) → 통과 (다음 적재에서 claim).
+    - 소유자 != caller → 403.
+    """
+    exists, owner = _fetch_conv_owner(thread_id)
+    if not exists or owner is None:
+        return
+    if owner != user_id:
+        raise HTTPException(403, "thread does not belong to this user")
 
 
 # ── persistence ─────────────────────────────────────────────
@@ -275,12 +315,19 @@ def _load_history(thread_id: str, limit: int = 20) -> list[dict]:
 
 def _persist_turn(thread_id: str, role: str, content: str,
                   citations: list | None,
-                  trace: dict | None) -> None:
-    """conversations + messages 적재 (없으면 conversation 생성). 멱등 + turn_idx 자동."""
+                  trace: dict | None,
+                  user_id: str | None = None) -> None:
+    """conversations + messages 적재 (없으면 conversation 생성). 멱등 + turn_idx 자동.
+
+    user_id 는 conversation 생성 시 소유자로 기록. 기존 소유자가 있으면 보존하고
+    legacy NULL 소유자만 claim (COALESCE).
+    """
     sql_conv = """
-    INSERT INTO chat.conversations (thread_id)
-    VALUES (%s)
-    ON CONFLICT (thread_id) DO UPDATE SET updated_at = now()
+    INSERT INTO chat.conversations (thread_id, user_id)
+    VALUES (%s, %s)
+    ON CONFLICT (thread_id) DO UPDATE
+      SET updated_at = now(),
+          user_id = COALESCE(chat.conversations.user_id, EXCLUDED.user_id)
     RETURNING id
     """
     sql_max_turn = "SELECT coalesce(max(turn_idx), -1) + 1 FROM chat.messages WHERE conversation_id = %s"
@@ -291,7 +338,7 @@ def _persist_turn(thread_id: str, role: str, content: str,
     ON CONFLICT (conversation_id, turn_idx, role) DO NOTHING
     """
     with get_pool().connection() as conn, conn.cursor() as cur:
-        cur.execute(sql_conv, (thread_id,))
+        cur.execute(sql_conv, (thread_id, user_id))
         conv_id = cur.fetchone()[0]
         cur.execute(sql_max_turn, (conv_id,))
         next_turn = cur.fetchone()[0]

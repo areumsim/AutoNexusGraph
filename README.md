@@ -793,7 +793,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | 산단공 공정 (15151075) | wired | 수동 CSV 다운 후 `make load-sandang-processes` |
 | `_legacy/v2/` | 보존 | 삭제 예정 미정 (`docs/mental_model.md §5.10`) |
 | Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. CI 컨테이너 미설정 |
-| API 인증 / Rate limit | **미구현** | FastAPI 5 엔드포인트 모두 open. 외부 노출 시 reverse proxy + auth gateway 필요 — §12.2 |
+| API 인증 / Rate limit | ✅ **구현** (`api/auth.py`) | API key 헤더 인증 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 히스토리 403) + per-identity in-memory rate limit (`API_RATE_LIMIT_PER_MIN`). `/health` 제외. `API_KEYS` 미설정 시 open 모드 (dev). 잔여: OAuth2/OIDC·multi-instance 분산 — §12.2 |
 | Production 배포 가이드 | 미작성 | Quickstart 는 dev 한정. 백업/DR/모니터링/multi-instance scaling 절차 없음 — §12.3 |
 | `docs/design/` | 빈 디렉토리 | 디자인 doc 자리만 있고 내용 없음 (PRD / mental_model / learning_guide 가 대체) |
 | `_legacy/` | 보존 (v1/v2 KGQA Agent) | 이전 단일도메인 시스템. CHANGELOG/HISTORY 보존. 삭제 vs 마이그레이션 정책 미정 |
@@ -1041,8 +1041,8 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
-| **API 인증** | 없음 — `/chat` `/chat/stream` `/chat/resume` `/threads/{id}` 모두 open | OAuth2 / API key middleware (FastAPI `Depends`) + Streamlit 측 토큰 주입 + thread_id 의 user_id binding (현재 thread_id 만 알면 누구나 타인 히스토리 조회 가능) |
-| **Rate limit** | 없음 | per-IP / per-user (slowapi 또는 reverse proxy) — LLM 비용 폭주 차단 |
+| **API 인증** | ✅ **구현** (`api/auth.py`) — `/chat` `/chat/stream` `/chat/resume` `/threads/{id}` 에 `Depends(authenticate)`. `X-API-Key` / `Authorization: Bearer` 헤더 + `API_KEYS` env (`token:user_id`). **thread_id ↔ user_id 바인딩** — 타인 히스토리 조회 403. `API_KEYS` 미설정 시 open 모드 (dev, 1회 경고). `/health` 는 인증 없음 | (잔여) OAuth2/OIDC 발급기관 연동 + 토큰 회전. 외부 IdP 통합은 reverse proxy 권장 |
+| **Rate limit** | ✅ **구현** — per-identity (user_id / open 모드 IP) sliding-window, `API_RATE_LIMIT_PER_MIN`. **in-memory (단일 인스턴스)** | (잔여) multi-instance 분산 — reverse proxy / redis (§12.3) |
 | **PII / 민감정보 정책** | 미정의 | 임원 인물·뉴스 본문에 이름·생년 포함 (`master.persons` 9,948 / (name, birth_year) 동명이인 분리). GDPR-style 삭제 권리 처리 / log redaction 정책 미문서화 |
 | **`data/cost_log.jsonl` 회전** | 영속 append, size 무제한 (gitignored 확인 완료) | 일·주별 rotate + 보존 기간 정책 + 누계 집계 cron (`python -m autonexusgraph.llm.cost_history`) |
 | **Secrets 관리** | `.env` 한 곳 | prod 는 vault / k8s secret 분리. `.env.example` 의 dev placeholder 와 prod 키 흐름 분리 절차 없음 |

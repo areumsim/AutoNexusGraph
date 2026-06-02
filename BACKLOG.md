@@ -99,7 +99,7 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| O-1 | **API 인증 / Rate limit** — FastAPI 5 엔드포인트 모두 open | 미구현 | **P0** | OAuth2 / API key middleware (FastAPI `Depends`) + Streamlit 측 토큰 주입 + thread_id 의 user_id binding (현재 thread_id 만 알면 누구나 타인 히스토리 조회). per-IP/per-user rate limit (slowapi 또는 reverse proxy) | README §12.2 |
+| O-1 | **API 인증 / Rate limit** | ✅ **구현** (`api/auth.py` + `test_api_auth.py` 12건) — API key 헤더 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 403) + per-identity in-memory rate limit. **잔여 (P2)**: OAuth2/OIDC 발급기관 연동, multi-instance 분산 (redis/reverse proxy) | ~~P0~~ → **P2** (잔여) | (잔여) 외부 IdP 통합 시 | README §12.2 |
 | O-2 | **Production 배포 가이드** — `docs/operations/production_deploy.md` | 미작성 | **P0** | k8s / compose prod profile / health probe / blue-green / canary. dev Quickstart 와 분리 | README §12.3 |
 | O-3 | **백업·DR** — PG dump + Neo4j backup + 재생성 RPO/RTO | 없음 | P1 | PG dump 스케줄 + `neo4j-admin backup` cron + vec.chunks embedding 재생성 시간 측정 (finance 748K + auto 16K 추정 수 시간) | README §12.3 |
 | O-4 | **CI/CD 파이프라인** — `.github/workflows/` 부재 | 없음 | P1 | unit test + lint + `make audit-dod --strict` + (옵션) ephemeral PG/Neo4j 통합테스트 | README §12.3 |
