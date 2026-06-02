@@ -1065,7 +1065,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 |---|---|---|
 | **Bridge candidate 검토 SOP** | 4,792 supplier candidate 영속 누적 — 검토 UI / 정책 없음 | (1) Streamlit 검토 페이지 — name match candidate 를 reviewer 가 ✓/✗ 라벨. (2) 6개월 미검토 candidate 자동 `rejected` 정책. (3) 검토 진행률 KPI |
 | **confidence_score calibration** | 미수행 — A(0.95) / B(0.80) / C(0.50) 가 실제 정답률과 단조 미검증 | gold QA 100+ 실측 후 `eval/metrics/confidence_weighted.py` 로 calibration plot. 필요 시 출처별 confidence 재조정 |
-| **`master.persons` 동명·동년생 충돌** | (name, birth_year) 키 사용 | 충돌 빈도 측정 routine + (name, birth_year, 회사) 보조 키 |
+| **`master.persons` 동명·동년생 충돌** | ✅ **측정 routine (Q-3)** — `make persons-collision` (`persons_collision.py`): NULL birth_year 비율 / 동명 다중 row / 병합의심 후보 | 실측 후 충돌률 높으면 (name, birth_year, 회사) 보조 키 도입 |
 | **embedding backfill 진행률 가시화** | ✅ **구현 (Q-4)** — `make embed-status` (source별 embedded/total/pct/pending) | 잔여: 누락 청크 자동 재시도 cron (`make embed-chunks` 반복) |
 | **데이터 freshness 모니터링** | 없음 | NHTSA recalls 마지막 호출 시각 / DART 마지막 filing 등 source 별 freshness check + stale 알람 |
 | **Schema 마이그레이션 버전 추적** | `infra/postgres/init/01~16.sql` 멱등 | Alembic 같은 versioned migration. 현재 `make migrate-schema-pg MIGRATE_FILE=...` 는 사용자가 무엇이 적용됐는지 추적 안 함 |
