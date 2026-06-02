@@ -66,11 +66,16 @@ logs/
 # === Legacy (이전 BNT_ONTOLOGY 잔재 격리) ===
 _legacy/
 
-# === 임시 / 메모 ===
+# === 임시 / 메모 / 스크래치 (사용자 개인 작업 파일 — 추적 금지) ===
 _tmp*
+_*tmp*
 _ref*
 _api_tmp*
 *.tmp
+# 백업/머지 잔재
+*.bak
+*.orig
+*.rej
 
 # === IDE ===
 .idea/
@@ -85,7 +90,6 @@ Thumbs.db
 Desktop.ini
 
 # === AI 도구 ===
-.claude/
 .claudeignore
 .codex/
 .agents/
