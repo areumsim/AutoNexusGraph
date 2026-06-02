@@ -246,21 +246,19 @@ stringData:
 
 ---
 
-## 10. 백업 · DR (O-3 — 요약)
+## 10. 백업 · DR (O-3)
 
-> 상세·자동화는 backlog **O-3** (별도 항목). 본 절은 최소 절차.
+> **SSOT**: [backup_dr.md](backup_dr.md). 스크립트 `scripts/ops/{backup,restore}.sh`.
 
 ```bash
-# PostgreSQL (XBRL/vec.chunks/master/chat 등 전체)
-docker exec ar-postgres pg_dump -U autonexusgraph -Fc autonexusgraph > backup/pg_$(date +%F).dump
-
-# Neo4j (정지 후 dump 또는 enterprise online backup)
-docker exec ar-neo4j neo4j-admin database dump neo4j --to-path=/data/backup
+make backup                                          # PG pg_dump -Fc + Neo4j community dump (보존 prune)
+make restore ARGS="--pg <dump> --neo4j <dump>"       # 파괴적 복원 (FORCE=1 로 프롬프트 생략)
+# cron 예: 0 3 * * *  cd /srv/autonexusgraph && bash scripts/ops/backup.sh >> /var/log/anxg_backup.log 2>&1
 ```
 
-- 영속 데이터는 `DB_DATA_ROOT` bind-mount — 호스트 스냅샷 가능.
-- `vec.chunks` 임베딩은 raw → 재생성 가능하나 시간 소요 (finance 748K + auto 16K, BGE-M3 backfill ~수 시간) → RPO/RTO 측정은 O-3.
-- 정기 `pg_dump` + `neo4j-admin backup` cron 은 O-3 에서 자동화.
+- `vec.chunks` 임베딩은 PG dump 에 **포함** → 정상 복원 시 재생성 불필요. RPO ≤ 24h(일일 cron) / RTO 수~수십 분(dump 보유).
+- Neo4j community = online backup 불가 → 대상 DB STOP→dump→START (다운타임 = dump 시간).
+- 재앙(dump 소실) 시에만 raw 재적재 + BGE-M3 재임베딩 ~수 시간. off-site 동기화 + 분기 복원 드릴 권장 — 상세 [backup_dr.md](backup_dr.md).
 
 ---
 

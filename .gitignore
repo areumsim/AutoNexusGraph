@@ -60,6 +60,10 @@ models/
 logs/
 *.log
 
+# === 백업 (O-3 — DB dump 산출물, DB_DATA_ROOT/backups 권장) ===
+backups/
+*.dump
+
 # === Docker volumes (compose가 named volume 쓰면 무시되지만 안전망) ===
 .docker_volumes/
 

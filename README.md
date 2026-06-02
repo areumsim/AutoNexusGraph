@@ -1053,7 +1053,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
 | **배포 가이드** | ✅ **작성** — [docs/operations/production_deploy.md](./docs/operations/production_deploy.md) + `infra/Dockerfile` + `docker-compose.prod.yml` (실행 가능) | k8s/compose prod 오버레이 / health probe / reverse proxy·TLS / blue-green / canary / 멀티 인스턴스 주의점 완료 |
-| **백업·DR** | 없음 | PG dump 스케줄 + Neo4j `neo4j-admin backup` cron + vec.chunks embedding 재생성 RPO/RTO. raw → DB 재생성 가능하지만 시간 미측정 (finance 748K + auto 16K backfill 추정 ~수 시간) |
+| **백업·DR** | ✅ **구현 (O-3)** — `make backup`/`restore` (`scripts/ops/`) + [backup_dr.md](./docs/operations/backup_dr.md). PG `pg_dump -Fc`(임베딩 포함) + Neo4j community STOP→dump→START + 보존 prune. RPO≤24h / RTO 수분(dump 보유)·수시간(재앙: raw 재적재+재임베딩) | 잔여: off-site 동기화 + 분기 복원 드릴 RTO 실측 |
 | **모니터링·알람** | Langfuse / LangSmith fail-soft 만 | Prometheus exporter (node count / chunk count / cost / error rate) + Grafana 대시보드 + 알람 (PG 끊김 / Neo4j disk full / LLM cost spike) |
 | **Multi-instance scaling** | PG checkpointer 공유 가능 — 검증 안 됨 | uvicorn worker N + checkpointer concurrent write 검증 + LLM rate limit 분산 |
 | **CI/CD** | ✅ **구현 (O-4)** — `.github/workflows/ci.yml`: `make smoke-e2e` keyless 게이트 (py3.10/3.11/3.12) + lint/mypy informational + DoD dashboard artifact | 잔여: `audit-dod --strict` (§10.7/§10.13 LLM eval 필요) + ephemeral PG/Neo4j 통합테스트 → LLM 키 / self-hosted runner 후 |
@@ -1147,6 +1147,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - [docs/operations/migrations.md](./docs/operations/migrations.md) — 스키마 마이그레이션 절차
 - **[docs/operations/production_deploy.md](./docs/operations/production_deploy.md)** — **production 배포 SSOT (O-2)** — 이미지 빌드(`infra/Dockerfile`) · compose prod 오버레이(`docker-compose.prod.yml`) · health probe · reverse proxy/TLS · k8s · blue-green/canary · 멀티 인스턴스 주의점. dev Quickstart 와 분리
 - **[docs/operations/bridge_review.md](./docs/operations/bridge_review.md)** — **Bridge candidate 검토 SOP (Q-1)** — `bridge.corp_entity` candidate ✓/✗ 라벨 (Streamlit UI) · 6개월 미검토 자동 거부 · 진행률 KPI · `make bridge-kpi`/`bridge-expire`
+- **[docs/operations/backup_dr.md](./docs/operations/backup_dr.md)** — **백업·재해복구 SOP (O-3)** — PG/Neo4j dump (`make backup`/`restore`) · 보존 · RPO/RTO · 복원 드릴 · 재앙 시나리오
 - [eval/qa_gold/README.md](./eval/qa_gold/README.md) — 평가 gold set 스키마 + 큐레이션 가이드
 
 > KCGS ESG 등급 수집 가이드는 [docs/data_lineage.md §1.8](./docs/data_lineage.md#18-kcgs-esg).

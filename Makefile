@@ -1,5 +1,5 @@
 .PHONY: help install fmt lint test test-int smoke-e2e up down logs health clean \
-        bridge-kpi bridge-expire \
+        bridge-kpi bridge-expire backup restore \
         ingest-corp ingest-krx ingest-ecos ingest-targets ingest-bulk \
         ingest-structural ingest-wikidata ingest-wikipedia \
         ingest-news ingest-fss ingest-ftc ingest-kosis \
@@ -246,6 +246,13 @@ load-graph:
 
 migrate-schema:                                      # Neo4j 스키마 정합성 마이그레이션 (README §11.6)
 	$(PYTHON) scripts/migrate_neo4j_schema.py
+
+# ── 백업 · DR (O-3) ───────────────────────────────────────────────────
+backup:                                              # PG + Neo4j dump (docs/operations/backup_dr.md)
+	bash scripts/ops/backup.sh
+
+restore:                                             # 복원 (파괴적) — ARGS="--pg <dump> --neo4j <dump>"
+	bash scripts/ops/restore.sh $(ARGS)
 
 # ── Bridge candidate 검토 운영 (Q-1) ──────────────────────────────────
 bridge-kpi:                                          # 검토 진행률 KPI (JSON)
