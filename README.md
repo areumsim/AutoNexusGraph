@@ -32,8 +32,8 @@
 | 무엇 | 왜 | 어떻게 (코드 진입점) |
 |---|---|---|
 | 3 도메인 + Bridge 를 한 turn 안에 묶는 GraphRAG 에이전트 | 단일 벡터 RAG 로는 "현대모비스 매출 ↔ 모비스가 공급하는 차종의 최근 리콜" 같은 멀티홉·교차도메인 질의 불가 | StateGraph 11 노드: Triage→Planner→Supervisor↔Workers(research/graph/sql/calculator)→Synthesizer→Validator (`agents/graph.py:110-123`) + Send-API 병렬 + Replan 최대 2회 (`validator.py:36 MAX_REPLANS=2`) |
-| 도메인 plug-in 으로 N-domain 확장 | 4번째 도메인 추가 시 "코어 변경 < 5%" 가 확장성 정량 증거 (PRD §10.12). 첫 plug-in 검증 = ip 도메인 = **inflection +1,877 LOC (13.32%) → baseline reset 후 0/15,396 LOC = 0.00%** ([정직 표기](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) — 두 숫자 같이 인용) ✅ | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV, 기본 `"autograph"`) 의 모듈을 첫 호출 시 soft-load (`_domain_handler.discover_plugins`, 라인 130). 외부 패키지가 `register_handler()` 부작용으로 등록 |
-| 서비스 등급 (MCP·관측가능성·평가 실측) 정량 증명 | 데모가 아닌 운영 등급으로의 증명이 1차 목표 (PRD §10.15~§10.17) | MCP 래퍼 52 tools (`src/autonexusgraph/mcp/`) · Langfuse 4.x OTEL (`agents/tracing.py`) · 축소 평가 매트릭스 4 어댑터 × FAST tier (`eval/runners/run_matrix_smoke.py`) |
+| 도메인 plug-in 으로 N-domain 확장 | 4번째 도메인 추가 시 "코어 변경 < 5%" 가 확장성 정량 증거 (§10.12). 첫 plug-in 검증 = ip 도메인 = **inflection +1,877 LOC (13.32%) → baseline reset 후 0/15,396 LOC = 0.00%** ([정직 표기](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) — 두 숫자 같이 인용) ✅ | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV, 기본 `"autograph"`) 의 모듈을 첫 호출 시 soft-load (`_domain_handler.discover_plugins`, 라인 130). 외부 패키지가 `register_handler()` 부작용으로 등록 |
+| 서비스 등급 (MCP·관측가능성·평가 실측) 정량 증명 | 데모가 아닌 운영 등급으로의 증명이 1차 목표 (§10.15~§10.17) | MCP 래퍼 52 tools (`src/autonexusgraph/mcp/`) · Langfuse 4.x OTEL (`agents/tracing.py`) · 축소 평가 매트릭스 4 어댑터 × FAST tier (`eval/runners/run_matrix_smoke.py`) |
 
 ### 핵심 용어 (자세한 정의는 [docs/learning_guide.md](./docs/learning_guide.md))
 
@@ -146,7 +146,7 @@
 
 ### IPGraph 도메인 (ip — 보조축 / corp_entity 브리지 전용 / 코드·온톨로지·도구 완료, 데이터 부분 적재)
 
-> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 PRD §10.12 "코어 변경 < 5%" 재측정 — `make audit-dod` 현재 default baseline `414bc1b` 기준 **0/15,396 LOC = 0.00%** ✅ (정직 표기: 통합 inflection `bab9411→414bc1b = +1,877 LOC` 후 reset — 두 숫자 같이 인용해야 정직, [ledger §B-D 참조](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)). baseline reset 이력·정책 + 정직 review §A-E SSOT: [eval/reports/core_diff_baseline_ledger.md](./eval/reports/core_diff_baseline_ledger.md) + §10.12 본문 + §11.1. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 코드: `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/{bridge,graph,patents,retrieve}.py + loaders/{load_cpc,load_openalex}.py + ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. 데이터 적재: CPC bulk 10,695 + OpenAlex works 629 (line 89, 92-96). **PG schema 12 ip.* 테이블 적용 완료 (2026-06-01 — 18/19_ipgraph.sql, schema drift 해소)** — patents/assignees/citations row 적재는 KIPRIS_API_KEY 발급 + USPTO ODP bulk download 대기.
+> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 §10.12 "코어 변경 < 5%" 재측정 — `make audit-dod` 현재 default baseline `414bc1b` 기준 **0/15,396 LOC = 0.00%** ✅ (정직 표기: 통합 inflection `bab9411→414bc1b = +1,877 LOC` 후 reset — 두 숫자 같이 인용해야 정직, [ledger §B-D 참조](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)). baseline reset 이력·정책 + 정직 review §A-E SSOT: [eval/reports/core_diff_baseline_ledger.md](./eval/reports/core_diff_baseline_ledger.md) + §10.12 본문 + §11.1. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 코드: `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/{bridge,graph,patents,retrieve}.py + loaders/{load_cpc,load_openalex}.py + ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. 데이터 적재: CPC bulk 10,695 + OpenAlex works 629 (line 89, 92-96). **PG schema 12 ip.* 테이블 적용 완료 (2026-06-01 — 18/19_ipgraph.sql, schema drift 해소)** — patents/assignees/citations row 적재는 KIPRIS_API_KEY 발급 + USPTO ODP bulk download 대기.
 
 | 영역 | 적재량 | 비고 |
 |---|---:|---|
@@ -177,7 +177,7 @@
 - **한국어 자체 임베딩** — BGE-M3 + BGE-Reranker (GPU 자체 호스팅)
 - **통합 Entity Resolution 마스터** — `entity_id` + `entity_type` 다형 키 (§3.4). corp_code 는 **finance 연동 키**로 wikidata_qid / lei / cik / isin / business_no 등과 매핑. 동명이인 인물은 (name, birth_year) 분리
 - **재실행 가능한 멱등 파이프라인** — raw → processed → DB. 모든 적재 `ON CONFLICT DO UPDATE` / `MERGE`. raw 만 있으면 언제든 재생성 가능
-- **도메인 확장성 (N-domain plug-in)** — core 는 외부 도메인 패키지를 직접 import 하지 않음. `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` 의 모듈을 첫 호출 시 soft-import 하고, 도메인 패키지의 `register_handler()` 부작용으로 활성. PRD §10.12 "코어 변경 < 5%" 보존 — **도메인3 (ip = 특허) 이 첫 plug-in 확장 정량 검증.** §10.12 baseline reset 후 코어 변경 < 5% 가 N-domain 확장성의 정량 증거. 의약품·전자제품·에너지·식품은 비전 (§10.1 Phase D/E)
+- **도메인 확장성 (N-domain plug-in)** — core 는 외부 도메인 패키지를 직접 import 하지 않음. `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` 의 모듈을 첫 호출 시 soft-import 하고, 도메인 패키지의 `register_handler()` 부작용으로 활성. §10.12 "코어 변경 < 5%" 보존 — **도메인3 (ip = 특허) 이 첫 plug-in 확장 정량 검증.** §10.12 baseline reset 후 코어 변경 < 5% 가 N-domain 확장성의 정량 증거. 의약품·전자제품·에너지·식품은 비전 (§10.1 Phase D/E)
 - **출처 등급 기반 confidence (A/B/C)** — 모든 그래프 엣지의 `confidence_score` 기본값을 출처에 따라 결정 (NHTSA/공식 = 0.95 A / Wikidata = 0.80 B / LLM P3 = 0.50 C). `validated_status` 가 candidate/validated/needs_review/rejected — 답변 인용 시 grade 표시
 - **시점 + provenance 강제** — auto 도메인 모든 엣지에 `source_type` / `source_id` / `confidence_score` / `validated_status` / `snapshot_year` / `extraction_method` / `schema_version` 7키 의무. `make audit-edge-meta --strict` 가 invariant 강제
 
@@ -351,7 +351,7 @@ CREATE TABLE bridge.corp_entity (
 
 **`VALID_ENTITY_TYPES`:** `("manufacturer", "supplier", "vehicle_model", "variant")` — 그 외는 `ValueError`.
 
-**ip 도메인 미러:** `src/ipgraph/tools/bridge.py` 의 `bridge_assignee_to_corp` / `bridge_corp_to_assignee` / `cross_query_ip`. **`bridge.corp_entity` 직접 변경 회피** — 신규 join 테이블 `ip.assignee_corp_map` 가 supplier candidate 운영 SOP 재사용. PRD §10.12 코어 변경 <5% 보존.
+**ip 도메인 미러:** `src/ipgraph/tools/bridge.py` 의 `bridge_assignee_to_corp` / `bridge_corp_to_assignee` / `cross_query_ip`. **`bridge.corp_entity` 직접 변경 회피** — 신규 join 테이블 `ip.assignee_corp_map` 가 supplier candidate 운영 SOP 재사용. §10.12 코어 변경 <5% 보존.
 
 ### 3.6 4-Pass + Bridge Pass 추출 전략
 
@@ -786,7 +786,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | bridge.corp_entity 부품사 corp_code 매핑 | 확장 대기 | 현재 한국 OEM/부품사 직접 매핑 소수 / 글로벌 OEM sec_cik 9개. supplier 4,792 candidate 검토 routine 미수행 |
 | Cross-Domain QA 100문항 + 라벨 4단계 | **44 row** seed 적재 (2026-06-02 재측정) | CD-L1 10 / L2 8 / L3 13 / L4 10 + difficulty 미부여 3 (IP-결합 8 row 포함 — CD-L3-IP 4 + CD-L4-IP 4). 100문항까지 사람 라벨링 + 확장 대기 |
 | confidence_score calibration | 미수행 | A/B/C 스칼라가 실제 정답률과 단조 관계인지 사후 검증 (`eval/metrics/confidence_weighted.py` 가 측정 도구) |
-| Bridge candidate 검토 운영 | UI/프로세스 미설계 | 4,792 supplier candidate 의 reviewed_status 승급/거부 운영 SOP 미정 |
+| Bridge candidate 검토 운영 | ✅ **도구 구현** (Q-1) — `bridge_review.py` + Streamlit `ui/bridge_review.py` (✓/✗) + 6개월 자동 만료 + 진행률 KPI + `26_bridge_review.sql` 감사 컬럼 + `make bridge-kpi`/`bridge-expire` ([SOP](./docs/operations/bridge_review.md)) | 4,792 supplier candidate 실제 라벨링은 사람 작업 (도구·cron 준비됨) |
 | KNCAP / Euro NCAP / IIHS | 인터페이스만 (KNCAP) / 미구현 | 공식 채널 약관 검토 후 |
 | KATRI / bigdata-tic OAuth | wired | `BIGDATA_TIC_CLIENT_ID/SECRET` 발급 후 활성 |
 | 팩토리온 (15087611) | scaffold | ingestion 3 endpoint (회사/공장번호/산단별) 구현, `DATA_GO_KR_API_KEY` 발급 후 활성 |
@@ -794,7 +794,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | `_legacy/v2/` | 보존 | 삭제 예정 미정 (`docs/mental_model.md §5.10`) |
 | Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. CI 컨테이너 미설정 |
 | API 인증 / Rate limit | ✅ **구현** (`api/auth.py`) | API key 헤더 인증 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 히스토리 403) + per-identity in-memory rate limit (`API_RATE_LIMIT_PER_MIN`). `/health` 제외. `API_KEYS` 미설정 시 open 모드 (dev). 잔여: OAuth2/OIDC·multi-instance 분산 — §12.2 |
-| Production 배포 가이드 | 미작성 | Quickstart 는 dev 한정. 백업/DR/모니터링/multi-instance scaling 절차 없음 — §12.3 |
+| Production 배포 가이드 | ✅ **작성** ([docs/operations/production_deploy.md](./docs/operations/production_deploy.md)) + `infra/Dockerfile` + `docker-compose.prod.yml` | 이미지 빌드 / compose prod 오버레이 / health probe / reverse proxy·TLS / k8s / blue-green·canary / 멀티 인스턴스 주의점. 잔여: 백업·DR 자동화 (O-3) / 모니터링 (O-5) — §12.3 |
 | `docs/design/` | 빈 디렉토리 | 디자인 doc 자리만 있고 내용 없음 (PRD / mental_model / learning_guide 가 대체) |
 | `_legacy/` | 보존 (v1/v2 KGQA Agent) | 이전 단일도메인 시스템. CHANGELOG/HISTORY 보존. 삭제 vs 마이그레이션 정책 미정 |
 | 모델 출력 reranker (BGE-Reranker-v2-m3) | 코드 wired (`RERANKER_URL=...`) | 실서비스에서 미활성. 활성 조건·임계 미정의 |
@@ -917,7 +917,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | Phase D (비전) | + 의약품 (`pharmagraph`) / 전자제품 (`elecgraph`) | PMDA / FDA / DRAM 로드맵 · IEC · iFixit | `bridge.corp_entity` + `bridge.drug_entity` 등 다형 |
 | Phase E (비전) | + 에너지·식품 (`energygraph` / `foodgraph`) | 한국전력 발전소 / 식약처 회수 | 다양한 도메인이 동일 corp_entity 로 join |
 
-**왜 가능한가:** core 는 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV) 의 모듈을 import 시점에 soft-load. 새 도메인은 `register_handler` 부작용 + `ontology/<domain>/*.yaml` + 사전 정의 도구 + Cypher 템플릿 + 화이트리스트 + gold QA seed 만 추가. **PRD §10.12 "코어 변경 < 5%" 가 강제** (`eval/metrics/core_diff.py` baseline 비교). **ip 추가 후 baseline reset 정책 (§11.1) 에 따라 재측정 → 정량 증거 산출.**
+**왜 가능한가:** core 는 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV) 의 모듈을 import 시점에 soft-load. 새 도메인은 `register_handler` 부작용 + `ontology/<domain>/*.yaml` + 사전 정의 도구 + Cypher 템플릿 + 화이트리스트 + gold QA seed 만 추가. **§10.12 "코어 변경 < 5%" 가 강제** (`eval/metrics/core_diff.py` baseline 비교). **ip 추가 후 baseline reset 정책 (§11.1) 에 따라 재측정 → 정량 증거 산출.**
 
 **열린 질문 / 갭:**
 - 코어와 finance 어댑터의 분리 (`docs/mental_model.md §3.1.4`) — pure core / fingraph / autograph / pharmagraph 3+ 분할이 필요한지, 현재 2-pkg 가 영구 설계인지 미정
@@ -1020,8 +1020,8 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | finance ↔ auto 스키마 변경 시 Bridge 깨짐 | Cross-Domain 장애 | `schema_version` 명시 (§3.7), 마이그레이션 스크립트 멱등 |
 | MVP 일정 압박 (5주 → 분기) | 도메인 적재 + 평가 둘 다 압박 | **§11.5 우선순위 재배열**: eval 실측 → ProcessGraph 실데이터 → 상용 신호 → ip 보조축 → gold 확장 |
 | 새 도메인 코드가 본질적으로 큰 LOC → 누적 변경량 < 5% 측정 불가 | §10.12 정량 게이트 무력화 | **§10.12 baseline reset 정책** — 도메인 추가 마다 reset + 누적 reset 이력 (현재 2회: `4049caf` → `bab9411` → `414bc1b`) |
-| Bridge candidate 4,792 검토 SOP 부재 | 그래프 품질 시간갈수록 악화 | (P0) Streamlit 검토 UI + 6개월 자동 만료 → BACKLOG.md §6 |
-| API 인증 / Rate limit 미구현 | 외부 노출 시 보안 위협 | (P0) Reverse proxy + auth gateway → BACKLOG.md §5 |
+| Bridge candidate 4,792 검토 SOP 부재 | 그래프 품질 시간갈수록 악화 | ✅ **도구 완료 (Q-1)** — Streamlit 검토 UI + 6개월 자동 만료 + 진행률 KPI ([docs/operations/bridge_review.md](./docs/operations/bridge_review.md)). 실제 라벨링은 운영 작업 → BACKLOG.md §6 |
+| API 인증 / Rate limit | 외부 노출 시 보안 위협 | ✅ **구현 (O-1)** — API key 헤더 인증 + thread_id↔user_id 바인딩 + per-identity rate limit (`api/auth.py`). 잔여: OAuth2/multi-instance → BACKLOG.md §5 |
 >
 > **§12.1 상용 신호 백로그 (P0+) 가 가장 우선.** 기존 §12.2~§12.7 (운영·보안·배포·CI 등) 는 PoC → MVP → 상용 화살표의 후반부로 의도적 강등. **도메인3 (ip) + ProcessGraph + 축소 평가 매트릭스 + MCP·관측가능성** 이 우선.
 
@@ -1052,7 +1052,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
-| **배포 가이드** | Quickstart dev 한정 | `docs/operations/production_deploy.md` 신설 — k8s/compose prod profile / health probe / blue-green / canary |
+| **배포 가이드** | ✅ **작성** — [docs/operations/production_deploy.md](./docs/operations/production_deploy.md) + `infra/Dockerfile` + `docker-compose.prod.yml` (실행 가능) | k8s/compose prod 오버레이 / health probe / reverse proxy·TLS / blue-green / canary / 멀티 인스턴스 주의점 완료 |
 | **백업·DR** | 없음 | PG dump 스케줄 + Neo4j `neo4j-admin backup` cron + vec.chunks embedding 재생성 RPO/RTO. raw → DB 재생성 가능하지만 시간 미측정 (finance 748K + auto 16K backfill 추정 ~수 시간) |
 | **모니터링·알람** | Langfuse / LangSmith fail-soft 만 | Prometheus exporter (node count / chunk count / cost / error rate) + Grafana 대시보드 + 알람 (PG 끊김 / Neo4j disk full / LLM cost spike) |
 | **Multi-instance scaling** | PG checkpointer 공유 가능 — 검증 안 됨 | uvicorn worker N + checkpointer concurrent write 검증 + LLM rate limit 분산 |
@@ -1143,6 +1143,8 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - [docs/operations/agents.md](./docs/operations/agents.md) — 에이전트 운영 (도메인 라우팅 / LangGraph / replan / checkpoint / tracing / safety 가드)
 <!-- docs/operations/rag_tools.md 폐기 (2026-06-02) — finance 시나리오 5개 모두 docs/api_reference.md §4.4 흡수. 3 도메인 통합 도구 SSOT 는 docs/api_reference.md. -->
 - [docs/operations/migrations.md](./docs/operations/migrations.md) — 스키마 마이그레이션 절차
+- **[docs/operations/production_deploy.md](./docs/operations/production_deploy.md)** — **production 배포 SSOT (O-2)** — 이미지 빌드(`infra/Dockerfile`) · compose prod 오버레이(`docker-compose.prod.yml`) · health probe · reverse proxy/TLS · k8s · blue-green/canary · 멀티 인스턴스 주의점. dev Quickstart 와 분리
+- **[docs/operations/bridge_review.md](./docs/operations/bridge_review.md)** — **Bridge candidate 검토 SOP (Q-1)** — `bridge.corp_entity` candidate ✓/✗ 라벨 (Streamlit UI) · 6개월 미검토 자동 거부 · 진행률 KPI · `make bridge-kpi`/`bridge-expire`
 - [eval/qa_gold/README.md](./eval/qa_gold/README.md) — 평가 gold set 스키마 + 큐레이션 가이드
 
 > KCGS ESG 등급 수집 가이드는 [docs/data_lineage.md §1.8](./docs/data_lineage.md#18-kcgs-esg).
