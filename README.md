@@ -146,7 +146,7 @@
 
 ### IPGraph 도메인 (ip — 보조축 / corp_entity 브리지 전용 / 코드·온톨로지·도구 완료, 데이터 부분 적재)
 
-> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 §10.12 "코어 변경 < 5%" 재측정 — `make audit-dod` 현재 default baseline `414bc1b` 기준 **0/15,396 LOC = 0.00%** ✅ (정직 표기: 통합 inflection `bab9411→414bc1b = +1,877 LOC` 후 reset — 두 숫자 같이 인용해야 정직, [ledger §B-D 참조](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)). baseline reset 이력·정책 + 정직 review §A-E SSOT: [eval/reports/core_diff_baseline_ledger.md](./eval/reports/core_diff_baseline_ledger.md) + §10.12 본문 + §11.1. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 코드: `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/{bridge,graph,patents,retrieve}.py + loaders/{load_cpc,load_openalex}.py + ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. 데이터 적재: CPC bulk 10,695 + OpenAlex works 629 (line 89, 92-96). **PG schema 12 ip.* 테이블 적용 완료 (2026-06-01 — 18/19_ipgraph.sql, schema drift 해소)** — patents/assignees/citations row 적재는 KIPRIS_API_KEY 발급 + USPTO ODP bulk download 대기.
+> 최종 목표 = "N-domain 확장성 정량 증명". 도메인3 추가 후 §10.12 "코어 변경 < 5%" 재측정 — `make audit-dod` 현재 default baseline `831e72d` (상용화 P0/P1 일괄 후 reset, [ledger](./eval/reports/core_diff_baseline_ledger.md)) 기준 **0% from 831e72d** ✅ (ip 통합 inflection `bab9411→414bc1b=+1,877 LOC`, 상용화 inflection `414bc1b→831e72d=+1,583 LOC` 별도 기록) (정직 표기: 통합 inflection `bab9411→414bc1b = +1,877 LOC` 후 reset — 두 숫자 같이 인용해야 정직, [ledger §B-D 참조](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)). baseline reset 이력·정책 + 정직 review §A-E SSOT: [eval/reports/core_diff_baseline_ledger.md](./eval/reports/core_diff_baseline_ledger.md) + §10.12 본문 + §11.1. 상세 설계 SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 코드: `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/{bridge,graph,patents,retrieve}.py + loaders/{load_cpc,load_openalex}.py + ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. 데이터 적재: CPC bulk 10,695 + OpenAlex works 629 (line 89, 92-96). **PG schema 12 ip.* 테이블 적용 완료 (2026-06-01 — 18/19_ipgraph.sql, schema drift 해소)** — patents/assignees/citations row 적재는 KIPRIS_API_KEY 발급 + USPTO ODP bulk download 대기.
 
 | 영역 | 적재량 | 비고 |
 |---|---:|---|
@@ -713,7 +713,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 
 ### 현재 측정 결과 (§10 DoD **20 항** v3.0, 2026-05-29 측정 + 2026-06-02 ProcessGraph 추가)
 
-`make audit-dod` 의 최신 출력 (2026-06-01 baseline `414bc1b`) — **자동 PASS 10/20 · ⊘ 3 LLM 키 / · 3 외부 측정 / ⚠️ 4 부분 (MCP SDK·Langfuse·#19·#20) / ❌ 0 미달 (#18 BoP 모델 ✅ 추가)**. 20 항목 = 기존 14 + v2.2 신설 §10.15~§10.17 + v3.0 신설 §10.18~§10.20 (ProcessGraph BoP).
+`make audit-dod` 의 출력 (2026-06-02 baseline `831e72d` reset 후) — §10.12 코어 변경 **0% ✅**. LLM 키 필요한 §10.7/§10.13 등은 simulation manifest 기준 미측정 (키 후 재측정). 20 항목 = 기존 14 + v2.2 신설 §10.15~§10.17 + v3.0 신설 §10.18~§10.20 (ProcessGraph BoP). 정확한 트래픽라이트는 `make audit-dod` 실행 결과 참조.
 
 | ID | 기준 | 상태 | 상세 |
 |---|---|:---:|---|
@@ -721,7 +721,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | §10.5 | BOM L0~L3 안정 + L4 coverage ≥ 60% | ✅ | L0~L3 stable, L4=63.7% |
 | §10.6 | bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+ | ✅ | strong_match **15/15 = 100%** (manufacturer reviewed 11 + supplier reviewed 4, 모두 conf≥0.9) — 2026-06-01 재측정 |
 | §10.11 | SUPPLIED_BY 엣지 confidence/provenance/snapshot_year 100% | ✅ | **30 edges** 모두 `source_type='manual_supplier_seed'` + 100% meta (yaml 46 매핑 vs Neo4j 30 = customer 다중 dedupe 정상) |
-| §10.12 | 코어 코드 변경 < 5% | ✅ | **baseline reset 2회**: `4049caf` (Phase B) → **`bab9411`** (도메인3 통합 직전, 12.22%) → **`414bc1b`** (ipgraph 인프라 일괄 PR 완료, **inflection +1,877 LOC + reset 후 0/15,396 LOC = 0.00%**). 이력 SSOT + 정직 review §A-E (자랑 vs 실제 분리, 측정 한계 명시): [`eval/reports/core_diff_baseline_ledger.md`](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) |
+| §10.12 | 코어 코드 변경 < 5% | ✅ | **baseline reset 3회**: `4049caf` (Phase B) → `bab9411` (도메인3 직전, 12.22%) → `414bc1b` (ipgraph 인프라, +1,877 LOC=13.32%) → **`831e72d`** (상용화 P0/P1 일괄: O-1/Q-1/Q-4/E-3, **inflection +1,583 LOC=10.28% → reset 후 0% from 831e72d**). 정직 표기 — inflection·reset 두 숫자 같이 인용: [`eval/reports/core_diff_baseline_ledger.md`](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) |
 | §10.7 | Hybrid vs Vector Multi-hop +30%p | ⊘ | LLM 키 필요 — `make eval-auto` 실행 후 자동 측정 |
 | §10.8 | Cross-Domain QA CD-L1~L4 | ⊘ | LLM 키 필요 |
 | §10.9 | 제원 수치 EM 95%+ | ⊘ | LLM 키 필요 |
@@ -874,7 +874,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 9. ⊘ **제원·재무 수치 Exact Match 95%+**
 10. ⊘ **Faithfulness (Ragas) 90%+**
 11. ✅ **`SUPPLIED_BY` 엣지 confidence + provenance + snapshot_year 100%** — **30 edges** 모두 `source_type='manual_supplier_seed'` + 100% meta (yaml 19 공급사 × 46 mapping → Neo4j 30 dedupe, customer 다중은 `:CONTAINS_COMPONENT` 별도 엣지). `edge_meta_invariants` 8 invariant 모두 PASS
-12. ✅ **코어 코드 변경 < 5%** — **baseline reset 2회**: `4049caf` (Phase B) → `bab9411` (도메인3 통합 직전, 12.22%) → `414bc1b` (ipgraph 인프라 일괄 PR 완료, **inflection +1,877 LOC + reset 후 0/15,396 LOC = 0.00%**). **정직 표기 — 두 숫자 같이 인용**: [eval/reports/core_diff_baseline_ledger.md §A-E](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)
+12. ✅ **코어 코드 변경 < 5%** — **baseline reset 3회**: `4049caf` (Phase B) → `bab9411` (도메인3 직전, 12.22%) → `414bc1b` (ipgraph 인프라, +1,877 LOC=13.32%) → `831e72d` (상용화 P0/P1 일괄 O-1/Q-1/Q-4/E-3, **inflection +1,583 LOC=10.28% → reset 후 0% from 831e72d**). **정직 표기 — inflection·reset 두 숫자 같이 인용**: [eval/reports/core_diff_baseline_ledger.md](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)
 13. ⊘ **메인 홉 효율 −30%** — 운영 trace 필요. `eval/runners` 에서 latency·hop 수집
 14. ⊘ **평균 latency 도메인내 <8초 / Cross <12초** — 운영 trace 필요
 
@@ -1019,7 +1019,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | Cross-Domain 목표치 불일치 | 평가 신뢰도 저하 | **§6 4단계 층화 (CD-L1 80% / L2 70% / L3 50~60% / L4 40~50%)** |
 | finance ↔ auto 스키마 변경 시 Bridge 깨짐 | Cross-Domain 장애 | `schema_version` 명시 (§3.7), 마이그레이션 스크립트 멱등 |
 | MVP 일정 압박 (5주 → 분기) | 도메인 적재 + 평가 둘 다 압박 | **§11.5 우선순위 재배열**: eval 실측 → ProcessGraph 실데이터 → 상용 신호 → ip 보조축 → gold 확장 |
-| 새 도메인 코드가 본질적으로 큰 LOC → 누적 변경량 < 5% 측정 불가 | §10.12 정량 게이트 무력화 | **§10.12 baseline reset 정책** — 도메인 추가 마다 reset + 누적 reset 이력 (현재 2회: `4049caf` → `bab9411` → `414bc1b`) |
+| 새 도메인 코드가 본질적으로 큰 LOC → 누적 변경량 < 5% 측정 불가 | §10.12 정량 게이트 무력화 | **§10.12 baseline reset 정책** — 도메인 추가/대형 기능 일괄 마다 reset + 누적 이력 (현재 3회: `4049caf` → `bab9411` → `414bc1b` → `831e72d`) |
 | Bridge candidate 4,792 검토 SOP 부재 | 그래프 품질 시간갈수록 악화 | ✅ **도구 완료 (Q-1)** — Streamlit 검토 UI + 6개월 자동 만료 + 진행률 KPI ([docs/operations/bridge_review.md](./docs/operations/bridge_review.md)). 실제 라벨링은 운영 작업 → BACKLOG.md §6 |
 | API 인증 / Rate limit | 외부 노출 시 보안 위협 | ✅ **구현 (O-1)** — API key 헤더 인증 + thread_id↔user_id 바인딩 + per-identity rate limit (`api/auth.py`). 잔여: OAuth2/multi-instance → BACKLOG.md §5 |
 >
@@ -1372,7 +1372,7 @@ make load-assignee-corp-map      # ip.assignee_corp_map 매칭 (supplier candida
 # 3. 평가 + DoD 재측정
 make eval-ip                     # gold_qa_ip_v0.jsonl 30 row (IP-L1/L2/L3 각 10)
 make eval-cross                  # CD-L3/L4 ip 결합 포함 (cross 44 row 중 IP 결합 변형 6 row 포함)
-make audit-dod                   # §10.12 baseline reset 후 ip 추가 코어 변경량 — 현재 0/15,396 LOC = 0.00% ✅
+make audit-dod                   # §10.12 코어 변경량 — baseline 831e72d (상용화 P0/P1 reset) 기준 0% ✅
 ```
 
 ---

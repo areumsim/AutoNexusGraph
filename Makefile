@@ -665,11 +665,14 @@ audit-dod:
 	#   - 4049caf  : 2026-05 Phase B 안정화 (도메인1+2 finance+auto 완료) — 본 PR 이전 anchor.
 	#   - bab9411  : 2026-06-01 도메인3 (ipgraph) 통합 직전 reset.
 	#   - 414bc1b  : 2026-06-01 도메인3 (ipgraph) 통합 + audit/MCP/ontology 인프라 일괄 PR
-	#                완료 anchor (current default). bab9411 → 414bc1b: +1,877 LOC = 13.32%
+	#                완료 anchor. bab9411 → 414bc1b: +1,877 LOC = 13.32%
 	#                (의도된 통합 변경 — MCP wire-up / ontology schema / plugin registration).
-	# 도메인 추가/대형 리팩터 마다 reset → 누적 ratio 가 5% 위협 시 의도된 변경
-	# 인지 식별. 운영자가 별도 commit 으로 baseline 이동 원하면 env override.
-	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-414bc1b} $(PYTHON) scripts/audit/dod_audit.py
+	#   - 831e72d  : 2026-06-02 상용화 P0/P1 기능 일괄 (O-1 인증 / Q-1 bridge 검토 /
+	#                Q-4 embed-status / E-3 hop 메트릭) 완료 anchor (current default).
+	#                414bc1b → 831e72d: +1,425/-158 = 1,583 LOC = 10.28% (의도된 기능 추가).
+	# 도메인 추가/대형 리팩터/대형 기능 일괄 마다 reset → 누적 ratio 가 5% 위협 시 의도된
+	# 변경 인지 식별. 운영자가 별도 commit 으로 baseline 이동 원하면 env override.
+	PYTHONPATH=src CORE_DIFF_BASELINE=$${CORE_DIFF_BASELINE:-831e72d} $(PYTHON) scripts/audit/dod_audit.py
 
 validate-gold-qa:
 	$(PYTHON) scripts/audit/validate_gold_qa.py eval/qa_gold/*.jsonl
