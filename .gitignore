@@ -1,3 +1,9 @@
+# === AI 어시스턴트 로컬 설정 (저장소 미추적) ===
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/
+
 # === 환경/시크릿 ===
 .env
 .env.local

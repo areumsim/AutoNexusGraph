@@ -2,7 +2,7 @@
 
 > **라이선스**: Proprietary (`pyproject.toml`). 본 문서는 **내부 기여자** 대상 — 개발 환경·게이트·코드 규약·PR 절차. 외부 공개 기여 프로세스 아님.
 >
-> 설계·요구사항 SSOT 는 [README](./README.md), 미완료 항목은 [BACKLOG.md](./BACKLOG.md). 운영 규칙은 [CLAUDE.md](./CLAUDE.md).
+> 설계·요구사항 SSOT 는 [README](./README.md), 미완료 항목은 [BACKLOG.md](./BACKLOG.md).
 
 ---
 
