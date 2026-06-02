@@ -1,0 +1,86 @@
+# CI — O-4 (BACKLOG §5 / README §12.3). keyless 게이트만 (DB·LLM·API 키 없이 통과).
+#
+# 게이트 = `make smoke-e2e` (pytest + mock audits: ontology / eval-matrix sim /
+# mcp / ipgraph / trace sim / validate-gold-qa). 프로젝트 자체 pre-push 게이트와 동일.
+#
+# lint(ruff)·typecheck(mypy)·DoD dashboard 는 **informational** (저장소가 아직
+# ruff-clean 아님 — 716건; DoD --strict 는 §10.7/§10.13 가 LLM eval 필요라
+# keyless 불가). 키·DB 필요한 strict 게이트는 후속 (셀프호스티드 또는 secrets).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: smoke-e2e (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install (all extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: smoke-e2e (keyless mock gate)
+        run: make smoke-e2e
+
+  lint:
+    name: lint + typecheck (informational)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (dev)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: ruff (informational — 저장소 아직 ruff-clean 아님)
+        continue-on-error: true
+        run: ruff check src tests scripts
+      - name: mypy (informational)
+        continue-on-error: true
+        run: mypy src
+
+  dod-dashboard:
+    name: DoD dashboard (artifact, non-gating)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # core_diff baseline commit 필요
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (all extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: audit-dod (non-strict report)
+        continue-on-error: true
+        run: make audit-dod
+      - name: Upload DoD report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dod-dashboard
+          path: |
+            data/reports/dod_audit_*.md
+            eval/reports/dod_*.md
+          if-no-files-found: ignore

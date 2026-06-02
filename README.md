@@ -792,7 +792,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | 팩토리온 (15087611) | scaffold | ingestion 3 endpoint (회사/공장번호/산단별) 구현, `DATA_GO_KR_API_KEY` 발급 후 활성 |
 | 산단공 공정 (15151075) | wired | 수동 CSV 다운 후 `make load-sandang-processes` |
 | `_legacy/v2/` | 보존 | 삭제 예정 미정 (`docs/mental_model.md §5.10`) |
-| Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. CI 컨테이너 미설정 |
+| Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. **CI(O-4)는 keyless smoke-e2e 만 — ephemeral PG/Neo4j 통합 잡은 secrets/self-hosted 후속** |
 | API 인증 / Rate limit | ✅ **구현** (`api/auth.py`) | API key 헤더 인증 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 히스토리 403) + per-identity in-memory rate limit (`API_RATE_LIMIT_PER_MIN`). `/health` 제외. `API_KEYS` 미설정 시 open 모드 (dev). 잔여: OAuth2/OIDC·multi-instance 분산 — §12.2 |
 | Production 배포 가이드 | ✅ **작성** ([docs/operations/production_deploy.md](./docs/operations/production_deploy.md)) + `infra/Dockerfile` + `docker-compose.prod.yml` | 이미지 빌드 / compose prod 오버레이 / health probe / reverse proxy·TLS / k8s / blue-green·canary / 멀티 인스턴스 주의점. 잔여: 백업·DR 자동화 (O-3) / 모니터링 (O-5) — §12.3 |
 | `docs/design/` | 빈 디렉토리 | 디자인 doc 자리만 있고 내용 없음 (README(구 PRD) / mental_model / learning_guide 가 대체) |
@@ -1056,7 +1056,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | **백업·DR** | 없음 | PG dump 스케줄 + Neo4j `neo4j-admin backup` cron + vec.chunks embedding 재생성 RPO/RTO. raw → DB 재생성 가능하지만 시간 미측정 (finance 748K + auto 16K backfill 추정 ~수 시간) |
 | **모니터링·알람** | Langfuse / LangSmith fail-soft 만 | Prometheus exporter (node count / chunk count / cost / error rate) + Grafana 대시보드 + 알람 (PG 끊김 / Neo4j disk full / LLM cost spike) |
 | **Multi-instance scaling** | PG checkpointer 공유 가능 — 검증 안 됨 | uvicorn worker N + checkpointer concurrent write 검증 + LLM rate limit 분산 |
-| **CI/CD** | 없음 (`.github/workflows/` 부재) | unit test + lint + `make audit-dod --strict` + (옵션) ephemeral PG/Neo4j 컨테이너 integration test |
+| **CI/CD** | ✅ **구현 (O-4)** — `.github/workflows/ci.yml`: `make smoke-e2e` keyless 게이트 (py3.10/3.11/3.12) + lint/mypy informational + DoD dashboard artifact | 잔여: `audit-dod --strict` (§10.7/§10.13 LLM eval 필요) + ephemeral PG/Neo4j 통합테스트 → LLM 키 / self-hosted runner 후 |
 | **Integration test 마커** | `pytest -m integration` 0 케이스 | `tests/integration/*` 신설 — load_auto_all / extract_p3+p4 / cross_query 실제 DB end-to-end |
 
 ### 12.4 데이터 품질·운영 (P1)
