@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 보안 취약점 (비공개 보고)
+    url: https://github.com/areumsim/AutoNexusGraph/security/advisories/new
+    about: 취약점은 공개 이슈 대신 비공개 advisory 로 — SECURITY.md 참조
+  - name: 미완료 항목 SSOT
+    url: https://github.com/areumsim/AutoNexusGraph/blob/main/BACKLOG.md
+    about: 이미 추적 중인지 BACKLOG.md 에서 먼저 확인

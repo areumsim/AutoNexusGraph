@@ -1106,7 +1106,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | **performance benchmark** | PRD 목표만 | 실측 latency p50/p95/p99 + 평균 토큰/turn + 평균 cost/turn dashboard |
 | **TROUBLESHOOTING.md** | 없음 | 흔한 실패 (LLM rate limit / pgvector 미설치 / Neo4j auth / DART 키 만료) 진단 트리 |
 | **changelog** | git log + `_legacy/CHANGELOG.md` | repo root `CHANGELOG.md` keepachangelog 형식 |
-| **GitHub Issue/PR template** | 없음 | bug / feature / data-source 템플릿 |
+| **GitHub Issue/PR template** | ✅ **작성 (F-4)** — `.github/ISSUE_TEMPLATE/{bug_report,feature_request,data_source}.md` + `config.yml`(보안 advisory·BACKLOG 링크) + `pull_request_template.md`(smoke-e2e·7키·LICENSE·BACKLOG 체크리스트) | — |
 | **README 다이어그램·스크린샷** | 텍스트 박스만 | Streamlit UI 캡처 + Neo4j Browser cross-domain 결과 캡처 |
 
 ### 12.8 한 줄 요약 — "eval 실측 → ProcessGraph → 상용 신호 → production" 순서
