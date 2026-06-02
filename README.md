@@ -782,7 +782,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | P3 selective LLM relations | wired-but-disabled = 1종 (COMPETES_WITH) | 실측 (`ontology/auto/relations.yaml:226-235`): COMPETES_WITH `pass: P3, enabled: false`. MANUFACTURED_AT 은 `pass: P2, enabled: true` (deterministic plants_seed). CONTAINS_MODULE / CONTAINS_PART 는 yaml 에 미정의 (현재 CONTAINS_COMPONENT 1종 P2 enabled 가 그 역할). LLM 확장(MANUFACTURED_AT LLM / Part 매핑) 은 비용·환각 위험으로 후속 PR 대기 — manual seed + Wikidata P176 우선 |
 | 12 조합 매트릭스 실측 (4 어댑터 × 3 LLM) | 측정 대기 | `make eval-full / eval-auto / eval-cross` 실행 + gold seed 100/100/30 확장 후 |
 | 공정위 기업집단 / KOSIS / KIPRIS / LAW.go.kr | 키 확보 대기 | Makefile 타겟·loader 는 있음 (`README §4`) |
-| vec.chunks embedding backfill | 진행 중 | finance 748K 중 일부, auto 16,435 모두 완료 |
+| vec.chunks embedding backfill | 진행 중 (진행률 가시화 ✅ Q-4) | finance 748K 중 일부, auto 16,435 모두 완료. `make embed-status` 로 source별 진행률 조회 |
 | bridge.corp_entity 부품사 corp_code 매핑 | 확장 대기 | 현재 한국 OEM/부품사 직접 매핑 소수 / 글로벌 OEM sec_cik 9개. supplier 4,792 candidate 검토 routine 미수행 |
 | Cross-Domain QA 100문항 + 라벨 4단계 | **44 row** seed 적재 (2026-06-02 재측정) | CD-L1 10 / L2 8 / L3 13 / L4 10 + difficulty 미부여 3 (IP-결합 8 row 포함 — CD-L3-IP 4 + CD-L4-IP 4). 100문항까지 사람 라벨링 + 확장 대기 |
 | confidence_score calibration | 미수행 | A/B/C 스칼라가 실제 정답률과 단조 관계인지 사후 검증 (`eval/metrics/confidence_weighted.py` 가 측정 도구) |
@@ -1066,7 +1066,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | **Bridge candidate 검토 SOP** | 4,792 supplier candidate 영속 누적 — 검토 UI / 정책 없음 | (1) Streamlit 검토 페이지 — name match candidate 를 reviewer 가 ✓/✗ 라벨. (2) 6개월 미검토 candidate 자동 `rejected` 정책. (3) 검토 진행률 KPI |
 | **confidence_score calibration** | 미수행 — A(0.95) / B(0.80) / C(0.50) 가 실제 정답률과 단조 미검증 | gold QA 100+ 실측 후 `eval/metrics/confidence_weighted.py` 로 calibration plot. 필요 시 출처별 confidence 재조정 |
 | **`master.persons` 동명·동년생 충돌** | (name, birth_year) 키 사용 | 충돌 빈도 측정 routine + (name, birth_year, 회사) 보조 키 |
-| **embedding backfill 진행률 가시화** | finance 748K 중 일부, auto 16K 100% | `make embed-status` 또는 dashboard — backfill 진행률 + 누락 청크 자동 재시도 cron |
+| **embedding backfill 진행률 가시화** | ✅ **구현 (Q-4)** — `make embed-status` (source별 embedded/total/pct/pending) | 잔여: 누락 청크 자동 재시도 cron (`make embed-chunks` 반복) |
 | **데이터 freshness 모니터링** | 없음 | NHTSA recalls 마지막 호출 시각 / DART 마지막 filing 등 source 별 freshness check + stale 알람 |
 | **Schema 마이그레이션 버전 추적** | `infra/postgres/init/01~16.sql` 멱등 | Alembic 같은 versioned migration. 현재 `make migrate-schema-pg MIGRATE_FILE=...` 는 사용자가 무엇이 적용됐는지 추적 안 함 |
 

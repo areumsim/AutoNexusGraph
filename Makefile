@@ -7,7 +7,7 @@
         ingest-openalex ingest-openalex-dry load-openalex \
         ingest-kipris load-cpc load-cpc-dry load-assignee-corp-map load-assignee-corp-map-dry ingest-uspto-odp \
         ingest-law ingest-kcgs \
-        serve-embeddings embed-chunks serve-api serve-ui \
+        serve-embeddings embed-chunks embed-status serve-api serve-ui \
         eval-smoke eval-full p3-extract-dry p3-extract p4-load \
         ingest-step1 ingest-step2 ingest-step3 ingest-step4 \
         ingest-step5 ingest-step6 ingest-step7 ingest-step8 \
@@ -335,6 +335,9 @@ serve-embeddings:                                    # 별도 터미널에서 �
 
 embed-chunks:                                        # vec.chunks.embedding 채우기 (서버 가동 후)
 	EMBEDDING_URL=http://127.0.0.1:8080 $(PYTHON) scripts/load/embed_chunks.py --batch-size 64
+
+embed-status:                                        # vec.chunks 임베딩 backfill 진행률 (Q-4, read-only; --json)
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.embed_status $(ARGS)
 
 # ── API + Web UI ────────────────────────────────────────────────────────────
 serve-api:                                           # FastAPI /chat 엔드포인트

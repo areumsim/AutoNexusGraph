@@ -115,7 +115,7 @@
 | Q-1 | **Bridge candidate 4,792 검토 SOP** | ✅ **구현** — `bridge_review.py` (사전 정의 함수) + `ui/bridge_review.py` (Streamlit ✓/✗ UI) + `auto_expire_stale`(6개월 미검토 자동 rejected) + `review_progress_kpi` + `26_bridge_review.sql`(reviewed_at/by 감사 컬럼) + `make bridge-kpi`/`bridge-expire` + 테스트 13건 + [SOP 문서](./docs/operations/bridge_review.md). **잔여**: 4,792 candidate 실제 라벨링은 사람 작업 (UI/cron 준비됨) | (도구 완료) | 사람 검토 실행 / expire cron 등록 | README §12.4 |
 | Q-2 | **confidence_score calibration** — A=0.95 / B=0.80 / C=0.50 가 실제 정답률과 단조 미검증 | 측정 인프라 wired (`scripts/audit/calibrate_confidence.py`) | P1 | LLM 키 활성 후 `make eval-full` → `make audit-calibrate` 1회. Platt scaling + 10-bin reliability diagram. systematic 어긋남이면 §4.0 표 재조정 | README §4.0 (Calibration 박스), §12.4 |
 | Q-3 | **`master.persons` 동명·동년생 충돌 빈도 측정** | (name, birth_year) 키 사용 | P2 | 충돌 빈도 측정 routine + (name, birth_year, 회사) 보조 키 | README §12.4 |
-| Q-4 | **embedding backfill 진행률 가시화** | finance 748K 중 일부 + auto 16K 100% | P3 | `make embed-status` 또는 dashboard. 누락 청크 자동 재시도 cron | README §12.4 |
+| Q-4 | **embedding backfill 진행률 가시화** | ✅ **구현** — `make embed-status` (`embed_status.py`, read-only) — 전체 + `source`별 embedded/total/pct/pending. 테스트 4건. **잔여**: 누락 청크 자동 재시도 cron (`make embed-chunks` 반복) | (도구 완료) | BGE 서버 가동 후 재시도 cron | README §12.4 |
 | Q-5 | **데이터 freshness 모니터링** | 없음 | P3 | NHTSA recalls 마지막 호출 시각 / DART 마지막 filing 등 source 별 freshness check + stale 알람 | README §12.4 |
 
 ---
