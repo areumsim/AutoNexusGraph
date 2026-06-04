@@ -64,7 +64,7 @@
 | G-1 | **`PERFORMED_AT` (회사 귀속 공정)** ≥ 30 | ✅ **충족 94** — manual_seed 35 validated(`load_performed_at.py`, B 0.85) + factoryon 59 candidate(`load_factoryon_plants.py`, :Plant A등급 + 업종→공정 추론 0.60). :Plant 29→103, OWNS_PLANT 53→60. 산단공 익명 스텝 무오염, 비귀속 위반 0 | (완료) | (잔여) DART 생산·설비 파생 추가 + factoryon 일반부품 업종 공정 매핑 정밀화 | README §10.19, docs/process_graph.md §2 |
 | G-2 | **`PRODUCED_BY` (Part→ProcessStep)** | (scaffold, 0) | P1 | 산단공 `part_id` 부재 — 부품↔공정 결정적 매핑 출처 확보 | docs/process_graph.md §2 |
 | G-3 | **`CONSUMES_MATERIAL` / `USES_EQUIPMENT`** | (scaffold, 0) | P2 | 산단공 소재·설비 정보 부재 — Wikidata + manual seed | docs/process_graph.md §2 |
-| G-4 | **`CAUSED_BY_PROCESS` (Recall→Process)** | (scaffold, 0) | P2 | 리콜 493건 US 영문 ↔ 한글 합성공정 환각위험 (P3 dry-run $0.51). KOTSA 한글 리콜 (D-1 키) 또는 영문 공정 taxonomy 확보 후 P3+P4 | docs/process_graph.md §2 |
+| G-4 | **`CAUSED_BY_PROCESS` (Recall→Process)** | ✅ **96 candidate** — `load_recall_process_map.py`. KOTSA 한글 리콜 941행 결함요약 + 공정키워드+결함지시어 deterministic 매칭 (조립71/가공11/용접11/사출2/프레스1), 전부 candidate/0.50 (인과 추론, 단독 근거 금지). 단조(첨단조향) 노이즈 차단. 한글-한글 매칭으로 환각위험 회피 | (완료) | (잔여) LLM P3 cross-validate 정밀화 | docs/process_graph.md §2 |
 | G-5 | **`MAPPED_TO` (BOM↔공정 cross)** | wired (yaml 정의) | P3 | 부품↔공정 결정적 매핑 (G-2 와 같은 트리거) | ontology/ip/relations.yaml:88 |
 | G-6 | **`USES_PROCESS` (산단공 :Process ↔ :Module)** | wired (ontology) | P3 | 산단공 사전 ↔ NHTSA Module taxonomy 매칭 routine 미구현 | README §12.5 |
 
@@ -149,7 +149,7 @@
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
 | PG-1 | **DoD #19 회사 귀속 인스턴스 `PERFORMED_AT` ≥ 30** | ✅ **충족 94/30** — manual_seed 35 validated + factoryon 59 candidate(A공장/추론공정). :Plant 29→103, OWNS_PLANT 53→60. **ProcessGraph "주요 축" 핵심 게이트 통과** | (완료) | — | README §10.19, docs/process_graph.md |
-| PG-2 | **DoD #20 cross 정확도 ≥ 50% — 공정↔재무 / 결함전파** | ⚠️ 부분 (소재 리스크 + 생산↔거시 2종 answerable, 2종 refusal) | P1 | LLM 키 + G-1 + G-4 (CAUSED_BY_PROCESS) | README §10.20 |
+| PG-2 | **DoD #20 cross 정확도 ≥ 50% — 공정↔재무 / 결함전파** | ⚠️ 부분 — G-1(PERFORMED_AT 94)+G-4(CAUSED_BY_PROCESS 96) 적재로 **결함전파·공정↔재무 경로 구조 완성**. 정확도 실측만 LLM 키 대기 | P1 | LLM 키 (G-1·G-4 ✅) | README §10.20 |
 | PG-3 | **row 단위 동적 confidence 격상 실측** | wired (`scripts/upgrade_processes_confidence.py`) | P2 | 1회 풀런 ≤ $2 + GPU 1분 (idempotent). 격상률 15~30% 예상 | README §4.0.1 |
 
 ---

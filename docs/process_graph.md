@@ -39,7 +39,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 | `PERFORMED_AT` | **94** | B(35)+A공장/candidate공정(59) | `load_performed_at.py` + `load_factoryon_plants.py` | ✅ manual_seed 35 validated + factoryon 59 candidate |
 | `PRODUCED_BY` | 0 | — | — | ⏳ 산단공 `part_id` 부재 |
 | `CONSUMES_MATERIAL` / `USES_EQUIPMENT` | 0 | — | — | ⏳ 산단공 소재·설비 정보 부재 |
-| `CAUSED_BY_PROCESS` | 0 | — | — | ⏳ US 영문 리콜 ↔ 한글 합성공정 환각위험(P3 dry-run $0.51) |
+| `CAUSED_BY_PROCESS` | **96** | C(candidate) | `loaders/load_recall_process_map.py` | ✅ 한글 리콜 결함→공정 (deterministic 키워드+결함지시어, conf 0.50) |
 | `auto.process_metrics` (KAMP) | 0 rows | B | `loaders/load_kamp_process_metrics.py` + `init/25_*.sql` | ⏳ scaffold (corp_code 부재=익명) |
 
 **기존 재사용 (회사 귀속·자원, 이미 grade 정합)**: `MANUFACTURED_AT` 99(B) + `OWNS_PLANT` 53(A)

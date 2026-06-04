@@ -344,16 +344,21 @@ relations:
       적재: `load_performed_at.py` (ontology/auto/performed_at_seed.yaml, manual_seed
       B등급 conf 0.85). 한국 OEM 9 공장 × 자동차 4대공정+파워트레인 = 35 엣지.
 
-  CAUSED_BY_PROCESS:                # Recall → Process (품질 이벤트 ↔ 공정, P3 후보)
+  CAUSED_BY_PROCESS:                # Recall → Process (품질 이벤트 ↔ 공정)
     from: Recall
     to: Process
     directed: true
     cardinality: many-to-many
     class: side_hop
-    provenance: llm                 # P3 LLM 추출 → P4 cross-validate 필수
+    provenance: deterministic       # KR 리콜 결함 + 공정키워드+결함지시어 매칭 (LLM P3 보강 가능)
     pass: P3
     confidence_default: 0.50         # C — "후보" 표시, C 단독 근거 금지
-    enabled: false                  # Step 6 활성화 (비용 dry-run → P4 통과분만)
+    enabled: true                   # 활성화 (2026-06-04) — load_recall_process_map.py 96 candidate
+    notes: |
+      KOTSA 한글 리콜(datagokr_kotsa) 결함요약에서 공정키워드(용접/조립/가공/사출/
+      프레스/도장)+결함지시어 동시출현 deterministic 매칭. 모든 엣지 candidate/0.50
+      — "그 공정이 원인"은 인과 추론이므로 단독 근거 금지. 한글-한글 매칭으로 US
+      영문 리콜 환각위험 회피. LLM P3 cross-validate 는 후속 정밀화.
 
 # ── 명명 컨벤션 ─────────────────────────────────────────────────
 naming_conventions:

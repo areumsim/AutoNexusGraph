@@ -35,7 +35,7 @@
         validate-gold-qa eval-cross eval-ip \
         ingest-datagokr-recalls ingest-datagokr-inspections \
         ingest-car-go-kr ingest-katri ingest-kncap \
-        load-manufactured-at load-performed-at load-performed-at-dry load-factoryon-plants load-factoryon-plants-dry load-datagokr-recalls load-datagokr-inspections \
+        load-manufactured-at load-performed-at load-performed-at-dry load-factoryon-plants load-factoryon-plants-dry load-recall-process-map load-recall-process-map-dry load-datagokr-recalls load-datagokr-inspections \
         load-kncap \
         load-sandang-processes load-sandang-processes-dry \
         ingest-factoryon-company ingest-factoryon-factory-no ingest-factoryon-complex \
@@ -132,6 +132,7 @@ help:
 	@echo "  load-manufactured-at              모델↔공장 seed → MANUFACTURED_AT"
 	@echo "  load-performed-at                 회사귀속 공정 seed → PERFORMED_AT (DoD #19)"
 	@echo "  load-factoryon-plants             factoryon → :Plant(A) + OWNS_PLANT + PERFORMED_AT(candidate)"
+	@echo "  load-recall-process-map           한글 리콜 결함 → CAUSED_BY_PROCESS (candidate, G-4)"
 	@echo ""
 	@echo "  clean           __pycache__/.pytest_cache 삭제"
 
@@ -754,6 +755,14 @@ load-factoryon-plants:
 
 load-factoryon-plants-dry:
 	$(PYTHON) -m autograph.loaders.load_factoryon_plants --dry-run
+
+# 한글 리콜 결함 → 공정 (:Recall)-[:CAUSED_BY_PROCESS]->(:Process). candidate.
+# 선행: KR 리콜 적재 (auto.events_recalls source=datagokr_kotsa) + :Recall 노드.
+load-recall-process-map:
+	$(PYTHON) -m autograph.loaders.load_recall_process_map
+
+load-recall-process-map-dry:
+	$(PYTHON) -m autograph.loaders.load_recall_process_map --dry-run
 
 # ─── 제조 공정 / 생산 — 사용자 명시 P0 ─────────────────────────
 # 산단공 합성 공정데이터 (15151075) — 수동 CSV 다운로드 → :Process 사전.
