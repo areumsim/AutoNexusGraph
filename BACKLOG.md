@@ -67,6 +67,9 @@
 | G-4 | **`CAUSED_BY_PROCESS` (Recall→Process)** | ✅ **96 candidate** — `load_recall_process_map.py`. KOTSA 한글 리콜 941행 결함요약 + 공정키워드+결함지시어 deterministic 매칭 (조립71/가공11/용접11/사출2/프레스1), 전부 candidate/0.50 (인과 추론, 단독 근거 금지). 단조(첨단조향) 노이즈 차단. 한글-한글 매칭으로 환각위험 회피 | (완료) | (잔여) LLM P3 cross-validate 정밀화 | docs/process_graph.md §2 |
 | G-5 | **`MAPPED_TO` (BOM↔공정 cross)** | wired (yaml 정의) | P3 | 부품↔공정 결정적 매핑 (G-2 와 같은 트리거) | ontology/ip/relations.yaml:88 |
 | G-6 | **`USES_PROCESS` (산단공 :Process ↔ :Module)** | wired (ontology) | P3 | 산단공 사전 ↔ NHTSA Module taxonomy 매칭 routine 미구현 | README §12.5 |
+| G-7 | **`DEFECT_MATCHES` Bridge (`:Recall`↔`:DefectType`)** | ✅ **7,417 엣지** — `:DefectType` 50 (NHTSA+KOTSA defect_summary 1,434 → Claude Code Agent 라벨링) + cosine_topk 7,218 (BGE-M3 top-3) + llm_assign 199 (sample 200건 Agent 분류). 정제 SOP 후 590 validated/85 rejected/6,742 candidate. **외부 API 호출 0** (Anthropic 401 우회) | (완료) | EU sample 200건 추가 Agent 분류 → EU validated 확장 / cos≥0.55 회색지대 사람 검토 SOP | docs/data_lineage.md §4.2 |
+| G-8 | **`MANIFESTS_AS` (`:FailureMode`↔`:DefectType`) + `SUBJECT_TO` (`:Equipment`↔`:FailureMode`)** | ✅ **MANIFESTS_AS 72** (cosine 36 + llm 36, 정제 후 14 validated) + **SUBJECT_TO 18** (`:Equipment` battery/bearing/igbt 3) — NASA PCoE Bearing/Battery/IGBT readme/논문 1.4GB → Agent 18 `:FailureMode` 추출. 가이드 §1.x 4-홉 회사귀속·회사무관 추적 처음 동작 | (완료) | NASA C-MAPSS/Milling 제외 — ROI 낮음 | docs/data_lineage.md §2.15·§4.2 |
+| G-9 | **`master_manufacturers` dedup canonical SOP** | ✅ **21 dup row → 8 canonical** — 한국 OEM (HYUNDAI 5/KIA 4/GENESIS 3) + FORD 10 + COMET/COMMANDER/CONDOR/CORBIN MOTORS/CROWN COACH/MOTOR COACH INDUSTRIES 7. NHTSA vPIC × Wikidata × 자회사 중복 통합. canonical = refs total (recalls+models+complaints+investigations) 최다. cross-jurisdiction 매칭 0→9건 (현대·기아 EU+NHTSA ICCU 글로벌 검출) | (완료) | supplier dedup + person dedup 동일 SOP 적용 가능 | docs/data_lineage.md §4.2.1 |
 
 ---
 
@@ -151,6 +154,7 @@
 | PG-1 | **DoD #19 회사 귀속 인스턴스 `PERFORMED_AT` ≥ 30** | ✅ **충족 94/30** — manual_seed 35 validated + factoryon 59 candidate(A공장/추론공정). :Plant 29→103, OWNS_PLANT 53→60. **ProcessGraph "주요 축" 핵심 게이트 통과** | (완료) | — | README §10.19, docs/process_graph.md |
 | PG-2 | **DoD #20 cross 정확도 ≥ 50% — 공정↔재무 / 결함전파** | ⚠️ 부분 — G-1(PERFORMED_AT 94)+G-4(CAUSED_BY_PROCESS 96) 적재로 **결함전파·공정↔재무 경로 구조 완성**. 정확도 실측만 LLM 키 대기 | P1 | LLM 키 (G-1·G-4 ✅) | README §10.20 |
 | PG-3 | **row 단위 동적 confidence 격상 실측** | wired (`scripts/upgrade_processes_confidence.py`) | P2 | 1회 풀런 ≤ $2 + GPU 1분 (idempotent). 격상률 15~30% 예상 | README §4.0.1 |
+| PG-4 | **KAMP 카탈로그 + 산단공 정규화 사전 적재** | ✅ **`auto.kamp_catalog` 50 row** (data.go.kr 15089213 무인증 다운, 13 industry × 11 process_category, 37 unique 공정 → 33 정규화 매핑 inline `_PROCESS_NORM`) + 신규 OEM/공정 출처 3건 (KAMP catalog + NASA PCoE + EU Safety Gate) — 가이드 우선순위 (KAMP→MaintNet→DEFECT_MATCHES→...) 5/7 완료 | (완료) | KAMP 본체 데이터셋은 **냉철 평가 후 보류 결정** — 출처 익명+단일 라인이라 NHTSA+KOTSA 자체 :DefectType 50 + NASA PCoE :FailureMode 18 보다 한계 효용 낮음 | docs/data_lineage.md §2.14 |
 
 ---
 
@@ -158,7 +162,7 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| IP-1 | **`ip.patents` (KIPRIS + USPTO ODP)** | 0 row, schema 적용 완료 | P1 | D-2 + D-3 키·bulk → `ingestion/{kipris,uspto_odp}.py` | README §1.5 |
+| IP-1 | **`ip.patents` (KIPRIS + USPTO ODP + Google Patents BigQuery)** | 0 row, schema 적용 완료. USPTO ODP는 2026-06-18 이후 X-API-KEY mandatory + bulk SPA 우회 부담 → **GCP BigQuery `patents-public-data.patents.publications` 우선 검토 (P0+, GCP Service Account JSON 발급 필요)** | P1 | **GCP Service Account JSON** ([docs/operations/api_keys_pending.md §1](./docs/operations/api_keys_pending.md)) or KIPRIS_API_KEY or USPTO ODP key — Python google-cloud-bigquery 3.41.0 설치 완료 | README §1.5 |
 | IP-2 | **`ip.assignees` + Wikidata QID·LEI·business_no 매칭** | 0 row, schema 적용 완료 | P1 | IP-1 적재 후 → `bridge_assignee_to_corp` 호출 | README §1.5 |
 | IP-3 | **`ip.citations` (PatentsView 후속 USPTO ODP)** | 0 row, schema 적용 완료 | P1 | D-3 bulk 적재 후 → `get_citation_network(depth≤2)` cap 강제 | README §1.5 |
 | IP-4 | **`ip.assignee_corp_map` 매핑** | 0 row, schema 적용 완료 | P1 | IP-2 적재 후 → supplier candidate 운영 SOP 재사용 (Q-1 와 같은 흐름) | README §1.5 |
