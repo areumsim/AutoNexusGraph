@@ -139,7 +139,7 @@
 |---|---|---|:---:|---|---|
 | F-1 | **CONTRIBUTING.md / SECURITY.md** | ✅ **작성** — 루트 `CONTRIBUTING.md`(개발환경·smoke-e2e 게이트·도메인 불변식 8항·PR 절차) + `SECURITY.md`(비공개 보고 채널·구현 통제·알려진 한계 정직표기) | (완료) | — | README §12.7 |
 | F-2 | **TROUBLESHOOTING.md** | ✅ **구현** — `docs/faq.md`(Q1~Q7) 가 단일 SSOT, 루트 `TROUBLESHOOTING.md` 는 발견성 포인터(중복 회피). 4 named 실패 보강: LLM rate limit(Q2.4) / pgvector·Neo4j auth(Q1.1) / DART·data.go.kr 키 만료(Q3.5) | (완료) | — | README §12.7 |
-| F-3 | **`docs/design/`** 빈 디렉토리 | placeholder | P3 | 핵심 컴포넌트 (LangGraph 노드 / DomainHandler / Bridge / P3-P4) ADR + diagrams | README §12.7 |
+| F-3 | **`docs/design/` ADR** | ✅ **작성** — `docs/design/` 신설 + ADR 4건(0001 LangGraph StateGraph / 0002 DomainHandler plug-in / 0003 Bridge 분리 테이블 / 0004 P1~P4 추출) + index. 각 코드 라인·mental_model 위임 | (완료) | diagram(이미지)은 후속 | README §12.7 |
 | F-4 | **GitHub Issue/PR template** | ✅ **작성** — `.github/ISSUE_TEMPLATE/{bug_report,feature_request,data_source}.md` + `config.yml` + `pull_request_template.md` (프로젝트 불변식 체크리스트 내장) | (완료) | — | README §12.7 |
 
 ---

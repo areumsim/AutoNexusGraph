@@ -795,7 +795,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. **CI(O-4)는 keyless smoke-e2e 만 — ephemeral PG/Neo4j 통합 잡은 secrets/self-hosted 후속** |
 | API 인증 / Rate limit | ✅ **구현** (`api/auth.py`) | API key 헤더 인증 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 히스토리 403) + per-identity in-memory rate limit (`API_RATE_LIMIT_PER_MIN`). `/health` 제외. `API_KEYS` 미설정 시 open 모드 (dev). 잔여: OAuth2/OIDC·multi-instance 분산 — §12.2 |
 | Production 배포 가이드 | ✅ **작성** ([docs/operations/production_deploy.md](./docs/operations/production_deploy.md)) + `infra/Dockerfile` + `docker-compose.prod.yml` | 이미지 빌드 / compose prod 오버레이 / health probe / reverse proxy·TLS / k8s / blue-green·canary / 멀티 인스턴스 주의점. 잔여: 백업·DR 자동화 (O-3) / 모니터링 (O-5) — §12.3 |
-| `docs/design/` | 빈 디렉토리 | 디자인 doc 자리만 있고 내용 없음 (README(구 PRD) / mental_model / learning_guide 가 대체) |
+| `docs/design/` | ✅ ADR 4건 (F-3) | LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출 — context·decision·consequences, 코드 라인 위임 |
 | `_legacy/` | 보존 (v1/v2 KGQA Agent) | 이전 단일도메인 시스템. CHANGELOG/HISTORY 보존. 삭제 vs 마이그레이션 정책 미정 |
 | 모델 출력 reranker (BGE-Reranker-v2-m3) | 코드 wired (`RERANKER_URL=...`) | 실서비스에서 미활성. 활성 조건·임계 미정의 |
 | USES_PROCESS / MADE_OF (L6) | wired (ontology 정의) | `:Process` 노드 사전 산단공 적재 / `:Material` 노드 미구현. 엣지 적재 routine 미구현 |
@@ -1100,7 +1100,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
 | **CONTRIBUTING.md / SECURITY.md** | ✅ **작성** ([CONTRIBUTING.md](./CONTRIBUTING.md) / [SECURITY.md](./SECURITY.md)) | 개발환경·smoke-e2e 게이트·도메인 불변식 8항·PR 절차 / 비공개 보고 채널·구현 통제·알려진 한계 정직표기 |
-| **`docs/design/` 빈 디렉토리** | placeholder | 핵심 컴포넌트 (LangGraph 노드 / DomainHandler / Bridge / P3-P4) ADR + diagrams |
+| **`docs/design/` ADR** | ✅ **작성 (F-3)** — ADR 4건 (LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 테이블 / P1~P4 추출) + index ([docs/design/](./docs/design/)) | diagram 이미지는 후속 |
 | **`_legacy/` 정책** | 보존 (v1/v2 KGQA Agent) | (a) deprecate notice + 일정 (b) 마이그레이션 가이드 (c) 또는 archived branch 로 이동 |
 | **architecture diagram 통합** | `docs/autograph.md §2.5` mermaid 만 | README 본문에 1장 핵심 다이어그램 (현재 텍스트 박스만) |
 | **performance benchmark** | PRD 목표만 | 실측 latency p50/p95/p99 + 평균 토큰/turn + 평균 cost/turn dashboard |
@@ -1129,6 +1129,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 33 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
 - [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 33 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트
+- [docs/design/](./docs/design/) — **ADR** (F-3) — 굳은 핵심 결정 4건 (LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출), context·decision·consequences
 - [docs/autograph.md](./docs/autograph.md) — **AutoGraph (auto 도메인) 단독** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약 / §2.5.4 배터리·소재 L5/L6 부분 적재)
 - **[docs/process_graph.md](./docs/process_graph.md)** — **ProcessGraph (제조 공정 BoP — auto 수직 심화, 주요 축)** 설계+구현 SSOT — BoM⟂BoP 모델 + 학술 근거 (MASON/PSL/ISO) + 회사 귀속 A/B 정책 + 내부 데이터 수용 규격 (DoD #20)
 - [docs/ipgraph.md](./docs/ipgraph.md) — **IPGraph (ip 도메인 = 보조축, corp_entity 브리지 전용)** 설계+구현 SSOT — DomainHandler / ontology yaml / tool pool / Cypher 템플릿 / gold QA / 작업 순서. 코드/스키마 완료, 특허 데이터 적재 대기
