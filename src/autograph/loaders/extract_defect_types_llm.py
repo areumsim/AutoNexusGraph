@@ -19,7 +19,6 @@ import logging
 import re
 from typing import Any
 
-from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 
 
@@ -97,23 +96,29 @@ def _strip_json_fence(text: str) -> str:
 
 
 def call_llm(prompt: str, *, model: str, max_tokens: int = 8000) -> tuple[str, dict]:
-    from anthropic import Anthropic
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY 미설정")
-    client = Anthropic(api_key=settings.anthropic_api_key, timeout=180.0)
-    resp = client.messages.create(
-        model=model,
+    """get_llm_client + budget_aware 경유 — cost_log 기록 + 비용 가드 통과.
+
+    (과거: raw ``Anthropic()`` 직접 호출로 cost_log/guard 를 통째로 우회했음.
+    이제 다른 모든 LLM 호출과 동일하게 LoggingLLMClient + BudgetAwareLLMClient
+    경유 → 누적 비용 기록 및 세션 한도 차단 대상에 포함.)
+    """
+    from autonexusgraph.llm.base import get_llm_client
+    from autonexusgraph.llm.budget_aware import budget_aware_client
+
+    inner = get_llm_client(model=model)
+    client = budget_aware_client(inner, caller="extract_defect_types_llm")
+    resp = client.chat(
+        [{"role": "user", "content": prompt}],
+        temperature=0.0,
         max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}],
+        purpose="defect_taxonomy",
     )
-    txt = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
     usage = {
-        "input_tokens": resp.usage.input_tokens,
-        "output_tokens": resp.usage.output_tokens,
-        "model": model,
+        "input_tokens": resp.usage.prompt_tokens,
+        "output_tokens": resp.usage.completion_tokens,
+        "model": resp.usage.model or model,
     }
-    return txt, usage
+    return resp.content, usage
 
 
 def extract_taxonomy(*, n_sample: int = 200, model: str) -> tuple[list[dict], dict]:

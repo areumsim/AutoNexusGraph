@@ -155,18 +155,27 @@ def test_cost_of_call_gemini_flash():
     assert abs(c - 0.00155) < 1e-6, f"got {c}"
 
 
-# ── 5) 전역 세션 트래커 — 한도 도달 시 BudgetExceeded ──────────────
+# ── 5) 전역 세션 트래커 — 영속(세션) 한도 도달 시 BudgetExceeded ──────────────
 def test_session_tracker_uses_settings_hard_limit(monkeypatch):
+    """LLM_SESSION_HARD_LIMIT_USD 가 영속 누적 가드(_session_limit_usd)로 enforce.
+
+    (설계: per-turn/batch 한도 = llm_cost_hard_limit_usd, 영속/시간창 누적 한도 =
+    llm_session_hard_limit_usd 로 분리. 과거엔 둘이 한 필드로 혼용돼 turn budget 이
+    무력화되는 버그가 있었음.)
+    """
     monkeypatch.setenv("LLM_SESSION_HARD_LIMIT_USD", "0.05")
     monkeypatch.delenv("LLM_COST_HARD_LIMIT_USD", raising=False)
+    monkeypatch.setenv("LLM_COST_WINDOW_HOURS", "0")     # all-time (base 결정적)
     from autonexusgraph import config
     config.get_settings.cache_clear()                    # type: ignore[attr-defined]
 
     from autonexusgraph.llm import cost_tracker
     cost_tracker.reset_tracker()
     tracker = cost_tracker.get_session_tracker(caller="test", model="gpt-4o-mini")
-    assert abs(tracker.state.hard_limit_usd - 0.05) < 1e-9
+    # 영속 세션 한도가 env 값으로 잡혀야 함
+    assert abs(tracker._session_limit_usd - 0.05) < 1e-9
 
+    # base + 이번 tracker 누적이 세션 한도를 넘으면 차단 (turn 한도와 무관하게)
     tracker.state.cost_usd = 0.06
     with pytest.raises(cost_tracker.BudgetExceeded):
         tracker.guard()

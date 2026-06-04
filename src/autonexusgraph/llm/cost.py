@@ -112,29 +112,50 @@ def cost_of_call(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens / 1_000_000) * in_per_1m + (output_tokens / 1_000_000) * out_per_1m
 
 
-# ─── 한도 정책 (env override) ─────────────────────────────────────────
-def get_hard_limit_usd(default: float = 5.00) -> float:
-    """무조건 중단 한도 — 추정 또는 누적이 이걸 넘으면 abort."""
+# ─── 한도 정책 (셸 env > .env/settings > 코드 기본값) ─────────────────────
+# 주의: .env 는 pydantic Settings 로만 로드되고 os.environ 에는 반영되지 않는다.
+# 따라서 os.environ 만 보면 .env 값이 무시된다 (과거 버그). 아래 헬퍼는
+# 셸 export(os.environ) → settings(.env) → 코드 기본값 순으로 resolve 한다.
+def _resolve_float(env_key: str, settings_attr: str, default: float) -> float:
+    raw = os.environ.get(env_key)
+    if raw is not None:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
     try:
-        return float(os.environ.get("LLM_COST_HARD_LIMIT_USD", default))
-    except ValueError:
-        return default
+        from ..config import get_settings
+        v = getattr(get_settings(), settings_attr, None)
+        if v is not None:
+            return float(v)
+    except Exception:   # noqa: BLE001
+        pass
+    return default
+
+
+def get_hard_limit_usd(default: float = 5.00) -> float:
+    """per-turn/batch hard limit — 단일 tracker(한 turn 또는 한 배치) 누적 한도."""
+    return _resolve_float("LLM_COST_HARD_LIMIT_USD", "llm_cost_hard_limit_usd", default)
+
+
+def get_session_limit_usd(default: float = 5.00) -> float:
+    """영속(세션/일) 누적 한도 — cost_log.jsonl 기반, turn/process 리셋과 무관."""
+    return _resolve_float("LLM_SESSION_HARD_LIMIT_USD", "llm_session_hard_limit_usd", default)
+
+
+def get_cost_window_hours(default: float = 24.0) -> float:
+    """영속 누적 한도 집계 시간창(시간). 0 이하면 전체 기간(all-time)."""
+    return _resolve_float("LLM_COST_WINDOW_HOURS", "llm_cost_window_hours", default)
 
 
 def get_auto_approve_usd(default: float = 0.50) -> float:
     """이하면 자동 진행, 초과면 --approve-cost 또는 prompt 필요."""
-    try:
-        return float(os.environ.get("LLM_COST_AUTO_APPROVE_USD", default))
-    except ValueError:
-        return default
+    return _resolve_float("LLM_COST_AUTO_APPROVE_USD", "llm_cost_auto_approve_usd", default)
 
 
 def get_report_every(default: int = 10) -> int:
     """매 N 호출마다 누적 비용 로그."""
-    try:
-        return int(os.environ.get("LLM_COST_REPORT_EVERY", default))
-    except ValueError:
-        return default
+    return int(_resolve_float("LLM_COST_REPORT_EVERY", "llm_cost_report_every", default))
 
 
 # ─── CLI 진입점 가드 ──────────────────────────────────────────────────
@@ -212,6 +233,7 @@ class BudgetCheck:
 
 __all__ = [
     "PRICING", "CostEstimate", "estimate", "cost_of_call",
-    "get_hard_limit_usd", "get_auto_approve_usd", "get_report_every",
+    "get_hard_limit_usd", "get_session_limit_usd", "get_cost_window_hours",
+    "get_auto_approve_usd", "get_report_every",
     "BudgetCheck",
 ]

@@ -19,7 +19,7 @@
 | **보조축 (수평 cross)** | **ip** = 특허·기술혁신 | assignee→corp 브리지를 타는 **수평 cross 진입 어댑터** (corp_entity 브리지 전용). 풀 도메인 어댑터 완료, 데이터 부분 적재 | 구현 (CPC 10,695 + OpenAlex 629) |
 | **곁가지 (L6)** | 배터리·소재 | 공개 거시(USGS) + Wikidata chem | (부분 적재 — Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8) |
 
-**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. 다만 **회사 귀속 인스턴스 (`PERFORMED_AT` / `PRODUCED_BY` 등) 는 0 — 팩토리온 키 + KAMP 데이터 + 한글 리콜 데이터 부재로 보류**. "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
+**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. **회사 귀속 인스턴스 `PERFORMED_AT` 94 적재** (manual_seed 35 validated B + factoryon 59 candidate A공장/추론공정, DoD #19 ≥30 충족). `PRODUCED_BY` 46 candidate (부품→공정 카테고리 추론), `CAUSED_BY_PROCESS` 96 candidate (리콜→공정). `CONSUMES_MATERIAL` 6 + `USES_EQUIPMENT` 16 (표준 공정 지식, ProcessStep→Material→Mineral L6 경로 완성). 산단공 실 소재·설비 데이터는 후속. "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
 
 > **정직성 가드 2개 필수:** (1) "준비된 빈 축" 명시 — 합성·공개데이터(산단공·KAMP)는 패턴/검증용이지 사실 주장용 아님 (회사 귀속 엣지 hard-check 차단). (2) **내부 데이터 수용 규격**(로더 계약 + 등급 승급 C합성→A내부)을 결과물로 보유 (DoD §10.20). 상세 [docs/process_graph.md](./docs/process_graph.md).
 
@@ -33,7 +33,7 @@
 |---|---|---|
 | 3 도메인 + Bridge 를 한 turn 안에 묶는 GraphRAG 에이전트 | 단일 벡터 RAG 로는 "현대모비스 매출 ↔ 모비스가 공급하는 차종의 최근 리콜" 같은 멀티홉·교차도메인 질의 불가 | StateGraph 11 노드: Triage→Planner→Supervisor↔Workers(research/graph/sql/calculator)→Synthesizer→Validator (`agents/graph.py:110-123`) + Send-API 병렬 + Replan 최대 2회 (`validator.py:36 MAX_REPLANS=2`) |
 | 도메인 plug-in 으로 N-domain 확장 | 4번째 도메인 추가 시 "코어 변경 < 5%" 가 확장성 정량 증거 (§10.12). 첫 plug-in 검증 = ip 도메인 = **inflection +1,877 LOC (13.32%) → baseline reset 후 0/15,396 LOC = 0.00%** ([정직 표기](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) — 두 숫자 같이 인용) ✅ | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV, 기본 `"autograph"`) 의 모듈을 첫 호출 시 soft-load (`_domain_handler.discover_plugins`, 라인 130). 외부 패키지가 `register_handler()` 부작용으로 등록 |
-| 서비스 등급 (MCP·관측가능성·평가 실측) 정량 증명 | 데모가 아닌 운영 등급으로의 증명이 1차 목표 (§10.15~§10.17) | MCP 래퍼 52 tools (`src/autonexusgraph/mcp/`) · Langfuse 4.x OTEL (`agents/tracing.py`) · 축소 평가 매트릭스 4 어댑터 × FAST tier (`eval/runners/run_matrix_smoke.py`) |
+| 서비스 등급 (MCP·관측가능성·평가 실측) 정량 증명 | 데모가 아닌 운영 등급으로의 증명이 1차 목표 (§10.15~§10.17) | MCP 래퍼 59 tools (`src/autonexusgraph/mcp/`) · Langfuse 4.x OTEL (`agents/tracing.py`) · 축소 평가 매트릭스 4 어댑터 × FAST tier (`eval/runners/run_matrix_smoke.py`) |
 
 ### 핵심 용어 (자세한 정의는 [docs/learning_guide.md](./docs/learning_guide.md))
 
@@ -126,7 +126,7 @@
 | Neo4j Standard / Plant / Complaint | (seed 후) | `standards.yaml` 22 + `plants.yaml` 18 + `manufactured_at_seed.yaml` 46 모델↔공장 |
 | `auto.staging_relations` (P3 LLM + Wikidata P176) | extract-auto-p3 후 | SUPPLIED_BY / RECALL_OF 후보 — P4 검증 후 그래프 적재 |
 | `auto.processes` (산단공 합성 15151075) | **550 row / 410 공정명** | C 등급 (0.50) — 공정명 정규형 사전. agent tool `search_processes` / `lookup_process` |
-| **ProcessGraph (BoP 축)** Neo4j `:Process` / `:ProcessStep` / `PRECEDES` / `INSTANTIATES` | **410 / 550 / 410 / 550** | C 등급 — 산단공 공정사전 → BoP routing (회사 비귀속). `tools/process.py` + `auto_proc_*`. **회사 귀속(PERFORMED_AT) / 품질(CAUSED_BY_PROCESS) / 메트릭(KAMP)은 (scaffold)** — 데이터·키 부재로 보류, SSOT [docs/process_graph.md](./docs/process_graph.md) |
+| **ProcessGraph (BoP 축)** Neo4j `:Process` / `:ProcessStep` / `PRECEDES` / `INSTANTIATES` | **410 / 550 / 410 / 550** | C 등급 — 산단공 공정사전 → BoP routing (회사 비귀속). `tools/process.py` + `auto_proc_*`. **회사 귀속 `PERFORMED_AT` 94 적재** (manual_seed 35 + factoryon 59 candidate, DoD #19 충족). 품질(CAUSED_BY_PROCESS) / 메트릭(KAMP)은 (scaffold) — 데이터 대기, SSOT [docs/process_graph.md](./docs/process_graph.md) |
 | `auto.plant_capacity` + `plant_production` (DART III. 생산·설비) | **107 + 77 row** (Hyundai 12 plants × 4~7년 + Kia 5 plants × 6년) | B 등급 (0.80) — Hyundai/Kia. agent tool `get_plant_capacity` / `get_oem_production` / `list_plants_by_oem`. Kia 파서는 `품목/소재지` schema 변형 대응 |
 | `auto.plant_utilization` (DART III. (3) 가동률) | **53 row** | B 등급 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct |
 | `auto.macro_production_yearly` (KAMA 15051116) | **21 row** (2005~2025) | A 등급 (0.95) — 연 단위 한국·세계 생산량. 2024 한국 점유 4.55%. agent tool `get_macro_production` |
@@ -518,7 +518,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 **수집 범위 (1차):** 코스피 200 + 코스닥 100 약 300개사, 최근 3개 회계연도.
 **제조 데이터 끝까지 채움 (wired, partial — 키 확보 대기):**
 - `DATA_GO_KR_API_KEY` → 팩토리온 [15087611](https://www.data.go.kr/data/15087611/openapi.do) (ingestion `factoryon_registry.py` + loader `load_factoryon.py` → `auto.factoryon_registry` PG `24_auto_factoryon.sql`. `make load-factoryon`)
-- 자동차 리콜 [15089863](https://www.data.go.kr/data/15089863/openapi.do) + 검사 [15155857](https://www.data.go.kr/data/15155857/fileData.do) (ingestion + `load_datagokr_*.py`)
+- 자동차 리콜 [3048950 (CSV)](https://www.data.go.kr/data/3048950/fileData.do) (구 오픈API 15089863 폐기) + 검사 [15155857](https://www.data.go.kr/data/15155857/fileData.do) (ingestion + `load_datagokr_*.py`)
 - DART 사업보고서 **가동률 표** 파서 — `dart_production_parser._parse_utilization_table` → `auto.plant_utilization` PG 적재 (`load_dart_production.py:199`). 완료.
 - KOSIS 산업 통계 — `kosis_client.py` + 신규 loader `load_kosis_industry.py` → `macro.kosis_series` (`make load-kosis`). KOSIS_API_KEY 필요.
 - Wikidata 배터리 셀 chem (cathode) — 신규 `wikidata_cell_chem.py` (CC0, 무인증). materials_seed.yaml 의 manual seed 보강. **회사단위 셀↔OEM 소싱은 grade C candidate 정직 표기** (§2.3).
@@ -534,7 +534,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 | 리콜 캠페인 | NHTSA Recalls API | 공공 | 불필요 | `auto.events_recalls` + Neo4j Recall |
 | 결함 신고 | NHTSA Complaints API | 공공 | 불필요 | `auto.events_complaints` + `vec.chunks` |
 | 제조사·모델·공급사 QID·LEI·사업자번호 | Wikidata SPARQL | CC0 | 불필요 (rate limit) | `auto.master_*` + `bridge.corp_entity` |
-| 자동차 리콜정보 (한국) | data.go.kr [15089863](https://www.data.go.kr/data/15089863/openapi.do) | 공공 | `DATA_GO_KR_API_KEY` | (키 확보 후) `auto.events_recalls` |
+| 자동차 리콜정보 (한국) | data.go.kr [3048950 (CSV)](https://www.data.go.kr/data/3048950/fileData.do) | 공공 | (무인증 CSV) | `auto.events_recalls` 941행 적재 (CSV 전량) |
 | 자동차검사관리 수리검사내역 (사고·침수·도난 차량 검사) | data.go.kr [15155857](https://www.data.go.kr/data/15155857/fileData.do) (파일 다운) | 공공 | 불필요 (파일) | `data/raw/datagokr/` → (적재 후) `auto.events_inspections` |
 | 시험인증 (KATRI / 부품 인증) | bigdata-tic.kr Open API | 공공 (회원) | OAuth `BIGDATA_TIC_CLIENT_ID/SECRET` | (키 확보 후) `auto.cert_*` |
 | 안전등급 (NCAP) | NHTSA SafetyRatings API | 공공 (US Gov) | 불필요 | `auto.spec_measurements` (safety.ncap.* / safety.feature.*) + Neo4j `(:VehicleVariant)-[:SAFETY_RATED_BY]->(:Standard {code:'NCAP_US'})` |
@@ -546,7 +546,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 | Euro NCAP / IIHS (옵션) | euroncap.com / iihs.org | 공공 (사용 약관) | 불필요 | (후속) `auto.spec_measurements` + `:Standard` (Euro NCAP / IIHS TSP) |
 | 제조 공정·생산능력 (제조 도메인) | DART 사업보고서 본문 파서 | 공공 | DART 키 (finance 와 공유) | `auto.production_*` (LLM 0% — 정규식 + 표 파서) |
 | 산단공 합성 공정데이터 (15151075) | data.go.kr (수동 CSV) | 공공 | 불필요 (파일) | `auto.processes` + Neo4j `:Process` 410 / `:ProcessStep` 550 / `PRECEDES`·`INSTANTIATES` (BoP routing, grade C). SSOT [docs/process_graph.md](./docs/process_graph.md) |
-| 공장 등록정보 (15087611) — 회사·공장번호·산단별 조회 | data.go.kr 팩토리온 (`apis.data.go.kr/B550624`) | 공공 | `DATA_GO_KR_API_KEY` | (키 확보 후) `auto.factory_registry` → MANUFACTURED_AT 보강 |
+| 공장 등록정보 (15087611) — 회사·공장번호·산단별 조회 | data.go.kr 팩토리온 (`apis.data.go.kr/B550624`) | 공공 | `DATA_GO_KR_API_KEY` (작동 확인) | `auto.factoryon_registry` 90행 적재 (OEM 5사 + tier-1) → MANUFACTURED_AT 보강 |
 
 > 인증 키 부재 시 ingestion 은 graceful skip — 코드 변경 없이 `.env` 만 채우면 활성화.
 
@@ -556,8 +556,8 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 
 | 데이터 | 출처 | 라이선스 | 인증 | 적재 위치 | 상태 |
 |---|---|---|---|---|---|
-| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개**) | `KIPRIS_API_KEY` | `ip.patents` + Neo4j Patent | (예정) |
-| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료(410 Gone), **ODP bulk dataset + Transition Guide** 채택 | `ip.patents` + `ip.citations` | (예정) |
+| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개**) | `KIPRIS_API_KEY` | `ip.patents` + Neo4j Patent | (scaffold, 보조) |
+| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료(410 Gone), **ODP bulk dataset + Transition Guide** 채택 | `ip.patents` + `ip.citations` | (scaffold, 보조) |
 | CPC 분류 체계 (계층 depth ≥ 4) | CPC scheme bulk (USPTO / EPO) | 공공 | 불필요 | `ip.cpc_scheme` + Neo4j CPCCode/SUBCLASS_OF | ✅ **10,695 row 적재** (§1 IPGraph 현황표) |
 | 글로벌 논문·연구 (assignee↔institution↔author) | OpenAlex API | CC0 | **무료 키 필요 (하루 10만 크레딧, 2025-02 이후)** | `ip.works` + Neo4j Work/Institution/Author | ✅ **629 row 적재** — 특허×논문 cross 승격은 institution↔corp_entity 매핑 후속 |
 
@@ -731,7 +731,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | §10.1~3 | docker compose / Streamlit toggle / LLM provider 전환 | · | 외부 측정 (docker / git / ENV) |
 | **§10.15** | **ip 도메인 추가 후 코어 변경 < 5% 재측정 (baseline reset)** | (wired) | `src/ipgraph/` 신규 패키지 + plug-in 자동 등록 (`ENV AUTONEXUSGRAPH_DOMAIN_PLUGINS=autograph,ipgraph`). `make audit-ipgraph` 가 handler/router/ontology/cypher templates(25)/gold(ip=30+cross_ip=8) 5종 wire-up 검증 → DoD dashboard 자동 반영. **core diff ratio** 측정은 baseline reset 후속 — `make audit-dod` 재실행 |
 | **§10.16** | **ip gold seed (IP-L1 80%+ / L2 70%+ / L3 50%+) + CD-L3/L4 ip 결합 8 문항** | (wired) | `gold_qa_ip_v0.jsonl` 30 row (L1 10 / L2 10 / L3 10) + `gold_qa_cross_v0.jsonl` IP cross 8 row (CD-L3 4 + CD-L4 4). 삼성SDI 배터리 H01M ↔ 영업이익 ↔ OEM 리콜 CD-L4 시연 row 포함. **목표 정확도 (80/70/50/40%)** 달성은 USPTO ODP/KIPRIS 적재 후 측정 — wire-up 완료 |
-| **§10.17 (a)** | **MCP 래퍼** | (wired) | `src/autonexusgraph/mcp/` — typed tool pool (52 tools: finance 21 + auto 31) 위 얇은 MCP server. `inspect.signature` + type hint → JSON Schema 자동 변환 (사용자 schema 작성 불요). stdio transport (`python -m autonexusgraph.mcp`). `make audit-mcp` 가 SDK 미설치 시 SKIPPED + tool discovery 검증, 설치 시 server boot + `ListToolsRequest` 핸들러 in-process round-trip 으로 52 tools 응답 실측 (2026-06-02 PASS). **SDK 설치 = `pip install -e ".[mcp]"`** (이제 `[all]` extras 에도 포함) |
+| **§10.17 (a)** | **MCP 래퍼** | (wired) | `src/autonexusgraph/mcp/` — typed tool pool (59 tools: finance 21 + auto 38) 위 얇은 MCP server. `inspect.signature` + type hint → JSON Schema 자동 변환 (사용자 schema 작성 불요). stdio transport (`python -m autonexusgraph.mcp`). `make audit-mcp` 가 SDK 미설치 시 SKIPPED + tool discovery 검증, 설치 시 server boot + `ListToolsRequest` 핸들러 in-process round-trip 으로 59 tools 응답 실측 (2026-06-04 PASS, SDK 설치). **SDK 설치 = `pip install -e ".[mcp]"`** (이제 `[all]` extras 에도 포함) |
 | **§10.17 (b)** | **Langfuse 실측 ON (turn별 token/cost/replan)** | (wired) | Langfuse 4.x OTEL + ContextVar 격리 + `meta JSONB` 적재. `make audit-trace` 로 실측 검증 — `data/reports/audit_trace_*.json` 의 최신 리포트가 dashboard 에 자동 반영 |
 | **§10.17 (c)** | **온톨로지 SHACL·pydantic 검증** | (wired) | pydantic v2 strict-validate (`src/autonexusgraph/ontology/schema.py`). `extra='forbid'` 미지정 키 reject + cardinality/class/provenance/pass enum 정합 + relation.from/to ↔ entities cross-check + edge_required_meta 7키 SoT 강제. `schema_version` yaml 헤더. `make audit-ontology` = 핵심 6 yaml(auto/ip/finance) + **보조 4 yaml(Y-1: extractors×2/system_taxonomy/plants, extra='forbid')** + cypher↔yaml cross-check → DoD dashboard 자동 반영 |
 | **§10.17 (d)** | **축소 평가 매트릭스 (4 어댑터 × FAST tier 1종 + rerank ablation)** | (wired, partial) | `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + `<name>_<tier>_rerank<0\|1>` cell 라벨. `eval/runners/run_matrix_smoke.py` 가 8 cells enumerate + thesis headline (Hybrid−Vector multi-hop EM vs +30%p) 자동 계산. `make audit-eval-matrix` simulation 모드 (LLM 비용 0) 기본 / `--full` 실 LLM. Allganize 외부 벤치 stub (`eval/qa_gold/gold_qa_allganize_v0.jsonl`). **full LLM 측정은 사용자 환경에서 별도 트리거** |
@@ -753,7 +753,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | 비용 가드 | 세션 hard limit (`LLM_SESSION_HARD_LIMIT_USD`) + 도메인별 turn budget (`config.turn_budget_for_domain`, ENV override) + 사전 추정 + auto-approve + JSONL 영속 로그 (`data/cost_log.jsonl`) |
 | 데이터 파이프라인 (finance) | DART corp 마스터, XBRL 184K, filings 4.6K, vec.chunks 748K, Neo4j Company/Person/지배구조 — Wikidata/Wikipedia/GLEIF/SEC/뉴스/KCGS 보강, ER 마스터 (`master.entities` + `master.entity_map`) |
 | 데이터 파이프라인 (auto) | NHTSA vPIC/Recalls/Complaints/SafetyRatings/Investigations/TSB, EPA fueleconomy, SEC EDGAR (글로벌 OEM XBRL), Wikidata mfr/model/supplier/P176, AI Hub, KOTSA 수리검사, NHTSA component taxonomy 자동 도출. `bridge.corp_entity` 4,806 (한국 OEM/부품사 corp_code + 글로벌 OEM sec_cik 9개) |
-| 제조 / 공정 (auto) | DART 사업보고서 본문 파서 (LLM 0%) — 생산능력·가동률·공장명 자동 추출. 산단공 합성 공정데이터 → `:Process` 사전. 팩토리온 공장등록 (15087611) scaffold (`DATA_GO_KR_API_KEY` 대기) |
+| 제조 / 공정 (auto) | DART 사업보고서 본문 파서 (LLM 0%) — 생산능력·가동률·공장명 자동 추출. 산단공 합성 공정데이터 → `:Process` 사전. 팩토리온 공장등록 (15087611) 부분 적재 90행 (OEM 5사 + tier-1, `DATA_GO_KR_API_KEY` 작동) |
 | 도구 (tools) | finance: `tools/financials,graph,retrieve.py` — 사전 정의 함수 풀. auto: `src/autograph/tools/{spec,graph,retrieve,bridge}.py`. 자유 SQL/Cypher 금지 |
 | Cypher 템플릿 | finance 22 = 14 정적 + 5 `find_paths_{1..5}hops` + 3 `get_subgraph_d{1..3}` (`tools/cypher_templates.py`). auto **24** (`src/autograph/cypher_templates_auto.py` — 기존 19 + `auto_plants_of_manufacturer` / `auto_plants_of_model` / `auto_investigations_by_model` / `auto_investigations_by_variant` / `auto_investigation_recall_chain` 5건 추가). ip 25 (`src/ipgraph/cypher_templates_ip.py`). type/range/regex 검증 + bool reject |
 | 멀티에이전트 (LangGraph) | StateGraph 11 노드 (triage/planner/supervisor/4 worker/executor_legacy/synthesizer/validator/finalize) + 함수 체인 fallback. `agents/graph.py` |
@@ -772,7 +772,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | P3/P4 추출 (auto) | `autograph.extractors.run_p3` (SUPPLIED_BY/RECALL_OF 활성) + `cross_validate`. `auto.staging_relations.p4_decision` ∈ candidate / validated / needs_review / rejected. `make extract-validate-auto` |
 | 평가 메트릭 | bridge_quality / main_hop_efficiency / confidence_weighted / latency (`eval/metrics/`) + `scripts/audit/{bom_coverage,edge_meta_invariants,dod_audit,validate_gold_qa}.py` |
 | gold QA seed | `gold_qa_v0.jsonl` finance **30** / `gold_qa_auto_v0.jsonl` auto **46** / `gold_qa_cross_v0.jsonl` CD **44** (level: CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형) / `gold_qa_ip_v0.jsonl` ip **30** (IP-L1/L2/L3 각 10) |
-| 외부 데이터 인터페이스 | data.go.kr (15089863/15155857), car.go.kr, KATRI (bigdata-tic), KNCAP 5 소스 ingestion + loader (graceful skip — 인증 키 부재 시 skip) |
+| 외부 데이터 인터페이스 | data.go.kr (3048950 리콜 CSV / 15155857 검사), car.go.kr, KATRI (bigdata-tic), KNCAP 5 소스 ingestion + loader (graceful skip — 인증 키 부재 시 skip) |
 
 ### 미구현 / wired-but-disabled / 측정 대기
 
@@ -789,7 +789,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | Bridge candidate 검토 운영 | ✅ **도구 구현** (Q-1) — `bridge_review.py` + Streamlit `ui/bridge_review.py` (✓/✗) + 6개월 자동 만료 + 진행률 KPI + `26_bridge_review.sql` 감사 컬럼 + `make bridge-kpi`/`bridge-expire` ([SOP](./docs/operations/bridge_review.md)) | 4,792 supplier candidate 실제 라벨링은 사람 작업 (도구·cron 준비됨) |
 | KNCAP / Euro NCAP / IIHS | 인터페이스만 (KNCAP) / 미구현 | 공식 채널 약관 검토 후 |
 | KATRI / bigdata-tic OAuth | wired | `BIGDATA_TIC_CLIENT_ID/SECRET` 발급 후 활성 |
-| 팩토리온 (15087611) | scaffold | ingestion 3 endpoint (회사/공장번호/산단별) 구현, `DATA_GO_KR_API_KEY` 발급 후 활성 |
+| 팩토리온 (15087611) | 부분 적재 (90행) | ingestion 3 endpoint 구현 + `DATA_GO_KR_API_KEY` 작동 → `auto.factoryon_registry` 90행 (OEM 5사 + tier-1). ProcessStep↔Plant 매핑 잔여 |
 | 산단공 공정 (15151075) | wired | 수동 CSV 다운 후 `make load-sandang-processes` |
 | `_legacy/v2/` | 보존 | 삭제 예정 미정 (`docs/mental_model.md §5.10`) |
 | Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. **CI(O-4)는 keyless smoke-e2e 만 — ephemeral PG/Neo4j 통합 잡은 secrets/self-hosted 후속** |
@@ -798,13 +798,13 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | `docs/design/` | ✅ ADR 4건 (F-3) | LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출 — context·decision·consequences, 코드 라인 위임 |
 | `_legacy/` | 보존 (v1/v2 KGQA Agent) | 이전 단일도메인 시스템. CHANGELOG/HISTORY 보존. 삭제 vs 마이그레이션 정책 미정 |
 | 모델 출력 reranker (BGE-Reranker-v2-m3) | 코드 wired (`RERANKER_URL=...`) | 실서비스에서 미활성. 활성 조건·임계 미정의 |
-| USES_PROCESS / MADE_OF (L6) | wired (ontology 정의) | `:Process` 노드 사전 산단공 적재 / `:Material` 노드 미구현. 엣지 적재 routine 미구현 |
+| USES_PROCESS / MADE_OF (L6) | **USES_PROCESS 189 적재** (Module→Process, candidate, `load_uses_process.py`) / MADE_OF 는 별도 (Cell→Material) |
 | DART 사업보고서 가동률 표 | 구현 완료 (2026-06-01) | `src/autograph/extractors/dart_production_parser.py::_parse_utilization_table` + `_parse_pct` 가 표 컬럼 정규화 + 가동률(util_pct) 추출. `auto.plant_utilization` 53 row 적재 완료 (§1 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct, B 등급 0.80) |
 | **IPGraph 도메인 어댑터** | **코드 구현 완료 (working tree, uncommitted)** — 도메인3 | `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/* + loaders/* + ingestion/*` + `ontology/ip/*` (audit-ontology 4/4 PASS) + tool pool 4종 + cypher `ip_*` 25 templates + gold seed 30 + cross_ip 8. `make audit-ipgraph` PASS. core 변경 0 LOC = 0.00% (§10.12). 상세 SSOT [docs/ipgraph.md](./docs/ipgraph.md) |
-| **`ip.assignee_corp_map`** | **(예정)** — 테이블 생성, mapping 데이터 0 | `19_ipgraph_bridge.sql` **적용 완료 (2026-06-01)** — assignee 적재 + auto/reviewed 매핑 SOP 대기. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
-| **KIPRIS / USPTO ODP (PatentsView 후속) / CPC bulk / OpenAlex** | **CPC bulk 10,695 + OpenAlex works 629 ✅ / KIPRIS·USPTO ODP (예정)** | `loaders/load_cpc.py` + `loaders/load_openalex.py` 적재 완료. PatentsView 는 **2026-03-20 USPTO Open Data Portal (data.uspto.gov) 로 이관 완료** — REST API 종료, **bulk dataset 채택**. `ingestion/{kipris,uspto_odp}.py` 구현됨, 키 발급 + bulk 적재 대기 |
-| **배터리·소재 (auto L5/L6)** | **(예정)** — ontology 정의만, 데이터 0 | Wikidata cell chem + USGS minerals + 무역통계. 회사단위 셀 ↔ OEM 소싱은 grade C candidate 정직 표기 |
-| **MCP 래퍼** | **(wired)** — `src/autonexusgraph/mcp/`. typed tool pool (52 tools: finance 21 + auto 31) + 자동 JSON Schema 변환 + stdio server + `ListToolsRequest` 핸들러 round-trip 실측 PASS (2026-06-02). `make audit-mcp` SDK 미설치 fail-soft | typed tool pool 위에 얇은 MCP server. 2026 상호운용 표준 신호 (Claude/OpenAI Agents SDK 양쪽 MCP 채택). `pip install -e ".[mcp]"` (이제 `[all]` extras 에도 포함) 후 `python -m autonexusgraph.mcp` |
+| **`ip.assignee_corp_map`** | **(scaffold)** — 테이블·loader 있음, mapping 데이터 0 | `19_ipgraph_bridge.sql` **적용 완료 (2026-06-01)** + `loaders/load_assignee_corp_map.py` — assignee 적재 + auto/reviewed 매핑 SOP 대기. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
+| **KIPRIS / USPTO ODP (PatentsView 후속) / CPC bulk / OpenAlex** | **CPC bulk 10,695 + OpenAlex works 629 ✅ / KIPRIS·USPTO ODP (scaffold, 보조)** | `loaders/load_cpc.py` + `loaders/load_openalex.py` 적재 완료. PatentsView 는 **2026-03-20 USPTO Open Data Portal (data.uspto.gov) 로 이관 완료** — REST API 종료, **bulk dataset 채택**. `ingestion/{kipris,uspto_odp}.py` 구현됨, 키 발급 + bulk 적재 대기 |
+| **배터리·소재 (auto L5/L6)** | **(부분 적재)** — Material 6 (materials_seed cathode chem) / Mineral 5 (`auto.master_minerals`) + DERIVED_FROM·MADE_OF 엣지 적재, L6 본격 진입 전 | Wikidata cell chem + USGS minerals + 무역통계. 회사단위 셀 ↔ OEM 소싱은 grade C candidate 정직 표기 |
+| **MCP 래퍼** | **(wired)** — `src/autonexusgraph/mcp/`. typed tool pool (59 tools: finance 21 + auto 38) + 자동 JSON Schema 변환 + stdio server + `ListToolsRequest` 핸들러 round-trip 실측 PASS (2026-06-02). `make audit-mcp` SDK 미설치 fail-soft | typed tool pool 위에 얇은 MCP server. 2026 상호운용 표준 신호 (Claude/OpenAI Agents SDK 양쪽 MCP 채택). `pip install -e ".[mcp]"` (이제 `[all]` extras 에도 포함) 후 `python -m autonexusgraph.mcp` |
 | **Langfuse 실측 ON** | **(wired)** — DoD #17 (b) | Langfuse 4.x OTEL native + ContextVar 격리. `make audit-trace` (LLM 비용 0 simulation 또는 `--full` 실 agent run) 가 `data/reports/audit_trace_*.json` 생성 → `make audit-dod` 자동 반영. `TRACE_BACKEND=langfuse` + `LANGFUSE_*` 키 필요 |
 | **온톨로지 pydantic strict 검증** | **PASS yaml 6/6 · cross-check PASS** (audit-ontology 2026-06-01) | `scripts/audit/ontology_validate.py` (Pydantic strict, `extra='forbid'`) — `ontology/{auto,ip}/{entities,relations}.yaml + ontology/{entities,relations}.yaml` 6 yaml 모두 통과. **cypher↔yaml cross-check** (default on): `cypher_templates_<domain>.py` 의 엣지 타입이 `relations.yaml` 에 정의되어 있는지 검증, cross-domain reference (예: ip cypher 가 auto.SUPPLIED_BY 참조) 는 기본 WARN(⚠️ 가시화), **Y-2: `make audit-ontology ARGS="--strict-cross"` 로 ERROR 강등 선택 가능**. 보완 완료: `LED_TO_RECALL` (auto/relations.yaml:162), `MAPPED_TO` (ip/relations.yaml:88) — 둘 다 yaml 에 정의됨 (audit-ontology 실측 PASS) |
 | **License invariant test** | **PASS — 15/15** (`tests/test_license.py`) | `_license.py` 정책 dict 와 도메인별 실제 사용 source 키 (finance/auto/ip/wiki) 의 동기화를 invariant 로 강제. 신규 ingester 추가 시 LICENSE_POLICY 미등록이면 test fail. `_common.save_raw` 가 미등록 source 첫 사용 시 WARN 로깅 |
@@ -883,7 +883,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 15. **(wired)** **IPGraph 도메인 추가 후 코어 변경 < 5% 재측정 (baseline reset)** — `src/ipgraph/{__init__,agent_handler,policy,ontology,cypher_templates_ip,tools/*}.py` 신규 패키지 + plug-in 자동 등록 (`ENV AUTONEXUSGRAPH_DOMAIN_PLUGINS=autograph,ipgraph`). `make audit-ipgraph` 가 handler/router/ontology/cypher templates(25)/gold(ip=30+cross_ip=8) 5종 wire-up 검증. PG init 18/19_ipgraph(.sql) + ontology/ip/*.yaml v2.2 schema_version. **core diff ratio** 측정은 baseline reset 후속. **정직 표기**: `0.00%` 단독 자랑이 아니라 통합 inflection (`bab9411 → 414bc1b = +1,877 LOC`) 과 같이 인용해야 정직 — [ledger §B-D](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5). → ip 추가가 N-domain 확장성의 정량 증거.
 16. **(wired)** **IPGraph gold seed + Cross-Domain ip 결합 측정** — `gold_qa_ip_v0.jsonl` 30 row (L1 10 / L2 10 / L3 10) + `gold_qa_cross_v0.jsonl` **44 row** (CD-L1 10 / L2 8 / L3 13 / L4 10 + difficulty 미부여 3 — **IP 결합 8 문항 (CD-L3 4 + CD-L4 4)** 포함). 삼성SDI 배터리 특허 H01M ↔ 영업이익 ↔ OEM 리콜 CD-L4 시연 row 포함. 목표 정확도 (IP-L1 80%+ / L2 70%+ / L3 50%+) 달성은 USPTO ODP/KIPRIS 적재 후 측정. `make validate-gold-qa` 0 errors (2026-06-02).
 17. **상용 신호 (Service-Grade Signals) 4 항:**
-    - **(a) (wired)** **MCP 래퍼** — `src/autonexusgraph/mcp/` 신규. typed tool pool (52 tools: finance 21 + auto 31) 자동 discovery + type hint → JSON Schema 자동 변환. stdio transport. `make audit-mcp` 가 SDK 미설치 시 SKIPPED + discovery 검증, 설치 시 server boot + `ListToolsRequest` 핸들러 in-process round-trip 으로 52 tools 응답 실측 (2026-06-02 PASS). `pip install -e ".[mcp]"`.
+    - **(a) (wired)** **MCP 래퍼** — `src/autonexusgraph/mcp/` 신규. typed tool pool (59 tools: finance 21 + auto 38) 자동 discovery + type hint → JSON Schema 자동 변환. stdio transport. `make audit-mcp` 가 SDK 미설치 시 SKIPPED + discovery 검증, 설치 시 server boot + `ListToolsRequest` 핸들러 in-process round-trip 으로 59 tools 응답 실측 (2026-06-04 PASS, SDK 설치). `pip install -e ".[mcp]"`.
     - **(b) (wired)** **Langfuse 실측 ON (turn별 token/cost/replan dashboard)** — `make audit-trace` + DoD dashboard 자동 반영. Langfuse 4.x OTEL native, ContextVar 격리, meta JSONB 적재. SSE generator yield 마다 turn.state 동기화. turn_id/question_kind 가 metadata 에 포함.
     - **(c) (wired)** **온톨로지 SHACL/pydantic 검증 (schema_version 온톨로지 레벨)** — `make audit-ontology` + DoD dashboard 자동 반영. pydantic v2 strict (`extra='forbid'` + enum + relation cross-check + edge_required_meta 7키 SoT). 핵심 6 yaml + **보조 4 yaml (Y-1: extractors/system_taxonomy/plants)** + cypher↔yaml cross-check. `schema_version` yaml 헤더. SHACL/rdflib 회피 — LPG 모델에 conceptual mismatch.
     - **(d) (wired, partial)** **축소 평가 매트릭스 (4 어댑터 × FAST tier 1종) + Allganize 외부 벤치 + rerank on/off ablation 실측** — `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + cell 식별자 자동 생성. `make audit-eval-matrix` simulation 8 cells enumerate (LLM 비용 0). **full LLM 측정 (`--full`) 은 사용자 환경 별도 트리거**.
@@ -892,13 +892,13 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 
 > 설계 SSOT = **[docs/process_graph.md](./docs/process_graph.md)**. §11.2 BOM 깊이 (auto 수직 심화) 와 한 쌍.
 
-18. ✅ **BoP 모델 안정** — `:Process` / `:ProcessStep` / `:Equipment` / `:Material` / `:Plant` **5 노드** + `PRODUCED_BY` / `PRECEDES` / `INSTANTIATES` / `USES_EQUIPMENT` / `CONSUMES_MATERIAL` / `PERFORMED_AT` / `CAUSED_BY_PROCESS` **7 엣지** 등록 (`ontology/auto/entities.yaml` + `relations.yaml` 확장, 별도 `process.yaml` 미생성 — 로더/감사 무수정 자동 동작). **현 측정**: `:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410 / 7 엣지 모두 ontology 등록 / `audit-ontology` PASS. **정량 게이트 충족** (≥400/≥400/≥300/7엣지/PASS).
-19. ⚠️ **회사 귀속 공정 인스턴스** — DART 사업보고서 III. 생산·설비 (B) + 팩토리온 15087611 (A) + manual_plant_process_seed (A) → `:Plant` / `PERFORMED_AT` 생성. **모든 회사 귀속 엣지 grade A/B 100%** (`load_performed_at.py` source allowlist hard-check 로 산단공 / KAMP / AI Hub 익명·합성 출처는 PERFORMED_AT 적재 차단). **현 측정**: `PERFORMED_AT` **0** (목표 ≥ 30 미달) — 팩토리온 `DATA_GO_KR_API_KEY` 부재 + ProcessStep↔Plant 직접 출처 부재. 회사 비귀속 출처 위반 0건은 ✅. 기존 `MANUFACTURED_AT` 99 + `OWNS_PLANT` 53 으로 회사→공장 귀속은 별도 존재. **활성화 트리거**: 팩토리온 키.
-20. ⚠️ **공정 cross 시연 (CD-Process)** — (a) 공정 ↔ 재무 (`Supplier → SUPPLIED_BY⁻¹ → Part → PRODUCED_BY → ProcessStep → PERFORMED_AT → Plant → operator_corp_code → finance` 4hop) (b) 공정 결함 전파 (`CAUSED_BY_PROCESS + INSTANTIATES + PRECEDES`) (c) 소재 리스크 (`CONSUMES_MATERIAL → Material → DERIVED_FROM → Mineral`) — 중 **2종 이상 Cross-Domain QA 통과**. **현 측정**: `gold_qa_auto_v0.jsonl` 공정 문항 ≥ 10 (AUTO0047+9) ✅ / `gold_qa_cross_v0.jsonl` CD-Process ≥ 5 ✅. **cross 실증**: **소재 리스크** (Module→Material→Mineral, NCM811→[Ni,Co,Mn,Li]) + **생산 vs 거시** (가동률 ↔ KAMA 거시) 2종 answerable / 공정↔재무·결함전파는 PERFORMED_AT·CAUSED_BY_PROCESS 미적재로 refusal. 정직 정책으로 허위 엣지 0건. **정량 게이트 부분 충족** (AUTO ≥ 10 / CD ≥ 5 ✅, cross 정확도 ≥ 50% 는 LLM 키 후 측정).
+18. ✅ **BoP 모델 안정** — `:Process` / `:ProcessStep` / `:Equipment` / `:Material` / `:Plant` **103 노드** + `PRODUCED_BY` / `PRECEDES` / `INSTANTIATES` / `USES_EQUIPMENT` / `CONSUMES_MATERIAL` / `PERFORMED_AT` / `CAUSED_BY_PROCESS` **7 엣지** 등록 (`ontology/auto/entities.yaml` + `relations.yaml` 확장, 별도 `process.yaml` 미생성 — 로더/감사 무수정 자동 동작). **현 측정**: `:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410 / 7 엣지 모두 ontology 등록 / `audit-ontology` PASS. **정량 게이트 충족** (≥400/≥400/≥300/7엣지/PASS).
+19. ✅ **회사 귀속 공정 인스턴스** — DART 사업보고서 III. 생산·설비 (B) + 팩토리온 15087611 (A) + manual_plant_process_seed (A) → `:Plant` / `PERFORMED_AT` 생성. **모든 회사 귀속 엣지 grade A/B 100%** (`load_performed_at.py` source allowlist hard-check 로 산단공 / KAMP / AI Hub 익명·합성 출처는 PERFORMED_AT 적재 차단). **현 측정**: `PERFORMED_AT` **94** (목표 ≥ 30 ✅) — (a) manual_seed **35 validated**(B, 한국 OEM 9공장 × 4대공정+파워트레인) + (b) factoryon **59 candidate**(:Plant A등급 + 업종→공정 추론 conf 0.60). **등급 정합**: plant 는 A(공식 registry)이나 공정 추론분은 candidate — plant A등급을 추론 공정엣지에 전가 금지(PRD §8). 산단공 익명 스텝 무오염, 회사 비귀속 출처 위반 0건 ✅. :Plant 29→**103**(factoryon 74 승격), `OWNS_PLANT` 53→**60**, `MANUFACTURED_AT` 99.
+20. ⚠️ **공정 cross 시연 (CD-Process)** — (a) 공정 ↔ 재무 (`Supplier → SUPPLIED_BY⁻¹ → Part → PRODUCED_BY → ProcessStep → PERFORMED_AT → Plant → operator_corp_code → finance` 4hop) (b) 공정 결함 전파 (`CAUSED_BY_PROCESS + INSTANTIATES + PRECEDES`) (c) 소재 리스크 (`CONSUMES_MATERIAL → Material → DERIVED_FROM → Mineral`) — 중 **2종 이상 Cross-Domain QA 통과**. **현 측정**: `gold_qa_auto_v0.jsonl` 공정 문항 ≥ 10 (AUTO0047+9) ✅ / `gold_qa_cross_v0.jsonl` CD-Process ≥ 5 ✅. **cross 실증**: **소재 리스크** (Module→Material→Mineral, NCM811→[Ni,Co,Mn,Li]) + **생산 vs 거시** (가동률 ↔ KAMA 거시) 2종 answerable / 공정↔재무·결함전파는 PERFORMED_AT 94 + CAUSED_BY_PROCESS 96(candidate) 적재로 **경로 구조 완성** (이전 refusal 사유 해소). 정직 정책으로 허위 엣지 0건 — 추론분은 candidate 표기. **정량 게이트 부분 충족** (AUTO ≥ 10 / CD ≥ 5 ✅, cross 정확도 ≥ 50% 는 LLM 키 후 측정).
 
 ### 핵심 정직 결론
 
-BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공정 인스턴스(#19)** 와 **LLM 품질 연결(#20 일부)** 은 *데이터·키 부재*로 보류 — **허위 엣지를 만들지 않고 coverage 를 그대로 표기**. 활성화 트리거 (팩토리온/KOTSA `DATA_GO_KR_API_KEY` / KAMP CSV / 한글 리콜) 가 풀리면 즉시 회사 귀속 엣지 적재 가능 — **DoD #20 "내부 데이터 수용 규격"** 가 코드로 보유 (`load_performed_at.py` source allowlist + `process_confidence.py` row 단위 격상 §4.0.1).
+BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공정 인스턴스(#19)** 는 충족 (`PERFORMED_AT` 94 = manual_seed 35 validated + factoryon 59 candidate). **LLM 품질 연결(#20 일부)** 은 LLM 키 대기 — **허위 엣지를 만들지 않고 coverage 를 그대로 표기**. 잔여 (KAMP CSV / LLM P3 정밀화) 가 풀리면 추가 적재 가능 (CAUSED_BY_PROCESS 96 candidate 적재 완료) — **DoD #20 "내부 데이터 수용 규격"** 가 코드로 보유 (`load_performed_at.py` source allowlist + `process_confidence.py` row 단위 격상 §4.0.1).
 
 ---
 
@@ -950,7 +950,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 **현재 작업 중인 것:**
 - DART 사업보고서 본문 파서 — 한국 OEM/부품사의 생산능력·가동률·공장명을 LLM 0% 정규식 + 표 파서로 추출 (가장 최근 커밋 `215f7e5`)
 - 산단공 합성 공정데이터 — `:Process` 사전 적재 (Casting / Forging / Stamping / Welding / Coating …)
-- 팩토리온 (15087611) scaffold — DATA_GO_KR_API_KEY 발급 후 회사·공장번호·산단별 등록 공장 조회 → `MANUFACTURED_AT` 보강
+- 팩토리온 (15087611) 부분 적재 90행 — DATA_GO_KR_API_KEY 작동, 회사·공장번호·산단별 조회 가동. 커버리지 확대 → `MANUFACTURED_AT` 보강
 - Wikidata P176 (manufactured by) — 부품↔공급사 staging 후 P4 cross-validate → Neo4j SUPPLIED_BY 승급
 
 ### 11.3 추론 가치 확장 — 공급망 위험 · 리콜 전파 · ESG 결합 · R&D ↔ 특허
@@ -987,7 +987,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 1. **eval 실측 (gate-zero)** — LLM 키 → 축소 매트릭스 (§10.17 d) → thesis headline (Hybrid > Vector multi-hop +30%p). **측정 전엔 아무것도 입증 안 됨.**
 2. **answerability 측정** — % grounded vs 정보부족. cross-domain 의 정직한 평가 (특히 process refusal 보존 패턴).
-3. **ProcessGraph 주요 축 (§10.18~20)** — process.yaml + DART 가동률 파서 (완료) + 팩토리온 키 → `PERFORMED_AT` ≥ 30 + **내부 데이터 수용 규격** (로더 계약 + 등급 승급 C합성→A내부).
+3. **ProcessGraph 주요 축 (§10.18~20)** — process.yaml + DART 가동률 파서 (완료) + `PERFORMED_AT` 94 ✅ (manual_seed 35 + factoryon 59) + **내부 데이터 수용 규격** (로더 계약 + 등급 승급 C합성→A내부).
 4. **상용 신호 (§12.1 P0+)** — MCP 래퍼 + Langfuse 실측 ON + 온톨로지 SHACL/pydantic 검증 + 축소 평가 매트릭스 (full LLM 트리거).
 5. **ip 보조축 (경량)** — CPC bulk (완료) + OpenAlex (완료) + assignee→corp 매핑 + USPTO ODP bulk + IP-L1~L2 cross 시연. KIPRIS 후순위.
 6. **gold QA 확장** — finance 100 / auto 100 / cross 50 / ip 100 + 외부 큐레이터 30% (자기충족성 완화).
@@ -1029,7 +1029,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
-| **MCP 래퍼** | **(wired)** — `src/autonexusgraph/mcp/{__init__,discovery,server,__main__}.py` 신규. 52 tools 자동 discovery + type hint→JSON Schema + `ListToolsRequest` 핸들러 round-trip 실측 PASS (2026-06-02). `make audit-mcp` 가 SDK 미설치 시 SKIPPED, 설치 시 server boot + handler round-trip 검증 | `pip install -e ".[mcp]"` (이제 `[all]` extras 에도 포함) → `python -m autonexusgraph.mcp` 로 stdio 서버 부팅. Claude Desktop / Cline 등이 .mcp.json 으로 본 서버 등록 후 호출 |
+| **MCP 래퍼** | **(wired)** — `src/autonexusgraph/mcp/{__init__,discovery,server,__main__}.py` 신규. 59 tools 자동 discovery + type hint→JSON Schema + `ListToolsRequest` 핸들러 round-trip 실측 PASS (2026-06-02). `make audit-mcp` 가 SDK 미설치 시 SKIPPED, 설치 시 server boot + handler round-trip 검증 | `pip install -e ".[mcp]"` (이제 `[all]` extras 에도 포함) → `python -m autonexusgraph.mcp` 로 stdio 서버 부팅. Claude Desktop / Cline 등이 .mcp.json 으로 본 서버 등록 후 호출 |
 | **Langfuse 실측 ON** | **(wired)** — Langfuse 4.x OTEL native + ContextVar 격리 + `meta JSONB` 적재. `make audit-trace` 자동 검증, DoD #17 (b) dashboard 자동 반영 | `.env` 의 `TRACE_BACKEND=langfuse` + `LANGFUSE_*` 키 설정. simulation 모드 (LLM 비용 0) 또는 `--full` (실 agent run). 향후 보강: per-replan 이벤트 emit, replan ROI 정량화 |
 | **온톨로지 SHACL/pydantic 검증** | **(wired)** — `src/autonexusgraph/ontology/` pydantic v2 strict 모델. `make audit-ontology` 자동 검증. SHACL/rdflib 회피 (LPG 그래프 conceptual mismatch + 무거운 dep) | yaml 로드 시점에 extra='forbid' + enum 정합 + relation.from/to cross-check + edge_required_meta 7키 SoT 강제. `schema_version` 헤더 1곳 SoT. 향후 보강: extractors.yaml / system_taxonomy.yaml / plants.yaml 등 보조 yaml 도 별도 모델 추가 |
 | **축소 평가 매트릭스 실측** | **(wired)** — `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + `eval/runners/run_matrix_smoke.py` 8 cells enumerate + thesis headline 자동 계산. `make audit-eval-matrix` simulation 모드 wire-up 검증 완료 (LLM 비용 0). DoD #17 (d) dashboard 자동 반영 | full LLM 측정은 `make audit-eval-matrix --full` (Sonnet 4.6 / GPT-4o-mini / Gemini Flash 중 1종) — Allganize 외부 gold (`eval/qa_gold/gold_qa_allganize_v0.jsonl` stub) 채워 thesis (§10.7) headline 실측 |
@@ -1074,7 +1074,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
-| **USES_PROCESS / MADE_OF (L6)** | `:Process` 노드 사전 적재 / `:Material` 미구현 / 엣지 0 | (1) 산단공 `:Process` ↔ `:Module` 매칭 routine, (2) `:Material` 노드 ontology + 배터리/합금 seed, (3) Wikidata P186 (made from material) staging |
+| **USES_PROCESS / MADE_OF (L6)** | **USES_PROCESS 189 적재** (Module.system_code→공정, candidate) / `:Material` 6 + MADE_OF | (1) ✅ Module→Process `load_uses_process.py` (2) 산단공 part_id deterministic 격상 (3) Wikidata P186 staging |
 | **DART 사업보고서 가동률 표** | 완료 (2026-06-01) | `_parse_utilization_table` 표 컬럼 정규화 + `auto.plant_utilization` 53 row 적재 |
 | **부품사 IR cross-reference** | 미구현 | DART finance 의 현대모비스/한온/만도 사업보고서 → auto 도메인 SUPPLIED_BY/MANUFACTURED_AT 보강 (reverse-direction Bridge) |
 | **NHTSA TSB / Manufacturer Communications** | 수동 zip 다운로드 모드만 | URL 자동 다운 routine (NHTSA URL 변경 추적) |
@@ -1295,7 +1295,7 @@ make migrate-auto-kama               # 16_autograph_kama_macro.sql
 make migrate-schema-pg MIGRATE_FILE=17_autograph_oem_news.sql       # IR/뉴스룸 events_oem_news
 make migrate-schema-pg MIGRATE_FILE=20_auto_minerals.sql            # USGS 핵심광물 (L6 소재 부록)
 make migrate-schema-pg MIGRATE_FILE=21_auto_ev_chargers.sql         # EV 충전 인프라 (예정 — `DATA_GO_KR_API_KEY` 발급 후)
-make migrate-schema-pg MIGRATE_FILE=24_auto_factoryon.sql           # 팩토리온 공장등록 (scaffold)
+make migrate-schema-pg MIGRATE_FILE=24_auto_factoryon.sql           # 팩토리온 공장등록 (부분 적재 90행)
 python -m autograph.loaders.neo4j_init    # CONSTRAINT/INDEX 멱등 — ontology/auto/entities.yaml SSOT
 
 # (옵션) pre-push 정합성 검증 — DB·LLM 없이 동작 (mock 모드)
@@ -1304,7 +1304,7 @@ make smoke-e2e                       # pytest + audit-ontology (cypher cross-che
 # 1. 인제스션 (.env 의 AUTO_INGEST_MAKES / AUTO_INGEST_YEAR_MIN/MAX 기반)
 make ingest-auto-all                # = vpic + recalls + complaints + safety + wikipedia + epa + investigations + sec-oem
 # 한국 시장 / KATRI / KNCAP (graceful skip — 키 없으면 0 byte)
-make ingest-datagokr-recalls        # data.go.kr 15089863 (DATA_GO_KR_API_KEY 필요)
+make ingest-datagokr-recalls        # data.go.kr 3048950 리콜 CSV (무인증, 수동 다운)
 make ingest-datagokr-inspections    # data.go.kr 15155857 (CSV 수동 다운)
 make ingest-katri                   # bigdata-tic.kr (BIGDATA_TIC_CLIENT_ID/SECRET 필요)
 make ingest-kncap                   # KNCAP (KNCAP_API_KEY 또는 수동 CSV)

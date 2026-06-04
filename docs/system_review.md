@@ -100,7 +100,7 @@
 
 | 자랑 | 실제 |
 |---|---|
-| README §10.17 — 4 상용 신호 모두 (wired) 또는 (wired, partial) | (a) **MCP** — typed tool pool 52 tools + JSON Schema 자동 변환 + stdio server. 외부 (Claude Desktop / Cursor / Cline) 호출 가능. ✅ 정합. (b) **Langfuse 실측 ON** — OTEL native + ContextVar 격리 + meta JSONB 적재. ✅ 정합. (c) **SHACL** — pydantic v2 로 대체 (`make audit-ontology`). 의도된 trade-off (PRD §11.1). (d) **축소 평가 매트릭스** — wire-up 완료, **실측 미실시** (§3.5 와 같은 한계) |
+| README §10.17 — 4 상용 신호 모두 (wired) 또는 (wired, partial) | (a) **MCP** — typed tool pool 59 tools + JSON Schema 자동 변환 + stdio server. 외부 (Claude Desktop / Cursor / Cline) 호출 가능. ✅ 정합. (b) **Langfuse 실측 ON** — OTEL native + ContextVar 격리 + meta JSONB 적재. ✅ 정합. (c) **SHACL** — pydantic v2 로 대체 (`make audit-ontology`). 의도된 trade-off (PRD §11.1). (d) **축소 평가 매트릭스** — wire-up 완료, **실측 미실시** (§3.5 와 같은 한계) |
 
 ---
 

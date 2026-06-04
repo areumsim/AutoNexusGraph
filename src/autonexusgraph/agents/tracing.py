@@ -205,8 +205,13 @@ def start_turn_context(thread_id: str, state: dict, *,
     domain = state.get("domain") if isinstance(state, dict) else None
 
     # 1. CostTracker (ContextVar 격리)
+    # per-turn 한도 = 도메인별 turn budget(agent_turn_budget_*_usd, 기본 0.20).
+    # 명시 전달해야 노드의 budget_aware_client(hard_limit=...) 와 일치한다.
+    # (과거: hard_limit 미전달 → 5.00 기본값 적용 → turn budget 무력화 버그)
+    from ..config import turn_budget_for_domain
     tracker = CostTracker(
         caller=caller, model="mixed",
+        hard_limit=turn_budget_for_domain(domain),
         thread_id=thread_id, turn_id=turn_id, domain=domain,
     )
     set_current_tracker(tracker)

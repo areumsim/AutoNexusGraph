@@ -275,7 +275,11 @@ relations:
     provenance: deterministic       # DART 공정도설명 + 산단공 매칭 (Step 3)
     pass: P2
     confidence_default: 0.80         # B (DART 매칭) — 산단공 단독은 C 로 하향
-    enabled: false                  # Step 3 활성화 (인스턴스 적재 후)
+    enabled: true                   # 활성화 (2026-06-04) — load_produced_by.py 46 candidate
+    notes: |
+      ontology 상정 deterministic BoP routing(DART 공정도 + 산단공 part_id)은
+      part_id 부재로 불가 → :Part NHTSA system → 공정 카테고리 추론 (candidate/0.50).
+      외주 부품은 의장(조립) BoP 진입. 진짜 deterministic 출처 들어오면 격상.
     notes: |
       부품이 어떤 공정 단계로 만들어지는가. (:Part)-[:PRODUCED_BY]->(:ProcessStep).
 
@@ -314,7 +318,7 @@ relations:
     provenance: deterministic
     pass: P2
     confidence_default: 0.50
-    enabled: false                  # scaffold (인스턴스 미적재)
+    enabled: true                   # 활성화 (2026-06-04) — load_process_resources.py 16 (표준 설비)
 
   CONSUMES_MATERIAL:                # ProcessStep → Material (→ L6 Mineral 하향)
     from: ProcessStep
@@ -325,7 +329,7 @@ relations:
     provenance: deterministic
     pass: P2
     confidence_default: 0.80
-    enabled: false                  # Step 5 활성화
+    enabled: true                   # 활성화 (2026-06-04) — 파워트레인(배터리셀) → L6 소재 6
 
   PERFORMED_AT:                     # ProcessStep → Plant (★ 회사 귀속 — A/B 만)
     from: ProcessStep
@@ -336,22 +340,44 @@ relations:
     provenance: deterministic       # DART(B) / 팩토리온(A) — 합성·익명 출처 금지
     pass: P2
     confidence_default: 0.80
-    enabled: false                  # Step 2 — 직접 출처 coverage 확인 후 활성화
+    enabled: true                   # 활성화 (2026-06-04) — manual_seed 35 엣지 적재 (DoD #19 ≥30)
     notes: |
       회사 귀속 핵심 엣지. 공장(:Plant)은 real(A/B) 이나 어떤 공정이 도는지는
       추론일 수 있음 — 추론분은 confidence 하향·validated_status='candidate' 로
       등급 정합 유지. plant real 등급을 inferred 공정 엣지에 전가 금지 (PRD §8).
+      적재: `load_performed_at.py` (ontology/auto/performed_at_seed.yaml, manual_seed
+      B등급 conf 0.85). 한국 OEM 9 공장 × 자동차 4대공정+파워트레인 = 35 엣지.
 
-  CAUSED_BY_PROCESS:                # Recall → Process (품질 이벤트 ↔ 공정, P3 후보)
+  CAUSED_BY_PROCESS:                # Recall → Process (품질 이벤트 ↔ 공정)
     from: Recall
     to: Process
     directed: true
     cardinality: many-to-many
     class: side_hop
-    provenance: llm                 # P3 LLM 추출 → P4 cross-validate 필수
+    provenance: deterministic       # KR 리콜 결함 + 공정키워드+결함지시어 매칭 (LLM P3 보강 가능)
     pass: P3
     confidence_default: 0.50         # C — "후보" 표시, C 단독 근거 금지
-    enabled: false                  # Step 6 활성화 (비용 dry-run → P4 통과분만)
+    enabled: true                   # 활성화 (2026-06-04) — load_recall_process_map.py 96 candidate
+    notes: |
+      KOTSA 한글 리콜(datagokr_kotsa) 결함요약에서 공정키워드(용접/조립/가공/사출/
+      프레스/도장)+결함지시어 동시출현 deterministic 매칭. 모든 엣지 candidate/0.50
+      — "그 공정이 원인"은 인과 추론이므로 단독 근거 금지. 한글-한글 매칭으로 US
+      영문 리콜 환각위험 회피. LLM P3 cross-validate 는 후속 정밀화.
+
+  USES_PROCESS:                     # Module → Process (모듈이 거치는 제조 공정유형)
+    from: Module
+    to: Process
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic       # Module.system_code → 공정 카테고리 매핑
+    pass: P2
+    confidence_default: 0.50         # C — system_code→공정 추론 (candidate)
+    enabled: true                   # 활성화 (2026-06-04) — load_uses_process.py
+    notes: |
+      Module(BoM L4) 의 system_code(BODY/POWERTRAIN/SUSPENSION 등) → 캐논 공정
+      카테고리. "어떤 공정으로 만들어지나"는 추론이므로 candidate/0.50. PRODUCED_BY
+      (Part→ProcessStep)의 모듈 수준 대응. 산단공 part_id 들어오면 deterministic 격상.
 
 # ── 명명 컨벤션 ─────────────────────────────────────────────────
 naming_conventions:

@@ -41,7 +41,8 @@ class AutoSettings(BaseSettings):
     kncap_api_key: str = ""
 
     # === data.go.kr (공공데이터포털) — 단일 키로 여러 API 활용 ===
-    # API 15089863 (한국 자동차 리콜정보), 15155857 (수리검사내역 — 파일) 등.
+    # 팩토리온 공장등록 (15087611) 등 키 기반 API. 한국 리콜은 3048950 CSV(무인증,
+    # 구 오픈API 15089863 폐기), 수리검사 15155857 도 파일데이터라 키 불필요.
     data_go_kr_api_key: str = ""
     data_go_kr_base_url: str = "https://api.odcloud.kr/api"
 

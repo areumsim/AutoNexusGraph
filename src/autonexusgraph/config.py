@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o"
     llm_timeout: float = 120.0
 
+    # Kill-switch — False 면 get_llm_client() 가 LLMError 로 모든 LLM 호출 차단.
+    # llm_guard.py on/off (또는 .env LLM_ENABLED) 로 토글. (실행 중 프로세스는
+    # get_settings lru_cache 때문에 재시작해야 반영 — 배치/CLI 는 즉시 반영.)
+    llm_enabled: bool = True
+
     # Provider-specific 키 — 모델명 prefix 로 알맞은 키 자동 선택.
     # OPENAI    : gpt-* 모델
     # ANTHROPIC : claude-* 모델
@@ -58,11 +63,14 @@ class Settings(BaseSettings):
 
     local_llm_base_url: str = "http://localhost:8000/v1"
 
-    # === 세션 비용 한도 (전역 가드 — 모든 LLM 호출 합산 한도) ===
-    # 도달 시 BudgetExceeded 로 모든 후속 호출 차단. 코드 기본값을 안전선으로,
-    # env 로 상향/하향 조정 가능.
+    # === 세션 비용 한도 (영속 누적 가드 — cost_log.jsonl 기반) ===
+    # turn/프로세스 리셋과 무관하게, llm_cost_window_hours 시간창 안의 모든 LLM
+    # 호출 누적이 이 값에 도달하면 BudgetExceeded 로 후속 호출 차단. (per-turn
+    # 한도는 agent_turn_budget_*_usd, per-batch 기본 한도는 llm_cost_hard_limit_usd)
     llm_session_hard_limit_usd: float = 5.00
     llm_session_warn_at_usd: float = 2.50
+    # 영속 누적 한도 집계 시간창(시간). 0 이하 → 전체 기간(all-time). 기본 24h.
+    llm_cost_window_hours: float = 24.0
 
     # === 임베딩 ===
     embedding_url: str = "http://localhost:8080"
@@ -153,7 +161,9 @@ class Settings(BaseSettings):
 
     # === LLM 비용 가드 (사용자 명시) ===
     # 모든 LLM 호출은 dry-run estimator + 누적 한도 + circuit breaker 통과해야 함.
-    llm_cost_hard_limit_usd: float = 5.00    # 누적 이 한도 도달 시 즉시 abort
+    # llm_cost_hard_limit_usd = 단일 tracker(한 turn 또는 한 배치)의 기본 hard
+    # limit. 영속/시간창 누적 한도는 위 llm_session_hard_limit_usd 가 담당.
+    llm_cost_hard_limit_usd: float = 5.00    # 단일 tracker 누적 도달 시 abort
     llm_cost_auto_approve_usd: float = 0.50  # 추정 이 이하면 자동 통과, 초과면 --approve-cost 필요
     llm_cost_report_every: int = 10          # 매 N 호출마다 누적 로그
     llm_cost_log_calls: bool = False          # True 면 ops.llm_calls 에 호출별 상세 적재

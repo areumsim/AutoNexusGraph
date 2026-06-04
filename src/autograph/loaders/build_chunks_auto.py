@@ -84,6 +84,7 @@ def _upsert_chunk(cur, *, source: str, section: str, text: str,
 _RECALL_SRC_MAP: dict[str, str] = {
     "nhtsa":          "nhtsa_recall",
     "datagokr_kotsa": "kotsa_recall",
+    "eu_safety_gate": "eu_recall",
 }
 
 

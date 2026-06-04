@@ -168,6 +168,10 @@ def get_llm_client(
     from ..config import get_settings
 
     s = get_settings()
+    # Kill-switch — llm_enabled=False 면 모든 LLM 호출 차단 (llm_guard.py off).
+    if not getattr(s, "llm_enabled", True):
+        raise LLMError("LLM disabled (llm_enabled kill-switch). `make llm-on` 또는 "
+                       ".env LLM_ENABLED=true 로 활성화.")
     final_model = model if model else _resolve_model(s, role)
     if provider:
         final_provider = provider
@@ -200,11 +204,17 @@ def get_llm_client(
             f"unknown LLM provider: {final_provider!r} (model={final_model!r})"
         )
 
-    # 모든 LLM 호출이 누락 없이 cost_log.jsonl 에 기록되도록 wrap.
-    # provider/메서드/budget_aware wrap 여부 무관 — 본 wrapper 가 항상 마지막에.
+    # Auto-wrap — 모든 client 가 항상 비용 가드 + 영속 로그를 거치게 한다.
+    #   inner(adapter) → BudgetAwareLLMClient(호출 전 guard, 후 record)
+    #                  → LoggingLLMClient(cost_log.jsonl append) [최외곽]
+    # 호출자가 budget_aware_client 로 또 감싸도 idempotent 하게 처리되어 이중 record
+    # 안 됨(budget_aware.py 참조). 지연 import 로 base↔budget_aware 순환 회피.
+    from .budget_aware import BudgetAwareLLMClient
     from .cost_log import LoggingLLMClient
+    from .cost_tracker import get_session_tracker
     caller_name = role or "anon"
-    return LoggingLLMClient(inner, caller=caller_name)
+    tracker = get_session_tracker(caller=caller_name, model=final_model)
+    return LoggingLLMClient(BudgetAwareLLMClient(inner, tracker), caller=caller_name)
 
 
 def _resolve_model(settings: Any, role: str | None) -> str:

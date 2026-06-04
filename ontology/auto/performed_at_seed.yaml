@@ -1,0 +1,62 @@
+# (:ProcessStep) -[:PERFORMED_AT]-> (:Plant)  회사 귀속 공정 시드.
+#
+# ProcessGraph DoD #19 (회사 귀속 인스턴스 ≥ 30) 의 manual_seed 출처.
+# 산단공(synthetic·익명) :ProcessStep 550 은 회사 귀속 금지 — 본 시드는 별도의
+# **회사 귀속 ProcessStep** 을 새로 생성한다 (step_id prefix `seed_`).
+#
+# 모델: 자동차 완성차 공장의 4 대 핵심공정 (프레스 → 차체 → 도장 → 의장) + 일부
+# 공장의 파워트레인(엔진·변속기). 모든 OEM 이 공개 IR / 공장 소개 / 위키에 동일하게
+# 기술하는 보편 사실 → PRD §3.5 **B 등급** (공개 deterministic), confidence 0.85,
+# validated_status='validated'.
+#
+# 정책 (source allowlist hard-check):
+#   - source_type = 'manual_seed' (DART / factoryon 와 함께 회사 귀속 허용 3 출처).
+#   - plant_code 는 ontology/auto/plants.yaml 의 :Plant code 를 그대로 참조.
+#   - process_name 은 캐논 taxonomy (synthetic 블롭과 분리) — :Process 신규 MERGE.
+#   - 한 공장이 여러 공정을 수행 → PERFORMED_AT many-to-many.
+
+version: 1
+last_updated: 2026-06-04
+
+# 캐논 :Process taxonomy (회사 귀속 공정유형) — synthetic 산단공 사전과 분리.
+processes:
+  - name: 프레스
+    desc: 차체 패널 스탬핑·프레스 성형 (Stamping/Press shop)
+  - name: 차체
+    desc: 차체 용접·조립 (Body/Welding shop)
+  - name: 도장
+    desc: 차체 도장 (Paint shop)
+  - name: 의장
+    desc: 최종 의장·조립 (Final assembly/Trim shop)
+  - name: 파워트레인
+    desc: 엔진·변속기 가공·조립 (Powertrain)
+
+# 공장별 수행 공정 — 한국 OEM 완성차/파워트레인 공장 (공개 자료 기반).
+mappings:
+  - plant_code: HYU_ULSAN        # 현대 울산 — 세계 최대 단일 완성차 + 엔진
+    manufacturer: HYUNDAI
+    processes: [프레스, 차체, 도장, 의장, 파워트레인]
+  - plant_code: HYU_ASAN         # 현대 아산 — 쏘나타/그랜저 승용
+    manufacturer: HYUNDAI
+    processes: [프레스, 차체, 도장, 의장]
+  - plant_code: HYU_JEONJU       # 현대 전주 — 상용(트럭·버스) + 엔진
+    manufacturer: HYUNDAI
+    processes: [차체, 도장, 의장, 파워트레인]
+  - plant_code: KIA_HWASEONG     # 기아 화성 — 대형 완성차 + 엔진
+    manufacturer: KIA
+    processes: [프레스, 차체, 도장, 의장, 파워트레인]
+  - plant_code: KIA_GWANGJU      # 기아 광주 — 셀토스/스포티지/봉고
+    manufacturer: KIA
+    processes: [프레스, 차체, 도장, 의장]
+  - plant_code: RNK_BUSAN        # 르노코리아 부산
+    manufacturer: RENAULT_KOREA
+    processes: [프레스, 차체, 도장, 의장]
+  - plant_code: KGM_PYEONGTAEK   # KG모빌리티 평택 — 완성차
+    manufacturer: KG_MOBILITY
+    processes: [프레스, 차체, 도장, 의장]
+  - plant_code: KGM_CHANGWON     # KG모빌리티 창원 — 엔진 전용
+    manufacturer: KG_MOBILITY
+    processes: [파워트레인]
+  - plant_code: GMK_BUPYEONG     # GM 한국 부평 — 완성차
+    manufacturer: GM_KOREA
+    processes: [프레스, 차체, 도장, 의장]

@@ -32,14 +32,39 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
-from .cost import cost_of_call, get_hard_limit_usd, get_report_every
+from .cost import (
+    cost_of_call,
+    get_cost_window_hours,
+    get_hard_limit_usd,
+    get_report_every,
+    get_session_limit_usd,
+)
 
 
 log = logging.getLogger(__name__)
 
 
+def _read_session_base() -> float:
+    """cost_log.jsonl 에서 영속 누적 비용 baseline 읽기 (tracker 생성 시 1회).
+
+    llm_cost_window_hours 시간창 안의 합. 파일/파싱 실패는 0.0 (fail-soft).
+    이 값 + 현재 tracker 누적 = 실제 영속 누계 → 세션 한도 가드의 기준.
+    """
+    try:
+        from datetime import datetime, timedelta, timezone
+        from .cost_log import total_cost
+        hrs = get_cost_window_hours()
+        since = None
+        if hrs and hrs > 0:
+            since = datetime.now(timezone.utc) - timedelta(hours=hrs)
+        return float(total_cost(since=since))
+    except Exception as e:   # noqa: BLE001
+        log.debug("[COST] session base read failed: %s", e)
+        return 0.0
+
+
 class BudgetExceeded(Exception):
-    """누적 비용이 hard_limit 도달 — batch abort 신호."""
+    """누적 비용이 한도 도달 — turn/batch abort 신호."""
 
 
 @dataclass
@@ -86,6 +111,11 @@ class CostTracker:
         )
         self._lock = threading.Lock()
         self._report_every = get_report_every()
+        # 영속(세션/일) 누적 가드 — cost_log.jsonl 기반. turn/process 리셋과 무관.
+        # base 는 생성 시점 1회 스냅샷 (호출마다 파일 재독 안 함). guard 는
+        # base + 현재 tracker 누적 vs session_limit 비교.
+        self._session_limit_usd = get_session_limit_usd()
+        self._session_base_usd = _read_session_base()
         self._persist_initial()
 
     # ── 누적 ───────────────────────────────────────────────────
@@ -121,14 +151,34 @@ class CostTracker:
                      f"(limit ${limit:.4f}, {100*cum/max(limit,1e-9):.1f}%)")
 
     def guard(self) -> None:
-        """다음 호출 전에 한도 확인. 초과 시 BudgetExceeded."""
+        """다음 호출 전에 한도 확인. 둘 중 하나라도 초과면 BudgetExceeded.
+
+        1. per-turn/batch: 이 tracker 자체 누적 ≥ hard_limit_usd
+        2. 영속(세션/일): session_base + 이 tracker 누적 ≥ session_limit_usd
+           (cost_log.jsonl 기반 — turn/process 리셋과 무관하게 누적 차단)
+        """
         with self._lock:
-            if self.state.cost_usd >= self.state.hard_limit_usd:
+            cum = self.state.cost_usd
+            if cum >= self.state.hard_limit_usd:
                 self.state.aborted = True
                 raise BudgetExceeded(
-                    f"누적 비용 ${self.state.cost_usd:.4f} ≥ hard_limit "
+                    f"turn 누적 ${cum:.4f} ≥ hard_limit "
                     f"${self.state.hard_limit_usd:.4f} (caller={self.state.caller})"
                 )
+            session_total = self._session_base_usd + cum
+            if session_total >= self._session_limit_usd:
+                self.state.aborted = True
+                raise BudgetExceeded(
+                    f"세션 누적 ${session_total:.4f} ≥ session_limit "
+                    f"${self._session_limit_usd:.4f} "
+                    f"(base ${self._session_base_usd:.4f} + turn ${cum:.4f}, "
+                    f"caller={self.state.caller})"
+                )
+
+    def session_spent_usd(self) -> float:
+        """현재 영속 누계 추정 (base 스냅샷 + 이 tracker 누적) — 진단용."""
+        with self._lock:
+            return self._session_base_usd + self.state.cost_usd
 
     # ── 종료 ──────────────────────────────────────────────────
     def finalize(self, status: str = "ok", *,
@@ -265,16 +315,16 @@ def get_session_tracker(caller: str | None = None,
     """
     tracker = _tracker_ctx.get()
     if tracker is not None and not tracker.state.finalized:
+        # 기존 tracker 재사용. 더 빡빡한 한도가 들어오면 하향 반영(절대 느슨하게
+        # 만들지 않음). 과거 버그: 여기서 hard_limit 을 통째로 무시해 노드가 넘긴
+        # turn budget(0.20)이 버려지고 5.00 이 적용됐음.
+        if hard_limit is not None and hard_limit < tracker.state.hard_limit_usd:
+            with tracker._lock:
+                tracker.state.hard_limit_usd = hard_limit
         return tracker
 
     # ctx 에 없거나 이전 tracker 가 이미 finalized 인 경우 — 새로 생성.
-    if hard_limit is None:
-        try:
-            from ..config import get_settings
-            hard_limit = get_hard_limit_usd(get_settings().llm_session_hard_limit_usd)
-        except Exception:   # noqa: BLE001
-            hard_limit = get_hard_limit_usd()
-
+    # hard_limit=None 이면 CostTracker 가 get_hard_limit_usd() 로 기본값 적용.
     tracker = CostTracker(
         caller=caller or "session",
         model=model or "mixed",

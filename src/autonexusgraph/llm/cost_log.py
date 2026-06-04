@@ -96,9 +96,29 @@ def iter_entries(path: Path | None = None) -> Iterator[dict[str, Any]]:
                 continue
 
 
-def total_cost(path: Path | None = None) -> float:
-    """현재까지 누적 비용 USD — 디버그/스모크용 1줄 헬퍼."""
-    return sum(float(e.get("cost_usd", 0.0) or 0.0) for e in iter_entries(path))
+def _parse_ts(ts_str: str) -> datetime | None:
+    """ISO ts → datetime (tz-aware). 파싱 실패 시 None."""
+    if not ts_str:
+        return None
+    try:
+        return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def total_cost(path: Path | None = None, *, since: datetime | None = None) -> float:
+    """누적 비용 USD. ``since`` 지정 시 그 시각 이후 entry 만 합산 (rolling window).
+
+    ts 없는/파싱 실패 entry 는 since 필터 시 보수적으로 제외.
+    """
+    tot = 0.0
+    for e in iter_entries(path):
+        if since is not None:
+            ts = _parse_ts(str(e.get("ts", "")))
+            if ts is None or ts < since:
+                continue
+        tot += float(e.get("cost_usd", 0.0) or 0.0)
+    return tot
 
 
 class LoggingLLMClient:
