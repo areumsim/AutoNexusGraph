@@ -318,7 +318,7 @@ relations:
     provenance: deterministic
     pass: P2
     confidence_default: 0.50
-    enabled: false                  # scaffold (인스턴스 미적재)
+    enabled: true                   # 활성화 (2026-06-04) — load_process_resources.py 16 (표준 설비)
 
   CONSUMES_MATERIAL:                # ProcessStep → Material (→ L6 Mineral 하향)
     from: ProcessStep
@@ -329,7 +329,7 @@ relations:
     provenance: deterministic
     pass: P2
     confidence_default: 0.80
-    enabled: false                  # Step 5 활성화
+    enabled: true                   # 활성화 (2026-06-04) — 파워트레인(배터리셀) → L6 소재 6
 
   PERFORMED_AT:                     # ProcessStep → Plant (★ 회사 귀속 — A/B 만)
     from: ProcessStep

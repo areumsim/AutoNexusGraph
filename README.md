@@ -19,7 +19,7 @@
 | **보조축 (수평 cross)** | **ip** = 특허·기술혁신 | assignee→corp 브리지를 타는 **수평 cross 진입 어댑터** (corp_entity 브리지 전용). 풀 도메인 어댑터 완료, 데이터 부분 적재 | 구현 (CPC 10,695 + OpenAlex 629) |
 | **곁가지 (L6)** | 배터리·소재 | 공개 거시(USGS) + Wikidata chem | (부분 적재 — Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8) |
 
-**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. **회사 귀속 인스턴스 `PERFORMED_AT` 94 적재** (manual_seed 35 validated B + factoryon 59 candidate A공장/추론공정, DoD #19 ≥30 충족). `PRODUCED_BY` 46 candidate (부품→공정 카테고리 추론), `CAUSED_BY_PROCESS` 96 candidate (리콜→공정). `CONSUMES_MATERIAL`/`USES_EQUIPMENT` 등은 0 (산단공 소재·설비 정보 부재). "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
+**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. **회사 귀속 인스턴스 `PERFORMED_AT` 94 적재** (manual_seed 35 validated B + factoryon 59 candidate A공장/추론공정, DoD #19 ≥30 충족). `PRODUCED_BY` 46 candidate (부품→공정 카테고리 추론), `CAUSED_BY_PROCESS` 96 candidate (리콜→공정). `CONSUMES_MATERIAL` 6 + `USES_EQUIPMENT` 16 (표준 공정 지식, ProcessStep→Material→Mineral L6 경로 완성). 산단공 실 소재·설비 데이터는 후속. "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
 
 > **정직성 가드 2개 필수:** (1) "준비된 빈 축" 명시 — 합성·공개데이터(산단공·KAMP)는 패턴/검증용이지 사실 주장용 아님 (회사 귀속 엣지 hard-check 차단). (2) **내부 데이터 수용 규격**(로더 계약 + 등급 승급 C합성→A내부)을 결과물로 보유 (DoD §10.20). 상세 [docs/process_graph.md](./docs/process_graph.md).
 
