@@ -28,7 +28,7 @@ from ._number_patterns import (
     numbers_from_tool_results as _numbers_from_tool_results,
 )
 from .grounding import verify_answer_grounding
-from .state import AgentState
+from .state import AgentState, _ClearedDict, _ClearedList
 
 log = logging.getLogger(__name__)
 
@@ -199,11 +199,12 @@ def mark_replan(state: AgentState) -> AgentState:
                        if isinstance(t, dict)],
         "prev_grounding": list((state.get("grounding") or {}).get("warnings") or []),
     }
-    state["tool_results"] = []
-    state["evidence_chunks"] = []
+    # 축6: 누적 채널은 마커로 비워 reducer 가 교체(clear)하게 한다 (merge 무력화 방지).
+    state["tool_results"] = _ClearedList()
+    state["evidence_chunks"] = _ClearedList()
     state["plan"] = []
     state["tasks"] = []
-    state["task_results"] = {}
+    state["task_results"] = _ClearedDict()
     state["answer"] = ""
     state["citations"] = []
     state["validation_status"] = "pending"

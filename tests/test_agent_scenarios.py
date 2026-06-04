@@ -331,3 +331,62 @@ def test_multihop_plan_emits_spawn_template():
     assert spawn[0]["spawn"]["intent"] == "get_operating_income"
     # _spawn 은 legacy plan(도구 직접호출 목록)에서 제외돼야 함.
     assert all("spawn" not in str(p.get("tool")) for p in state.get("plan") or [])
+
+
+# ── 축6: 병렬 Send fan-in last-wins 손실 하드닝 ────────────────
+def test_fanin_reducers_dedup_and_clear():
+    """dedup-concat/merge reducer — 손실 0·pre-fork 중복 0·clear 마커 동작."""
+    from autonexusgraph.agents.state import (
+        _ClearedDict, _ClearedList, _concat_dedup_by, _merge_dict_dedup,
+    )
+    concat = _concat_dedup_by("id")
+    e0 = [{"id": "c0"}]
+    ch = concat(concat(concat(None, e0), e0 + [{"id": "cA"}]), e0 + [{"id": "cB"}])
+    assert [c["id"] for c in ch] == ["c0", "cA", "cB"]   # 동시 worker 보존, pre-fork 1회
+
+    md = _merge_dict_dedup
+    ch = md(md({"g": 0}, {"g": 0, "a": 1}), {"g": 0, "b": 2})
+    assert ch == {"g": 0, "a": 1, "b": 2}
+
+    # clear 마커 → 교체(replan 비우기); 비-마커 빈 컬렉션 → merge(비기여 worker 보호)
+    assert concat([{"id": "x"}], _ClearedList()) == []
+    assert md({"a": 1}, _ClearedDict()) == {}
+    assert concat([{"id": "x"}], []) == [{"id": "x"}]
+    assert md({"a": 1}, {}) == {"a": 1}
+
+
+def test_langgraph_parallel_fanin_no_loss():
+    """실제 LangGraph StateGraph + Send 병렬 — 4 worker 결과 전부 보존(손실 0)."""
+    pytest.importorskip("langgraph")
+    from langgraph.graph import END, StateGraph
+    from langgraph.types import Send
+
+    from autonexusgraph.agents.state import AgentState
+
+    def fan(state):
+        return {}
+
+    def route(state):
+        return [Send("work", {**state, "_cur": i}) for i in range(4)]
+
+    def work(state):
+        i = state["_cur"]
+        ev = list(state.get("evidence_chunks") or [])
+        ev.append({"id": f"c{i}"})           # pre-fork 사본 + 자기 델타(legacy 패턴)
+        tr = dict(state.get("task_results") or {})
+        tr[f"w{i}"] = i
+        return {"evidence_chunks": ev, "task_results": tr}
+
+    g = StateGraph(AgentState)
+    g.add_node("fan", fan)
+    g.add_node("work", work)
+    g.set_entry_point("fan")
+    g.add_conditional_edges("fan", route, ["work"])
+    g.add_edge("work", END)
+    app = g.compile()
+
+    out = app.invoke({"evidence_chunks": [{"id": "pre"}],
+                      "task_results": {"seed": -1}, "question": "q"})
+    assert sorted(c["id"] for c in out["evidence_chunks"]) == \
+        ["c0", "c1", "c2", "c3", "pre"]      # 4 병렬 전부 + pre 1회(중복 0)
+    assert out["task_results"] == {"seed": -1, "w0": 0, "w1": 1, "w2": 2, "w3": 3}

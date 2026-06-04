@@ -251,11 +251,19 @@ def planner_node(state: AgentState) -> AgentState:
     """
     from .dag import make_spawn_task, make_task
 
+    from .state import _ClearedDict, _ClearedList
+
+    # 축6: 누적 채널 per-turn 리셋 — 마커로 reducer 에 교체 지시. checkpointer 다중턴
+    # 잔류·병렬 fan-in 누적 오염 방지. 함수체인(reducer 미적용)에선 빈 컬렉션과 동일.
+    # planner 가 gather 단계 시작점이므로 여기서 비우면 workers 가 깨끗이 누적.
+    state["task_results"] = _ClearedDict()
+    state["tool_results"] = _ClearedList()
+    state["evidence_chunks"] = _ClearedList()
+
     # triage 가 입력 거부를 결정 (prompt_injection 등) — task 생성 건너뛰고
     # synthesizer 가 결정적 거부 답변을 생성하도록 위임.
     if state.get("aborted_reason") == "prompt_injection":
         state["tasks"] = []
-        state["task_results"] = {}
         state["plan"] = []
         return state
 
@@ -285,7 +293,7 @@ def planner_node(state: AgentState) -> AgentState:
     if handler is not None and hasattr(handler, "plan_tasks"):
         tasks = call_handler_method(state, handler, "plan_tasks", state, question=q)
         state["tasks"] = tasks or []
-        state["task_results"] = {}
+        # task_results 는 planner 진입부에서 이미 마커로 리셋됨 — 재대입 금지(마커 보존).
         state["plan"] = [
             {"tool": t["intent"], "args": t["args"],
              "purpose": f"{t['agent']}:{t['intent']}"}
@@ -401,7 +409,7 @@ def planner_node(state: AgentState) -> AgentState:
             ))
 
     state["tasks"] = tasks
-    state["task_results"] = {}
+    # task_results 는 planner 진입부에서 이미 마커로 리셋됨 — 재대입 금지(마커 보존).
 
     # 호환용 legacy plan — executor 폴백 (tasks 빈 경우 사용).
     # _spawn 템플릿은 reflect 전용 — 도구 호출 불가하므로 legacy plan 에서 제외.
