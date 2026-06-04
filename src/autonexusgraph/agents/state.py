@@ -149,6 +149,10 @@ class AgentState(TypedDict, total=False):
     validation_status: Annotated[str, _last_wins]
     validation_issues: Annotated[list[str], _last_wins]
     grounding: Annotated[dict, _last_wins]
+    # (b) Result-aware replan — Validator 실패 시 mark_replan 이 채우고 planner 가 읽어
+    # 전략을 바꾼다. {"n", "prev_kind", "prev_issues", "prev_tools", "prev_grounding"}.
+    # 없으면(=첫 turn) 룰 planner 기본 동작. n_replans 와 짝으로 폐회로 증거.
+    replan_hint: Annotated[dict, _last_wins]
 
     # Human-in-the-Loop (PRD §7.5.6)
     pending_interrupt: Annotated[dict, _last_wins]

@@ -18,7 +18,7 @@ import logging
 import re
 from typing import Any
 
-from .dag import update_status
+from .dag import resolve_arg_bindings, update_status
 from .state import AgentState
 
 log = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
     from ..tools.retrieve import search_documents, search_by_metadata, get_chunk
 
     intent = task.get("intent") or "search"
-    args = dict(task.get("args") or {})
+    args = resolve_arg_bindings(state, task.get("args"))   # (a) closed-loop 데이터 흐름
     domain = _domain(state)
 
     # 도메인 handler 의 retrieve 모듈에 해당 intent 가 있으면 그쪽 위임.
@@ -169,7 +169,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
 def graph_worker(state: AgentState, task: dict) -> AgentState:
     """Neo4j 관계 탐색 (cypher_guard 통과). args 의 intent 가 함수명. 도메인 인식."""
     intent = task.get("intent") or ""
-    args = dict(task.get("args") or {})
+    args = resolve_arg_bindings(state, task.get("args"))   # (a) closed-loop 데이터 흐름
 
     allowed = _allowed_intents(state, "graph")
     if intent not in allowed:
@@ -195,7 +195,7 @@ def graph_worker(state: AgentState, task: dict) -> AgentState:
 def sql_worker(state: AgentState, task: dict) -> AgentState:
     """PG 정형 조회. 사전 정의 함수 풀만 (PRD §7.5.10). 도메인 인식."""
     intent = task.get("intent") or ""
-    args = dict(task.get("args") or {})
+    args = resolve_arg_bindings(state, task.get("args"))   # (a) closed-loop 데이터 흐름
 
     allowed = _allowed_intents(state, "sql")
     if intent not in allowed:
@@ -229,7 +229,7 @@ def calculator_worker(state: AgentState, task: dict) -> AgentState:
        - variables: dict[str, number] — expr 안 변수 바인딩 (선택)
        - aggregate: 'sum'|'mean'|'max'|'min'|'count' + over: list — 집계 (선택)
     """
-    args = dict(task.get("args") or {})
+    args = resolve_arg_bindings(state, task.get("args"))   # (a) closed-loop — over 등 upstream 바인딩
 
     try:
         if "aggregate" in args and "over" in args:

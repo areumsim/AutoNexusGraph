@@ -65,7 +65,16 @@ def request_interrupt(payload: InterruptPayload) -> Any:
             raise InterruptUnavailable("langgraph interrupt API 미사용 (폴백 환경)") from exc
     logger.info("[interrupt] kind=%s prompt=%r", payload.get("kind"),
                 str(payload.get("prompt", ""))[:80])
-    return interrupt(dict(payload))
+    try:
+        return interrupt(dict(payload))
+    except RuntimeError as exc:
+        # langgraph 는 설치됐으나 runnable context 밖에서 호출됨 (폴백 함수 체인이
+        # langgraph 설치 환경에서 도는 경우 / 테스트). interrupt() 가
+        # "Called get_config outside of a runnable context" RuntimeError 를 던진다.
+        # ImportError 와 동일하게 우아한 다운그레이드로 통일 — 호출부가 1순위 자동선택.
+        raise InterruptUnavailable(
+            "langgraph interrupt 를 runnable context 밖에서 호출 — 폴백 처리"
+        ) from exc
 
 
 # ── Clarification — 모호한 회사명 ──────────────────────────
