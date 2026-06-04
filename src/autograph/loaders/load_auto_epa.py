@@ -1,7 +1,7 @@
 """data/raw/auto/epa_fueleconomy/vehicles.csv(.zip) → auto.spec_measurements.
 
 PRD §3.5: EPA 인증 = A 등급 (0.95). 정량 수치 → number_guard 통과 후 cite 가능.
-"제원 수치 EM 95%+" (PRD §10.9) 직접 기여.
+"제원 수치 EM 95%+" (README §10.9) 직접 기여.
 
 매칭 흐름:
     1) CSV row 의 (year, make, model) → name_norm 기반 variant_id 매칭.

@@ -83,7 +83,7 @@ def search_documents_auto(query: str, *,
 
     Args:
         rerank: True (기본) 시 vector top_k × multiplier 후보를 BGE-Reranker 재정렬.
-            False 시 vector 유사도만. PRD §10 DoD #17 (d) ablation 셀 토글.
+            False 시 vector 유사도만. README §10 DoD #17 (d) ablation 셀 토글.
     """
     if not query or not query.strip():
         return []

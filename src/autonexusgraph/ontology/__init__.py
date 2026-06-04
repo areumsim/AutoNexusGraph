@@ -1,4 +1,4 @@
-"""Domain-agnostic 온톨로지 스키마 — pydantic v2 검증 (PRD §10 DoD #17 (c)).
+"""Domain-agnostic 온톨로지 스키마 — pydantic v2 검증 (README §10 DoD #17 (c)).
 
 각 도메인 (auto / finance / ip 예정) 의 yaml SSOT 는 본 모듈의
 ``OntologyFile`` 으로 1차 검증 후 사용된다. extra='forbid' 로 미지정 키 reject

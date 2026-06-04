@@ -30,7 +30,7 @@ def _constraint(label: str, key: str | list[str]) -> str:
     단일: ``CREATE CONSTRAINT … FOR (n:L) REQUIRE n.k IS UNIQUE``
     복합: ``CREATE CONSTRAINT … FOR (n:L) REQUIRE (n.k1, n.k2) IS UNIQUE``
 
-    PRD §10 DoD #17 (c) — ontology EntitySpec.key 가 str|list[str] 양쪽 허용.
+    README §10 DoD #17 (c) — ontology EntitySpec.key 가 str|list[str] 양쪽 허용.
     finance Person (key=['name', 'birth_year']) 같은 복합 키 엔티티 호환.
     """
     if isinstance(key, str):

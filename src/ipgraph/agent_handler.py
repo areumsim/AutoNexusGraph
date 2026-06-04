@@ -1,6 +1,6 @@
 """IPGraph (도메인3) DomainHandler — core 와 plug-in 결합.
 
-PRD §10.12 의도: core (autonexusgraph) → ipgraph 의존 0건. 본 모듈은 import 1회로
+README §10.12 의도: core (autonexusgraph) → ipgraph 의존 0건. 본 모듈은 import 1회로
 ``register_handler(IPGraphHandler())`` + ``register_router(route_domain_ip)`` 부작용.
 
 Protocol 6 메서드 (실 spec = ``src/autonexusgraph/agents/_domain_handler.py:44-81``):

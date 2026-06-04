@@ -49,7 +49,7 @@ def _hop_fields(state: dict) -> dict:
         return {"hop_count": h["hop_count"],
                 "max_hop_depth": h["max_hop_depth"],
                 "tool_sequence": h["tool_sequence"]}
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — trace 부착은 fail-soft (실패 시 빈 dict 로 응답 자체는 진행)
         return {}
 
 
@@ -83,7 +83,7 @@ def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse
     try:
         state = run_agent(req.message, thread_id=req.thread_id,
                           history=history, domain=req.domain)
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — HTTP 경계: agent 내부의 LLM/DB/네트워크/도메인 어댑터 다층 실패를 HTTP 500 으로 흡수 (구체 예외 처리는 agent 내부)
         log.exception("[chat] agent failed")
         raise HTTPException(500, f"agent failed: {e}")
 
@@ -173,7 +173,7 @@ def chat_stream(req: ChatRequest, user_id: str = Depends(authenticate)) -> Strea
                                           **_hop_fields(st)})
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — SSE 경계: 어떤 실패든 __error__ 이벤트 + [DONE] 으로 stream 종결 (raise 시 클라이언트 hang)
             log.exception("[chat_stream] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
@@ -236,7 +236,7 @@ def chat_resume(req: ResumeRequest, user_id: str = Depends(authenticate)) -> Str
                    "error": f"resume_unavailable: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — SSE 경계: resume 실패도 __error__ + [DONE] 으로 stream 종결
             log.exception("[chat_resume] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
@@ -266,14 +266,14 @@ def health() -> dict:
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT 1")
         out["postgres"] = "ok"
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — health probe: pool/connection/query 어떤 실패든 status 문자열로 노출 (probe 가 절대 raise 하지 않도록)
         out["postgres"] = f"error: {e}"
     try:
         from ..db.neo4j import get_driver
         with get_driver().session() as s:
             s.run("RETURN 1").consume()
         out["neo4j"] = "ok"
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — health probe: import/driver/session 어떤 실패든 status 문자열로 노출
         out["neo4j"] = f"error: {e}"
     return out
 

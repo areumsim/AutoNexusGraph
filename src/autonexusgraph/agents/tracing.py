@@ -186,7 +186,7 @@ class TurnContext:
 @contextlib.contextmanager
 def start_turn_context(thread_id: str, state: dict, *,
                        caller: str = "agent_chat") -> Iterator[TurnContext]:
-    """Turn 단위 lifecycle context manager — PRD §10 DoD #17 (b) 핵심.
+    """Turn 단위 lifecycle context manager — README §10 DoD #17 (b) 핵심.
 
     enter:
       1. ContextVar 격리된 새 CostTracker (thread_id, turn_id, domain 식별자 보유)

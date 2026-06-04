@@ -105,7 +105,7 @@ def get_oem_financials_sec(manufacturer_id: int, *,
                            year_min: int | None = None,
                            year_max: int | None = None,
                            limit: int = 20) -> list[dict]:
-    """글로벌 OEM 재무 (SEC XBRL facts). PRD §10 cross-domain QA 의 정량 답변용.
+    """글로벌 OEM 재무 (SEC XBRL facts). README §10 cross-domain QA 의 정량 답변용.
 
     concept 미지정 → 핵심 회계 항목 (Revenues, NetIncomeLoss, OperatingIncomeLoss …) 다중.
     fiscal_period: 'FY' (연간 기본) | 'Q1' | 'Q2' | 'Q3'.

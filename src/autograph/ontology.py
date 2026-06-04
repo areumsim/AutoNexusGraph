@@ -8,7 +8,7 @@ ontology/auto/{entities,relations,extractors,system_taxonomy,standards,plants}.y
 - ``extractors/*``         : 프롬프트에 entity/relation 표 주입 (schema-aware)
 - ``extractors.cross_validate``: 관계 from/to 라벨 검증 + confidence_default
 
-검증 (PRD §10 DoD #17 (c)): entities.yaml / relations.yaml 은 load 시점에
+검증 (README §10 DoD #17 (c)): entities.yaml / relations.yaml 은 load 시점에
 ``autonexusgraph.ontology.OntologyFile`` 로 pydantic strict-validate. 미지정 키 /
 잘못된 enum / 미존재 라벨 reference 는 import 시점에 reject. ``schema_version``
 은 파일 헤더 1곳 SoT — ``ontology_schema_version()`` 헬퍼 노출.

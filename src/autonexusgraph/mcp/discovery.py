@@ -1,6 +1,6 @@
 """Tool 자동 discovery + type hint → JSON Schema 변환.
 
-PRD §10 DoD #17 (a) — 외부 MCP 클라이언트에 typed tool pool 자동 노출
+README §10 DoD #17 (a) — 외부 MCP 클라이언트에 typed tool pool 자동 노출
 (finance 21 + auto 38 = 59 tools, BACKLOG S-1 SSOT; ``__all__`` 기준 자동 산정).
 
 핵심:

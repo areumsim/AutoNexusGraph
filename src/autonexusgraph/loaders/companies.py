@@ -47,7 +47,7 @@ def _build_row(target: dict, company_path: Path) -> dict[str, Any] | None:
     if company_path.exists():
         try:
             company = json.loads(company_path.read_text(encoding="utf-8"))
-        except Exception:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             company = {}
 
     # corp_name 우선순위: company.json > target.name_dart > target.name_krx
@@ -132,6 +132,7 @@ def load_companies(
         return stats
 
     # 실제 적재
+    import psycopg
     from ..db.postgres import transaction
     with transaction() as conn:
         with conn.cursor() as cur:
@@ -142,7 +143,7 @@ def load_companies(
                     # executemany 는 inserted/updated 구분 안 됨 — 합산만
                     stats.inserted += len(batch)
                     stats.batches += 1
-                except Exception:
+                except psycopg.Error:
                     stats.failed += len(batch)
                     raise
     return stats

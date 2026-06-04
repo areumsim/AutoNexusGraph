@@ -1,12 +1,25 @@
 """런타임 LLM 비용 트래커 + circuit breaker — ContextVar 격리.
 
-설계 (v2 — 근본 재정비):
+설계:
 - ContextVar 기반 격리. FastAPI threadpool / asyncio task 단위로 자동 분리되어
   multi-turn 동시 실행 시 turn boundary 가 깨지지 않는다.
 - 기존 process singleton (_singleton + _singleton_lock) 제거.
 - get_tracker / get_session_tracker 이원화 → get_session_tracker 단일 진입점.
 - ops.llm_usage 의 ``meta JSONB`` 컬럼에 turn 식별자 (thread_id, turn_id, n_replans,
   domain) 적재 — 별도 ALTER 불필요.
+
+3 계층 비용 기록 (의도된 역할 분리, 중복 아님):
+    1. **cost_log.jsonl** — per-call append (LoggingLLMClient 가 최외곽 wrap).
+       파일 기반, DB 불필요. cost_history CLI / session baseline read 의 source.
+    2. **CostTracker (ContextVar)** — per-call update (BudgetAwareLLMClient 가 record).
+       in-memory 라이브 budget 가드. turn boundary 시 reset/finalize.
+    3. **ops.llm_usage (PG)** — per-turn init/finalize + ops.llm_calls per-call.
+       장기 분석 / Langfuse 연계.
+
+세션 budget 가드는 `_read_session_base()` 가 cost_log.jsonl 의 시간창 합을 1회 읽어
+tracker 의 baseline 으로 사용 (read direction: cost_log → tracker, 단방향).
+
+가격 SSOT: ``llm/cost.py::cost_of_call`` (tracker 와 cost_estimator 모두 동일 함수 사용).
 
 수명 주기 (turn 단위):
     from autonexusgraph.agents.tracing import start_turn_context

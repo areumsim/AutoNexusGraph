@@ -1,4 +1,4 @@
-"""Domain handler registry — PRD §10.12 의도 충족 인프라.
+"""Domain handler registry — README §10.12 의도 충족 인프라.
 
 본 모듈의 목적은 **core (autonexusgraph) 가 외부 도메인 패키지(autograph 등)
 를 직접 import 하지 않으면서도** 도메인별 동작을 위임할 수 있게 하는 것.

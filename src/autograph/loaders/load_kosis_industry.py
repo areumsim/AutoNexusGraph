@@ -1,6 +1,6 @@
 """KOSIS 산업 통계 raw → macro.kosis_series PG 적재.
 
-PRD §10 — 자동차 산업 거시 통계 (광업제조업 동향조사 등) 시계열 통합.
+README §10 — 자동차 산업 거시 통계 (광업제조업 동향조사 등) 시계열 통합.
 scripts/ingest/download_kosis.py 가 raw json 만 저장 — 본 loader 가 PG 정규화.
 
 사용:

@@ -3,7 +3,7 @@
 본 모듈은 ``src/autograph/__init__.py`` 가 import 1회로 인해 두 핸들러 (auto,
 cross_domain) + 라우터 (route_domain) 를 core registry 에 자동 등록한다.
 
-PRD §10.12 의도: core 는 ``from autograph`` 를 0건 보유. 핸들러 등록이 의존
+README §10.12 의도: core 는 ``from autograph`` 를 0건 보유. 핸들러 등록이 의존
 방향을 바꾼다 (autograph → core, 반대 아님).
 
 각 핸들러가 보유:

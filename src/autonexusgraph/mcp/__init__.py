@@ -1,4 +1,4 @@
-"""AutoNexusGraph 의 MCP (Model Context Protocol) 서버 — PRD §10 DoD #17 (a).
+"""AutoNexusGraph 의 MCP (Model Context Protocol) 서버 — README §10 DoD #17 (a).
 
 외부 에이전트 (Claude Desktop, Cline, OpenAI Agents SDK) 가 typed tool pool 을
 MCP 프로토콜로 호출 가능. domain-agnostic — auto/finance/(ip) 도구 모두 자동 discover.

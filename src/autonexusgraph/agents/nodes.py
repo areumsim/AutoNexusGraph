@@ -149,7 +149,7 @@ def triage_node(state: AgentState) -> AgentState:
 
     state["target_companies"] = targets
 
-    # ── 도메인 entity 식별 — 등록된 handler 에 위임 (PRD §10.12) ──
+    # ── 도메인 entity 식별 — 등록된 handler 에 위임 (README §10.12) ──
     # finance 외 도메인 (auto/cross_domain) 의 entity 식별은 외부 패키지(autograph)
     # 가 _domain_handler 에 등록한 handler.identify_targets 가 처리. core 는 외부
     # 패키지를 알지 못함. 미등록 도메인은 finance 만 진행.
@@ -320,7 +320,7 @@ def planner_node(state: AgentState) -> AgentState:
             log.info("[planner] LLM 자율 plan 채택 — tasks=%d", len(llm_tasks))
             return _planner_cost_gate(state, kind, targets, len(llm_tasks))
 
-    # ── 도메인 분기 — 등록 handler 에 plan 위임 (PRD §10.12) ─────────
+    # ── 도메인 분기 — 등록 handler 에 plan 위임 (README §10.12) ─────────
     # finance 외 도메인은 외부 패키지가 등록한 handler.plan_tasks 가 task list 반환.
     # core 는 어떤 도메인이 있는지 알지 못함. autograph 미설치 시 등록 0건 → 아래
     # finance 룰 기반 planner 로 자연 폴백.

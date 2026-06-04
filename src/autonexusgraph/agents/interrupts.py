@@ -190,10 +190,10 @@ def coerce_cost_response(response: Any) -> bool:
 
 
 # ── Sensitive decision (외부 보고용 / 민감 답변 — Synthesizer 직전) ──
-# PRD §9 비목표 인접 키워드 — 답변/질문에 등장 시 외부 노출 전 사용자 승인 요청.
+# README §9 비목표 인접 키워드 — 답변/질문에 등장 시 외부 노출 전 사용자 승인 요청.
 # 매우 보수적 집합 — 추가 시 false-positive 영향 검토 (synthesizer 답변 차단 부작용).
 SENSITIVE_KEYWORDS: tuple[str, ...] = (
-    # 투자 자문 (PRD §9 영구 비목표 1)
+    # 투자 자문 (README §9 영구 비목표 1)
     "투자 자문", "매매 신호", "추천 종목", "예상 수익", "수익률 전망",
     # 법적 조언 / 권고
     "법적 조언", "법적 권고", "법률 자문",

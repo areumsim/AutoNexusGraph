@@ -89,7 +89,7 @@ def search_documents(
     Args:
         rerank: True (기본) 시 vector top_k * candidate_multiplier 후보를 가져와
             BGE-Reranker 로 재정렬 후 top_k 반환. False 시 vector 유사도만.
-            PRD §10 DoD #17 (d) ablation 셀에서 토글.
+            README §10 DoD #17 (d) ablation 셀에서 토글.
         rerank_candidate_multiplier: rerank 활성 시 candidate pool = top_k × 본 값.
             서버 실패 시 vector 유사도 fallback (fail-soft).
 

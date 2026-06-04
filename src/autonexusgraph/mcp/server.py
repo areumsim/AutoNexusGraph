@@ -1,4 +1,4 @@
-"""MCP stdio server — PRD §10 DoD #17 (a).
+"""MCP stdio server — README §10 DoD #17 (a).
 
 mcp SDK 가 설치된 환경에서만 import 성공. 미설치 시 ``__init__.py`` 의 fail-soft
 가 처리.

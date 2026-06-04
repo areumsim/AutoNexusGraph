@@ -238,13 +238,13 @@ def run_agent(question: str, *,
               domain: str | None = None,
               rerank: bool | None = None,
               llm_planner: bool | None = None) -> AgentState:
-    """단일 turn 실행 (blocking). PRD §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
+    """단일 turn 실행 (blocking). README §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
 
     ``start_turn_context`` 가 ContextVar 격리된 CostTracker + Langfuse span 을
     enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG ops.llm_usage 의
     meta JSONB 에 thread_id/turn_id/n_replans/domain 영구 적재.
 
-    ``rerank`` (PRD §10 DoD #17 (d) 평가 매트릭스 ablation): None=기본(retrieve 도구
+    ``rerank`` (README §10 DoD #17 (d) 평가 매트릭스 ablation): None=기본(retrieve 도구
     default), True/False 명시 시 research_worker 가 search_documents(rerank=...) 로 전파.
 
     ``llm_planner`` (축2 LLM 자율 planner ablation): None=config(`AGENT_LLM_PLANNER`)

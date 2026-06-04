@@ -165,7 +165,7 @@ class AgentState(TypedDict, total=False):
     target_models: Annotated[list[int], _last_wins]
     target_makes: Annotated[list[str], _last_wins]
     # 검색 재정렬 토글 — entry 에서만 set. None=기본(retrieve 도구 자체 default=True).
-    # 평가 매트릭스 (PRD §10 DoD #17 (d)) 의 rerank on/off ablation 셀이 이 값을
+    # 평가 매트릭스 (README §10 DoD #17 (d)) 의 rerank on/off ablation 셀이 이 값을
     # run_agent 인자로 주입 → research_worker 가 search_documents(rerank=...) 에 전파.
     rerank: Annotated[bool | None, _last_wins]
     # 축2 LLM 자율 planner ablation — entry 에서만 set. None=config(AGENT_LLM_PLANNER) 기본,

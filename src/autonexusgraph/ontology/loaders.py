@@ -1,7 +1,7 @@
 """도메인 온톨로지 로더 팩토리 — autograph / ipgraph 공통 구현 (중복 제거).
 
 ``ontology/<domain>/{entities,relations}.yaml`` 를 pydantic strict-validate
-(PRD §10 DoD #17 (c)) 한 뒤 raw dict 로 환원하는 10개 헬퍼는 auto·ip 도메인이
+(README §10 DoD #17 (c)) 한 뒤 raw dict 로 환원하는 10개 헬퍼는 auto·ip 도메인이
 동일했다. 본 팩토리가 ``ontology_dir`` 파라미터화로 1회 정의 → 각 도메인 모듈은
 ``make_domain_loaders(dir)`` 의 결과를 module-level 함수로 바인딩한다.
 

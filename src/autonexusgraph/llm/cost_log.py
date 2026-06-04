@@ -47,7 +47,7 @@ def _detect_provider(model: str) -> str:
     try:
         from .base import detect_provider
         return detect_provider(model)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — provider 추정 실패 시 '?' 폴백 (비용 기록 자체는 진행)
         return "?"
 
 
@@ -73,8 +73,7 @@ def append(entry: dict[str, Any]) -> None:
         with _lock:
             with path.open("a", encoding="utf-8") as f:
                 f.write(line + "\n")
-    except Exception as exc:   # noqa: BLE001
-        # LLM 호출 흐름을 막지 않기 위해 silent.
+    except Exception as exc:   # noqa: BLE001 — cost 기록 실패가 LLM 호출 흐름을 막지 않도록 silent log.debug
         log.debug("[cost_log] append failed: %s", exc)
 
 

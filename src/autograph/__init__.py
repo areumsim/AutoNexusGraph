@@ -13,7 +13,7 @@ AutoNexusGraph 코어(LangGraph multi-agent, PG/Neo4j/pgvector, cost/number/cyph
 __version__ = "0.1.0"
 
 
-# ── DomainHandler 자동 등록 (PRD §10.12) ───────────────────────────
+# ── DomainHandler 자동 등록 (README §10.12) ───────────────────────────
 # autograph 패키지가 import 되는 순간 core registry 에 AutoHandler +
 # CrossDomainHandler + route_domain 라우터를 등록한다. 이로써 core 는
 # ``from autograph`` 0건을 유지하면서도 자동차 도메인 동작.

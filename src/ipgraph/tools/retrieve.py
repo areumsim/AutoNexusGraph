@@ -62,7 +62,7 @@ def search_patents(query: str, *,
                    rerank_candidate_multiplier: int = 3) -> list[dict]:
     """특허 abstract+claims 의 벡터 의미 검색 + 메타 필터 + (옵션) rerank.
 
-    PRD §10 DoD #17 (d) — rerank ablation 1급. False 시 vector 유사도만.
+    README §10 DoD #17 (d) — rerank ablation 1급. False 시 vector 유사도만.
     """
     if not query or not query.strip():
         return []

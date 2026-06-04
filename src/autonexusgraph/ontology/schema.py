@@ -1,6 +1,6 @@
 """Pydantic v2 모델 — domain-agnostic 온톨로지 스키마.
 
-PRD §10 DoD #17 (c) 충족:
+README §10 DoD #17 (c) 충족:
   "온톨로지 SHACL/pydantic 검증 (schema_version 온톨로지 레벨)"
 
 설계 결정:

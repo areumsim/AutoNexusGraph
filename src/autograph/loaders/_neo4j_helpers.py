@@ -5,7 +5,7 @@ snapshot_year, extraction_method, schema_version) 를 모든 엣지가 일관되
 한 곳에서 강제한다. snapshot_year 와 schema_version 은 입력 dict 에 누락되면
 helper 가 합리적 기본값으로 보강 (year=현재, schema_version=ontology 헤더).
 
-**schema_version 단일 SoT**: PRD §10 DoD #17 (c) — `ontology/auto/relations.yaml`
+**schema_version 단일 SoT**: README §10 DoD #17 (c) — `ontology/auto/relations.yaml`
 헤더의 ``schema_version`` 이 SoT. `default_schema_version()` 가 본 헤더 값을 lazy
 회수 (캐시). 적재 시점 코드에 버전 박지 마라 — yaml 만 바꾸면 자동 전파.
 

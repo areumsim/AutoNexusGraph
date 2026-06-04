@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 
 # ── Domain-aware allowed intent + toolbox ────────────────────
 # finance 도메인 화이트리스트 — core 의 SSOT. auto 화이트리스트는 외부 패키지
-# (autograph) 가 자기 handler 에 보유. core 는 인지하지 않음 (PRD §10.12).
+# (autograph) 가 자기 handler 에 보유. core 는 인지하지 않음 (README §10.12).
 FIN_GRAPH_ALLOWED = {
     "list_subsidiaries", "list_parents", "get_executives",
     "get_companies_of_person", "get_major_shareholders",

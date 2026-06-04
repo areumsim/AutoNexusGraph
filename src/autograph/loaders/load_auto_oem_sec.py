@@ -23,7 +23,7 @@ SEC EDGAR Company Facts JSON 구조:
       }
     }
 
-본 loader 가 추출하는 concept (PRD §10 의 cross-domain QA 에 필요한 정량):
+본 loader 가 추출하는 concept (README §10 의 cross-domain QA 에 필요한 정량):
 
     Revenues / RevenuesNetOfInterestExpense / RevenuesFromContractWithCustomer*  → 매출
     NetIncomeLoss                                                                 → 순이익

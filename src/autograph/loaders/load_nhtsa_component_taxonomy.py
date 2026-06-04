@@ -10,7 +10,7 @@ NHTSA 표준 component_text 는 ``SYSTEM:SUBSYSTEM:PART`` 형식 (예:
 매핑 결과는 load_recall_components 또는 load_auto_neo4j 재실행 시 RECALL_OF
 edge 로 자동 반영 → BOM Level 4 coverage 자동 향상.
 
-PRD §10.5 직접 충족용. token-매칭 (load_recall_components) 보다 정확.
+README §10.5 직접 충족용. token-매칭 (load_recall_components) 보다 정확.
 
 CLI:
     python -m autograph.loaders.load_nhtsa_component_taxonomy

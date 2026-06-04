@@ -1,7 +1,7 @@
 """IPGraph (특허) 도메인 온톨로지 로더.
 
 ``ontology/ip/{entities,relations}.yaml`` 을 한 곳에서 로드 + pydantic strict validate
-(PRD §10 DoD #17 (c)). autograph/ontology.py 와 동일 패턴.
+(README §10 DoD #17 (c)). autograph/ontology.py 와 동일 패턴.
 
 호출자:
 - ``loaders.load_*``       : 엣지 적재 시 §6.7 의무 메타 키 강제
