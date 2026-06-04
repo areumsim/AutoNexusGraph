@@ -50,9 +50,9 @@
 | **B11** | NHTSA complaint 65% (10,390/16,005) 짧은 카테고리 매칭 실패 | COMPLAINT_OF +10k edges 기대 | ⭐ P2 | L3 system 매칭 확장 2주 |
 | **B6** | AI-Hub aggregate model name mismatch | 현재 24 edges OK — 명목적 ⚠️ | ⭐ P2 (사실상 P3) | 추가 작업 불필요 |
 
-상세 진단 SOP 는 [data_inventory.md §3](data_inventory.md).
+상세 진단 SOP 는 [data_inventory.md §3](data_inventory.md) (이번 라운드 보강 완료).
 
-**실시간 측정 routine**: `make audit-b-issues` — 4 건 모두 PG/Neo4j 실측 + 자동 RESOLVED/ACTIVE/MONITORING 분류 + JSON 산출 (`data/reports/b_issues.json`). 베이스라인 (2026-06-02): B6 ⚠️ 26 rows / B7 🟡 0 / B10 🟡 1 / B11 🟡 0.682. `make audit-b-issues ARGS="--strict"` 로 CI 게이트 가능.
+**실시간 측정 routine (P2-10 보강 2026-06-02)**: `make audit-b-issues` — 4 건 모두 PG/Neo4j 실측 + 자동 RESOLVED/ACTIVE/MONITORING 분류 + JSON 산출 (`data/reports/b_issues.json`). 베이스라인 (2026-06-02): B6 ⚠️ 26 rows / B7 🟡 0 / B10 🟡 1 / B11 🟡 0.682. `make audit-b-issues ARGS="--strict"` 로 CI 게이트 가능.
 
 ---
 

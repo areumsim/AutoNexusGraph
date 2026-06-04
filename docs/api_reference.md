@@ -2,7 +2,7 @@
 
 > **본 문서의 위치**: agent worker 가 호출하는 사전 정의 도구 (Tool Pool) 의 시그니처·반환 스키마 통합 카탈로그. **자유 SQL/Cypher/벡터 호출은 금지** — LLM 은 함수명 + 파라미터만 결정. 본 문서가 SSOT.
 >
-> §4.4 = finance 시나리오 5개 (operations/rag_tools.md 흡수, stub). §4.5 Auto / §4.6 IP 단일 도메인 시나리오.
+> ~~docs/operations/rag_tools.md~~ 의 finance 시나리오 5개 모두 본 문서 §4.4 로 흡수 (2026-06-02). rag_tools.md 는 폐기 stub. **§4.5 Auto / §4.6 IP 단일 도메인 시나리오 추가 (P2-(8) 보강, 2026-06-02 후속)**.
 >
 > 코드 SSOT (정합 우선순위 — 본 문서 ↔ 코드 충돌 시 코드가 SSOT):
 > - core (finance): `src/autonexusgraph/tools/{financials,graph,retrieve}.py` + `cypher_templates.py`
@@ -19,7 +19,7 @@
 
 ### 0.2 안전 가드 (worker 단계에서 자동 적용)
 
-- **화이트리스트 강제** — worker 가 도메인별 `allowed_intents` (`auto`: 31 / `ip`: 19 / `finance`: 21 인텐트) 검증 후 호출. 외부 인텐트는 차단. (코드 SSOT: `workers.py:30-41` / `autograph/agent_handler.py:42-65` / `ipgraph/agent_handler.py:26-42`.)
+- **화이트리스트 강제** — worker 가 도메인별 `allowed_intents` (`auto`: 22 / `ip`: 16 / `finance`: 18 인텐트) 검증 후 호출. 외부 인텐트는 차단.
 - **cypher_guard** — 모든 그래프 호출은 `assert_read_only` 경유 (`safety/cypher_guard.py:68`). 쓰기 키워드 + 위험 CALL 차단.
 - **param_schema 검증** — Cypher 템플릿은 `type/range/regex/enum/bool reject` (`tools/cypher_templates.py:413 _validate_param`).
 - **`reviewed_status='rejected'` 자동 제외** — bridge / graph 호출 모두.
@@ -135,7 +135,7 @@ Cypher 템플릿 22개 경유 (`cypher_templates.py::TEMPLATES` — 정적 14 + 
 
 ## 3. IP 도메인 (`src/ipgraph/tools/`)
 
-도메인 `ip` / `cross_domain` 모드에서만 활성. `IPGraphHandler.allowed_intents` 화이트리스트 19 인텐트 (graph 8 + sql 8 + research 3).
+도메인 `ip` / `cross_domain` 모드에서만 활성. `IPGraphHandler.allowed_intents` 화이트리스트 16 인텐트 (graph 8 + sql 5 + research 3).
 
 ### 3.1 `tools/patents.py` — PG 정형
 
@@ -285,7 +285,7 @@ for s in subs:
     # 향후: news[i]['sentiment'] 활용 (배포 후)
 ```
 
-### 4.5 Auto 단일 도메인 시나리오
+### 4.5 Auto 단일 도메인 시나리오 (P2-(8) 보강 2026-06-02)
 
 #### A. "쏘나타 1.6T 하이브리드 출력은?"
 
@@ -367,7 +367,7 @@ prod = get_macro_production(year=2024)
 # 거시지표 (KOSIS 204 monthly + 21 yearly rows) — finance 의 ECOS 와 cross-ref 가능
 ```
 
-### 4.6 IP 단일 도메인 시나리오
+### 4.6 IP 단일 도메인 시나리오 (P2-(8) 보강 2026-06-02)
 
 #### A. "삼성SDI 의 H01M (배터리) CPC 분야 특허 수"
 
@@ -447,9 +447,9 @@ op = get_operating_income(corp["corp_code"], 2024)
 
 | 도메인 | sql_worker | graph_worker | research_worker | 코드 |
 |---|---|---|---|---|
-| **finance** | 7 (`lookup_company` / `get_revenue` / `get_operating_income` / `get_company_info` / `get_balance_sheet_item` / `compare_companies` / `list_companies_by_market`) | 11 (위 §1.2 모두) | 3 (`search_documents` / `search_by_metadata` / `get_chunk`) | `agents/workers.py:30-41` |
-| **auto** | 17 (위 §2.1 + bridge 4 + `cross_query` + macro 2 + plant·process 4) | 11 (위 §2.2 핵심) | 3 (`search_documents_auto` / `search_by_metadata_auto` / `get_chunk_auto`) | `src/autograph/agent_handler.py:42-65` |
-| **ip** | 8 (위 §3.1 + bridge 2 + `cross_query_ip`) | 8 (위 §3.2 핵심) | 3 (`search_patents` / `search_by_metadata_ip` / `get_chunk_ip`) | `src/ipgraph/agent_handler.py:26-42` |
+| **finance** | 7 (`lookup_company` / `get_revenue` / `get_operating_income` / `get_company_info` / `get_balance_sheet_item` / `compare_companies` / `list_companies_by_market`) | 12 (위 §1.2 모두) | 1 (`search_documents`) | `agents/workers.py:30-46` |
+| **auto** | 6 (`lookup_vehicle` / `get_vehicle_info` / `get_spec` / `compare_vehicles` / `get_safety_rating` / `get_oem_financials_sec`) | 11 (위 §2.2 핵심) | 1 (`search_documents_auto`) | `src/autograph/agent_handler.py:42-65` |
+| **ip** | 5 (위 §3.1 전부) | 8 (위 §3.2 핵심) | 3 (`search_patents` / `search_by_metadata_ip` / `get_chunk_ip`) | `src/ipgraph/agent_handler.py:26-42` |
 | **cross_domain** | finance ∪ auto ∪ ip SQL | finance ∪ auto ∪ ip graph + bridge.* | 세 도메인 research 모두 | `src/autograph/agent_handler.py::CrossDomainHandler` |
 
 ---

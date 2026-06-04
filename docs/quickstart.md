@@ -1,7 +1,7 @@
 # Quickstart — 5분 안에 첫 질의
 
 > **목표**: 환경 구성 → DB 부팅 → 최소 데이터 적재 → 첫 질의·답변 확인 까지 5분.
-> 전체 운영·평가·확장은 [README §14 Quickstart](../README.md#14-quickstart) (finance) ·
+> 전체 운영·평가·확장은 [README §13 Quickstart](../README.md#13-quickstart) (finance) ·
 > [Quickstart — AutoGraph](../README.md#quickstart--autograph-자동차-도메인) ·
 > [Quickstart — IPGraph](../README.md#quickstart--ipgraph-특허-도메인) 참조.
 >
@@ -149,7 +149,7 @@ make serve-ui                                 # Streamlit :31021 채팅 UI (st.s
 | 특허 도메인 적재 (CPC + OpenAlex 이미 완료, KIPRIS/USPTO 추가) | [README §13 Quickstart — IPGraph](../README.md#quickstart--ipgraph-특허-도메인) |
 | 임베딩 backfill (BGE-M3 GPU) | `make serve-embeddings` + `make embed-chunks` |
 | LangGraph 활성화 (PG checkpoint + tracing) | `make install-agent` + `make enable-langgraph` |
-| 평가 매트릭스 측정 | `make eval-smoke` (3 row) / `make eval-full` (100 문항) / `make audit-dod` (DoD 20항 트래픽라이트) |
+| 평가 매트릭스 측정 | `make eval-smoke` (3 row) / `make eval-full` (100 문항) / `make audit-dod` (DoD 17항 트래픽라이트) |
 | 도메인 plug-in 새로 추가 | [docs/architecture.md §6.2](architecture.md) |
 | 막힐 때 | [docs/faq.md](faq.md) (자주 막히는 지점 + 진단 트리) |
 | 도구·tool API 참조 | [docs/api_reference.md](api_reference.md) |
@@ -164,7 +164,7 @@ make serve-ui                                 # Streamlit :31021 채팅 UI (st.s
 | `DART_API_KEY` | (필수) | finance 핵심 데이터 소스 |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` | (선택) | LLM provider — 한 개 이상 필요. 없으면 FAKE LLM |
 | `LLM_PROVIDER` | (자동 detect) | `openai` / `anthropic` / `google` / `local` |
-| `LLM_SESSION_HARD_LIMIT_USD` | `5.00` | 세션 총 LLM 비용 한도 (`llm/cost.py:141` 기본값 + `.env.example:74`) |
+| `LLM_SESSION_HARD_LIMIT_USD` | `10.0` | 세션 총 LLM 비용 한도 |
 | `LLM_COST_AUTO_APPROVE_USD` | `0.50` | turn 추정 비용이 이를 초과하면 HITL 승인 |
 | `FINGRAPH_MIN_KOREAN_RATIO` | `0.30` | language_guard 한국어 비율 임계 |
 | `TRACE_BACKEND` | (none) | `langfuse` / `langsmith` — tracing 활성 시 |
