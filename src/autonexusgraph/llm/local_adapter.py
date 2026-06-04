@@ -49,7 +49,7 @@ class LocalLLMClient(LLMClient):
                 max_tokens=max_tokens,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 LLM 호출 모든 실패 흡수 → LLMError 변환 (호출자가 통일 처리)
             raise LLMError(f"Local LLM chat failed ({self.base_url}): {e}") from e
         usage = _usage_from(resp.usage, self.model)
         return LLMResponse(content=resp.choices[0].message.content or "", usage=usage, raw=resp)
@@ -71,7 +71,7 @@ class LocalLLMClient(LLMClient):
                 stream=True,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — stream 모든 실패 흡수 → LLMError 변환 (통일 boundary)
             raise LLMError(f"Local LLM stream failed: {e}") from e
         for chunk in stream:
             delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -99,7 +99,7 @@ class LocalLLMClient(LLMClient):
                 response_format={"type": "json_object"},
                 **kwargs,
             )
-        except Exception:
+        except Exception:   # noqa: BLE001 — JSON response_format 미지원 (로컬 LLM) 흡수 → schema-in-system 폴백
             # 폴백: schema 를 system 에 주입 후 자유 생성
             schema_str = json.dumps(schema.get("schema", schema), ensure_ascii=False, indent=2)
             augmented = [
@@ -114,7 +114,7 @@ class LocalLLMClient(LLMClient):
                     temperature=temperature,
                     **kwargs,
                 )
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — schema-in-system 폴백 chat 도 실패 → LLMError 변환
                 raise LLMError(f"Local LLM json failed: {e}") from e
         content = resp.choices[0].message.content or "{}"
         try:

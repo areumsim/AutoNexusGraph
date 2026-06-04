@@ -146,18 +146,18 @@ def _register() -> None:
             register_handler,
             register_router,
         )
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — core registry import 실패 → register skip (finance-only / 테스트 환경)
         log.debug("[ipgraph.agent_handler] core handler API unavailable: %s", exc)
         return
     try:
         register_handler(IPGraphHandler())
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — handler 등록 실패 흡수 → silent (debug log, core 가 finance 폴백)
         log.debug("[ipgraph.agent_handler] register_handler failed: %s", exc)
 
     try:
         from .policy import route_domain_ip
         register_router(route_domain_ip)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — router 등록 실패 흡수 → silent (라우팅이 finance 만 동작)
         log.debug("[ipgraph.agent_handler] register_router failed: %s", exc)
 
 

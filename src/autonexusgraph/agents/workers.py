@@ -137,7 +137,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
             _record(state, task, status="done", result=out)
             if isinstance(out, list):
                 state.setdefault("evidence_chunks", []).extend(out)
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
             log.warning("[research:%s] %s failed: %s", domain, intent, exc)
             _record(state, task, status="failed", result={"error": str(exc)})
         return state
@@ -159,7 +159,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
         _record(state, task, status="done", result=out)
         if isinstance(out, list):
             state.setdefault("evidence_chunks", []).extend(out)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[research] %s failed: %s", intent, exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -185,7 +185,7 @@ def graph_worker(state: AgentState, task: dict) -> AgentState:
         _record(state, task, status="done", result=out)
         if intent == "get_subgraph":
             state["graph_subgraph"] = out
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[graph] %s failed: %s", intent, exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -209,7 +209,7 @@ def sql_worker(state: AgentState, task: dict) -> AgentState:
     try:
         out = fn(**args)
         _record(state, task, status="done", result=out)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[sql] %s failed: %s", intent, exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -240,7 +240,7 @@ def calculator_worker(state: AgentState, task: dict) -> AgentState:
                 args.get("variables") or {},
             )
         _record(state, task, status="done", result={"value": result})
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[calculator] failed: %s", exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state

@@ -1,8 +1,8 @@
 """Wikipedia (ko/en) 자동차 본문 ingestion — 키 불필요.
 
 대상:
-    auto.master_vehicle_models.name  (예: 'Sonata', 'Grandeur', 'Model Y')
-    auto.master_manufacturers.name   (예: 'Hyundai', 'Tesla', 'Genesis')
+    anxg_auto.master_vehicle_models.name  (예: 'Sonata', 'Grandeur', 'Model Y')
+    anxg_auto.master_manufacturers.name   (예: 'Hyundai', 'Tesla', 'Genesis')
 
 전략:
     1) Wikidata QID 가 있으면 sitelinks 로 정확 title 획득 (가장 신뢰).
@@ -65,7 +65,7 @@ def _title_from_qid(qid: str, lang: str) -> str | None:
             if r.status_code != 200:
                 return None
             data = r.json()
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — Wikipedia API 요청 실패 흡수 → None
         return None
     entity = (data.get("entities") or {}).get(qid)
     if not entity:
@@ -103,7 +103,7 @@ def _fetch_entity_pages(
                 _LIMITER.acquire()
                 try:
                     title = _title_from_qid(qid, lang)
-                except Exception as e:   # noqa: BLE001
+                except Exception as e:   # noqa: BLE001 — Wikipedia API/fetch/save 실패 흡수 → log + 다음 entity 진행
                     log.debug("[wiki:%s] qid->title 실패 %s: %s", lang, qid, e)
             if not title:
                 title = name
@@ -115,7 +115,7 @@ def _fetch_entity_pages(
             try:
                 page = wiki.fetch(title, with_html=with_html,
                                   with_infobox=with_infobox)
-            except Exception as e:   # noqa: BLE001
+            except Exception as e:   # noqa: BLE001 — Wikipedia API/fetch/save 실패 흡수 → log + 다음 entity 진행
                 log.warning("[wiki:%s] fetch %s 실패: %s", lang, title, e)
                 stats["errors"] += 1
                 ckpt.mark_failed(key, str(e))
@@ -131,7 +131,7 @@ def _fetch_entity_pages(
                             _LIMITER.acquire()
                             page = wiki.fetch(alt, with_html=with_html,
                                               with_infobox=with_infobox)
-                except Exception as e:   # noqa: BLE001
+                except Exception as e:   # noqa: BLE001 — Wikipedia API/fetch/save 실패 흡수 → log + 다음 entity 진행
                     log.debug("[wiki:%s] search %s 실패: %s", lang, name, e)
 
             if not page or not page.extract:
@@ -155,7 +155,7 @@ def _fetch_entity_pages(
                 log.info("[wiki:%s] %s [%s] %s → %d chars",
                          lang, entity_kind, eid, page.title,
                          len(page.extract or ""))
-            except Exception as e:   # noqa: BLE001
+            except Exception as e:   # noqa: BLE001 — Wikipedia API/fetch/save 실패 흡수 → log + 다음 entity 진행
                 log.warning("[wiki:%s] save %s 실패: %s", lang, key, e)
                 stats["errors"] += 1
                 ckpt.mark_failed(key, str(e))
@@ -229,7 +229,7 @@ def _load_models_from_pg(limit: int | None) -> list[tuple]:
     with conn.cursor() as cur:
         q = """
             SELECT model_id, name, wikidata_qid
-              FROM auto.master_vehicle_models
+              FROM anxg_auto.master_vehicle_models
              ORDER BY model_id
         """
         if limit:
@@ -243,7 +243,7 @@ def _load_manufacturers_from_pg(limit: int | None) -> list[tuple]:
     with conn.cursor() as cur:
         q = """
             SELECT manufacturer_id, name, wikidata_qid
-              FROM auto.master_manufacturers
+              FROM anxg_auto.master_manufacturers
              ORDER BY manufacturer_id
         """
         if limit:
@@ -317,9 +317,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="autograph.ingestion.wikipedia_auto")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--models", action="store_true",
-                      help="auto.master_vehicle_models 본문 수집")
+                      help="anxg_auto.master_vehicle_models 본문 수집")
     grp.add_argument("--manufacturers", action="store_true",
-                      help="auto.master_manufacturers 본문 수집")
+                      help="anxg_auto.master_manufacturers 본문 수집")
     grp.add_argument("--plants", action="store_true",
                       help="ontology/auto/plants.yaml 의 plant 본문 수집 (2026-06-01 신규)")
     grp.add_argument("--all", action="store_true",
