@@ -45,7 +45,7 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| D-1 | **팩토리온 공장 등록 (15087611)** — 회사·공장번호·산단별 조회 | (부분 적재) — `auto.factoryon_registry` **5행** (현대차 아산/전주/대구 등, `DATA_GO_KR_API_KEY` 작동 확인 2026-06-04) | **P0** | (잔여) 회사 커버리지 확대 `make ingest-factoryon-company NAME=...` → ProcessStep↔Plant 매핑(G-1) | README §7, BACKLOG §9 (ProcessGraph #19 직접 의존) |
+| D-1 | **팩토리온 공장 등록 (15087611)** — 회사·공장번호·산단별 조회 | (부분 적재) — `auto.factoryon_registry` **90행** (현대차·기아·한국지엠·쌍용·르노 OEM 5사 + 현대모비스 27/현대제철 19/현대위아 11 등 tier-1, `DATA_GO_KR_API_KEY` 작동, 2026-06-04 확대 적재) | **P0** | (잔여) ProcessStep↔Plant 매핑 + `load_performed_at.py`(factoryon source) 실행 → PERFORMED_AT(G-1). 커버리지 추가는 `make ingest-factoryon-company NAME=...` | README §7, BACKLOG §9 (ProcessGraph #19 직접 의존) |
 | D-2 | **KIPRIS Open API** — 한국 특허·출원 | (scaffold, 보조) | **P1** | `KIPRIS_API_KEY` 발급 (공공데이터포털) → `make ingest-kipris` (ingestion/loader/DDL 구현됨, 키·데이터 부재) | docs/ipgraph.md §4, BACKLOG §10 |
 | D-3 | **USPTO Open Data Portal (PatentsView 후속)** — 미국 특허·인용·assignee | (scaffold, 보조) | **P1** | bulk download (data.uspto.gov) → `make ingest-uspto-odp` (ingestion/loader/DDL 구현됨, bulk 데이터 부재). PatentsView REST 종료 (2026-03-20, 410 Gone) | docs/ipgraph.md §4 |
 | D-4 | **KAMP 제조AI 데이터셋 (15089213)** — 사출/용접/프레스 시계열·불량 | (scaffold) | P1 | CSV 수동 다운 → `make load-kamp-process-metrics`. `auto.process_metrics` (corp_code 컬럼 의도적 부재 = 익명) | docs/process_graph.md §2, BACKLOG §9 |
@@ -61,7 +61,7 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| G-1 | **`PERFORMED_AT` (회사 귀속 공정)** ≥ 30 | (scaffold, 0/30) | **P0** | D-1 팩토리온 키 + ProcessStep↔Plant 매핑 출처 | README §10.19, docs/process_graph.md §2 |
+| G-1 | **`PERFORMED_AT` (회사 귀속 공정)** ≥ 30 | (scaffold, 0/30) — factoryon 90행 적재 완료(D-1, 키 작동) → **남은 건 매핑·실행** | **P0** | ProcessStep↔Plant 매핑 출처 + `load_performed_at.py`(factoryon source allowlist) 실행 | README §10.19, docs/process_graph.md §2 |
 | G-2 | **`PRODUCED_BY` (Part→ProcessStep)** | (scaffold, 0) | P1 | 산단공 `part_id` 부재 — 부품↔공정 결정적 매핑 출처 확보 | docs/process_graph.md §2 |
 | G-3 | **`CONSUMES_MATERIAL` / `USES_EQUIPMENT`** | (scaffold, 0) | P2 | 산단공 소재·설비 정보 부재 — Wikidata + manual seed | docs/process_graph.md §2 |
 | G-4 | **`CAUSED_BY_PROCESS` (Recall→Process)** | (scaffold, 0) | P2 | 리콜 493건 US 영문 ↔ 한글 합성공정 환각위험 (P3 dry-run $0.51). KOTSA 한글 리콜 (D-1 키) 또는 영문 공정 taxonomy 확보 후 P3+P4 | docs/process_graph.md §2 |
@@ -148,7 +148,7 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| PG-1 | **DoD #19 회사 귀속 인스턴스 `PERFORMED_AT` ≥ 30** | ⚠️ 0/30 | **P0** | D-1 팩토리온 키 + ProcessStep↔Plant 매핑 출처. **본 시스템의 ProcessGraph "주요 축" 주장의 핵심 게이트** | README §10.19, docs/process_graph.md |
+| PG-1 | **DoD #19 회사 귀속 인스턴스 `PERFORMED_AT` ≥ 30** | ⚠️ 0/30 — factoryon 90행 적재(D-1, 키 작동) → 매핑·실행만 남음 | **P0** | ProcessStep↔Plant 매핑 출처 + `load_performed_at.py` 실행. **본 시스템의 ProcessGraph "주요 축" 주장의 핵심 게이트** | README §10.19, docs/process_graph.md |
 | PG-2 | **DoD #20 cross 정확도 ≥ 50% — 공정↔재무 / 결함전파** | ⚠️ 부분 (소재 리스크 + 생산↔거시 2종 answerable, 2종 refusal) | P1 | LLM 키 + G-1 + G-4 (CAUSED_BY_PROCESS) | README §10.20 |
 | PG-3 | **row 단위 동적 confidence 격상 실측** | wired (`scripts/upgrade_processes_confidence.py`) | P2 | 1회 풀런 ≤ $2 + GPU 1분 (idempotent). 격상률 15~30% 예상 | README §4.0.1 |
 

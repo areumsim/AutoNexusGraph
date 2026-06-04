@@ -19,7 +19,7 @@
 | **보조축 (수평 cross)** | **ip** = 특허·기술혁신 | assignee→corp 브리지를 타는 **수평 cross 진입 어댑터** (corp_entity 브리지 전용). 풀 도메인 어댑터 완료, 데이터 부분 적재 | 구현 (CPC 10,695 + OpenAlex 629) |
 | **곁가지 (L6)** | 배터리·소재 | 공개 거시(USGS) + Wikidata chem | (부분 적재 — Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8) |
 
-**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. 다만 **회사 귀속 인스턴스 (`PERFORMED_AT` / `PRODUCED_BY` 등) 는 0 — 팩토리온 5행·한글 리콜 941행은 적재됐으나 ProcessStep↔Plant 매핑 미구축 + factoryon 커버리지 sparse 로 보류 (KAMP 메트릭만 데이터 부재)**. "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
+**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. 다만 **회사 귀속 인스턴스 (`PERFORMED_AT` / `PRODUCED_BY` 등) 는 0 — 팩토리온 90행·한글 리콜 941행은 적재됐으나 ProcessStep↔Plant 매핑 미구축 + factoryon 커버리지 sparse 로 보류 (KAMP 메트릭만 데이터 부재)**. "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
 
 > **정직성 가드 2개 필수:** (1) "준비된 빈 축" 명시 — 합성·공개데이터(산단공·KAMP)는 패턴/검증용이지 사실 주장용 아님 (회사 귀속 엣지 hard-check 차단). (2) **내부 데이터 수용 규격**(로더 계약 + 등급 승급 C합성→A내부)을 결과물로 보유 (DoD §10.20). 상세 [docs/process_graph.md](./docs/process_graph.md).
 
@@ -126,7 +126,7 @@
 | Neo4j Standard / Plant / Complaint | (seed 후) | `standards.yaml` 22 + `plants.yaml` 18 + `manufactured_at_seed.yaml` 46 모델↔공장 |
 | `auto.staging_relations` (P3 LLM + Wikidata P176) | extract-auto-p3 후 | SUPPLIED_BY / RECALL_OF 후보 — P4 검증 후 그래프 적재 |
 | `auto.processes` (산단공 합성 15151075) | **550 row / 410 공정명** | C 등급 (0.50) — 공정명 정규형 사전. agent tool `search_processes` / `lookup_process` |
-| **ProcessGraph (BoP 축)** Neo4j `:Process` / `:ProcessStep` / `PRECEDES` / `INSTANTIATES` | **410 / 550 / 410 / 550** | C 등급 — 산단공 공정사전 → BoP routing (회사 비귀속). `tools/process.py` + `auto_proc_*`. **회사 귀속(PERFORMED_AT) / 품질(CAUSED_BY_PROCESS) / 메트릭(KAMP)은 (scaffold)** — factoryon 5행·리콜 941행 적재됐으나 ProcessStep↔Plant 매핑 미구축으로 보류 (KAMP 메트릭만 데이터 부재), SSOT [docs/process_graph.md](./docs/process_graph.md) |
+| **ProcessGraph (BoP 축)** Neo4j `:Process` / `:ProcessStep` / `PRECEDES` / `INSTANTIATES` | **410 / 550 / 410 / 550** | C 등급 — 산단공 공정사전 → BoP routing (회사 비귀속). `tools/process.py` + `auto_proc_*`. **회사 귀속(PERFORMED_AT) / 품질(CAUSED_BY_PROCESS) / 메트릭(KAMP)은 (scaffold)** — factoryon 90행·리콜 941행 적재됐으나 ProcessStep↔Plant 매핑 미구축으로 보류 (KAMP 메트릭만 데이터 부재), SSOT [docs/process_graph.md](./docs/process_graph.md) |
 | `auto.plant_capacity` + `plant_production` (DART III. 생산·설비) | **107 + 77 row** (Hyundai 12 plants × 4~7년 + Kia 5 plants × 6년) | B 등급 (0.80) — Hyundai/Kia. agent tool `get_plant_capacity` / `get_oem_production` / `list_plants_by_oem`. Kia 파서는 `품목/소재지` schema 변형 대응 |
 | `auto.plant_utilization` (DART III. (3) 가동률) | **53 row** | B 등급 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct |
 | `auto.macro_production_yearly` (KAMA 15051116) | **21 row** (2005~2025) | A 등급 (0.95) — 연 단위 한국·세계 생산량. 2024 한국 점유 4.55%. agent tool `get_macro_production` |
@@ -546,7 +546,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 | Euro NCAP / IIHS (옵션) | euroncap.com / iihs.org | 공공 (사용 약관) | 불필요 | (후속) `auto.spec_measurements` + `:Standard` (Euro NCAP / IIHS TSP) |
 | 제조 공정·생산능력 (제조 도메인) | DART 사업보고서 본문 파서 | 공공 | DART 키 (finance 와 공유) | `auto.production_*` (LLM 0% — 정규식 + 표 파서) |
 | 산단공 합성 공정데이터 (15151075) | data.go.kr (수동 CSV) | 공공 | 불필요 (파일) | `auto.processes` + Neo4j `:Process` 410 / `:ProcessStep` 550 / `PRECEDES`·`INSTANTIATES` (BoP routing, grade C). SSOT [docs/process_graph.md](./docs/process_graph.md) |
-| 공장 등록정보 (15087611) — 회사·공장번호·산단별 조회 | data.go.kr 팩토리온 (`apis.data.go.kr/B550624`) | 공공 | `DATA_GO_KR_API_KEY` (작동 확인) | `auto.factoryon_registry` 5행 적재 → 회사 커버리지 확대 + MANUFACTURED_AT 보강 |
+| 공장 등록정보 (15087611) — 회사·공장번호·산단별 조회 | data.go.kr 팩토리온 (`apis.data.go.kr/B550624`) | 공공 | `DATA_GO_KR_API_KEY` (작동 확인) | `auto.factoryon_registry` 90행 적재 (OEM 5사 + tier-1) → MANUFACTURED_AT 보강 |
 
 > 인증 키 부재 시 ingestion 은 graceful skip — 코드 변경 없이 `.env` 만 채우면 활성화.
 
@@ -753,7 +753,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | 비용 가드 | 세션 hard limit (`LLM_SESSION_HARD_LIMIT_USD`) + 도메인별 turn budget (`config.turn_budget_for_domain`, ENV override) + 사전 추정 + auto-approve + JSONL 영속 로그 (`data/cost_log.jsonl`) |
 | 데이터 파이프라인 (finance) | DART corp 마스터, XBRL 184K, filings 4.6K, vec.chunks 748K, Neo4j Company/Person/지배구조 — Wikidata/Wikipedia/GLEIF/SEC/뉴스/KCGS 보강, ER 마스터 (`master.entities` + `master.entity_map`) |
 | 데이터 파이프라인 (auto) | NHTSA vPIC/Recalls/Complaints/SafetyRatings/Investigations/TSB, EPA fueleconomy, SEC EDGAR (글로벌 OEM XBRL), Wikidata mfr/model/supplier/P176, AI Hub, KOTSA 수리검사, NHTSA component taxonomy 자동 도출. `bridge.corp_entity` 4,806 (한국 OEM/부품사 corp_code + 글로벌 OEM sec_cik 9개) |
-| 제조 / 공정 (auto) | DART 사업보고서 본문 파서 (LLM 0%) — 생산능력·가동률·공장명 자동 추출. 산단공 합성 공정데이터 → `:Process` 사전. 팩토리온 공장등록 (15087611) 부분 적재 5행 (`DATA_GO_KR_API_KEY` 작동, 커버리지 확대 중) |
+| 제조 / 공정 (auto) | DART 사업보고서 본문 파서 (LLM 0%) — 생산능력·가동률·공장명 자동 추출. 산단공 합성 공정데이터 → `:Process` 사전. 팩토리온 공장등록 (15087611) 부분 적재 90행 (OEM 5사 + tier-1, `DATA_GO_KR_API_KEY` 작동) |
 | 도구 (tools) | finance: `tools/financials,graph,retrieve.py` — 사전 정의 함수 풀. auto: `src/autograph/tools/{spec,graph,retrieve,bridge}.py`. 자유 SQL/Cypher 금지 |
 | Cypher 템플릿 | finance 22 = 14 정적 + 5 `find_paths_{1..5}hops` + 3 `get_subgraph_d{1..3}` (`tools/cypher_templates.py`). auto **24** (`src/autograph/cypher_templates_auto.py` — 기존 19 + `auto_plants_of_manufacturer` / `auto_plants_of_model` / `auto_investigations_by_model` / `auto_investigations_by_variant` / `auto_investigation_recall_chain` 5건 추가). ip 25 (`src/ipgraph/cypher_templates_ip.py`). type/range/regex 검증 + bool reject |
 | 멀티에이전트 (LangGraph) | StateGraph 11 노드 (triage/planner/supervisor/4 worker/executor_legacy/synthesizer/validator/finalize) + 함수 체인 fallback. `agents/graph.py` |
@@ -789,7 +789,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | Bridge candidate 검토 운영 | ✅ **도구 구현** (Q-1) — `bridge_review.py` + Streamlit `ui/bridge_review.py` (✓/✗) + 6개월 자동 만료 + 진행률 KPI + `26_bridge_review.sql` 감사 컬럼 + `make bridge-kpi`/`bridge-expire` ([SOP](./docs/operations/bridge_review.md)) | 4,792 supplier candidate 실제 라벨링은 사람 작업 (도구·cron 준비됨) |
 | KNCAP / Euro NCAP / IIHS | 인터페이스만 (KNCAP) / 미구현 | 공식 채널 약관 검토 후 |
 | KATRI / bigdata-tic OAuth | wired | `BIGDATA_TIC_CLIENT_ID/SECRET` 발급 후 활성 |
-| 팩토리온 (15087611) | 부분 적재 (5행) | ingestion 3 endpoint 구현 + `DATA_GO_KR_API_KEY` 작동 → `auto.factoryon_registry` 5행. 회사 커버리지 확대 잔여 |
+| 팩토리온 (15087611) | 부분 적재 (90행) | ingestion 3 endpoint 구현 + `DATA_GO_KR_API_KEY` 작동 → `auto.factoryon_registry` 90행 (OEM 5사 + tier-1). ProcessStep↔Plant 매핑 잔여 |
 | 산단공 공정 (15151075) | wired | 수동 CSV 다운 후 `make load-sandang-processes` |
 | `_legacy/v2/` | 보존 | 삭제 예정 미정 (`docs/mental_model.md §5.10`) |
 | Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. **CI(O-4)는 keyless smoke-e2e 만 — ephemeral PG/Neo4j 통합 잡은 secrets/self-hosted 후속** |
@@ -950,7 +950,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 **현재 작업 중인 것:**
 - DART 사업보고서 본문 파서 — 한국 OEM/부품사의 생산능력·가동률·공장명을 LLM 0% 정규식 + 표 파서로 추출 (가장 최근 커밋 `215f7e5`)
 - 산단공 합성 공정데이터 — `:Process` 사전 적재 (Casting / Forging / Stamping / Welding / Coating …)
-- 팩토리온 (15087611) 부분 적재 5행 — DATA_GO_KR_API_KEY 작동, 회사·공장번호·산단별 조회 가동. 커버리지 확대 → `MANUFACTURED_AT` 보강
+- 팩토리온 (15087611) 부분 적재 90행 — DATA_GO_KR_API_KEY 작동, 회사·공장번호·산단별 조회 가동. 커버리지 확대 → `MANUFACTURED_AT` 보강
 - Wikidata P176 (manufactured by) — 부품↔공급사 staging 후 P4 cross-validate → Neo4j SUPPLIED_BY 승급
 
 ### 11.3 추론 가치 확장 — 공급망 위험 · 리콜 전파 · ESG 결합 · R&D ↔ 특허
@@ -1295,7 +1295,7 @@ make migrate-auto-kama               # 16_autograph_kama_macro.sql
 make migrate-schema-pg MIGRATE_FILE=17_autograph_oem_news.sql       # IR/뉴스룸 events_oem_news
 make migrate-schema-pg MIGRATE_FILE=20_auto_minerals.sql            # USGS 핵심광물 (L6 소재 부록)
 make migrate-schema-pg MIGRATE_FILE=21_auto_ev_chargers.sql         # EV 충전 인프라 (예정 — `DATA_GO_KR_API_KEY` 발급 후)
-make migrate-schema-pg MIGRATE_FILE=24_auto_factoryon.sql           # 팩토리온 공장등록 (부분 적재 5행)
+make migrate-schema-pg MIGRATE_FILE=24_auto_factoryon.sql           # 팩토리온 공장등록 (부분 적재 90행)
 python -m autograph.loaders.neo4j_init    # CONSTRAINT/INDEX 멱등 — ontology/auto/entities.yaml SSOT
 
 # (옵션) pre-push 정합성 검증 — DB·LLM 없이 동작 (mock 모드)
