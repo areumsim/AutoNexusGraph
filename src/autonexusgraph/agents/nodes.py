@@ -196,6 +196,16 @@ def triage_node(state: AgentState) -> AgentState:
     return state
 
 
+# ── 축2: LLM 자율 planner 토글 ──────────────────────────────
+def _llm_planner_enabled() -> bool:
+    """settings.agent_llm_planner (opt-in). 설정 로드 실패 시 안전하게 False."""
+    try:
+        from ..config import get_settings
+        return bool(getattr(get_settings(), "agent_llm_planner", False))
+    except Exception:   # noqa: BLE001
+        return False
+
+
 # ── (b) Result-aware replan adaptation ──────────────────────
 def _replan_escalate_kind(kind: str, hint: dict) -> str:
     """직전 실패 원인에 따라 question_kind 를 승격 — 같은 계획 재시도 대신 다른 전략.
@@ -283,6 +293,24 @@ def planner_node(state: AgentState) -> AgentState:
                      (replan_hint.get("prev_issues") or [])[:2])
         kind = new_kind
         state["question_kind"] = kind
+
+    # ── 축2: LLM 자율 planner (opt-in) ──────────────────────────────
+    # 활성 시 LLM 이 화이트리스트 검증된 task DAG 를 제안. 성공하면 룰/handler 분기를
+    # 건너뛴다. 실패/비활성/빈결과 → 아래 기존 로직으로 자연 폴백(안전 기본값 유지).
+    # replan_hint 를 LLM 에 주입해 (b) 와 시너지 — 실패 반영 재계획.
+    if _llm_planner_enabled():
+        from .llm_planner import try_llm_plan
+        llm_tasks = try_llm_plan(state, kind=kind, targets=targets,
+                                 year_hint=year_hint, q=q, replan_hint=replan_hint)
+        if llm_tasks:
+            state["tasks"] = llm_tasks
+            state["plan"] = [
+                {"tool": t["intent"], "args": t["args"],
+                 "purpose": f"{t['agent']}:{t['intent']}"}
+                for t in llm_tasks if t.get("agent") != "_spawn"
+            ]
+            log.info("[planner] LLM 자율 plan 채택 — tasks=%d", len(llm_tasks))
+            return _planner_cost_gate(state, kind, targets, len(llm_tasks))
 
     # ── 도메인 분기 — 등록 handler 에 plan 위임 (PRD §10.12) ─────────
     # finance 외 도메인은 외부 패키지가 등록한 handler.plan_tasks 가 task list 반환.

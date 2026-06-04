@@ -143,6 +143,10 @@ class Settings(BaseSettings):
     agent_max_replan: int = 2
     agent_query_budget_sec: int = 40
     agent_max_answer_len: int = 5000
+    # 축2: LLM 자율 planner (plan-and-execute). True 면 planner 가 LLM 으로 task DAG 를
+    # 제안하고 화이트리스트 검증 후 사용 — 실패/빈결과 시 기존 룰·handler 로 폴백.
+    # 기본 False (opt-in) — 룰 planner 가 검증된 안전 기본값.
+    agent_llm_planner: bool = False
     agent_turn_budget_usd: float = 0.20    # 한 대화 turn 의 최대 LLM 비용 (도메인 기본값)
     # 도메인별 override — 0.0 이면 agent_turn_budget_usd 상속.
     # auto 도메인은 LLM 추출 (P3) 이 cross 분야 보다 무거울 수 있어 별도 한도 권장.
