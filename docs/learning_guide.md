@@ -1744,7 +1744,7 @@ plt.plot(bins[:-1], bin_correct, 'o-'); plt.plot([0, 1], [0, 1], '--'); plt.save
 ### 11.6 MCP (Model Context Protocol) 상호운용
 
 - **출처**: Anthropic, "Model Context Protocol" 표준 (2024-11 발표, 2025년 OpenAI Agents SDK 채택)
-- **본 시스템 현황**: **wired (partial)** — `src/autonexusgraph/mcp/` 에 52 tools 자동 discovery + JSON Schema 변환 + stdio server. `pip install -e ".[mcp]"` 후 `python -m autonexusgraph.mcp` 로 부팅. Claude Desktop / Cline / Cursor / OpenAI Agents 등이 .mcp.json 으로 본 서버 등록 후 호출 가능.
+- **본 시스템 현황**: **wired (partial)** — `src/autonexusgraph/mcp/` 에 59 tools 자동 discovery + JSON Schema 변환 + stdio server. `pip install -e ".[mcp]"` 후 `python -m autonexusgraph.mcp` 로 부팅. Claude Desktop / Cline / Cursor / OpenAI Agents 등이 .mcp.json 으로 본 서버 등록 후 호출 가능.
 - **적용 가능성**: 이미 적용. 추가 보강 — MCP resource (PG/Neo4j 직접 조회) + MCP prompts (도메인별 시스템 프롬프트 노출).
 
 ### 11.7 LLM-as-judge 평가
