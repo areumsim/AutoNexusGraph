@@ -21,7 +21,7 @@
 
 - **화이트리스트 강제** — worker 가 도메인별 `allowed_intents` (`auto`: 31 / `ip`: 19 / `finance`: 21 인텐트) 검증 후 호출. 외부 인텐트는 차단. (코드 SSOT: `workers.py:30-41` / `autograph/agent_handler.py:42-65` / `ipgraph/agent_handler.py:26-42`.)
 - **cypher_guard** — 모든 그래프 호출은 `assert_read_only` 경유 (`safety/cypher_guard.py:68`). 쓰기 키워드 + 위험 CALL 차단.
-- **param_schema 검증** — Cypher 템플릿은 `type/range/regex/enum/bool reject` (`tools/cypher_templates.py:413 _validate_param`).
+- **param_schema 검증** — Cypher 템플릿은 `type/range/regex/enum/bool reject` (`tools/cypher_templates.py:422 _validate_param`).
 - **`reviewed_status='rejected'` 자동 제외** — bridge / graph 호출 모두.
 - **number_guard** — synthesizer 단계에서 답변의 비-화이트리스트 큰 숫자 마스킹.
 
@@ -47,7 +47,7 @@
 
 ### 1.2 `tools/graph.py` — Neo4j 그래프 탐색
 
-Cypher 템플릿 22개 경유 (`cypher_templates.py::TEMPLATES` — 정적 14 + 동적 `find_paths_{1..5}hops` 5 + `get_subgraph_d{1..3}` 3 = 22).
+Cypher 템플릿 14개 경유 (`cypher_templates.py::TEMPLATES` top-level dict — `find_paths` / `get_subgraph` 등 정적 정의. 동적 hop variants 는 함수 내부 처리).
 
 | 함수 | 시그니처 | 반환 |
 |---|---|---|
@@ -91,7 +91,7 @@ Cypher 템플릿 22개 경유 (`cypher_templates.py::TEMPLATES` — 정적 14 + 
 
 ### 2.2 `tools/graph.py` — Neo4j (Cypher 템플릿 `auto_*`)
 
-`AUTO_TEMPLATES` 24개 (정적 20 + 동적 `auto_find_paths_{1..4}hops` 4).
+`AUTO_TEMPLATES` 23개 (`cypher_templates_auto.py:25` dict top-level keys).
 
 | 함수 | 시그니처 | 반환 |
 |---|---|---|
@@ -149,7 +149,7 @@ Cypher 템플릿 22개 경유 (`cypher_templates.py::TEMPLATES` — 정적 14 + 
 
 ### 3.2 `tools/graph.py` — Neo4j (Cypher 템플릿 `ip_*`)
 
-`IP_TEMPLATES` 25개 (lookup 5 + assignee 6 + cpc 6 + citation 4 + cross 4).
+`IP_TEMPLATES` 23개 (`cypher_templates_ip.py:30` dict top-level keys).
 
 | 함수 | 시그니처 | 반환 |
 |---|---|---|

@@ -94,7 +94,7 @@
 
 | 자랑 | 실제 |
 |---|---|
-| README §6 / README §6 — finance 30 / auto 46 / cross 44 / ip 30 = 150 row | ⚠️ 4 중 정직 표기 필요 (2026-06-02 실측):<br>(a) **모든 row 가 시스템 작성자 작성** — 외부 큐레이터 비율 **0%**. 정책 30% 미달.<br>(b) **refusal row (is_answerable=false) 평균 5.3%** (finance 3.3% / auto 4.3% / cross 9.1% / ip 0%). 정책 10% 미달.<br>(c) **`gold_answer_text` paraphrase 평균 = finance 0.23 / auto 0.41 / cross 0.00** — 정책 3개 미달. EM/F1 매우 엄격 → 점수 낮아질 가능성 큼.<br>(d) **ip 30 row 의 gold_answer_text 모두 비어있음** — KIPRIS/USPTO 적재 후 채움.<br>→ 평가 점수는 **sanity check 수준** — 정량 증거로 활용 시 본 한계 명시 필수 (mental_model §5.7 / learning_guide §8.2.1 / gold_qa_guide §2.2 인지) |
+| README §6 / README §6 — finance 30 / **auto 56** (L1~L3 + AUTO-PROC 10) / **cross 49** (CD-L1~L4 + CD-PROC 5 + IP 결합 변형) / ip 30 = **165 row** | ⚠️ 4 중 정직 표기 필요:<br>(a) **모든 row 가 시스템 작성자 작성** — 외부 큐레이터 비율 **0%**. 정책 30% 미달.<br>(b) **refusal row (is_answerable=false) 정책 10% 미달**.<br>(c) **`gold_answer_text` paraphrase 정책 3개 미달**. EM/F1 매우 엄격 → 점수 낮아질 가능성 큼.<br>(d) **ip 30 row 의 gold_answer_text 모두 비어있음** — KIPRIS/USPTO 적재 후 채움.<br>→ 평가 점수는 **sanity check 수준** — 정량 증거로 활용 시 본 한계 명시 필수 (mental_model §5.7 / learning_guide §8.2.1 / gold_qa_guide §2.2 인지) |
 
 ### 3.7 "MCP / Langfuse / SHACL / 평가 매트릭스" (README §10.17 = 4 상용 신호)
 

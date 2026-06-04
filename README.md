@@ -1003,7 +1003,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | 영역 | 현재 | 최종 |
 |---|---|---|
 | 평가 매트릭스 | 4 어댑터 × 3 LLM = 12 조합 인프라 완성, 실측 대기 | **축소 매트릭스 4 조합 (4 어댑터 × FAST tier 1종) 우선 headline (thesis §10.7) + Allganize 외부 벤치 + rerank on/off ablation.** 2번째 LLM 은 subset (CD-L3/L4) — 풀 12 조합 실측 + Confidence-Weighted Accuracy calibration + Vector RAG 비교 공정성 검증은 후속 |
-| Gold QA | finance 30 / auto 46 / cross 44 / ip 30 row seed | finance 100 / auto 100 / cross 100 / ip 100 — CD-L1~L4 라벨 + 사람 검증 |
+| Gold QA | finance 30 / auto 56 / cross 49 / ip 30 row seed (165 total) | finance 100 / auto 100 / cross 100 / ip 100 — CD-L1~L4 라벨 + 사람 검증 |
 | Cross-Domain 목표 정답률 | (미실측) | CD-L1 80%+ / L2 70%+ / L3 50–60% / L4 40–50% (§2.2) |
 | Bridge 품질 | confidence ≥ 0.9 비율 측정 인프라 (`eval/metrics/bridge_quality.py`) | confidence ≥ 0.9 비율 80%+ + 검토 SOP + 자동 만료 정책 (예: 6개월 미검토 candidate → 자동 rejected) |
 | HITL | clarification + cost approval 활성 | `sensitive_decision` (대출/투자/계약 관련 high-stakes 결정 시 사람 승인) + 답변 후 explicit feedback 루프 |
@@ -1119,7 +1119,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
 | **12 조합 매트릭스 실측** | 인프라 완성, LLM 키 필요 | `make eval-full / eval-auto / eval-cross` 풀 실행 + `eval/reports/<run>/summary.md` PR 첨부 |
-| **gold QA 확장** | finance 30 / auto 46 / cross 44 / ip 30 seed | 각각 100 row + CD-L1~L4 라벨 + 외부 큐레이터 30% (자기충족성 완화 — `docs/mental_model.md §5.7`) |
+| **gold QA 확장** | finance 30 / auto 56 / cross 49 / ip 30 seed (165 total) | 각각 100 row + CD-L1~L4 라벨 + 외부 큐레이터 30% (자기충족성 완화 — `docs/mental_model.md §5.7`) |
 | **§10.12 baseline 이동 정책** | dod_audit 가 baseline (`4049caf856`) 고정. 실제 코어 변경량은 baseline 갱신 시점에 reset | "baseline 은 도메인 추가 마다 reset" 또는 "월 단위 reset" 같은 명시 정책 + 누적 차분 표 |
 | **§10.13/14 trace 메트릭** | ✅ **구현 (E-3)** — `agents/hop_metrics.py` 가 per-turn cypher hop 수 + tool 호출 sequence 를 trace(Langfuse + PG `agent_trace`)에 기록 + eval pred_row `hop_count` + `main_hop_efficiency` 실제 hop 경로(`hybrid_vs_vector_hops`) | §10.13 ✅ 전환은 LLM eval 1회 실행 후 (현재 manifest 는 simulation) |
 | **답변 사용자 피드백 루프** | UI 에 👍/👎/📝 wiring, 저장소 정의 없음 | `chat.feedback` 스키마 + 저주파 retraining loop |
@@ -1405,7 +1405,7 @@ make load-assignee-corp-map      # ip.assignee_corp_map 매칭 (supplier candida
 
 # 3. 평가 + DoD 재측정
 make eval-ip                     # gold_qa_ip_v0.jsonl 30 row (IP-L1/L2/L3 각 10)
-make eval-cross                  # CD-L3/L4 ip 결합 포함 (cross 44 row 중 IP 결합 변형 6 row 포함)
+make eval-cross                  # CD-L3/L4 ip 결합 포함 (cross 49 row — CD-L1~L4 + CD-PROC 5 + IP 결합 변형)
 make audit-dod                   # §10.12 코어 변경량 — baseline 831e72d (상용화 P0/P1 reset) 기준 0% ✅
 ```
 

@@ -537,7 +537,7 @@ stateDiagram-v2
     end note
 ```
 
-`should_replan(state)` (`validator.py:165`):
+`should_replan(state)` (`validator.py:173`):
 
 ```python
 def should_replan(state):
@@ -550,7 +550,7 @@ def should_replan(state):
     return True
 ```
 
-`mark_replan(state)` (`validator.py:176`) 는 다음 키를 **리셋** 해서 planner 가 새로 채우게 한다:
+`mark_replan(state)` (`validator.py:184`) 는 다음 키를 **리셋** 해서 planner 가 새로 채우게 한다:
 - `tool_results = []`
 - `evidence_chunks = []`
 - `plan = []`, `tasks = []`, `task_results = {}`
@@ -1762,7 +1762,7 @@ make audit-calibrate ARGS="--adapter hybrid --metric f1 --em-threshold 0.5"
 ##### 11.4.0-legacy 5분 recipe (참고)
 
 **실행 가능 조건**:
-1. gold QA 최소 100 row 측정 완료 (현재 finance 30 / auto 46 / cross 44 — 총 120, 조건 충족)
+1. gold QA 최소 100 row 측정 완료 (현재 finance 30 / auto 56 / cross 49 — 총 135, ip 30 별도 — gold_answer 미적재. 조건 충족)
 2. LLM 키 활성 + `make eval-full` 실행 → `eval/reports/<run>/predictions.jsonl` 생성
 
 **실행 절차** (5분):
@@ -1905,7 +1905,7 @@ plt.plot(bins[:-1], bin_correct, 'o-'); plt.plot([0, 1], [0, 1], '--'); plt.save
 | §3.2.1 | `src/autonexusgraph/agents/graph.py:108-122` |
 | §3.2.2 | `src/autonexusgraph/agents/graph.py:124-162` |
 | §3.3 | `src/autonexusgraph/agents/state.py:22-72` |
-| §3.5 | `src/autonexusgraph/agents/validator.py:31`, `validator.py:165-188` |
+| §3.5 | `src/autonexusgraph/agents/validator.py:36`, `validator.py:173-195` |
 | §3.6 | `src/autonexusgraph/agents/_domain_handler.py:22-26`, `:44-80`, `:108-148`, `:196-213` |
 | §4.1.1 | `src/autonexusgraph/safety/prompt_safety.py:36-62` |
 | §4.1.4 | `src/autonexusgraph/agents/policy.py:24-52` |
