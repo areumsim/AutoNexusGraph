@@ -236,7 +236,8 @@ def run_agent(question: str, *,
               thread_id: str = "default",
               history: list[dict] | None = None,
               domain: str | None = None,
-              rerank: bool | None = None) -> AgentState:
+              rerank: bool | None = None,
+              llm_planner: bool | None = None) -> AgentState:
     """단일 turn 실행 (blocking). PRD §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
 
     ``start_turn_context`` 가 ContextVar 격리된 CostTracker + Langfuse span 을
@@ -245,9 +246,13 @@ def run_agent(question: str, *,
 
     ``rerank`` (PRD §10 DoD #17 (d) 평가 매트릭스 ablation): None=기본(retrieve 도구
     default), True/False 명시 시 research_worker 가 search_documents(rerank=...) 로 전파.
+
+    ``llm_planner`` (축2 LLM 자율 planner ablation): None=config(`AGENT_LLM_PLANNER`)
+    기본, True/False 명시 시 이 turn 한정 planner 모드 override → 평가 매트릭스가
+    룰 planner vs LLM planner 셀을 분리 측정 (rerank 와 동일 패턴).
     """
     state: AgentState = _init_state(question, thread_id, history, domain=domain,
-                                    rerank=rerank)
+                                    rerank=rerank, llm_planner=llm_planner)
     with start_turn_context(thread_id or "default", state) as turn:
         if _HAS_LANGGRAPH:
             try:
@@ -265,7 +270,8 @@ def run_agent_stream(question: str, *,
                      thread_id: str = "default",
                      history: list[dict] | None = None,
                      domain: str | None = None,
-                     rerank: bool | None = None
+                     rerank: bool | None = None,
+                     llm_planner: bool | None = None
                      ) -> Iterator[tuple[str, AgentState]]:
     """노드별 partial state stream — UI/SSE 용 (PRD §7.6.5).
 
@@ -274,7 +280,7 @@ def run_agent_stream(question: str, *,
     트리거되어 PG/Langfuse 적재 완료.
     """
     state: AgentState = _init_state(question, thread_id, history, domain=domain,
-                                    rerank=rerank)
+                                    rerank=rerank, llm_planner=llm_planner)
     with start_turn_context(thread_id or "default", state) as turn:
         # A1 (P0+ #1 결함 fix): 매 yield 직후 turn.state 갱신 — generator close /
         # client disconnect 시점에도 마지막 partial 까지 PG/Langfuse 에 기록되도록.
@@ -288,7 +294,7 @@ def run_agent_stream(question: str, *,
             except Exception as exc:   # noqa: BLE001
                 log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
                 state = _init_state(question, thread_id, history, domain=domain,
-                                    rerank=rerank)
+                                    rerank=rerank, llm_planner=llm_planner)
                 turn.state = state   # type: ignore[assignment]
         for node_name, partial in _stream_with_fallback_chain(state):
             turn.state = partial   # type: ignore[assignment]
@@ -433,7 +439,8 @@ def _stream_with_fallback_chain(state: AgentState) -> Iterator[tuple[str, AgentS
 
 def _init_state(question: str, thread_id: str, history: list[dict] | None,
                 *, domain: str | None = None,
-                rerank: bool | None = None) -> AgentState:
+                rerank: bool | None = None,
+                llm_planner: bool | None = None) -> AgentState:
     """초기 state. domain 미지정 시 등록 라우터 검색 → 모두 None 이면 finance.
 
     domain 라우팅 흐름 (PRD §7.5.11 + §10.12):
@@ -465,6 +472,8 @@ def _init_state(question: str, thread_id: str, history: list[dict] | None,
     }
     if rerank is not None:
         state["rerank"] = rerank
+    if llm_planner is not None:
+        state["llm_planner"] = llm_planner   # 축2 ablation — config 토글 per-turn override
     return state
 
 

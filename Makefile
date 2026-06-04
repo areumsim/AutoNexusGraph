@@ -632,14 +632,17 @@ audit-ontology:
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/ontology_validate.py $(ARGS)
 
 audit-eval-matrix:
-	# PRD §10 DoD #17 (d) — 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation).
+	# PRD §10 DoD #17 (d) — 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation
+	# + 축2 hybrid 룰 vs LLM planner ablation = 10 cells).
 	# 기본 = simulation (LLM 비용 0). --full 옵션으로 실제 LLM 호출.
 	# 사용자 ARGS 전달 가능: make audit-eval-matrix ARGS="--full --limit 30"
+	# 축2 planner ablation 끄려면: ARGS="--no-planner-ablation" (8 cells 로 복귀).
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py $(ARGS)
 
 audit-eval-matrix-full:
-	# PRD §10.7 thesis 측정 — --full + multi-hop 16 row 포함 위해 limit 30 (default).
-	# 비용 추정: 8 cells × 30 row ≈ $3 (gpt-4o-mini, hybrid 비중 큼).
+	# PRD §10.7 thesis + 축2 planner ablation 측정 — --full + multi-hop 16 row 위해 limit 30.
+	# 비용 추정: 10 cells × 30 row ≈ $4~5 (gpt-4o-mini; hybrid + planner1 4셀이 비중 큼).
+	# 산출 JSON 의 thesis(hybrid−vector) + planner_ablation(LLM−룰) 두 headline 확인.
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py --full
 
 audit-mcp:

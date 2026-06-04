@@ -168,6 +168,9 @@ class AgentState(TypedDict, total=False):
     # 평가 매트릭스 (PRD §10 DoD #17 (d)) 의 rerank on/off ablation 셀이 이 값을
     # run_agent 인자로 주입 → research_worker 가 search_documents(rerank=...) 에 전파.
     rerank: Annotated[bool | None, _last_wins]
+    # 축2 LLM 자율 planner ablation — entry 에서만 set. None=config(AGENT_LLM_PLANNER) 기본,
+    # True/False=이 turn 한정 override. 평가 매트릭스가 룰 vs LLM planner 셀 분리에 사용.
+    llm_planner: Annotated[bool | None, _last_wins]
 
     # 전처리 (rewriter / temporal 결과) — triage/rewriter 한 번만 set, worker read-only
     question_rewritten: Annotated[str, _last_wins]

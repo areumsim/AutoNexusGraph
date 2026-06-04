@@ -197,8 +197,16 @@ def triage_node(state: AgentState) -> AgentState:
 
 
 # ── 축2: LLM 자율 planner 토글 ──────────────────────────────
-def _llm_planner_enabled() -> bool:
-    """settings.agent_llm_planner (opt-in). 설정 로드 실패 시 안전하게 False."""
+def _llm_planner_enabled(state: AgentState | None = None) -> bool:
+    """LLM planner 활성 여부 — state override(평가 ablation) > config(opt-in).
+
+    state["llm_planner"] 가 True/False 면 그것을 우선(이 turn 한정). None/미설정이면
+    settings.agent_llm_planner. 설정 로드 실패 시 안전하게 False.
+    """
+    if state is not None:
+        override = state.get("llm_planner")
+        if override is not None:
+            return bool(override)
     try:
         from ..config import get_settings
         return bool(getattr(get_settings(), "agent_llm_planner", False))
@@ -298,7 +306,7 @@ def planner_node(state: AgentState) -> AgentState:
     # 활성 시 LLM 이 화이트리스트 검증된 task DAG 를 제안. 성공하면 룰/handler 분기를
     # 건너뛴다. 실패/비활성/빈결과 → 아래 기존 로직으로 자연 폴백(안전 기본값 유지).
     # replan_hint 를 LLM 에 주입해 (b) 와 시너지 — 실패 반영 재계획.
-    if _llm_planner_enabled():
+    if _llm_planner_enabled(state):
         from .llm_planner import try_llm_plan
         llm_tasks = try_llm_plan(state, kind=kind, targets=targets,
                                  year_hint=year_hint, q=q, replan_hint=replan_hint)

@@ -105,24 +105,31 @@ class AgentAdapter(ABC):
 
     def __init__(self, *,
                  rerank: bool = True,
-                 llm_tier: str = "fast") -> None:
+                 llm_tier: str = "fast",
+                 llm_planner: bool = False) -> None:
         """매트릭스 변수.
 
         Args:
             rerank: BGE-Reranker 적용 여부. False = vector top_k 만 (ablation baseline).
             llm_tier: 'fast' | 'smart' — env LLM_MODEL_<TIER> 매핑. 본 단계는 라벨용,
                 실제 모델 선택은 ``get_llm_client(role=..., tier=...)`` 가 처리.
+            llm_planner: 축2 LLM 자율 planner ablation. True = `run_agent(llm_planner=True)`
+                로 전파 → 룰 planner 대신 LLM plan. hybrid 어댑터에서만 유효(타 어댑터는
+                agent planner 미경유). default False = 룰 planner(기존 동작 무변경).
         """
         self.rerank = bool(rerank)
         self.llm_tier = str(llm_tier or "fast").lower()
+        self.llm_planner = bool(llm_planner)
 
     def label(self) -> str:
         """매트릭스 셀 식별자 — predictions.jsonl / per_question.csv 의 adapter 컬럼.
 
         예: ``vector_fast_rerank1``, ``hybrid_fast_rerank0``. runner 가 본 라벨로
         per-cell 파일을 분리해 동일 어댑터의 rerank on/off 두 셀을 분리 저장.
+        LLM planner ablation 셀은 ``_planner1`` 접미사로 추가 분리(기존 라벨 무변경).
         """
-        return f"{self.name}_{self.llm_tier}_rerank{int(self.rerank)}"
+        base = f"{self.name}_{self.llm_tier}_rerank{int(self.rerank)}"
+        return f"{base}_planner1" if self.llm_planner else base
 
     @abstractmethod
     def query(self, question: str, *,

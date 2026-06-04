@@ -2,10 +2,13 @@
 """PRD §10 DoD #17 (d) — 축소 평가 매트릭스 enumerator (4 어댑터 × FAST × rerank ablation).
 
 본 runner 는 평가 매트릭스의 **셀 enumeration 인프라** 를 검증한다 (PRD §11.1):
-  - 4 어댑터 (vector / graph / hybrid / sql_vec) × rerank {on/off} = 8 cells
-  - 각 cell 의 식별자 (``<name>_<tier>_rerank<0|1>``) + 어댑터 인스턴스화
+  - 4 어댑터 (vector / graph / hybrid / sql_vec) × rerank {on/off} = 8 base cells
+  - (축2) hybrid 룰 vs LLM 자율 planner ablation 2 cells (``_planner1``) = 총 10 cells
+  - 각 cell 의 식별자 (``<name>_<tier>_rerank<0|1>[_planner1]``) + 어댑터 인스턴스화
   - thesis headline 자동 계산 — ``hybrid_fast_rerank1`` vs ``vector_fast_rerank0``
     multi-hop EM 차이 (PRD §10.7 +30%p 목표)
+  - (축2) planner_ablation headline — ``hybrid_*_rerank1`` (룰) vs ``_planner1`` (LLM)
+    multi-hop EM 차이 (LLM 자율 planner 가 룰 템플릿 대비 품질 우위인지 정량화)
 
 기본 = simulation (LLM 비용 0, mock AgentResponse). ``--full`` 옵션 시 실제
 ``run_qa_eval`` 를 cell 마다 호출 → LLM 비용 발생.
@@ -47,20 +50,38 @@ DEFAULT_RERANK = (True, False)            # ablation 양 셀
 
 def enumerate_cells(adapters: tuple[str, ...] = DEFAULT_ADAPTERS,
                      tiers:    tuple[str, ...] = DEFAULT_TIERS,
-                     reranks:  tuple[bool, ...] = DEFAULT_RERANK
+                     reranks:  tuple[bool, ...] = DEFAULT_RERANK,
+                     planner_ablation: bool = True,
                      ) -> list[dict[str, Any]]:
-    """축소 매트릭스 셀 목록 — (adapter, tier, rerank) 직곱."""
+    """축소 매트릭스 셀 목록 — (adapter, tier, rerank) 직곱 + (축2) hybrid planner ablation.
+
+    planner_ablation=True 이고 adapters 에 hybrid 가 포함되면, hybrid 셀마다 LLM 자율
+    planner 버전(``_planner1``)을 추가한다 — 룰 planner vs LLM planner 정량 비교용.
+    타 어댑터(vector/graph/sql_vec)는 agent planner 미경유라 ablation 무의미 → 미추가.
+    """
     from eval.adapters import get_adapter
 
     cells: list[dict[str, Any]] = []
     for adapter_name, tier, rerank in itertools.product(adapters, tiers, reranks):
         adapter = get_adapter(adapter_name, rerank=rerank, llm_tier=tier)
         cells.append({
-            "label":    adapter.label(),
-            "adapter":  adapter_name,
-            "tier":     tier,
-            "rerank":   rerank,
+            "label":       adapter.label(),
+            "adapter":     adapter_name,
+            "tier":        tier,
+            "rerank":      rerank,
+            "llm_planner": False,
         })
+    # 축2 — hybrid 룰 vs LLM planner 셀 추가 (rerank 별).
+    if planner_ablation and "hybrid" in adapters:
+        for tier, rerank in itertools.product(tiers, reranks):
+            adapter = get_adapter("hybrid", rerank=rerank, llm_tier=tier, llm_planner=True)
+            cells.append({
+                "label":       adapter.label(),
+                "adapter":     "hybrid",
+                "tier":        tier,
+                "rerank":      rerank,
+                "llm_planner": True,
+            })
     return cells
 
 
@@ -100,7 +121,8 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
     import os
     env = {**os.environ,
            "EVAL_RERANK":   "1" if cell["rerank"] else "0",
-           "EVAL_LLM_TIER": cell["tier"]}
+           "EVAL_LLM_TIER": cell["tier"],
+           "EVAL_LLM_PLANNER": "1" if cell.get("llm_planner") else "0"}
     log.info("[matrix] full cell %s — cmd: %s", cell["label"], " ".join(cmd))
     rc = subprocess.run(cmd, env=env, cwd=str(ROOT)).returncode
 
@@ -266,6 +288,47 @@ def compute_dod_13_14(cells_with_metrics: list[dict[str, Any]]) -> dict[str, Any
     return {"dod_13_main_hop_efficiency": dod_13, "dod_14_latency": dod_14}
 
 
+def compute_planner_ablation(cells_with_metrics: list[dict[str, Any]]
+                              ) -> dict[str, Any]:
+    """축2 — hybrid 룰 planner vs LLM 자율 planner 비교 (동일 rerank=on 셀 기준).
+
+    ``hybrid_*_rerank1`` (룰) vs ``hybrid_*_rerank1_planner1`` (LLM) 의 multi_hop_em
+    (없으면 em) 차이. LLM planner 가 룰 템플릿 대비 멀티홉 품질을 올리는지 정량화.
+    """
+    def _pick(llm: bool):
+        return next(
+            (c for c in cells_with_metrics
+             if c["adapter"] == "hybrid" and c["rerank"]
+             and bool(c.get("llm_planner")) == llm),
+            None,
+        )
+    rule, llm = _pick(False), _pick(True)
+    if not rule or not llm:
+        return {"available": False, "reason": "hybrid rule/LLM planner 셀 미포함"}
+
+    def _metric(c):
+        return c.get("multi_hop_em") if c.get("multi_hop_em") is not None else c.get("em")
+    rule_m, llm_m = _metric(rule), _metric(llm)
+    if rule_m is None or llm_m is None:
+        return {
+            "available": False,
+            "reason": "simulation 모드 — EM 미산정 (full 모드 필요)",
+            "rule_cell": rule["label"], "llm_cell": llm["label"],
+        }
+    diff_pp, _ = compute_diff_pp(llm_m, rule_m)   # LLM − 룰
+    return {
+        "available":  True,
+        "rule_cell":  rule["label"],
+        "llm_cell":   llm["label"],
+        "rule_em":    rule_m,
+        "llm_em":     llm_m,
+        "diff_pp":    diff_pp,
+        "llm_better": llm_m >= rule_m,
+        "rule_cost":  rule.get("cost_usd"),
+        "llm_cost":   llm.get("cost_usd"),
+    }
+
+
 def main() -> int:
     p = argparse.ArgumentParser(prog="run_matrix_smoke",
                                  description=__doc__.split("\n")[0])
@@ -279,6 +342,8 @@ def main() -> int:
                    help="csv — fast,smart (기본 fast)")
     p.add_argument("--reranks", default="on,off",
                    help="csv — on,off (기본 둘 다 — ablation)")
+    p.add_argument("--no-planner-ablation", action="store_true",
+                   help="축2 hybrid 룰 vs LLM planner 셀 추가를 끔 (기본 추가)")
     p.add_argument("--full", action="store_true",
                    help="실제 run_qa_eval 호출 (LLM 비용 발생). 미지정 시 simulation "
                         "(LLM 비용 0, 셀 enumeration 만).")
@@ -308,7 +373,8 @@ def main() -> int:
         reranks = DEFAULT_RERANK
 
     simulation = not args.full       # default 가 simulation
-    cells = enumerate_cells(adapters, tiers, reranks)
+    cells = enumerate_cells(adapters, tiers, reranks,
+                            planner_ablation=not args.no_planner_ablation)
     log.info("[matrix] %d cells: %s", len(cells), [c["label"] for c in cells])
 
     extra_args = []
@@ -323,6 +389,7 @@ def main() -> int:
 
     thesis = compute_thesis_headline(results)
     dod_13_14 = compute_dod_13_14(results)
+    planner_ablation = compute_planner_ablation(results)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -335,6 +402,7 @@ def main() -> int:
         "thesis":   thesis,
         "dod_13":   dod_13_14["dod_13_main_hop_efficiency"],
         "dod_14":   dod_13_14["dod_14_latency"],
+        "planner_ablation": planner_ablation,   # 축2 — 룰 vs LLM planner
         "gold":     str(args.gold),
     }
     out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
@@ -361,7 +429,16 @@ def main() -> int:
             cross_repr = (f"{d14.get('cross_pass_rate'):.2f}"
                           if d14.get('cross_pass_rate') is not None else "n/a")
             dod_str += f" #14: int={d14.get('internal_pass_rate'):.2f}/cross={cross_repr} {m14}"
-        print(f"[audit-eval-matrix] PASS ({mode}, {len(cells)} cells: {labels}){thesis_str}{dod_str}  ({out_path})")
+        # 축2 — 룰 vs LLM planner 한 줄.
+        pa = payload["planner_ablation"]
+        planner_str = ""
+        if pa.get("available"):
+            mark = "✅" if pa.get("llm_better") else "⚠️"
+            planner_str = (f" planner(LLM−룰): {pa['diff_pp']:+.1f}%p "
+                           f"(룰={pa['rule_em']:.3f}/LLM={pa['llm_em']:.3f}) {mark}")
+        elif "planner1" in labels:
+            planner_str = f" planner: {pa.get('reason', 'n/a')}"
+        print(f"[audit-eval-matrix] PASS ({mode}, {len(cells)} cells: {labels}){thesis_str}{dod_str}{planner_str}  ({out_path})")
         return 0
     failed = [r["label"] for r in results if not r.get("ran")]
     print(f"[audit-eval-matrix] FAIL ({mode}) — cells failed: {failed}  ({out_path})")

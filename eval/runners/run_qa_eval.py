@@ -634,6 +634,7 @@ def main() -> int:
     _matrix_mode = bool(
         args.rerank is not None or args.llm_tier is not None
         or "EVAL_RERANK" in os.environ or "EVAL_LLM_TIER" in os.environ
+        or "EVAL_LLM_PLANNER" in os.environ
     )
 
     def _resolve_rerank() -> bool:
@@ -644,15 +645,20 @@ def main() -> int:
         if args.llm_tier is not None:
             return args.llm_tier
         return os.getenv("EVAL_LLM_TIER", "fast").lower()
+    def _resolve_llm_planner() -> bool:
+        # 축2 ablation — env EVAL_LLM_PLANNER 만 (matrix runner 가 hybrid planner 셀에 전달).
+        return os.getenv("EVAL_LLM_PLANNER", "0").lower() in ("1", "true", "on", "yes")
     _rerank = _resolve_rerank()
     _tier = _resolve_tier()
+    _llm_planner = _resolve_llm_planner()
 
     all_per_q: list[dict] = []
     budgets: dict[str, dict] = {}
 
     for ad_name in adapter_names:
         try:
-            adapter = get_adapter(ad_name, rerank=_rerank, llm_tier=_tier)
+            adapter = get_adapter(ad_name, rerank=_rerank, llm_tier=_tier,
+                                  llm_planner=_llm_planner)
         except ValueError as e:
             print(f"  [{ad_name}] {e}", file=sys.stderr)
             continue

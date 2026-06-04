@@ -14,14 +14,18 @@ class HybridAdapter(AgentAdapter):
     name = "hybrid"
     version = "0.1"
 
-    def __init__(self, *, rerank: bool = True, llm_tier: str = "fast") -> None:
+    def __init__(self, *, rerank: bool = True, llm_tier: str = "fast",
+                 llm_planner: bool = False) -> None:
         """Hybrid 어댑터 — 본 프로젝트의 production agent (Triage/Planner/Executor/Synth).
 
         rerank 토글은 ``run_agent(rerank=...)`` 로 전달되어 research_worker 가
         ``search_documents(rerank=...)`` 까지 전파 (PRD §10 DoD #17 (d) ablation).
         → ``hybrid_fast_rerank0`` 셀이 ``hybrid_fast_rerank1`` 과 실제로 분리됨.
+
+        llm_planner 토글(축2 ablation)은 ``run_agent(llm_planner=...)`` 로 전달 →
+        룰 planner vs LLM 자율 planner 셀(``_planner1``)을 실제 분리 측정.
         """
-        super().__init__(rerank=rerank, llm_tier=llm_tier)
+        super().__init__(rerank=rerank, llm_tier=llm_tier, llm_planner=llm_planner)
 
     def query(self, question: str, *,
               domain: str | None = None) -> AgentResponse:
@@ -29,7 +33,8 @@ class HybridAdapter(AgentAdapter):
 
         t0 = time.monotonic()
         try:
-            state = run_agent(question, domain=domain, rerank=self.rerank)
+            state = run_agent(question, domain=domain, rerank=self.rerank,
+                              llm_planner=self.llm_planner)
         except Exception as e:
             return AgentResponse(
                 refused=True, refusal_reason=f"agent_failed:{e}",
