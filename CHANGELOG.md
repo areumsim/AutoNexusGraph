@@ -8,6 +8,43 @@
 
 ---
 
+## 2026-06-04 — v2.2-rev2: ProcessGraph P0 게이트(DoD #19) 통과 + 미완료 라벨 전수 정정 (PR #6)
+
+PR #6 (`docs/label-audit-recall-source-fix` → main, 16 commits) 머지. v2.2-rev1 BoP 정책
+정의를 실데이터로 충족 + Layer 1 Bridge 신규 + Layer 2 EU 지역 확장 + Neo4j namespace
+SSOT. [DoD §10.19 충족 / §10.20 부분 — 결함전파·공정↔재무 경로 구조 완성, 정확도 실측만 LLM 키 대기]
+
+### Added
+- **ProcessGraph 엣지 5종 — DoD §10.19 통과**: PERFORMED_AT 94 (G-1, 회사귀속 ≥ 30 게이트 통과)
+  / PRODUCED_BY 46 (G-2, Part→ProcessStep) / USES_EQUIPMENT 16 + CONSUMES_MATERIAL 6 (G-3,
+  Equipment 13 신규) / CAUSED_BY_PROCESS 96 (G-4, KOTSA 한글 리콜 결함→공정 deterministic) /
+  USES_PROCESS 189 (G-6, Module→Process). 산단공 익명 스텝 무오염·비귀속 위반 0
+- **Layer 1 Bridge — 가이드 §1.x 4-홉 회사귀속·회사무관 추적 처음 동작**: `:DefectType` 50
+  (NHTSA+KOTSA defect_summary 1,434 → Agent 추출, 8 카테고리 균형) + `:FailureMode` 18 +
+  `:Equipment` 3 (NASA PCoE Bearing/Battery/IGBT readme + 논문 1.4 GB → Agent) + DEFECT_MATCHES
+  7,417 / MANIFESTS_AS 72 / SUBJECT_TO 18. 신규 SQL `28_auto_defect_matches.sql` +
+  `29_auto_failure_modes.sql` (pgvector 1024 + 7키 풀)
+- **Layer 2 — 3 지역 자동차 리콜 2,406건**: NHTSA 493 + KOTSA 941 + **EU Safety Gate 972**
+  (weekly XML 122/131, CC BY 4.0). brand 매핑 NHTSA 100% / KOTSA 92.1% / EU 86.7%.
+  `master_manufacturers` dedup 21→8 row → **cross-jurisdictional 9 패턴 검출** (Ford
+  "연료라인 누유" 3-region 7쌍 / 현대·기아 EV ICCU 글로벌 캠페인 4+3 / JAGUAR 주조 결함 /
+  VW 안전삼각대 83 / Mercedes 접착제 76 등)
+- **Neo4j domain namespace SSOT** (CE multi-DB 미지원 우회) — 33 라벨 매핑 + 96,969 노드
+  backfill
+- **운영·보안·DX**: O-1 FastAPI API key 인증·rate limit·thread 소유권 / O-2 production 배포
+  가이드 + `docker-compose.prod.yml` / Q-1 Bridge candidate 검토 SOP (Streamlit UI + KPI) /
+  LLM 비용 가드 실효화 (turn·세션 한도 + kill-switch + auto-wrap)
+- **KAMP 카탈로그 50 row** + 산단공 `:Process` 정규화 사전 (37→33 매핑, inline `_PROCESS_NORM`)
+- **신규 문서 3건**: `docs/operations/api_keys_pending.md` (P0 GCP / P1 KIPRIS·Anthropic·KAMP.ai / P2 USPTO·EPO 발급 대기 + 진입 체크리스트) / `docs/data_lineage.md` §2.14~16 + §4.2~4.2.1 (3 신규 출처 + cross-jurisdiction 인사이트) / `BACKLOG.md` G-7/G-8/G-9 + PG-4 + IP-1 trigger 갱신
+
+### Fixed
+- D-1 팩토리온 / D-5 리콜 라벨 정정 (live PG 실측 — factoryon 5→90행, events_recalls 941행)
+- S-1 MCP tool count 드리프트 교정 (52→59, auto 31→38) — audit SSOT 정합
+- S-3 온톨로지 검증 + Y-1 보조 yaml pydantic strict 충족
+- G-5 `ontology/ip/relations.yaml` 오기 정정 — `MAPPED_TO`는 BOM↔공정 아닌 **IP assignee→Company** 브릿지
+
+---
+
 ## 2026-06-02 — v2.2-rev1: ProcessGraph (BoP) 축 격상 정책 통합 (PR-P0-A)
 
 산단공 자동차 부품 제조업 공정 합성데이터 (data.go.kr 15151075, `auto.processes` 550 row /
