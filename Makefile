@@ -602,9 +602,9 @@ audit-trace:
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/trace_smoke.py
 
 audit-ontology:
-	# PRD §10 DoD #17 (c) — 온톨로지 pydantic strict 검증.
-	# ontology/auto + ontology/ (finance) 의 entities/relations.yaml 모두 검증.
-	PYTHONPATH=src:. $(PYTHON) scripts/audit/ontology_validate.py
+	# PRD §10 DoD #17 (c) — 온톨로지 pydantic strict 검증 (핵심+보조 yaml + cypher cross).
+	# Y-2: 도메인 격리 엄격 검증은 ARGS="--strict-cross" (cross-domain ref → ERROR).
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/ontology_validate.py $(ARGS)
 
 audit-eval-matrix:
 	# PRD §10 DoD #17 (d) — 축소 평가 매트릭스 (4 어댑터 × FAST × rerank ablation).

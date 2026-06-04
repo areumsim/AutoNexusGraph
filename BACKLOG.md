@@ -214,7 +214,7 @@
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
 | Y-1 | **보조 yaml SHACL/pydantic 확장** — extractors.yaml / system_taxonomy.yaml / plants.yaml | ✅ **구현** — `ontology_validate.py` 에 pydantic strict 모델 4개(ExtractorsFile/SystemTaxonomyFile/PlantsFile, extra='forbid') + `AUX_TARGETS` 추가. `make audit-ontology` aux 4 PASS (auto.extractors 15 · finance.extractors 9 · system_taxonomy 19 · plants 30). 테스트 5건(드리프트 reject) | (완료) | seed yaml(materials/part/supplier/standards) 추가 검증은 후속 | README §10.17 (c) |
-| Y-2 | **Cypher cross-check WARN 강등 (cross-domain reference)** — 예: ip cypher 가 auto.SUPPLIED_BY 참조 | wired (WARN 강등) | P3 | strict 모드 결정 필요 — cross-domain reference 를 ERROR 로 강등할지 WARN 유지할지 | scripts/audit/ontology_validate.py |
+| Y-2 | **Cypher cross-check WARN 강등 (cross-domain reference)** — 예: ip cypher 가 auto.SUPPLIED_BY 참조 | ✅ **구현** — 기본 WARN(가시화 ⚠️ 출력) + `--strict-cross`(`make audit-ontology ARGS="--strict-cross"`) 로 ERROR 강등 선택. 현 cross-domain ref: ip→`SUPPLIED_BY` 1건. 테스트 1건 | (완료) | strict 를 CI 게이트로 승격할지는 운영 결정 | scripts/audit/ontology_validate.py |
 
 ---
 

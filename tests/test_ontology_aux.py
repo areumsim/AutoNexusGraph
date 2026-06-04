@@ -47,3 +47,23 @@ def test_extractor_pass_alias_and_source_str_or_dict():
 def test_extractor_unknown_key_rejected():
     with pytest.raises(ValidationError):
         ExtractorsFile(version=1, extractors={"e": {"pass": "P2", "nonsense": 1}})
+
+
+# ── Y-2: cross-domain cypher reference WARN ↔ ERROR ─────────────────
+def test_strict_cross_promotes_cross_domain_ref_to_error():
+    from scripts.audit.ontology_validate import (
+        CYPHER_TEMPLATE_REGISTRIES,
+        _load_all_yaml_relations,
+        _validate_cypher_relations,
+    )
+    all_yaml = _load_all_yaml_relations()
+    domain, imp, dn, rels = next(t for t in CYPHER_TEMPLATE_REGISTRIES if t[0] == "ip")
+
+    warn = _validate_cypher_relations(domain, imp, dn, rels, all_yaml, strict_cross=False)
+    strict = _validate_cypher_relations(domain, imp, dn, rels, all_yaml, strict_cross=True)
+
+    # ip cypher 는 auto.SUPPLIED_BY 를 cross-domain 참조 (BACKLOG Y-2 예시)
+    assert "SUPPLIED_BY" in warn["cross_domain_refs"]
+    assert warn["passed"] is True            # 기본 WARN — gate 비차단
+    assert strict["passed"] is False         # --strict-cross → ERROR
+    assert strict["cross_domain_refs"] == warn["cross_domain_refs"]

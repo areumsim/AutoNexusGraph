@@ -219,11 +219,15 @@ def _load_all_yaml_relations() -> dict[str, set[str]]:
 
 def _validate_cypher_relations(domain: str, import_path: str, dict_name: str,
                                 relations_yaml: Path,
-                                all_yaml_rels: dict[str, set[str]]) -> dict:
+                                all_yaml_rels: dict[str, set[str]],
+                                strict_cross: bool = False) -> dict:
     """Cypher 템플릿에서 사용된 엣지 타입이 relations.yaml 에 정의되어 있는지 검증.
 
-    cross-domain reference (예: ip.cypher 가 auto.SUPPLIED_BY 참조) 는 WARN 으로 강등.
+    cross-domain reference (예: ip.cypher 가 auto.SUPPLIED_BY 참조) 는 기본 WARN.
     진짜 누락 (어느 도메인 yaml 에도 없는 엣지) 만 ERROR.
+
+    Y-2: ``strict_cross=True`` (CLI ``--strict-cross``) 면 cross-domain reference 도
+    ERROR 로 강등 — 도메인 격리를 엄격히 강제할 때.
     """
     label = f"{domain}.cypher-vs-yaml"
     if not relations_yaml.exists():
@@ -277,6 +281,17 @@ def _validate_cypher_relations(domain: str, import_path: str, dict_name: str,
             "unused_in_cypher":  unused_in_cypher,
         }
 
+    if strict_cross and cross_domain_refs:
+        return {
+            "label":             label,
+            "passed":            False,
+            "reason":            f"cross-domain reference (--strict-cross): {cross_domain_refs}",
+            "n_cypher_rels":     len(cypher_rels),
+            "n_yaml_rels":       len(yaml_rels),
+            "cross_domain_refs": cross_domain_refs,
+            "unused_in_cypher":  unused_in_cypher,
+        }
+
     return {
         "label":             label,
         "passed":            True,
@@ -298,6 +313,8 @@ def main() -> int:
                    help="cypher templates ↔ relations.yaml cross-check 수행 (기본 on)")
     p.add_argument("--no-cross", action="store_false", dest="cross",
                    help="cross-check 건너뛰기")
+    p.add_argument("--strict-cross", action="store_true", default=False,
+                   help="Y-2: cross-domain cypher reference 를 ERROR 로 (기본 WARN)")
     p.add_argument("--log-level", default="WARNING")
     args = p.parse_args()
     logging.basicConfig(level=args.log_level)
@@ -320,7 +337,8 @@ def main() -> int:
         all_yaml = _load_all_yaml_relations()
         for domain, imp, dn, rels_path in CYPHER_TEMPLATE_REGISTRIES:
             results.append(
-                _validate_cypher_relations(domain, imp, dn, rels_path, all_yaml)
+                _validate_cypher_relations(domain, imp, dn, rels_path, all_yaml,
+                                           strict_cross=args.strict_cross)
             )
 
     failed = [r for r in results if not r["passed"]]
@@ -362,6 +380,11 @@ def main() -> int:
         if cross_summary:
             line += f"  ▸ cross: {cross_summary}"
         print(f"{line}  ({out_path})")
+        # Y-2: cross-domain reference 는 PASS 라도 WARN 으로 가시화 (--strict-cross 시 ERROR).
+        for r in results:
+            if r.get("passed") and r.get("cross_domain_refs"):
+                print(f"  ⚠️ {r['label']}: cross-domain reference (WARN, "
+                      f"--strict-cross 시 ERROR): {r['cross_domain_refs']}")
     else:
         print(f"[audit-ontology] FAIL — {len(failed)}/{len(results)} checks  ({out_path})")
         for r in failed:
