@@ -49,38 +49,79 @@ def test_all_4_adapters_support_rerank_toggle():
 
 
 # ── 셀 enumerator ─────────────────────────────────────────────────
-def test_default_matrix_has_8_cells():
+def test_default_matrix_base_8_plus_planner_2():
+    """기본 = 8 base 셀 + (축2) hybrid LLM planner ablation 2 = 10."""
     cells = enumerate_cells()
-    # 4 adapters × 1 tier × 2 rerank = 8
+    assert len(cells) == 10
+    base = {c["label"] for c in cells if not c["llm_planner"]}
+    assert base == {f"{a}_fast_rerank{r}" for a in DEFAULT_ADAPTERS for r in (0, 1)}
+    planner = {c["label"] for c in cells if c["llm_planner"]}
+    assert planner == {"hybrid_fast_rerank1_planner1", "hybrid_fast_rerank0_planner1"}
+
+
+def test_planner_ablation_off_gives_base_8():
+    cells = enumerate_cells(planner_ablation=False)
     assert len(cells) == 8
-    labels = {c["label"] for c in cells}
-    assert labels == {
-        f"{a}_fast_rerank{r}"
-        for a in DEFAULT_ADAPTERS
-        for r in (0, 1)
-    }
+    assert all(not c["llm_planner"] for c in cells)
 
 
 def test_cell_keys_are_complete():
     cells = enumerate_cells()
     for c in cells:
-        assert set(c.keys()) == {"label", "adapter", "tier", "rerank"}
+        assert set(c.keys()) == {"label", "adapter", "tier", "rerank", "llm_planner"}
         assert c["tier"] == "fast"
         assert isinstance(c["rerank"], bool)
+        assert isinstance(c["llm_planner"], bool)
 
 
 def test_custom_adapter_subset():
+    # vector(2) + hybrid(2) base + hybrid planner(2) = 6
     cells = enumerate_cells(adapters=("vector", "hybrid"))
-    assert len(cells) == 4   # 2 × 2 rerank
-    adapters_in_cells = {c["adapter"] for c in cells}
-    assert adapters_in_cells == {"vector", "hybrid"}
+    assert len(cells) == 6
+    assert {c["adapter"] for c in cells} == {"vector", "hybrid"}
+
+
+def test_subset_without_hybrid_has_no_planner_cells():
+    """hybrid 미포함 subset 은 planner 셀 0 (agent planner 미경유)."""
+    cells = enumerate_cells(adapters=("vector", "graph"))
+    assert len(cells) == 4
+    assert all(not c["llm_planner"] for c in cells)
 
 
 def test_custom_single_rerank_value():
+    # 4 adapters × 1 rerank = 4 base + hybrid planner 1 = 5
     cells = enumerate_cells(reranks=(True,))
-    assert len(cells) == 4   # 4 adapters × 1 rerank
+    assert len(cells) == 5
     for c in cells:
         assert c["rerank"] is True
+
+
+# ── 축2 planner ablation headline ─────────────────────────────────
+def test_planner_ablation_headline_full_mode():
+    """hybrid 룰 vs LLM planner multi_hop_em 차이 계산 (LLM 우위 판정)."""
+    from eval.runners.run_matrix_smoke import compute_planner_ablation
+    cells = enumerate_cells()
+    results = []
+    for c in cells:
+        em = None
+        if c["label"] == "hybrid_fast_rerank1":
+            em = 0.50           # 룰 planner
+        elif c["label"] == "hybrid_fast_rerank1_planner1":
+            em = 0.62           # LLM planner
+        results.append({**c, "multi_hop_em": em})
+    pa = compute_planner_ablation(results)
+    assert pa["available"] is True
+    assert pa["rule_em"] == 0.50 and pa["llm_em"] == 0.62
+    assert pa["diff_pp"] == 12.0
+    assert pa["llm_better"] is True
+
+
+def test_planner_ablation_unavailable_in_simulation():
+    from eval.runners.run_matrix_smoke import compute_planner_ablation
+    cells = enumerate_cells()
+    results = [{**c, "multi_hop_em": None} for c in cells]
+    pa = compute_planner_ablation(results)
+    assert pa["available"] is False
 
 
 # ── thesis headline ───────────────────────────────────────────────
