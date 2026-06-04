@@ -364,6 +364,21 @@ relations:
       — "그 공정이 원인"은 인과 추론이므로 단독 근거 금지. 한글-한글 매칭으로 US
       영문 리콜 환각위험 회피. LLM P3 cross-validate 는 후속 정밀화.
 
+  USES_PROCESS:                     # Module → Process (모듈이 거치는 제조 공정유형)
+    from: Module
+    to: Process
+    directed: true
+    cardinality: many-to-many
+    class: side_hop
+    provenance: deterministic       # Module.system_code → 공정 카테고리 매핑
+    pass: P2
+    confidence_default: 0.50         # C — system_code→공정 추론 (candidate)
+    enabled: true                   # 활성화 (2026-06-04) — load_uses_process.py
+    notes: |
+      Module(BoM L4) 의 system_code(BODY/POWERTRAIN/SUSPENSION 등) → 캐논 공정
+      카테고리. "어떤 공정으로 만들어지나"는 추론이므로 candidate/0.50. PRODUCED_BY
+      (Part→ProcessStep)의 모듈 수준 대응. 산단공 part_id 들어오면 deterministic 격상.
+
 # ── 명명 컨벤션 ─────────────────────────────────────────────────
 naming_conventions:
   entity_type:    PascalCase (VehicleModel, Supplier)

@@ -798,7 +798,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | `docs/design/` | ✅ ADR 4건 (F-3) | LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출 — context·decision·consequences, 코드 라인 위임 |
 | `_legacy/` | 보존 (v1/v2 KGQA Agent) | 이전 단일도메인 시스템. CHANGELOG/HISTORY 보존. 삭제 vs 마이그레이션 정책 미정 |
 | 모델 출력 reranker (BGE-Reranker-v2-m3) | 코드 wired (`RERANKER_URL=...`) | 실서비스에서 미활성. 활성 조건·임계 미정의 |
-| USES_PROCESS / MADE_OF (L6) | wired (ontology 정의) | `:Process` 노드 사전 산단공 적재 / `:Material` 노드 미구현. 엣지 적재 routine 미구현 |
+| USES_PROCESS / MADE_OF (L6) | **USES_PROCESS 189 적재** (Module→Process, candidate, `load_uses_process.py`) / MADE_OF 는 별도 (Cell→Material) |
 | DART 사업보고서 가동률 표 | 구현 완료 (2026-06-01) | `src/autograph/extractors/dart_production_parser.py::_parse_utilization_table` + `_parse_pct` 가 표 컬럼 정규화 + 가동률(util_pct) 추출. `auto.plant_utilization` 53 row 적재 완료 (§1 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct, B 등급 0.80) |
 | **IPGraph 도메인 어댑터** | **코드 구현 완료 (working tree, uncommitted)** — 도메인3 | `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/* + loaders/* + ingestion/*` + `ontology/ip/*` (audit-ontology 4/4 PASS) + tool pool 4종 + cypher `ip_*` 25 templates + gold seed 30 + cross_ip 8. `make audit-ipgraph` PASS. core 변경 0 LOC = 0.00% (§10.12). 상세 SSOT [docs/ipgraph.md](./docs/ipgraph.md) |
 | **`ip.assignee_corp_map`** | **(scaffold)** — 테이블·loader 있음, mapping 데이터 0 | `19_ipgraph_bridge.sql` **적용 완료 (2026-06-01)** + `loaders/load_assignee_corp_map.py` — assignee 적재 + auto/reviewed 매핑 SOP 대기. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
@@ -1074,7 +1074,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 | 항목 | 현재 | 필요 작업 |
 |---|---|---|
-| **USES_PROCESS / MADE_OF (L6)** | `:Process` 노드 사전 적재 / `:Material` 미구현 / 엣지 0 | (1) 산단공 `:Process` ↔ `:Module` 매칭 routine, (2) `:Material` 노드 ontology + 배터리/합금 seed, (3) Wikidata P186 (made from material) staging |
+| **USES_PROCESS / MADE_OF (L6)** | **USES_PROCESS 189 적재** (Module.system_code→공정, candidate) / `:Material` 6 + MADE_OF | (1) ✅ Module→Process `load_uses_process.py` (2) 산단공 part_id deterministic 격상 (3) Wikidata P186 staging |
 | **DART 사업보고서 가동률 표** | 완료 (2026-06-01) | `_parse_utilization_table` 표 컬럼 정규화 + `auto.plant_utilization` 53 row 적재 |
 | **부품사 IR cross-reference** | 미구현 | DART finance 의 현대모비스/한온/만도 사업보고서 → auto 도메인 SUPPLIED_BY/MANUFACTURED_AT 보강 (reverse-direction Bridge) |
 | **NHTSA TSB / Manufacturer Communications** | 수동 zip 다운로드 모드만 | URL 자동 다운 routine (NHTSA URL 변경 추적) |
