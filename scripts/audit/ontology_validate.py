@@ -12,7 +12,9 @@ strict-validate.
   4. relation.from / to 가 entities 에 존재 (entities 와 relations 같이 검증 시)
   5. edge_required_meta 가 PRD §6.7 7키 SoT 와 일치
   6. schema_version 헤더 존재 (DoD #17 (c) 의 "온톨로지 레벨" 핵심)
-  7. **(신규)** cypher_templates 의 엣지 타입 ⊆ relations.yaml 정의된 관계명
+  7. cypher_templates 의 엣지 타입 ⊆ relations.yaml 정의된 관계명
+  8. **(Y-1)** 보조 yaml strict (extractors / system_taxonomy / plants) —
+     pydantic extra='forbid' 로 field-name 드리프트 reject
 
 종료 코드:
     0: 모든 파일 pass
@@ -28,11 +30,15 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from autonexusgraph.ontology import (   # noqa: E402
+from autonexusgraph.ontology import (  # noqa: E402
     OntologyFile,
     OntologyValidationError,
     load_and_validate,
@@ -71,6 +77,107 @@ CYPHER_TEMPLATE_REGISTRIES: list[tuple[str, str, str, Path]] = [
     ("ip",   "ipgraph.cypher_templates_ip",      "IP_TEMPLATES",
      ROOT / "ontology" / "ip"   / "relations.yaml"),
 ]
+
+
+# ── 보조 yaml strict 모델 (Y-1) — extractors / system_taxonomy / plants ──
+# extra='forbid' 로 field-name 드리프트(오타·미정의 키) reject. 이질적 내부 값은
+# Any 로 두어 값-형태 변동에 brittle 하지 않게 (목적 = 키 드리프트 탐지, §10.17c).
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class ExtractorSource(_Strict):
+    type: str | None = None
+    endpoint: str | None = None
+    params: Any = None
+    url: str | None = None
+    table: str | None = None
+    tables: Any = None
+    filter: Any = None
+    function: str | None = None
+    lib: str | None = None
+    ref: Any = None
+    refs: Any = None
+
+
+class ExtractorOut(_Strict):
+    entities: list[str] = []
+    relations: list[str] = []
+
+
+class Extractor(_Strict):
+    pass_: str = Field(alias="pass")           # 'pass' 는 예약어 → alias
+    source: ExtractorSource | str | None = None  # dict 또는 free-text (cross_validate 등)
+    method: str | None = None
+    out: ExtractorOut | None = None
+    impl: Any = None                           # str 또는 dict
+    target: dict | None = None
+    idempotency: str | None = None
+    status: str | None = None
+    confidence: Any = None
+    confidence_gate: Any = None
+    llm: Any = None
+    logic: Any = None
+    notes: Any = None
+
+
+class ExtractorsFile(_Strict):
+    version: int
+    last_updated: Any = None
+    status_summary: Any = None
+    extractors: dict[str, Extractor]
+
+
+class SystemEntry(_Strict):
+    code: str
+    name: str
+    description: str | None = None
+    alias_codes: list[str] = []
+
+
+class SystemTaxonomyFile(_Strict):
+    version: int
+    last_updated: Any = None
+    systems: list[SystemEntry]
+
+
+class PlantEntry(_Strict):
+    code: str
+    name: str
+    manufacturer_name: str
+    country: str
+    city: str | None = None
+    wikidata_qid: str | None = None
+    notes: str | None = None
+
+
+class PlantsFile(_Strict):
+    version: int
+    last_updated: Any = None
+    plants: list[PlantEntry]
+
+
+# (label, path, model, item_attr) — item_attr 로 개수 카운트.
+AUX_TARGETS: list[tuple[str, Path, type[BaseModel], str]] = [
+    ("auto.extractors",      ROOT / "ontology" / "auto" / "extractors.yaml",      ExtractorsFile,     "extractors"),
+    ("finance.extractors",   ROOT / "ontology" / "extractors.yaml",               ExtractorsFile,     "extractors"),
+    ("auto.system_taxonomy", ROOT / "ontology" / "auto" / "system_taxonomy.yaml", SystemTaxonomyFile, "systems"),
+    ("auto.plants",          ROOT / "ontology" / "auto" / "plants.yaml",          PlantsFile,         "plants"),
+]
+
+
+def _validate_aux(label: str, path: Path, model: type[BaseModel], item_attr: str) -> dict:
+    """보조 yaml 1개 strict 검증 — 키 드리프트(extra forbid) reject."""
+    if not path.exists():
+        return {"label": label, "path": str(path), "passed": False, "reason": "파일 없음"}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        obj = model.model_validate(data)
+        items = getattr(obj, item_attr)
+        return {"label": label, "path": str(path), "passed": True, "n_items": len(items)}
+    except Exception as e:   # noqa: BLE001 — pydantic ValidationError 포함
+        return {"label": label, "path": str(path), "passed": False,
+                "reason": str(e).splitlines()[0][:200]}
 
 
 def _validate_one(label: str, path: Path, require_schema_version: bool) -> dict:
@@ -203,6 +310,11 @@ def main() -> int:
 
     results = [_validate_one(label, path, must) for label, path, must in targets]
 
+    # 보조 yaml strict 검증 (Y-1) — extractors / system_taxonomy / plants.
+    if not args.paths:
+        for label, path, model, item_attr in AUX_TARGETS:
+            results.append(_validate_aux(label, path, model, item_attr))
+
     # cypher templates ↔ relations.yaml cross-check.
     if args.cross and not args.paths:
         all_yaml = _load_all_yaml_relations()
@@ -234,12 +346,19 @@ def main() -> int:
             for r in results
             if r.get("n_entities") is not None
         )
+        aux_summary = " · ".join(
+            f"{r['label']}({r['n_items']})"
+            for r in results
+            if r.get("n_items") is not None
+        )
         cross_summary = " · ".join(
             f"{r['label']}({r['n_cypher_rels']}cy/{r['n_yaml_rels']}yml)"
             for r in results
             if r.get("n_cypher_rels") is not None
         )
         line = f"[audit-ontology] PASS — {yaml_summary}"
+        if aux_summary:
+            line += f"  ▸ aux: {aux_summary}"
         if cross_summary:
             line += f"  ▸ cross: {cross_summary}"
         print(f"{line}  ({out_path})")
