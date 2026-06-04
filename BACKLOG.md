@@ -14,14 +14,14 @@
 
 | 카테고리 | 항목수 | P0 | P1 | P2 | P3 |
 |---|---:|---:|---:|---:|---:|
-| 1. 데이터 인입 (키 / bulk download) | 9 | 2 | 2 | 1 | 4 |
+| 1. 데이터 인입 (키 / bulk download) | 10 | 2 | 2 | 1 | 5 |
 | 2. 그래프·엣지 적재 | 6 | 1 | 1 | 2 | 2 |
 | 3. 에이전트·도구·HITL | 6 | 0 | 2 | 2 | 2 |
-| 4. 상용 신호 (MCP / Langfuse / SHACL / 매트릭스) | 5 | 0 | 3 | 1 | 1 |
+| 4. 상용 신호 (MCP / Langfuse / SHACL / 매트릭스) | 6 | 0 | 3 | 2 | 1 |
 | 5. 운영·보안·배포 | 6 | 2 | 1 | 2 | 1 |
 | 6. Bridge·데이터 품질·calibration | 5 | 1 | 1 | 1 | 2 |
-| 7. 평가·신뢰성·gold QA | 6 | 0 | 2 | 3 | 1 |
-| 8. 문서·DX | 4 | 0 | 0 | 2 | 2 |
+| 7. 평가·신뢰성·gold QA | 7 | 0 | 3 | 3 | 1 |
+| 8. 문서·DX | 7 | 0 | 0 | 4 | 3 |
 | 9. ProcessGraph 회사 귀속 + KAMP + 품질 | 3 | 1 | 1 | 1 | 0 |
 | 10. IPGraph 데이터 적재 + bridge join | 7 | 0 | 4 | 1 | 2 |
 | 11. 배터리·소재 L5/L6 | 5 | 0 | 0 | 4 | 1 |
@@ -29,7 +29,7 @@
 | 13. NCAP / Euro NCAP / IIHS | 4 | 0 | 0 | 0 | 4 |
 | 14. 라우팅·정책·미정 결정 | 2 | 0 | 0 | 1 | 1 |
 | 15. 온톨로지·schema | 2 | 0 | 0 | 1 | 1 |
-| **합계** | **83** | **7** | **18** | **23** | **23** |
+| **합계** | **89** | **7** | **19** | **26** | **26** |
 
 ### 우선순위 정의
 
@@ -54,6 +54,7 @@
 | D-7 | **공정위 기업집단 데이터** | (예정) | P3 | data.go.kr 키 → Neo4j Group + BELONGS_TO_GROUP | README §4 |
 | D-8 | **KOSIS 산업 통계 (광공업동향)** — 제조업 생산지수 by KSIC | (scaffold) | P3 | `KOSIS_API_KEY` 발급 → `make ingest-kosis` → `make load-kosis` → `macro.kosis_series` (ingestion/loader/DDL 구현됨, 키·데이터 부재) | README §4 |
 | D-9 | **LAW.go.kr 법령** | (예정) | P3 | open.law.go.kr 키 → `law.laws` | README §4 |
+| D-10 | **KAMP CSV ID `15089213` 외부 URL 유효성 검증** (D-4 보조 트리거 분리) | 미검증 (본 세션 발견) | P3 | data.go.kr 접속 → CSV URL 존재성·파일포맷·schema 확인 → `data/raw/kamp/15089213/` 배치 후 D-4 unblock | docs/operations/api_keys_pending.md §6 Bulk 데이터 |
 
 ---
 
@@ -95,6 +96,7 @@
 | S-3 | **온톨로지 SHACL/pydantic 검증** | ✅ **완료** — 핵심 6 yaml + **보조 4 yaml(Y-1: `auto`/`finance` extractors · system_taxonomy · plants, `extra='forbid'` strict)** + cypher↔yaml cross-check 모두 PASS. cross-domain ref strict 모드(Y-2 `--strict-cross`). `make audit-ontology`(`ontology_validate.py` + `tests/test_ontology_aux.py` 5건). **잔여**: SHACL 정식 shape 그래프는 pydantic v2 로 대체(의도된 trade-off, PRD §11.1) | (완료) | — | README §10.17 (c) |
 | S-4 | **축소 평가 매트릭스 실측 (4 어댑터 × FAST tier 1종 + rerank ablation)** | (wired, **ablation 정합 수정 완료**) — 8 cells enumerate PASS. **2026-06-04**: rerank ablation 이 `run_agent→research_worker→search_documents` 까지 실제 전파(hybrid_rerank0≠rerank1 분리, 이전엔 hybrid no-op) + thesis hits@k fallback 부활(`_run_cell_full` 의 `multi_hop_hits` 추출 누락 수정). **full 실행 결과 전 셀 0.000 — LLM 키 3종(OpenAI 401/Google expired/Anthropic 401) 전부 만료**로 thesis 측정 차단 (과금 0). 코드측 준비 완료, 유효 키 1개면 즉시 실측 | **P0+** | LLM 키(다음 주 갱신 예정, [api_keys_pending §0](./docs/operations/api_keys_pending.md)) → `make audit-eval-matrix-full` → `eval/reports/<run>/summary.md` 첨부 + Allganize 외부 벤치 stub 채움 | README §10.17 (d) |
 | S-5 | **§10.12 baseline reset 정책 dashboard 자동 반영** | (wired) — baseline reset 2회 이력 | P1 | `make audit-dod` 출력에 baseline commit + 누적 reset 이력 + "도메인 추가 마다 reset" 명시 (대부분 완료, dashboard 표시만 보강) | README §10.12 |
+| S-6 | **api_keys_pending.md §"One-Shot Runbook" ↔ BACKLOG cross-link** — PR #14 (`3550a4c`) 머지된 LLM 키 발급 즉시 실행 sequence 가 S-4 / S-2 / Q-2 / D-3 / D-4 등 다수 unblock 매트릭스 보유, BACKLOG 본문 역링크 부재 | (스택 명시) | P2 | 각 BACKLOG row 의 "활성화 트리거" 컬럼에 `[runbook §6]` cross-link 추가 (S-4 / S-2 / Q-2 / D-2 / D-3 / D-8 등) | docs/operations/api_keys_pending.md §6 |
 
 ---
 
@@ -133,6 +135,7 @@
 | E-4 | **답변 사용자 피드백 루프** — 👍/👎/📝 → 저장소 | UI wiring 완료, 저장소 정의 없음 | P2 | `chat.feedback` 스키마 + 저주파 retraining loop | README §12.6 |
 | E-5 | **Vector RAG 공정성 검증** — gold QA "Vector 도 풀 수 있는 질문" 비율 | 매트릭스 내 Vector adapter 단독 측정 | P2 | 작성자 편향 완화 — 사람 검증 또는 외부 큐레이터 | README §12.6 |
 | E-6 | **performance benchmark** — p50/p95/p99 latency + 평균 토큰·cost/turn | PRD 목표만, 실측 미수행 | P3 | E-1 풀 실측 후 dashboard 구축 | README §12.7 |
+| E-7 | **`turn_budget_for_domain` 도메인별 declared field 기본값 ($) 실측 검증** — `config.py:248` 정책 (Settings declared field + ENV + 무관 기본) 확인 완료, 도메인별 기본값 ($) 미확인 | 미검증 (본 세션 [미확인]) | P1 | `python3 -c "from autonexusgraph.config import get_settings; s=get_settings(); print({d: getattr(s, f'agent_turn_budget_{d}_usd', None) for d in ['finance','auto','ip','cross_domain']})"` → README §0 cost tier 3 계층 인용 정합 검증 | README §0 / docs/architecture.md §5.1 (f) |
 
 ---
 
@@ -144,6 +147,9 @@
 | F-2 | **TROUBLESHOOTING.md** | ✅ **구현** — `docs/faq.md`(Q1~Q7) 가 단일 SSOT, 루트 `TROUBLESHOOTING.md` 는 발견성 포인터(중복 회피). 4 named 실패 보강: LLM rate limit(Q2.4) / pgvector·Neo4j auth(Q1.1) / DART·data.go.kr 키 만료(Q3.5) | (완료) | — | README §12.7 |
 | F-3 | **`docs/design/` ADR** | ✅ **작성** — `docs/design/` 신설 + ADR 4건(0001 LangGraph StateGraph / 0002 DomainHandler plug-in / 0003 Bridge 분리 테이블 / 0004 P1~P4 추출) + index. 각 코드 라인·mental_model 위임 | (완료) | diagram(이미지)은 후속 | README §12.7 |
 | F-4 | **GitHub Issue/PR template** | ✅ **작성** — `.github/ISSUE_TEMPLATE/{bug_report,feature_request,data_source}.md` + `config.yml` + `pull_request_template.md` (프로젝트 불변식 체크리스트 내장) | (완료) | — | README §12.7 |
+| F-5 | **`make load-kamp-process-metrics` Makefile 타겟 미정의** — 모듈 `src/autograph/loaders/load_kamp_process_metrics.py` 는 존재, Makefile 타겟 부재 (BACKLOG D-4 트리거 인용 stale) | 모듈 ✓ / 타겟 ✗ | P3 | Makefile 에 5줄 타겟 정의 + BACKLOG D-4 트리거 명령 정합 검증 | Makefile + BACKLOG D-4 |
+| F-6 | **Mermaid 다이어그램 GitHub 실제 렌더 + Figma 동기화** — 본 세션 신설 2 다이어그램 (README §0 도메인 위계 4축 / autograph §2.5.4 BoM ⟂ BoP 직교) 의 렌더 미실측 | 미검증 (본 세션 발견) | P2 | GitHub PR/main 페이지 접속 후 렌더 캡처 + 옵션 Mermaid live editor 검증 | README §0 / docs/autograph.md §2.5.4 |
+| F-7 | **mental_model / learning_guide 본문 잔여 `PRD §X.Y` 인용 약 15건** — 두 문서 본문 정책 "점진적 갱신 중" (mental_model.md:45, learning_guide.md:51) 으로 갈음 중 | 정책 명시됨 | P2 | grep `PRD §` 으로 잔재 모니터링 + 발견 시 다음 PR 에 같이 정리 | docs/mental_model.md / docs/learning_guide.md |
 
 ---
 
