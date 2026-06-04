@@ -334,7 +334,7 @@ SELECT source_type, count(*)
 
 - 16,005 complaint 중 10,390 (65%) 가 'POWER TRAIN' 같은 단순 카테고리라 NHTSA recall taxonomy ('POWER TRAIN:DRIVELINE:...' 같은 세분화) 와 매칭 실패.
 - 결과: COMPLAINT_OF 4,793 edges (5,615 후보 중 PG 매칭 가능한 것만).
-- 추가 보강: complaint 의 distinct category 도 components 에 등록하면 +10k edges 기대. 단 PRD L4 (module) 분류상 'POWER TRAIN' 은 L3 (system) 이라 진단/분류 별도 작업 필요.
+- 추가 보강: complaint 의 distinct category 도 components 에 등록하면 +10k edges 기대. 단 README §11.2 BOM L4 (module) 분류상 'POWER TRAIN' 은 L3 (system) 이라 진단/분류 별도 작업 필요.
 
 **🔍 진단 SOP**:
 ```sql
@@ -380,7 +380,7 @@ SELECT system_code, count(*)
 PYTHONPATH=src python3 -m eval.metrics.prd_dashboard -o eval/reports/prd_dashboard_latest.md
 ```
 
-| PRD 기준 | 자동 측정 결과 | 상태 |
+| README §10 기준 | 자동 측정 결과 | 상태 |
 |---|---|:---:|
 | §10.1~10.3 (docker/UI/LLM env) | 외부 측정 — 본 dashboard 범위 밖 | · |
 | §10.4 (OEM 5~8 × 모델 30~50 × 2022-24) | OEM=5 models=102 years=(2020,2024) | ✅ |

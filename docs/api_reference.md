@@ -352,11 +352,11 @@ if ulsan:
     # → [{"capacity_units": ..., "unit": ..., "snapshot_year": ..., ...}]
 
 # (2) 가동률 — `auto.plant_utilization` 53 row 적재됨 (dart_production_parser:316 SoT).
-#     단 typed tool 함수 미등록 — agent 가 자유 SQL 호출 금지 (PRD 정책).
+#     단 typed tool 함수 미등록 — agent 가 자유 SQL 호출 금지 (README §5 정책).
 #     본 시나리오는 미래의 `get_plant_utilization` tool 추가 후 1줄 호출이 목표.
 ```
 
-> **(미구현 — backlog)** `autograph/tools/spec.py` 에 `get_plant_utilization(corp_code, plant_code=None, year=None)` 추가 + intent 화이트리스트 등록 + `auto_*` cypher template 또는 `query_dicts` 래퍼. 적재된 53 row 의 활용 단축 도구 부재 — 현재는 agent 가 직접 호출 못함 (PRD "자유 SQL 금지" 정책상).
+> **(미구현 — backlog)** `autograph/tools/spec.py` 에 `get_plant_utilization(corp_code, plant_code=None, year=None)` 추가 + intent 화이트리스트 등록 + `auto_*` cypher template 또는 `query_dicts` 래퍼. 적재된 53 row 의 활용 단축 도구 부재 — 현재는 agent 가 직접 호출 못함 ("자유 SQL 금지" 정책상, README §5).
 
 #### E. "EV 시장 점유율 — KOSIS 산업통계 기준"
 

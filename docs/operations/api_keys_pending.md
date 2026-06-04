@@ -20,7 +20,7 @@
 
 **영향**: `make audit-eval-matrix-full` 은 8 cells 전부 정상 실행되나 synthesizer 호출마다
 auth 실패 → 답변 공백 → em/f1/hits **전부 0.000, cost $0.0000** (빌링 전 실패 = 과금 0).
-→ **PRD §10.7 Hybrid>Vector thesis (S-4) 수치 측정 불가**. `LLM_PROVIDER=auto`, `LLM_MODEL_FAST=gpt-4o-mini`.
+→ **README §10.7 Hybrid>Vector thesis (S-4) 수치 측정 불가**. `LLM_PROVIDER=auto`, `LLM_MODEL_FAST=gpt-4o-mini`.
 
 **현재 상태 (코드측 준비 완료)**: rerank ablation 이 `run_agent → search_documents` 까지 실제
 전파되도록 수정 완료 (hybrid_rerank0 ≠ hybrid_rerank1 분리) + thesis hits@k fallback 부활.

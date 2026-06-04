@@ -100,7 +100,7 @@
 
 | 자랑 | 실제 |
 |---|---|
-| README §10.17 — 4 상용 신호 모두 (wired) 또는 (wired, partial) | (a) **MCP** — typed tool pool 59 tools + JSON Schema 자동 변환 + stdio server. 외부 (Claude Desktop / Cursor / Cline) 호출 가능. ✅ 정합. (b) **Langfuse 실측 ON** — OTEL native + ContextVar 격리 + meta JSONB 적재. ✅ 정합. (c) **SHACL** — pydantic v2 로 대체 (`make audit-ontology`). 의도된 trade-off (PRD §11.1). (d) **축소 평가 매트릭스** — wire-up 완료, **실측 미실시** (§3.5 와 같은 한계) |
+| README §10.17 — 4 상용 신호 모두 (wired) 또는 (wired, partial) | (a) **MCP** — typed tool pool 59 tools + JSON Schema 자동 변환 + stdio server. 외부 (Claude Desktop / Cursor / Cline) 호출 가능. ✅ 정합. (b) **Langfuse 실측 ON** — OTEL native + ContextVar 격리 + meta JSONB 적재. ✅ 정합. (c) **SHACL** — pydantic v2 로 대체 (`make audit-ontology`). 의도된 trade-off (README §11.1). (d) **축소 평가 매트릭스** — wire-up 완료, **실측 미실시** (§3.5 와 같은 한계) |
 
 ---
 
@@ -108,7 +108,7 @@
 
 본 표는 [docs/runbook_traces.md](runbook_traces.md) 의 9 대표 시나리오를 trace 단위로 자랑 vs 실제 매핑.
 
-| Trace | 시스템 자랑 (README/PRD) | 실제 상태 | gap |
+| Trace | 시스템 자랑 (README) | 실제 상태 | gap |
 |---|---|---|---|
 | **§1 finance L1** | "DART XBRL 정확한 수치 인용" | ✅ 완전 작동 — gold 30 row | LLM 키 활성 후 실측 미실시 |
 | **§2 finance L2** | "multi-hop 추론" | ✅ 작동 가능 | gold curation + multi_hop_em/f1 측정 필요 |

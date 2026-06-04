@@ -282,7 +282,7 @@
 
 ---
 
-## 6. PRD BOM Level × 데이터 가용성 매트릭스 (재정리)
+## 6. BOM Level × 데이터 가용성 매트릭스 (README §11.2)
 
 | Level | 정의 | 가용 소스 (활용도 순) | 현재 채워짐? |
 |---|---|---|---|
@@ -296,7 +296,7 @@
 
 ---
 
-## 7. PRD 출처 등급 × 현재 구현 매트릭스
+## 7. 출처 등급 × 현재 구현 매트릭스 (README §4.0)
 
 | 등급 | confidence | 적용 소스 | 통합 상태 |
 |---|---|---|---|
@@ -305,7 +305,7 @@
 | **B** 0.80 | Wikidata, EPA, 매뉴얼/브로셔 | ✅ Wikidata. EPA 미통합 (§A4, A5) |
 | **B~C** 0.70 | Wikipedia, DBpedia | ✅ Wikipedia (P3 완료). DBpedia 미통합 (§A6) |
 | **C** 0.50 | LLM P3 추출 | ✅ P3 staging + cross_validate |
-| **C-** 0.40 | 커뮤니티 / 비공식 | ❌ 사용 안 함 (PRD 정책) |
+| **C-** 0.40 | 커뮤니티 / 비공식 | ❌ 사용 안 함 (README §4.0 정책) |
 
 ---
 
@@ -362,7 +362,7 @@
   - **Gap 해소**: §C2 EuroNCAP, §C4 KNCAP 스크래핑.
 
 ### 🔴 큰 부족
-- **L5 Part**: PRD MVP 제외 (post-MVP). 리콜 LLM 추출만 진입.
+- **L5 Part**: MVP 제외 (post-MVP, README §11.2). 리콜 LLM 추출만 진입.
 - **한국 시장 리콜**: API 키 발급 전까지 manual CSV (§B1, §C1).
 - **자기인증 / 형식승인**: KATRI 키 부재 — README §4 에 `events.certifications` 명시되지만 스키마·loader 모두 미구현.
 - **부품사 IR**: 개별 부품사 (현대모비스, 만도, 한온시스템 …) IR 본문 미수집. DART 측에 finance 가 있지만 자동차 도메인 cross-reference 안 됨.
@@ -370,7 +370,7 @@
 
 ### 📊 평가 데이터
 - **Cross-Domain QA L1~L4 층화 라벨**: gold dataset 에 분류 라벨 미포함 — 사람 라벨링 필요.
-- **multi-hop 비율**: PRD 목표 검증용 표본 수 부족 (gold 13건 → 50건+ 필요).
+- **multi-hop 비율**: README §10.8 목표 검증용 표본 수 부족 (gold 13건 → 50건+ 필요).
 
 ---
 

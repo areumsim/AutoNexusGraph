@@ -28,7 +28,7 @@ make audit-eval-matrix-full
 - 10 cells = 8 base(4 어댑터 × rerank on/off) + **축2 hybrid 룰 vs LLM planner 2**.
 - 산출: `data/reports/audit_eval_matrix_<ISO>.json` + per-cell `eval/reports/matrix_<ts>/`.
 - 콘솔 PASS 라인에 **두 headline** 자동 표시:
-  - `thesis: hybrid−vector = +N%p` (PRD §10.7, RAG 우위)
+  - `thesis: hybrid−vector = +N%p` (README §10.7, RAG 우위)
   - `planner(LLM−룰): +N%p (룰=.. / LLM=..)` ✅/⚠️ (축2, LLM 자율 planner 우위 여부)
 
 검토 포인트 (JSON):
