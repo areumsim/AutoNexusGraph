@@ -22,7 +22,12 @@ from typing import Any, Iterator
 
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
 from .state import AgentState
-from .supervisor import supervisor_done, supervisor_node, sup_send_directives
+from .supervisor import (
+    mid_execution_reflect,
+    supervisor_done,
+    supervisor_node,
+    sup_send_directives,
+)
 from .tracing import start_turn_context
 from .validator import MAX_REPLANS, mark_replan, should_replan, validator_node
 from .workers import (
@@ -109,10 +114,13 @@ def _build_langgraph_app():
     workflow = StateGraph(AgentState)
     workflow.add_node("triage", triage_node)
     workflow.add_node("planner", planner_node)
-    # Supervisor 의 두 역할:
-    # - 함수 노드로서 noop (Send 가 routing 처리). 다만 langgraph 가 노드를
-    #   반드시 호출하므로 supervisor_node 를 가벼운 진입점으로 등록.
-    workflow.add_node("supervisor", lambda s: s)
+    # Supervisor 노드: 라우팅 자체는 Send(sup_send_directives)가 처리하지만, 재진입마다
+    # ReAct reflect 를 돌려 직전 batch 결과 기반 동적 task 를 생성한다(observe→act).
+    # 각 worker 가 이 노드로 복귀(add_edge below)하므로 batch 사이 reflect 가 보장된다.
+    def _supervisor_reflect(s: AgentState) -> AgentState:
+        mid_execution_reflect(s)
+        return s
+    workflow.add_node("supervisor", _supervisor_reflect)
     workflow.add_node("worker_research", _worker_wrap(research_worker))
     workflow.add_node("worker_graph", _worker_wrap(graph_worker))
     workflow.add_node("worker_sql", _worker_wrap(sql_worker))

@@ -249,7 +249,7 @@ def planner_node(state: AgentState) -> AgentState:
 
     여전히 ``state["plan"]`` (flat list) 도 채워서 executor 폴백 호환.
     """
-    from .dag import make_task
+    from .dag import make_spawn_task, make_task
 
     # triage 가 입력 거부를 결정 (prompt_injection 등) — task 생성 건너뛰고
     # synthesizer 가 결정적 거부 답변을 생성하도록 위임.
@@ -371,6 +371,16 @@ def planner_node(state: AgentState) -> AgentState:
                      "year": year_hint, "metric": "revenue"},
                     depends_on=[gid],
                 ))
+        # ReAct mid-execution fan-out: 발견된 자회사마다 영업이익을 개별 조회.
+        # compare(revenue 일괄)와 보완 차원 — 자회사 수를 plan 시점엔 모르므로 정적
+        # DAG 로 표현 불가. supervisor 의 reflect 가 graph 완료 후 런타임에 펼친다.
+        if year_hint:
+            for gid in graph_ids:
+                tasks.append(make_spawn_task(
+                    _next_id("spawn_"), from_id=gid, for_each="child_corp_code",
+                    agent="sql", intent="get_operating_income", arg="corp_code",
+                    base_args={"year": year_hint},
+                ))
         if q:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
@@ -393,9 +403,12 @@ def planner_node(state: AgentState) -> AgentState:
     state["tasks"] = tasks
     state["task_results"] = {}
 
-    # 호환용 legacy plan — executor 폴백 (tasks 빈 경우 사용)
+    # 호환용 legacy plan — executor 폴백 (tasks 빈 경우 사용).
+    # _spawn 템플릿은 reflect 전용 — 도구 호출 불가하므로 legacy plan 에서 제외.
     plan: list[dict] = []
     for t in tasks:
+        if t.get("agent") == "_spawn":
+            continue
         plan.append({
             "tool": t["intent"],
             "args": t["args"],

@@ -21,14 +21,18 @@ pytest.importorskip("numexpr", reason="calculator worker 가 numexpr 의존")
 
 import autonexusgraph.tools as toolbox
 from autonexusgraph.agents import session
-from autonexusgraph.agents.dag import make_task
+from autonexusgraph.agents.dag import make_spawn_task, make_task
 from autonexusgraph.agents.nodes import (
     _build_context,
     planner_node,
     synthesizer_node,
     triage_node,
 )
-from autonexusgraph.agents.supervisor import supervisor_node
+from autonexusgraph.agents.supervisor import (
+    MAX_DYNAMIC_TASKS,
+    mid_execution_reflect,
+    supervisor_node,
+)
 from autonexusgraph.agents.validator import mark_replan
 
 
@@ -253,3 +257,77 @@ def test_replan_is_result_aware_not_retry():
     assert any(t["agent"] == "research" for t in state["tasks"])
     rk = [t["args"].get("top_k") for t in state["tasks"] if t["agent"] == "research"]
     assert rk and rk[0] > 6   # widen 적용
+
+
+# ── ReAct mid-execution replan (turn 내부 observe→act) ─────────
+def _spawn_state(n_subs):
+    """graph done + spawn 템플릿 — upstream 결과 n_subs 개 행."""
+    g = make_task("g1", "graph", "list_subsidiaries", {})
+    g["status"] = "done"
+    sp = make_spawn_task("sp", "g1", "child_corp_code", "sql",
+                         "get_operating_income", "corp_code", {"year": 2023})
+    rows = [{"child_corp_code": f"{i:08d}"} for i in range(n_subs)]
+    return {"tasks": [g, sp], "task_results": {"g1": rows},
+            "llm_usage_usd": 0.0, "domain": "finance"}
+
+
+def test_react_dynamic_fanout_through_supervisor():
+    """graph 가 발견한 자회사 수만큼 supervisor 가 런타임에 task 생성·실행."""
+    tasks = [
+        make_task("g1", "graph", "list_subsidiaries", {"parent_corp_code": "00126380"}),
+        make_spawn_task("sp", "g1", "child_corp_code", "sql",
+                        "get_operating_income", "corp_code", {"year": 2023}),
+    ]
+    state = _base_state(tasks=tasks)
+    calls = []
+    with patch.object(toolbox, "list_subsidiaries",
+                      lambda **kw: [{"child_corp_code": "00111111"},
+                                    {"child_corp_code": "00222222"}], create=True), \
+         patch.object(toolbox, "get_operating_income",
+                      lambda corp_code, year, **kw: calls.append(corp_code)
+                      or {"value": 1}, create=True):
+        supervisor_node(state)
+    dyn = [t for t in state["tasks"] if t.get("_dynamic")]
+    assert len(dyn) == 2                         # 정적 plan 엔 없던 task 가 런타임 생성
+    assert sorted(calls) == ["00111111", "00222222"]
+    assert all(t["status"] == "done" for t in dyn)
+
+
+def test_react_fanout_respects_max_cap():
+    """MAX_DYNAMIC_TASKS 초과분은 drop + safety_signal 기록 (silent 절단 금지)."""
+    state = _spawn_state(MAX_DYNAMIC_TASKS + 5)
+    mid_execution_reflect(state)
+    dyn = [t for t in state["tasks"] if t.get("_dynamic")]
+    assert len(dyn) == MAX_DYNAMIC_TASKS
+    assert any("mid_replan_capped" in s for s in state.get("safety_signals", []))
+
+
+def test_react_fanout_budget_guard():
+    """예산 초과 시 spawn 중단 — 템플릿 skipped, child 0."""
+    state = _spawn_state(3)
+    state["llm_usage_usd"] = 10 ** 9
+    mid_execution_reflect(state)
+    sp = next(t for t in state["tasks"] if t["agent"] == "_spawn")
+    assert sp["status"] == "skipped"
+    assert not [t for t in state["tasks"] if t.get("_dynamic")]
+
+
+def test_react_no_reexpansion():
+    """동일 upstream 재확장 방지 — reflect 반복 호출에도 child 수 불변 (무한 fan-out 차단)."""
+    state = _spawn_state(2)
+    assert mid_execution_reflect(state) is True
+    assert mid_execution_reflect(state) is False
+    assert len([t for t in state["tasks"] if t.get("_dynamic")]) == 2
+
+
+def test_multihop_plan_emits_spawn_template():
+    """planner multi_hop 이 정적 plan 에 ReAct spawn 템플릿을 포함 (production 연결)."""
+    state = _base_state(question="삼성전자 자회사들의 매출 비교 2023",
+                        question_rewritten="삼성전자 자회사들의 매출 비교 2023",
+                        question_kind="multi_hop", target_companies=["00126380"])
+    planner_node(state)
+    spawn = [t for t in state["tasks"] if t.get("agent") == "_spawn"]
+    assert spawn, "multi_hop 이 spawn 템플릿을 내야 함"
+    assert spawn[0]["spawn"]["intent"] == "get_operating_income"
+    # _spawn 은 legacy plan(도구 직접호출 목록)에서 제외돼야 함.
+    assert all("spawn" not in str(p.get("tool")) for p in state.get("plan") or [])

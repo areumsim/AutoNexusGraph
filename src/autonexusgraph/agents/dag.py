@@ -33,6 +33,43 @@ def make_task(
     }
 
 
+def make_spawn_task(
+    task_id: str,
+    from_id: str,
+    for_each: str,
+    agent: str,
+    intent: str,
+    arg: str,
+    base_args: dict | None = None,
+) -> dict:
+    """ReAct 동적 fan-out 템플릿 — upstream(from_id) 결과 행마다 child task 1개 생성.
+
+    agent="_spawn" 센티넬 — worker 로 디스패치되지 않고 ``mid_execution_reflect`` 가
+    upstream 완료 시점에 펼친다(observe→act). 각 child = make_task(agent, intent,
+    {**base_args, arg: row[for_each]}). 정적 plan 으로는 표현 못 하는 "발견 기반 확장".
+
+    Args:
+        from_id   — 관측 대상 upstream task id (depends_on 으로 자동 설정)
+        for_each  — upstream 결과 행에서 뽑을 필드명 (예: "child_corp_code")
+        agent/intent — 생성할 child 의 worker/도구
+        arg       — child args 에 row 값을 넣을 키 (예: "corp_code")
+        base_args — child 공통 args (예: {"year": 2023})
+    """
+    return {
+        "id": task_id,
+        "agent": "_spawn",
+        "intent": f"spawn:{intent}",
+        "args": {},
+        "depends_on": [from_id],
+        "status": "pending",
+        "result": None,
+        "spawn": {
+            "from": from_id, "for_each": for_each, "agent": agent,
+            "intent": intent, "arg": arg, "base_args": dict(base_args or {}),
+        },
+    }
+
+
 def unblocked_tasks(tasks: list[dict]) -> list[dict]:
     """의존성 충족 + 아직 pending 인 task 들. Supervisor 가 다음 디스패치 대상."""
     done_ids = {t["id"] for t in tasks if t.get("status") == "done"}
@@ -176,6 +213,7 @@ def resolve_arg_bindings(state: dict, args: dict | None) -> dict:
 
 __all__ = [
     "make_task",
+    "make_spawn_task",
     "unblocked_tasks",
     "all_done",
     "get_task",
