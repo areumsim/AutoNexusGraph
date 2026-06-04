@@ -102,7 +102,7 @@ def triage_node(state: AgentState) -> AgentState:
                 continue
             try:
                 hits = lookup_pg(word, limit=5)
-            except Exception:
+            except Exception:   # noqa: BLE001 — PG lookup 실패 흡수 → 빈 hits 폴백 (다음 word 진행)
                 hits = []
             if not hits:
                 continue
@@ -210,7 +210,7 @@ def _llm_planner_enabled(state: AgentState | None = None) -> bool:
     try:
         from ..config import get_settings
         return bool(getattr(get_settings(), "agent_llm_planner", False))
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — config 읽기 실패 흡수 → planner OFF 폴백 (룰 기반 동작)
         return False
 
 
@@ -606,7 +606,7 @@ def _attempt_fallback_recovery(state: AgentState) -> bool:
     _maybe_inject_rerank(state, fb_fn, fb_args)
     try:
         fb_out = fb_fn(**fb_args)
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fallback 함수 호출 실패 흡수 → log + 다음 recovery 단계 진행
         log.warning("[recovery] fallback %s failed: %s", fb_tool, e)
         return False
     if not fb_out:
@@ -643,7 +643,7 @@ def executor_node(state: AgentState) -> AgentState:
             continue
         try:
             out = fn(**args)
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — tool 호출 실패 흡수 → log + 다음 tool 진행 (executor fail-soft)
             log.warning(f"[executor] {tool_name} failed: {e}")
             continue
         item = {"tool": tool_name, "purpose": step.get("purpose"), "args": args,
@@ -781,7 +781,7 @@ def synthesizer_node(state: AgentState,
             "ok": False, "error_type": "BudgetExceeded", "error": str(e),
             "llm_called": False, "fallback_used": "budget",
         }
-    except Exception as e:    # noqa: BLE001
+    except Exception as e:    # noqa: BLE001 — synthesizer LLM 실패 흡수 (BudgetExceeded 별도 위에서 catch) → 결정적 brief 폴백 + state 명시
         # fail-soft 유지 (eval 진행 보장) — 단, 실패 정보를 state 에 명시.
         log.warning("[synth] LLM failed: %s: %s", type(e).__name__, e)
         from .answering import build_deterministic_brief

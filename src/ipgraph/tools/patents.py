@@ -39,7 +39,7 @@ def lookup_patent(query: str, *, limit: int = 10) -> list[dict[str, Any]]:
             cur.execute(sql, (query, f"%{query}%", limit))
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 쿼리 실패 흡수 → fallback 결과 (agent fail-soft)
         log.warning("[ip.lookup_patent] PG 실패: %s", e)
         return []
 
@@ -71,7 +71,7 @@ def get_patent_info(pub_no: str) -> dict[str, Any] | None:
                 return None
             cols = [d.name for d in cur.description]
             return dict(zip(cols, row))
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 쿼리 실패 흡수 → fallback 결과 (agent fail-soft)
         log.warning("[ip.get_patent_info] PG 실패: %s", e)
         return None
 
@@ -120,7 +120,7 @@ def list_patents_by_assignee(assignee_id: str,
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 쿼리 실패 흡수 → fallback 결과 (agent fail-soft)
         log.warning("[ip.list_patents_by_assignee] PG 실패: %s", e)
         return []
 
@@ -154,7 +154,7 @@ def count_patents_by_field(assignee_id: str, cpc_section: str,
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 쿼리 실패 흡수 → fallback 결과 (agent fail-soft)
         log.warning("[ip.count_patents_by_field] PG 실패: %s", e)
         return []
 
@@ -190,7 +190,7 @@ def compare_assignees_patent_volume(assignee_ids: list[str], year: int,
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 쿼리 실패 흡수 → fallback 결과 (agent fail-soft)
         log.warning("[ip.compare_assignees_patent_volume] PG 실패: %s", e)
         return []
 

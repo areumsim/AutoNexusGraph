@@ -14,7 +14,7 @@ complaints) 가 아니므로** `auto.events_*` 에 적재하지 않고 다음 3 
 
 적재 규약:
 - :Module 노드 MERGE key 는 ``{id: ...}`` (auto.components.component_id) — neo4j_init 제약과 일치.
-- 공용 ``get_driver()`` + UNWIND $rows 배치 적재.
+- 공용 ``get_session()`` (namespace 격리) + UNWIND $rows 배치 적재.
 
 CLI:
     python -m autograph.loaders.load_auto_aihub --dataset 71347
@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from autonexusgraph.config import get_settings
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
@@ -120,7 +120,7 @@ def _iter_71347_labels(root: Path):
                 try:
                     with z.open(info) as f:
                         yield json.loads(f.read().decode("utf-8"))
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 — ZIP entry 파싱 실패 흡수 → continue
                     continue
     for zip_path in root.rglob("VL.zip"):
         with zipfile.ZipFile(zip_path) as z:
@@ -130,7 +130,7 @@ def _iter_71347_labels(root: Path):
                 try:
                     with z.open(info) as f:
                         yield json.loads(f.read().decode("utf-8"))
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 — ZIP entry 파싱 실패 흡수 → continue
                     continue
 
 
@@ -337,13 +337,13 @@ RETURN count(rel) AS edges
 def _neo4j_merge_component_edges(rows: list[dict], *, batch: int = 200) -> int:
     """각 row = {model_name, component_id, name, system_code, source, confidence, snapshot_year}.
 
-    공용 get_driver() + UNWIND 배치 적재. 노드는 :Module, 엣지는 :CONTAINS_COMPONENT.
+    공용 get_session() + UNWIND 배치 적재. 노드는 :Module, 엣지는 :CONTAINS_COMPONENT.
     """
     if not rows:
         return 0
-    driver = get_driver()
+
     n = 0
-    with driver.session() as s:
+    with get_session() as s:
         for i in range(0, len(rows), batch):
             chunk = rows[i:i + batch]
             result = s.run(_MERGE_AIHUB_EDGES, rows=chunk)
@@ -392,7 +392,7 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
                     aliases=[korean], source="aihub_71347")
                 cur.execute("RELEASE SAVEPOINT sp_comp")
                 stats.components_inserted += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_comp")
                 stats.errors.append(f"71347 component {canonical}: {e}")
                 continue
@@ -417,7 +417,7 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
                     stats.chunks_inserted += 1
                 elif op == "updated":
                     stats.chunks_updated += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_chunk")
                 stats.errors.append(f"71347 chunk {uniq}: {e}")
 
@@ -474,7 +474,7 @@ def load_578(*, dry_run: bool = False) -> LoadStats:
                     aliases=[korean], source="aihub_578")
                 cur.execute("RELEASE SAVEPOINT sp_comp")
                 stats.components_inserted += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_comp")
                 stats.errors.append(f"578 component {canonical}: {e}")
                 continue
@@ -496,7 +496,7 @@ def load_578(*, dry_run: bool = False) -> LoadStats:
                     stats.chunks_inserted += 1
                 elif op == "updated":
                     stats.chunks_updated += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_chunk")
                 stats.errors.append(f"578 chunk {uniq}: {e}")
 
