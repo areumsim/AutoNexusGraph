@@ -654,7 +654,7 @@ psql -c "SELECT relation_type, gate_status, p4_decision, count(*)
 | KNCAP / Euro NCAP / IIHS | KNCAP 인터페이스만 (`ingestion.kncap` + `loaders.load_kncap`). Euro NCAP/IIHS 미구현 | 외부 채널 약관 검토 후 |
 | `:Part` 대량 적재 | LLM P3 RECALL_OF 결과에서 자연 발생 | manual seed 는 Module 위주 |
 | integration test (`pytest -m integration`) | 마커 없음 (0 케이스) | 실제 Neo4j/PG 필요 — 별도 CI |
-| eval/qa_gold 확장 (도내 100/100 + CD 30 완전) | seed: finance 30 / auto 46 / cross 44 | `make validate-gold-qa` lint 통과. 100 row 확장은 별도 |
+| eval/qa_gold 확장 (도내 100/100 + CD 30 완전) | seed: finance 30 / **auto 56** (L1~L3 + AUTO-PROC 10) / **cross 49** (CD-L1~L4 + CD-PROC 5 + IP 결합 변형) / ip 30 | `make validate-gold-qa` lint 통과. 100 row 확장은 별도 |
 
 본 도큐먼트가 다루는 골격 (Module/Part 분리 / P3·P4 / Standard·Plant seed) 범위 밖. ontology · 비용 가드 · 적재 helper · 테스트 인프라는 그대로 재사용 가능.
 

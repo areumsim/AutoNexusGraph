@@ -305,7 +305,7 @@ flowchart TD
 - **대안 1 — 직접 라우팅 (코드 if/else)**: tools 호출 순서를 코드에 박는 방식. 새 task 유형 추가마다 라우팅 코드 수정 — 도메인 확장성 부족. **기각**.
 - **대안 2 — 순차 worker 호출 (Send-API 없음)**: 의존성 그래프 무시하고 순차 — multi-hop 질문에서 latency 비례 증가. **부분 채택** (langgraph 미설치 환경에서 `_run_with_fallback_chain` 으로 fallback, `graph.py:210-224`).
 - **대안 3 — Plan-and-Execute (planner 한 번 + executor 한 번)**: 한 번에 다 풀어서 보내는 방식. replan 트리거 정의가 모호하고, validator 와의 결합 약함. **기각**.
-- **선택 = StateGraph + supervisor + Send-API** — supervisor 가 의존성 그래프의 unblocked task 만 Send 로 병렬 발사 (`agents/supervisor.py:sup_send_directives`), worker 완료 후 supervisor 로 복귀, 모두 done 일 때 synthesizer. validator 가 fail 시 planner 로 재진입 (`graph.py:139-150`).
+- **선택 = StateGraph + supervisor + Send-API** — supervisor 가 의존성 그래프의 unblocked task 만 Send 로 병렬 발사 (`agents/supervisor.py:sup_send_directives`), worker 완료 후 supervisor 로 복귀, 모두 done 일 때 synthesizer. validator 가 fail 시 planner 로 재진입 (`graph.py:_route_after_validator:60`).
 
 **(c) 왜 plug-in ENV-based discover (vs setuptools entry_points)?**
 
@@ -364,7 +364,7 @@ flowchart TD
 ```
 1. 코어 import 시 (`autonexusgraph.agents._domain_handler` 로드)
    └ discover_plugins() 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (기본 "autograph") 파싱
-2. 각 모듈명을 `importlib.import_module(name)` 으로 import (한 번만 — `_DISCOVERED` 플래그)
+2. 각 모듈명을 `importlib.import_module(name)` 으로 import (한 번만 — `_DISCOVERY_DONE` 플래그 + `_DISCOVERY_LOCK`, `_domain_handler.py:105-106`)
 3. 도메인 패키지의 `__init__.py` 가 `from . import agent_handler` 부작용 실행
 4. agent_handler 모듈 import 시 모듈 최상단에서
    `register_handler(AutoHandler())` + `register_handler(CrossDomainHandler())` 호출
