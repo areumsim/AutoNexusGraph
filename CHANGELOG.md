@@ -8,6 +8,50 @@
 
 ---
 
+## 2026-06-04 — v2.3: 에이전트성(agency) 7축 폐회로 — open-loop→closed-loop + LLM 자율 planner (PR #9, #11)
+
+에이전트성 7축 진단에서 확정된 결함(replan=동일계획 재시도 · 도구결과 미반영 open-loop ·
+기억 미주입 · 회복 비대칭 · 병렬 fan-in 손실 · 룰엔진 planner)을 **코어 한정·무회귀**로 해소.
+룰 planner·4 가드는 안전 기본값으로 보존하며 분기만 추가. "에이전트답게 보이는 것"이 아니라
+"실제로 자율 루프가 닫히는가" 를 기준으로 시나리오 테스트로 행동 증명. [§10.12 코어 변경 최소]
+
+### Added
+- **(축3 Reflection) Result-aware replan** — Validator 실패 시 `replan_hint`(실패원인+직전계획)를
+  보존 → planner 가 kind 승격·retrieval 확대로 **다른 전략 재계획**(동일계획 재시도 아님).
+  `hallucinated_numbers` 는 자유서술 축소(narrative→structural). (`validator.mark_replan`,
+  `nodes._replan_escalate_kind`/`_apply_replan_widen`)
+- **(축1 Planning) ReAct mid-execution replan** — supervisor 재진입마다 직전 batch 를 관측해
+  **런타임에 task 동적 생성**(발견 entity별 fan-out). 정적 DAG 로는 크기를 알 수 없던 확장.
+  가드: `MAX_DYNAMIC_TASKS=20`·turn_budget 중단·재확장 방지·topological 무결성. 함수체인·
+  LangGraph 양 런타임 대칭. (`dag.make_spawn_task`, `supervisor.mid_execution_reflect`)
+- **(축1 Planning) Closed-loop 데이터 흐름** — `dag.resolve_arg_bindings`(`$from` 바인딩)로
+  worker 가 도구 호출 직전 upstream 결과를 args 로 주입 → `depends_on` 이 선언만이 아니라
+  데이터가 흐름. multi_hop 의 `compare_companies(corp_codes=graph.child_corp_code)`.
+- **(축2 Tool use) LLM 자율 planner** (opt-in `AGENT_LLM_PLANNER`, 기본 off) — LLM 이 task DAG 를
+  제안 → `_allowed_intents` 화이트리스트 검증(자유 cypher/SQL 금지 유지)+topological+고아 dep
+  제거. 실패/빈/전부무효/순환/budget 초과 시 룰·handler 폴백(fail-soft). (`agents/llm_planner.py`)
+- **(축4 Memory) Memory→행동 연결** — `session.summarize()`(호출처 0→1)+직전 대화(history)를
+  synthesizer 프롬프트에 주입. first-turn 노이즈 회피. (`nodes._memory_block`)
+- **(축5 Recovery) 빈결과 회복 대칭화** — `_attempt_fallback_recovery` 헬퍼를 executor(legacy)+
+  synthesizer(DAG) 양 경로가 공유 — DAG 경로도 "정보 부족" 직행 대신 도메인 fallback 검색.
+
+### Fixed
+- **(축6 Coherence) 병렬 Send fan-in 손실** — `task_results`/`evidence_chunks`/`tool_results` 가
+  `last_wins` reducer 로 동시 worker 결과를 손실(순수 concat 은 pre-fork 중복)하던 것을
+  **dedup-merge reducer**(공유 pre-fork 를 key 로 멱등 흡수)로 무손실 누적. clear 충돌은
+  `_ClearedDict`/`_ClearedList` 서브클래스 마커로 해소(함수체인 reducer 미적용이라 무영향).
+  checkpointer 다중턴 잔류도 planner 진입부 per-turn 리셋으로 차단. (`agents/state.py`)
+- **interrupt graceful-downgrade** — langgraph 설치 + runnable-context 밖 호출 시 `RuntimeError`
+  를 `InterruptUnavailable` 로 변환 — 폴백 함수체인에서 clarification/cost-approval 자동해소 보장.
+
+### Tests
+- `tests/test_agent_scenarios.py` 15케이스(1-hop / 멀티홉 closed-loop / 3-hop 일관성 / 빈결과복구 /
+  clarification / 예산초과 부분답변 / multi-turn 기억 / replan 폐회로 / ReAct fan-out·cap·budget·
+  재확장방지 / 실제 LangGraph Send 4 병렬 fan-in 무손실 / reducer 단위) + `tests/test_llm_planner.py`
+  11케이스(자율 DAG / 화이트리스트 drop / 폴백 / 토글). **전체 1109 passed 무회귀.**
+
+---
+
 ## 2026-06-04 — v2.2-rev2: ProcessGraph P0 게이트(DoD #19) 통과 + 미완료 라벨 전수 정정 (PR #6)
 
 PR #6 (`docs/label-audit-recall-source-fix` → main, 16 commits) 머지. v2.2-rev1 BoP 정책
