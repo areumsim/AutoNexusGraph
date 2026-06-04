@@ -23,6 +23,8 @@ docker compose logs neo4j   | tail -50              # Neo4j 로그
 - **데이터 볼륨 권한** — `~/arsim/DB_FG/` 가 root 소유 → `sudo chown -R $USER ~/arsim/DB_FG`
 - **메모리 부족** — Neo4j 가 OOMKilled → `docker stats` 확인, `JAVA_OPTS=-Xmx2G` 환경에서 4G+ 권장
 - **스키마 초기화 실패** — 빈 볼륨이 아닌데 init/*.sql 가 재실행 시도 → 이미 적용된 환경에는 hot-apply ([docs/operations/migrations.md](operations/migrations.md))
+- **pgvector 확장 미설치** — `ERROR: type "vector" does not exist`. compose 는 `pgvector/pgvector:pg16` 이미지라 자동 활성. 다른 PG 이미지 사용 시 `CREATE EXTENSION IF NOT EXISTS vector;` 필요
+- **Neo4j auth 불일치** — `Neo.ClientError.Security.Unauthorized`. `.env` 의 `NEO4J_USER/PASSWORD` 가 compose `NEO4J_AUTH`(dev 기본 `neo4j/autonexusgraph_dev`, prod 는 `NEO4J_PASSWORD` 주입)와 불일치 → 일치시키거나, 비번 변경 시 `~/arsim/DB_FG/neo4j/data` auth 볼륨 삭제 후 재기동
 
 ### Q1.2 `python -c "import autonexusgraph"` 가 ModuleNotFoundError
 
@@ -80,6 +82,16 @@ print('등록된 핸들러:', sorted(_HANDLERS.keys()))
 
 **해결**: 세션 재시작 (`cost_log.jsonl` 은 누적이라 재시작해도 누적값 유지 — 운영 환경에서는 일·주별 rotate 필요, §11.2 운영 보안 P1).
 
+### Q2.4 LLM provider rate limit (429 / `RateLimitError`)
+
+**증상**: provider 가 분당 토큰/요청 한도 초과로 429 반환. eval 매트릭스·P3 추출 등 병렬 호출 시 빈번.
+
+**해결**:
+- 동시성 ↓ — eval/추출 배치 크기·worker 수 축소.
+- FAST tier 로 전환 (`LLM_MODEL_FAST`) — 저비용·고RPM 모델.
+- provider 측 tier 상향 또는 키 분산.
+- 어댑터는 일시 실패 시 fail-soft (해당 worker skip + 명시) — turn 자체는 안 깨짐. 재시도/backoff 강화는 어댑터 후속 과제.
+
 ---
 
 ## Q3. 데이터 적재·정합
@@ -129,6 +141,16 @@ ORDER BY total DESC;
 **현재 상태** (2026-06-01): finance 748K 중 일부 backfill 진행 중, auto 16,435 모두 완료, ip 423 (OpenAlex abstract) backfill 대기.
 
 **재시도**: `make embed-chunks` (멱등, NULL 만 채움).
+
+### Q3.5 외부 API 키 만료·무효 (DART / data.go.kr / KIPRIS 등)
+
+**증상**: ingestion 이 인증 오류 또는 빈 응답. DART 는 키 만료 시 `status=020` (사용 한도 초과/무효) 또는 `013` (데이터 없음).
+
+**진단·해결**:
+- `.env` 의 해당 키 존재·유효 확인 (`DART_API_KEY` / `DATA_GO_KR_API_KEY` / `KIPRIS_API_KEY` …). DART 키는 만료되므로 [opendart.fss.or.kr](https://opendart.fss.or.kr) 에서 재발급.
+- **키 부재는 graceful skip** (0 byte raw / 0 row) — 크래시 아님. 적재 0 이면 키부터 의심.
+- data.go.kr 키는 **활용신청 승인** 후 수 시간~1일 지연. 승인 전 호출은 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`.
+- freshness 점검: `make freshness` (소스별 마지막 적재 시각 + stale, Q-5).
 
 ---
 

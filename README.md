@@ -1104,7 +1104,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | **`_legacy/` 정책** | 보존 (v1/v2 KGQA Agent) | (a) deprecate notice + 일정 (b) 마이그레이션 가이드 (c) 또는 archived branch 로 이동 |
 | **architecture diagram 통합** | `docs/autograph.md §2.5` mermaid 만 | README 본문에 1장 핵심 다이어그램 (현재 텍스트 박스만) |
 | **performance benchmark** | PRD 목표만 | 실측 latency p50/p95/p99 + 평균 토큰/turn + 평균 cost/turn dashboard |
-| **TROUBLESHOOTING.md** | 없음 | 흔한 실패 (LLM rate limit / pgvector 미설치 / Neo4j auth / DART 키 만료) 진단 트리 |
+| **TROUBLESHOOTING.md** | ✅ **작성 (F-2)** — `docs/faq.md`(Q1~Q7) SSOT + 루트 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) 포인터. LLM rate limit·pgvector·Neo4j auth·DART/data.go.kr 키 만료 진단 보강 | — |
 | **changelog** | git log + `_legacy/CHANGELOG.md` | repo root `CHANGELOG.md` keepachangelog 형식 |
 | **GitHub Issue/PR template** | ✅ **작성 (F-4)** — `.github/ISSUE_TEMPLATE/{bug_report,feature_request,data_source}.md` + `config.yml`(보안 advisory·BACKLOG 링크) + `pull_request_template.md`(smoke-e2e·7키·LICENSE·BACKLOG 체크리스트) | — |
 | **README 다이어그램·스크린샷** | 텍스트 박스만 | Streamlit UI 캡처 + Neo4j Browser cross-domain 결과 캡처 |
@@ -1125,6 +1125,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - **[BACKLOG.md](./BACKLOG.md)** — **전수 미완료 항목 SSOT** (83 항목 / 15 카테고리 / P0~P3 트래픽라이트 + 활성화 트리거)
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — 내부 기여 가이드 (개발환경 · `make smoke-e2e` 게이트 · 도메인 불변식 8항 · PR 절차)
 - [SECURITY.md](./SECURITY.md) — 보안 정책 (비공개 취약점 보고 · 구현된 통제 · 알려진 한계 정직표기)
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — 진단 포인터 (SSOT = [docs/faq.md](./docs/faq.md) Q1~Q7)
 - [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 33 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
 - [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 33 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트
