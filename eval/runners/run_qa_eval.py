@@ -293,9 +293,10 @@ def compute_per_question_metrics(
             "question_kind": p.get("question_kind", ""),
             "complexity": g.get("complexity", ""),
             "requires_multi_hop": bool(g.get("requires_multi_hop")),
-            # Cross-Domain QA 4단계 층화 라벨 (CD-L1~L4) — PRD §10.8 측정용.
-            # 비-cross gold 에는 없으므로 빈 문자열로 표기.
-            "difficulty": g.get("difficulty", ""),
+            # Cross-Domain QA 4단계 층화 라벨 (CD-L1~L4) — README §10.8 측정용.
+            # gold cross/ip 는 `level` 필드 SSOT, 구 difficulty 필드는 폴백 (보존).
+            # 비-cross gold (auto/finance) 에는 없으므로 빈 문자열로 표기.
+            "difficulty": g.get("level") or g.get("difficulty", ""),
 
             "em":           exact_match(p.get("answer", ""), golds_text),
             "f1":           token_f1(p.get("answer", ""), golds_text),
@@ -376,6 +377,10 @@ def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
     Returns:
         {adapter: {difficulty: {n, em, f1, em_target, em_target_met}}}.
         difficulty 가 비어있는 row 는 제외 (auto / finance gold).
+
+    Note: per_q[i]['difficulty'] 는 gold 의 `level` 필드(SSOT) 에서 채워진다
+    (run_qa_eval.evaluate_predictions, "difficulty" 라인 참조). cross gold
+    는 모두 CD-L1~CD-L4 4단계 중 하나. CD-PROC-* 도 난이도 기반 흡수.
     """
     out: dict[str, dict[str, dict]] = {}
     for r in per_q:
