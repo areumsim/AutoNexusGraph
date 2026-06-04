@@ -1,0 +1,20 @@
+{
+  "agent_state_fields": 36,
+  "py_per_domain": {
+    "autonexusgraph": 107,
+    "autograph": 97,
+    "ipgraph": 21,
+    "common": 2
+  },
+  "gold_rows": {
+    "gold_qa_auto_v0": 56,
+    "gold_qa_cross_v0": 49,
+    "gold_qa_ip_v0": 30,
+    "gold_qa_v0": 30
+  },
+  "prd_refs": {
+    "src": 174,
+    "docs": 67
+  },
+  "mcp_tools": 59
+}
