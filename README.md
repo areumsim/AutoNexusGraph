@@ -61,7 +61,7 @@ flowchart TB
 
 | 무엇 | 왜 | 어떻게 (코드 진입점) |
 |---|---|---|
-| 3 도메인 + Bridge 를 한 turn 안에 묶는 GraphRAG 에이전트 | 단일 벡터 RAG 로는 "현대모비스 매출 ↔ 모비스가 공급하는 차종의 최근 리콜" 같은 멀티홉·교차도메인 질의 불가 | StateGraph 11 노드: Triage→Planner→Supervisor↔Workers(research/graph/sql/calculator)→Synthesizer→Validator (`agents/graph.py:110-123`) + Send-API 병렬 + Replan 최대 2회 (`validator.py:36 MAX_REPLANS=2`) |
+| 3 도메인 + Bridge 를 한 turn 안에 묶는 GraphRAG 에이전트 | 단일 벡터 RAG 로는 "현대모비스 매출 ↔ 모비스가 공급하는 차종의 최근 리콜" 같은 멀티홉·교차도메인 질의 불가 | StateGraph 11 노드: Triage→Planner→Supervisor↔Workers(research/graph/sql/calculator)→Synthesizer→Validator (`agents/graph.py:110-123`) + Send-API 병렬 + **result-aware Replan**(실패원인 반영 재계획, 최대 2회 `validator.py MAX_REPLANS=2`) + **ReAct mid-execution** 동적 task 생성 + **LLM 자율 planner**(opt-in `AGENT_LLM_PLANNER`) — open-loop→closed-loop (v2.3) |
 | 도메인 plug-in 으로 N-domain 확장 | 4번째 도메인 추가 시 "코어 변경 < 5%" 가 확장성 정량 증거 (§10.12). 첫 plug-in 검증 = ip 도메인 = **inflection +1,877 LOC (13.32%) → baseline reset 후 0/15,396 LOC = 0.00%** ([정직 표기](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) — 두 숫자 같이 인용) ✅ | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV, 기본 `"autograph"`) 의 모듈을 첫 호출 시 soft-load (`_domain_handler.discover_plugins`, 라인 130). 외부 패키지가 `register_handler()` 부작용으로 등록 |
 | 서비스 등급 (MCP·관측가능성·평가 실측) 정량 증명 | 데모가 아닌 운영 등급으로의 증명이 1차 목표 (§10.15~§10.17) | MCP 래퍼 59 tools (`src/autonexusgraph/mcp/`) · Langfuse 4.x OTEL (`agents/tracing.py`) · 축소 평가 매트릭스 4 어댑터 × FAST tier (`eval/runners/run_matrix_smoke.py`) |
 
@@ -71,7 +71,7 @@ flowchart TB
 - **도메인 plug-in** — core 는 외부 도메인 패키지를 직접 import 하지 않는다. ENV 모듈을 첫 호출 시 soft-load 후 `register_handler` 부작용으로 활성. core ↔ 도메인 어댑터 분리.
 - **4 가드** — `prompt_safety` (injection 단발 차단) · `cypher_guard` (READ-ONLY 강제 + APOC write 블록, `safety/cypher_guard.py:assert_read_only`) · `number_guard` (큰 숫자 화이트리스트, `agents/number_guard.py`) · `language_guard` (한국어 비율 ≥ `FINGRAPH_MIN_KOREAN_RATIO=0.30`, `safety/language_guard.py:16`).
 - **cost tier** — 비용 가드는 3 계층: **세션** hard limit (`LLM_SESSION_HARD_LIMIT_USD`) → **도메인별 turn** budget (`config.turn_budget_for_domain`, ENV override) → **호출별 사전 추정** (Rewriter / Synthesizer / Title, `cost_estimator.py`) + `LLM_COST_AUTO_APPROVE_USD` (기본 $0.50) 초과 시 HITL 승인.
-- **AgentState** — TypedDict, **34 필드** (입력 7 / 전처리 4 / triage·planner 5 / 누적 5 / 합성 3 / 검증 3 / HITL 3 / 메타 4). `_last_wins` reducer 로 병렬 worker 충돌 회피 (`agents/state.py:99-161`).
+- **AgentState** — TypedDict, **35 필드** (입력 7 / 전처리 4 / triage·planner 5 / 누적 5 / 합성 3 / 검증 4 / HITL 3 / 메타 4 — 검증에 `replan_hint` 추가). 누적 채널(`task_results`/`evidence_chunks`/`tool_results`)은 **dedup-merge reducer** 로 병렬 Send fan-in 무손실(공유 pre-fork 를 key 로 멱등 흡수), clear 는 `_ClearedDict`/`_ClearedList` 마커, 그 외는 `_last_wins` (`agents/state.py`).
 
 ### 진입점 다이어그램
 
@@ -787,11 +787,13 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | 도구 (tools) | finance: `tools/financials,graph,retrieve.py` — 사전 정의 함수 풀. auto: `src/autograph/tools/{spec,graph,retrieve,bridge}.py`. 자유 SQL/Cypher 금지 |
 | Cypher 템플릿 | finance 22 = 14 정적 + 5 `find_paths_{1..5}hops` + 3 `get_subgraph_d{1..3}` (`tools/cypher_templates.py`). auto **24** (`src/autograph/cypher_templates_auto.py` — 기존 19 + `auto_plants_of_manufacturer` / `auto_plants_of_model` / `auto_investigations_by_model` / `auto_investigations_by_variant` / `auto_investigation_recall_chain` 5건 추가). ip 25 (`src/ipgraph/cypher_templates_ip.py`). type/range/regex 검증 + bool reject |
 | 멀티에이전트 (LangGraph) | StateGraph 11 노드 (triage/planner/supervisor/4 worker/executor_legacy/synthesizer/validator/finalize) + 함수 체인 fallback. `agents/graph.py` |
-| Planner DAG | `make_task(depends_on=…)`, `dag.unblocked_tasks`, `dag.topologically_valid` (`agents/dag.py`) |
-| Supervisor + Send API | 순차 모드 + 병렬 모드 (LangGraph `Send`). turn budget circuit breaker |
-| Worker | research / graph / sql / calculator (numexpr sandbox) — 2단계 화이트리스트 (`_allowed_intents` + `_resolve_tool`) |
-| Synthesizer | budget-aware LLM client, XML escape, number guard 적용 |
-| Validator + Replan | 6 검사 (length, self-report bypass, language, grounding, hallucinated_numbers, edge_confidence), MAX_REPLANS=2 |
+| Planner DAG | 룰 템플릿 + **LLM 자율 planner**(opt-in `AGENT_LLM_PLANNER`, 화이트리스트 검증·실패 시 룰 폴백, `agents/llm_planner.py`). `make_task`/`make_spawn_task`/**`resolve_arg_bindings`**(`$from` upstream 결과→args, closed-loop)/`unblocked_tasks`/`topologically_valid` (`agents/dag.py`) |
+| Supervisor + Send API | 순차 + 병렬 (LangGraph `Send`) + **ReAct mid-execution reflect**(완료 batch 관측→동적 task fan-out, `MAX_DYNAMIC_TASKS=20`·재확장 방지, `mid_execution_reflect`). 병렬 fan-in **dedup-merge reducer**(무손실). turn budget circuit breaker |
+| Worker | research / graph / sql / calculator (numexpr sandbox) — 2단계 화이트리스트 (`_allowed_intents` + `_resolve_tool`) + upstream 결과 바인딩 주입 |
+| Synthesizer | budget-aware LLM client, XML escape, number guard 적용, **memory 주입**(이전 대화+`session.summarize`, `_memory_block`), 빈결과 fallback 회복 |
+| Validator + Replan | 6 검사 (length, self-report bypass, language, grounding, hallucinated_numbers, edge_confidence), MAX_REPLANS=2. **result-aware replan** — 실패원인(`replan_hint`)으로 kind 승격·retrieval 확대 (동일계획 재시도 아님) |
+| 기억 (memory) | 세션 entity carry-over(thread TTL/LRU) + synth 프롬프트 주입(이전 대화 + `session.summarize`) + PG checkpoint 재개 (`agents/session.py`, `nodes._memory_block`) |
+| 회복 (recovery) | 빈결과 시 도메인 fallback 검색 — executor·synthesizer 양 경로 대칭 (`_attempt_fallback_recovery`). interrupt 미지원 환경 graceful-downgrade(1순위 자동선택) |
 | HITL — clarification | 회사명 모호성 자동 감지 (margin<10%, `is_ambiguous_company`), LangGraph interrupt → `/chat/resume`, Streamlit dialog |
 | HITL — cost approval | `LLM_COST_AUTO_APPROVE_USD` (기본 $0.50) 초과 시 user 승인. 거절 시 worker skip + 명시 답변. 폴백환경 자동 통과 + 경고 |
 | Safety guards | prompt_safety (high-risk 단발 차단 + low-risk telemetry, SSOT 단일 rule), cypher_guard (READ-ONLY + APOC write/dynamic-cypher procedure 블록 — `assert_read_only` / `assert_templates_params_match`), number_guard (pre-synth 마스킹 + post-synth validator SSOT 공유), language_guard (한국어 비율 30%) |
