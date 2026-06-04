@@ -1,5 +1,5 @@
 .PHONY: help install fmt lint test test-int smoke-e2e up down logs health clean \
-        bridge-kpi bridge-expire persons-collision freshness backup restore \
+        bridge-kpi bridge-expire persons-collision freshness metrics serve-metrics backup restore \
         ingest-corp ingest-krx ingest-ecos ingest-targets ingest-bulk \
         ingest-structural ingest-wikidata ingest-wikipedia \
         ingest-news ingest-fss ingest-ftc ingest-kosis \
@@ -266,6 +266,12 @@ persons-collision:                                   # master.persons 동명·�
 
 freshness:                                           # source별 데이터 freshness + stale 판정 (Q-5, read-only; stale 시 exit 1)
 	PYTHONPATH=src $(PYTHON) -m autonexusgraph.freshness $(ARGS)
+
+metrics:                                             # Prometheus 메트릭 1회 출력 (O-5)
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.metrics_exporter --once
+
+serve-metrics:                                       # Prometheus exporter HTTP 서버 (O-5; :9105/metrics)
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.metrics_exporter $(ARGS)
 
 # ── PG hot-apply (운영 중 컨테이너에 신규 init/*.sql 멱등 적용) ────────────
 # docker-entrypoint-initdb.d 는 빈 볼륨 첫 기동 시에만 실행되므로, 신규

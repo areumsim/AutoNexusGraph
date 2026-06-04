@@ -794,7 +794,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | `_legacy/v2/` | 보존 | 삭제 예정 미정 (`docs/mental_model.md §5.10`) |
 | Integration test (`pytest -m integration`) | 마커 0건 | unit test 파일 수: root 48 + autograph 17 = 65. 실제 Neo4j/PG 통합은 `docs/autograph.md §7.5` 수동 절차. **CI(O-4)는 keyless smoke-e2e 만 — ephemeral PG/Neo4j 통합 잡은 secrets/self-hosted 후속** |
 | API 인증 / Rate limit | ✅ **구현** (`api/auth.py`) | API key 헤더 인증 (`X-API-Key`/`Bearer` + `API_KEYS` env) + thread_id↔user_id 바인딩 (타인 히스토리 403) + per-identity in-memory rate limit (`API_RATE_LIMIT_PER_MIN`). `/health` 제외. `API_KEYS` 미설정 시 open 모드 (dev). 잔여: OAuth2/OIDC·multi-instance 분산 — §12.2 |
-| Production 배포 가이드 | ✅ **작성** ([docs/operations/production_deploy.md](./docs/operations/production_deploy.md)) + `infra/Dockerfile` + `docker-compose.prod.yml` | 이미지 빌드 / compose prod 오버레이 / health probe / reverse proxy·TLS / k8s / blue-green·canary / 멀티 인스턴스 주의점. 잔여: 백업·DR 자동화 (O-3) / 모니터링 (O-5) — §12.3 |
+| Production 배포 가이드 | ✅ **작성** ([docs/operations/production_deploy.md](./docs/operations/production_deploy.md)) + `infra/Dockerfile` + `docker-compose.prod.yml` | 이미지 빌드 / compose prod / health probe / reverse proxy·TLS / k8s / blue-green·canary / 멀티 인스턴스. 백업·DR(O-3 ✅) / 모니터링(O-5 ✅) 별도 구현 완료 — §12.3 |
 | `docs/design/` | ✅ ADR 4건 (F-3) | LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출 — context·decision·consequences, 코드 라인 위임 |
 | `_legacy/` | 보존 (v1/v2 KGQA Agent) | 이전 단일도메인 시스템. CHANGELOG/HISTORY 보존. 삭제 vs 마이그레이션 정책 미정 |
 | 모델 출력 reranker (BGE-Reranker-v2-m3) | 코드 wired (`RERANKER_URL=...`) | 실서비스에서 미활성. 활성 조건·임계 미정의 |
@@ -1054,7 +1054,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 |---|---|---|
 | **배포 가이드** | ✅ **작성** — [docs/operations/production_deploy.md](./docs/operations/production_deploy.md) + `infra/Dockerfile` + `docker-compose.prod.yml` (실행 가능) | k8s/compose prod 오버레이 / health probe / reverse proxy·TLS / blue-green / canary / 멀티 인스턴스 주의점 완료 |
 | **백업·DR** | ✅ **구현 (O-3)** — `make backup`/`restore` (`scripts/ops/`) + [backup_dr.md](./docs/operations/backup_dr.md). PG `pg_dump -Fc`(임베딩 포함) + Neo4j community STOP→dump→START + 보존 prune. RPO≤24h / RTO 수분(dump 보유)·수시간(재앙: raw 재적재+재임베딩) | 잔여: off-site 동기화 + 분기 복원 드릴 RTO 실측 |
-| **모니터링·알람** | Langfuse / LangSmith fail-soft 만 | Prometheus exporter (node count / chunk count / cost / error rate) + Grafana 대시보드 + 알람 (PG 끊김 / Neo4j disk full / LLM cost spike) |
+| **모니터링·알람** | ✅ **구현 (O-5)** — Prometheus exporter (`make metrics`/`serve-metrics`, `metrics_exporter.py`) + `infra/monitoring/`(prometheus/alerts 6/grafana 8패널) + compose prod 서비스 ([monitoring.md](./docs/operations/monitoring.md)). Langfuse(turn trace)와 보완 | 잔여: Alertmanager 발송 채널 |
 | **Multi-instance scaling** | PG checkpointer 공유 가능 — 검증 안 됨 | uvicorn worker N + checkpointer concurrent write 검증 + LLM rate limit 분산 |
 | **CI/CD** | ✅ **구현 (O-4)** — `.github/workflows/ci.yml`: `make smoke-e2e` keyless 게이트 (py3.10/3.11/3.12) + lint/mypy informational + DoD dashboard artifact | 잔여: `audit-dod --strict` (§10.7/§10.13 LLM eval 필요) + ephemeral PG/Neo4j 통합테스트 → LLM 키 / self-hosted runner 후 |
 | **Integration test 마커** | `pytest -m integration` 0 케이스 | `tests/integration/*` 신설 — load_auto_all / extract_p3+p4 / cross_query 실제 DB end-to-end |
@@ -1150,6 +1150,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - **[docs/operations/production_deploy.md](./docs/operations/production_deploy.md)** — **production 배포 SSOT (O-2)** — 이미지 빌드(`infra/Dockerfile`) · compose prod 오버레이(`docker-compose.prod.yml`) · health probe · reverse proxy/TLS · k8s · blue-green/canary · 멀티 인스턴스 주의점. dev Quickstart 와 분리
 - **[docs/operations/bridge_review.md](./docs/operations/bridge_review.md)** — **Bridge candidate 검토 SOP (Q-1)** — `bridge.corp_entity` candidate ✓/✗ 라벨 (Streamlit UI) · 6개월 미검토 자동 거부 · 진행률 KPI · `make bridge-kpi`/`bridge-expire`
 - **[docs/operations/backup_dr.md](./docs/operations/backup_dr.md)** — **백업·재해복구 SOP (O-3)** — PG/Neo4j dump (`make backup`/`restore`) · 보존 · RPO/RTO · 복원 드릴 · 재앙 시나리오
+- **[docs/operations/monitoring.md](./docs/operations/monitoring.md)** — **모니터링·알람 SOP (O-5)** — Prometheus exporter(`make metrics`) · `infra/monitoring/`(alerts/grafana) · 메트릭 카탈로그
 - [eval/qa_gold/README.md](./eval/qa_gold/README.md) — 평가 gold set 스키마 + 큐레이션 가이드
 
 > KCGS ESG 등급 수집 가이드는 [docs/data_lineage.md §1.8](./docs/data_lineage.md#18-kcgs-esg).

@@ -79,3 +79,40 @@ services:
   #     - ${DB_DATA_ROOT:-/home/user/arsim/DB_FG}/caddy:/data
   #   networks: [autonexusgraph_net]
   #   depends_on: [api, web]
+
+  # ── 모니터링 (O-5) — exporter + Prometheus + Grafana ─────────────
+  metrics:
+    image: autonexusgraph:${IMAGE_TAG:-latest}
+    container_name: anxg-metrics
+    restart: unless-stopped
+    command: ["python", "-m", "autonexusgraph.metrics_exporter", "--port", "9105"]
+    env_file: [.env.prod]
+    networks: [autonexusgraph_net]
+    depends_on:
+      postgres: { condition: service_healthy }
+      neo4j: { condition: service_healthy }
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: anxg-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ${DB_DATA_ROOT:-/home/user/arsim/DB_FG}/prometheus:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    networks: [autonexusgraph_net]
+    depends_on: [metrics]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: anxg-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD 필수 (.env.prod)}
+    volumes:
+      - ${DB_DATA_ROOT:-/home/user/arsim/DB_FG}/grafana:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    networks: [autonexusgraph_net]
+    depends_on: [prometheus]
+    # 대시보드: infra/monitoring/grafana_dashboard.json 을 UI Import (datasource=Prometheus).

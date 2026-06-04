@@ -1,0 +1,51 @@
+# Prometheus 알람 규칙 (O-5). exporter 메트릭(anxg_*) 기반.
+groups:
+  - name: autonexusgraph
+    rules:
+      - alert: PostgresDown
+        expr: anxg_up{component="postgres"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "PostgreSQL 도달 불가"
+          description: "exporter 가 PG ping 실패 2분 지속."
+
+      - alert: Neo4jDown
+        expr: anxg_up{component="neo4j"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Neo4j 도달 불가"
+          description: "exporter 가 Neo4j ping 실패 2분 지속 (disk full / OOM 의심)."
+
+      - alert: LLMCostSpike
+        expr: increase(anxg_llm_cost_usd_total[1h]) > 5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "LLM 비용 급증 (>$5/h)"
+          description: "최근 1h 누적 LLM 비용 증가분이 임계 초과 — 폭주/루프 의심."
+
+      - alert: DataSourcesStale
+        expr: anxg_data_sources_stale > 0
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "stale 데이터 소스 {{ $value }}개"
+          description: "freshness 임계 초과 소스 존재 — make freshness 로 확인 (Q-5)."
+
+      - alert: MetricsScrapeErrors
+        expr: anxg_scrape_errors > 0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "exporter collector 실패 {{ $value }}건"
+          description: "일부 메트릭 수집 실패 (DB 연결/스키마 확인)."
+
+      - alert: ExporterDown
+        expr: up{job="autonexusgraph"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "metrics exporter 다운"
+          description: "Prometheus 가 exporter scrape 실패 — 컨테이너 상태 확인."

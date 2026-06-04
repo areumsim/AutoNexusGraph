@@ -1,0 +1,67 @@
+{
+  "__inputs": [
+    { "name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "pluginId": "prometheus" }
+  ],
+  "title": "AutoNexusGraph — Ops (O-5)",
+  "tags": ["autonexusgraph"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "DB up",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "anxg_up", "legendFormat": "{{component}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [
+        { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } } }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Scrape errors",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "anxg_scrape_errors" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Stale data sources",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "anxg_data_sources_stale" }]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "LLM cost (USD, cumulative)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "anxg_llm_cost_usd_total" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "LLM cost rate ($/h)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "increase(anxg_llm_cost_usd_total[1h])" }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "vec.chunks total vs embedded",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "anxg_vec_chunks_total", "legendFormat": "total" },
+        { "expr": "anxg_vec_chunks_embedded", "legendFormat": "embedded" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Neo4j nodes",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "anxg_neo4j_nodes_total" }]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Bridge entries by status",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "anxg_bridge_entries", "legendFormat": "{{status}}" }]
+    }
+  ]
+}
