@@ -45,11 +45,11 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| D-1 | **팩토리온 공장 등록 (15087611)** — 회사·공장번호·산단별 조회 | (scaffold) | **P0** | `DATA_GO_KR_API_KEY` 발급 → `make ingest-factoryon-company` | README §7, BACKLOG §9 (ProcessGraph #19 직접 의존) |
+| D-1 | **팩토리온 공장 등록 (15087611)** — 회사·공장번호·산단별 조회 | (부분 적재) — `auto.factoryon_registry` **5행** (현대차 아산/전주/대구 등, `DATA_GO_KR_API_KEY` 작동 확인 2026-06-04) | **P0** | (잔여) 회사 커버리지 확대 `make ingest-factoryon-company NAME=...` → ProcessStep↔Plant 매핑(G-1) | README §7, BACKLOG §9 (ProcessGraph #19 직접 의존) |
 | D-2 | **KIPRIS Open API** — 한국 특허·출원 | (scaffold, 보조) | **P1** | `KIPRIS_API_KEY` 발급 (공공데이터포털) → `make ingest-kipris` (ingestion/loader/DDL 구현됨, 키·데이터 부재) | docs/ipgraph.md §4, BACKLOG §10 |
 | D-3 | **USPTO Open Data Portal (PatentsView 후속)** — 미국 특허·인용·assignee | (scaffold, 보조) | **P1** | bulk download (data.uspto.gov) → `make ingest-uspto-odp` (ingestion/loader/DDL 구현됨, bulk 데이터 부재). PatentsView REST 종료 (2026-03-20, 410 Gone) | docs/ipgraph.md §4 |
 | D-4 | **KAMP 제조AI 데이터셋 (15089213)** — 사출/용접/프레스 시계열·불량 | (scaffold) | P1 | CSV 수동 다운 → `make load-kamp-process-metrics`. `auto.process_metrics` (corp_code 컬럼 의도적 부재 = 익명) | docs/process_graph.md §2, BACKLOG §9 |
-| D-5 | **자동차 리콜정보 (3048950, CSV)** — 한국 OEM 리콜. 구 오픈API 15089863 폐기 | (scaffold) | P2 | CSV 수동 다운 (무인증) → `make ingest-datagokr-recalls` → `make load-datagokr-recalls` (ingestion/loader/DDL 구현됨, 데이터 부재) | README §4, docs/data_sources.md §B1 |
+| D-5 | **자동차 리콜정보 (3048950, CSV)** — 한국 OEM 리콜. 구 오픈API 15089863 폐기 | ✅ **적재 완료** — `auto.events_recalls` **941행** (CSV 전량, source=datagokr_kotsa, 무인증) | P2 | (잔여) 신규 CSV 릴리스 시 재적재 `make load-datagokr-recalls --csv <path>` | README §4, docs/data_sources.md §B1 |
 | D-6 | **자동차검사관리 (15155857)** — 사고·침수·도난 검사 | (부분 적재) | P3 | CSV 파일 다운 (무인증) → `make ingest-datagokr-inspections`. **이미 47,171 row 적재 완료 (2016~2025, `auto.events_inspections`) — 이 항목은 신규 채널 보강용** | docs/data_sources.md |
 | D-7 | **공정위 기업집단 데이터** | (예정) | P3 | data.go.kr 키 → Neo4j Group + BELONGS_TO_GROUP | README §4 |
 | D-8 | **KOSIS 산업 통계 (광공업동향)** — 제조업 생산지수 by KSIC | (scaffold) | P3 | `KOSIS_API_KEY` 발급 → `make ingest-kosis` → `make load-kosis` → `macro.kosis_series` (ingestion/loader/DDL 구현됨, 키·데이터 부재) | README §4 |
