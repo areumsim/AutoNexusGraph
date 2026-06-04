@@ -56,7 +56,7 @@ def _resolve_backend() -> str:
     try:
         from ..config import get_settings
         return get_settings().langgraph_checkpoint_backend
-    except Exception:
+    except Exception:   # noqa: BLE001 — config import/load 실패 흡수 → 기본 'auto' 폴백
         return "auto"
 
 
@@ -68,7 +68,7 @@ def _resolve_schema() -> str:
     try:
         from ..config import get_settings
         return get_settings().langgraph_checkpoint_schema or "chat"
-    except Exception:
+    except Exception:   # noqa: BLE001 — config import/load 실패 흡수 → 기본 'chat' 폴백
         return "chat"
 
 
@@ -83,7 +83,7 @@ def _resolve_dsn() -> str | None:
         s = get_settings()
         if getattr(s, "langgraph_checkpoint_dsn", ""):
             return s.langgraph_checkpoint_dsn
-    except Exception:
+    except Exception:   # noqa: BLE001 — config (langgraph_checkpoint_dsn) 읽기 실패 흡수 → POSTGRES_DSN env 폴백
         pass
     # 2) POSTGRES_DSN env
     raw = os.getenv("POSTGRES_DSN")
@@ -93,7 +93,7 @@ def _resolve_dsn() -> str | None:
     try:
         from ..config import get_settings
         return get_settings().postgres_dsn or None
-    except Exception:
+    except Exception:   # noqa: BLE001 — config (postgres_dsn) 읽기 실패 흡수 → None (memory saver 폴백)
         return None
 
 
@@ -138,7 +138,7 @@ def _ensure_schema_exists(dsn: str, schema: str) -> bool:
             from psycopg.sql import SQL, Identifier
             cur.execute(SQL("CREATE SCHEMA IF NOT EXISTS {}").format(Identifier(schema)))
         return True
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — 권한/네트워크 등 모든 실패 흡수 → False (public schema 폴백)
         logger.warning("CREATE SCHEMA %s 실패 (계속 진행, public 사용 가능): %s", schema, exc)
         return False
 
@@ -181,12 +181,12 @@ def _postgres_saver() -> Any | None:
         saver = PostgresSaver(conn)
         try:
             saver.setup()
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — saver.setup() (테이블 생성) 실패 흡수 → 기존 테이블 있으면 계속 동작
             logger.warning("PostgresSaver.setup() 실패 (계속 진행): %s", exc)
         logger.info("LangGraph PostgresSaver 활성 (schema=%s, dsn=%s)",
                     schema, _redact(dsn_with_path))
         return saver
-    except Exception as exc:   # noqa: BLE001 — fail-soft
+    except Exception as exc:   # noqa: BLE001 — PG 초기화 모든 실패 (network/auth/version) 흡수 → memory saver 폴백
         logger.warning("PostgresSaver 초기화 실패 — memory 폴백: %s", exc)
         return None
 
