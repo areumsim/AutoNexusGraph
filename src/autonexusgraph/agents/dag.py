@@ -33,6 +33,43 @@ def make_task(
     }
 
 
+def make_spawn_task(
+    task_id: str,
+    from_id: str,
+    for_each: str,
+    agent: str,
+    intent: str,
+    arg: str,
+    base_args: dict | None = None,
+) -> dict:
+    """ReAct 동적 fan-out 템플릿 — upstream(from_id) 결과 행마다 child task 1개 생성.
+
+    agent="_spawn" 센티넬 — worker 로 디스패치되지 않고 ``mid_execution_reflect`` 가
+    upstream 완료 시점에 펼친다(observe→act). 각 child = make_task(agent, intent,
+    {**base_args, arg: row[for_each]}). 정적 plan 으로는 표현 못 하는 "발견 기반 확장".
+
+    Args:
+        from_id   — 관측 대상 upstream task id (depends_on 으로 자동 설정)
+        for_each  — upstream 결과 행에서 뽑을 필드명 (예: "child_corp_code")
+        agent/intent — 생성할 child 의 worker/도구
+        arg       — child args 에 row 값을 넣을 키 (예: "corp_code")
+        base_args — child 공통 args (예: {"year": 2023})
+    """
+    return {
+        "id": task_id,
+        "agent": "_spawn",
+        "intent": f"spawn:{intent}",
+        "args": {},
+        "depends_on": [from_id],
+        "status": "pending",
+        "result": None,
+        "spawn": {
+            "from": from_id, "for_each": for_each, "agent": agent,
+            "intent": intent, "arg": arg, "base_args": dict(base_args or {}),
+        },
+    }
+
+
 def unblocked_tasks(tasks: list[dict]) -> list[dict]:
     """의존성 충족 + 아직 pending 인 task 들. Supervisor 가 다음 디스패치 대상."""
     done_ids = {t["id"] for t in tasks if t.get("status") == "done"}
@@ -115,8 +152,68 @@ def filter_by_agent(tasks: Iterable[dict], agent: str) -> list[dict]:
     return [t for t in tasks if t.get("agent") == agent]
 
 
+# ── (a) Closed-loop 데이터 흐름 — upstream 결과를 dependent task args 로 ──────
+def _resolve_binding(result: object, spec: dict) -> object:
+    """단일 바인딩 spec 을 upstream task 결과(result)로부터 값 추출.
+
+    result 는 보통 list[dict] (graph/sql/research 결과 행들). field 미지정이면 행 자체.
+    - collect=True → 모든 행의 field 값 list (None 제외)
+    - index=N      → N 번째 행의 field 값
+    - 기본          → 첫 행의 field 값
+    참조 불가(미완료·None·index 초과·값 None) → spec["default"] (기본 None).
+    """
+    field = spec.get("field")
+    if isinstance(result, list):
+        rows = result
+    elif result is None:
+        rows = []
+    else:
+        rows = [result]
+
+    def _pick(row: object) -> object:
+        if field is None:
+            return row
+        return row.get(field) if isinstance(row, dict) else None
+
+    if spec.get("collect"):
+        return [x for x in (_pick(r) for r in rows) if x is not None]
+    idx = int(spec.get("index") or 0)
+    if 0 <= idx < len(rows):
+        val = _pick(rows[idx])
+        if val is not None:
+            return val
+    return spec.get("default")
+
+
+def resolve_arg_bindings(state: dict, args: dict | None) -> dict:
+    """task args 안의 upstream 결과 참조(``$from``)를 실제 값으로 치환.
+
+    PRD §7.5.3 의 depends_on 을 **선언만** 이 아니라 **데이터가 흐르게** 만드는 핵심.
+    worker 가 도구를 부르기 직전 호출 — dependent task 가 이미 done 된 upstream task 의
+    결과를 args 로 받는다 (open-loop → closed-loop).
+
+    바인딩 형식 — arg 값이 dict 이며 ``$from`` 키를 가지면 upstream 참조:
+        {"$from": "g_1", "field": "child_corp_code"}                  # 첫 행 (scalar)
+        {"$from": "g_1", "field": "child_corp_code", "collect": True} # 모든 행 (list)
+        {"$from": "g_1", "field": "x", "index": 2}                    # 특정 행
+        {"$from": "g_1"}                                              # 결과 전체
+
+    upstream 결과는 ``state["task_results"][task_id]``. 바인딩이 아닌 값은 그대로 통과.
+    항상 새 dict 반환 (원본 task args 불변).
+    """
+    results = state.get("task_results") or {}
+    out: dict = {}
+    for k, v in (args or {}).items():
+        if isinstance(v, dict) and "$from" in v:
+            out[k] = _resolve_binding(results.get(v.get("$from")), v)
+        else:
+            out[k] = v
+    return out
+
+
 __all__ = [
     "make_task",
+    "make_spawn_task",
     "unblocked_tasks",
     "all_done",
     "get_task",
@@ -124,4 +221,5 @@ __all__ = [
     "task_summary",
     "topologically_valid",
     "filter_by_agent",
+    "resolve_arg_bindings",
 ]

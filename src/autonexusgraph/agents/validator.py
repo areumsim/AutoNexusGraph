@@ -28,7 +28,7 @@ from ._number_patterns import (
     numbers_from_tool_results as _numbers_from_tool_results,
 )
 from .grounding import verify_answer_grounding
-from .state import AgentState
+from .state import AgentState, _ClearedDict, _ClearedList
 
 log = logging.getLogger(__name__)
 
@@ -182,17 +182,34 @@ def should_replan(state: AgentState) -> bool:
 
 
 def mark_replan(state: AgentState) -> AgentState:
-    """replan 카운터 증가 + 이전 도구 결과·DAG 클리어 (planner 가 새로 채움)."""
-    state["n_replans"] = int(state.get("n_replans") or 0) + 1
-    state["tool_results"] = []
-    state["evidence_chunks"] = []
+    """replan 카운터 증가 + 이전 도구 결과·DAG 클리어 (planner 가 새로 채움).
+
+    (b) Result-aware replan: 도구/DAG 를 비우기 **전에** 실패 원인(validation_issues)과
+    직전 계획(intent 목록·grounding 경고)을 ``replan_hint`` 에 보존한다. planner_node 가
+    이를 읽어 같은 계획을 재시도하는 대신 전략을 바꾼다(kind 승격·retrieval 확대).
+    이것이 "동일 계획 재시도(open-loop)" → "실패 반영 재계획(closed-loop)" 의 핵심.
+    """
+    n = int(state.get("n_replans") or 0) + 1
+    state["n_replans"] = n
+    state["replan_hint"] = {
+        "n": n,
+        "prev_kind": state.get("question_kind"),
+        "prev_issues": list(state.get("validation_issues") or []),
+        "prev_tools": [t.get("intent") for t in (state.get("tasks") or [])
+                       if isinstance(t, dict)],
+        "prev_grounding": list((state.get("grounding") or {}).get("warnings") or []),
+    }
+    # 축6: 누적 채널은 마커로 비워 reducer 가 교체(clear)하게 한다 (merge 무력화 방지).
+    state["tool_results"] = _ClearedList()
+    state["evidence_chunks"] = _ClearedList()
     state["plan"] = []
     state["tasks"] = []
-    state["task_results"] = {}
+    state["task_results"] = _ClearedDict()
     state["answer"] = ""
     state["citations"] = []
     state["validation_status"] = "pending"
-    log.info("[validator] replan #%d 시작", state["n_replans"])
+    log.info("[validator] replan #%d 시작 — issues=%s", n,
+             state["replan_hint"]["prev_issues"][:3])
     return state
 
 

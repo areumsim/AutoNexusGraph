@@ -92,6 +92,67 @@ def _dict_merge(old: Any, new: Any) -> dict:
     return new
 
 
+# ── 축6: 병렬 Send fan-in last-wins 손실 하드닝 ──────────────────
+# 문제: 병렬 worker (Send-API) 가 각자 pre-fork state 사본에 자기 델타를 더해 반환하면
+#   - last_wins → 한 worker 결과만 남고 동시 worker 결과 손실
+#   - 순수 concat → 각 분기가 들고 온 pre-fork 부분이 중복
+# 해결: key 로 dedupe 하는 concat/merge reducer. 공유 pre-fork 항목은 key 가 같아
+# 멱등 흡수되고, 각 worker 의 새 항목만 누적된다. LangGraph 의 분기 격리(checkpointer
+# 직렬화) 여부와 무관하게 정확 — 공유변이/격리 양쪽에서 같은 결과.
+#
+# clear 충돌 해소 (이전 롤백 사유): mark_replan/planner 의 "통째 비우기"가 merge
+# reducer 와 충돌(빈 {} 이 merge 되어 clear 무력화). dict/list **서브클래스 마커**
+# (_ClearedDict/_ClearedList)로 해결 — reducer 는 마커를 보면 교체(clear)하고, 함수체인
+# (reducer 미적용)에선 그냥 빈 dict/list 로 동작하므로 노드 코드 무변경.
+class _ClearedDict(dict):
+    """reducer 에게 merge 대신 교체(clear)를 지시하는 빈 dict 마커."""
+
+
+class _ClearedList(list):
+    """reducer 에게 concat 대신 교체(clear)를 지시하는 빈 list 마커."""
+
+
+def _merge_dict_dedup(old: Any, new: Any) -> dict:
+    """task_results 용 — key(task_id) merge + clear 마커 인식.
+
+    _ClearedDict 면 교체(replan 시 비우기). 그 외엔 ``_dict_merge`` 와 동일하게
+    key 병합 — 병렬 worker 가 각자 task_id 로 적재하고 공유 pre-fork key 는 멱등.
+    """
+    if isinstance(new, _ClearedDict):
+        return {}
+    return _dict_merge(old, new)
+
+
+def _concat_dedup_by(key: str):
+    """list[dict] 용 reducer 팩토리 — key 로 dedupe 하는 concat + clear 마커 인식.
+
+    evidence_chunks(key='id') / tool_results(key='task_id') 처럼 병렬 worker 가
+    누적하는 list. 각 분기가 들고 온 공유 pre-fork 항목은 key 동일 → 1회만 보존,
+    worker 별 새 항목은 모두 누적. key 없는 항목(legacy executor / fallback)은
+    dedupe 대상 외 — 그대로 보존(순차 단일 노드 컨텍스트라 중복 없음).
+    """
+    def _reducer(old: Any, new: Any) -> list:
+        if isinstance(new, _ClearedList):
+            return []
+        if old is None:
+            return list(new) if isinstance(new, list) else []
+        if new is None:
+            return list(old) if isinstance(old, list) else []
+        if isinstance(old, list) and isinstance(new, list):
+            out: list = []
+            seen: set = set()
+            for item in list(old) + list(new):
+                k = item.get(key) if isinstance(item, dict) else None
+                if k is not None:
+                    if k in seen:
+                        continue
+                    seen.add(k)
+                out.append(item)
+            return out
+        return new
+    return _reducer
+
+
 class AgentState(TypedDict, total=False):
     """conversation 한 turn 의 누적 상태."""
 
@@ -125,18 +186,14 @@ class AgentState(TypedDict, total=False):
                                       #   {"id": str, "agent": AgentName, "intent": str,
                                       #    "args": dict, "depends_on": list[str],
                                       #    "status": TaskStatus, "result": Any}
-    # 누적 키 — worker 가 state 전체 mutate 후 return (legacy 패턴). LangGraph
-    # last_wins 면 병렬 worker 중복 누적 회피. 단 진짜 병렬 worker 결과 누적이
-    # 필요한 경우는 supervisor 가 순차 dispatch — workers.py 리팩터는 별도 PR.
-    #
-    # (라-Δ rollback, 2026-06-02): _list_concat / _dict_merge reducer 적용 시도 →
-    # validator.mark_replan / executor / planner 의 "통째 set 으로 clear" 패턴과
-    # 충돌 (reducer 가 노드 return 마다 적용되어 clear 무력화). 작성자 의도 (별도
-    # PR — workers.py 흐름 재설계 후 적용) 가 정합. reducer 함수 자체는
-    # ``_list_concat`` / ``_dict_merge`` 로 모듈에 보존 — workers 리팩터 PR 에서 활용.
-    task_results: Annotated[dict, _last_wins]
-    tool_results: Annotated[list[dict], _last_wins]
-    evidence_chunks: Annotated[list[dict], _last_wins]
+    # 누적 키 — 병렬 worker (Send-API) 결과를 fan-in 시 손실 없이 누적 (축6 하드닝).
+    # dedupe reducer 가 공유 pre-fork 항목을 key 로 멱등 흡수하고 worker 별 새 항목만
+    # 누적 → last_wins 의 "동시 worker 결과 손실"·순수 concat 의 "pre-fork 중복" 동시 회피.
+    # clear (replan 비우기) 는 _ClearedDict/_ClearedList 마커로 처리 (이전 롤백 사유 해소).
+    # 함수체인 (reducer 미적용) 은 worker 순차 mutate 로 기존과 동일 동작.
+    task_results: Annotated[dict, _merge_dict_dedup]
+    tool_results: Annotated[list[dict], _concat_dedup_by("task_id")]
+    evidence_chunks: Annotated[list[dict], _concat_dedup_by("id")]
     graph_subgraph: Annotated[dict, _last_wins]
     fallback_used: Annotated[bool, _last_wins]
 
@@ -149,6 +206,10 @@ class AgentState(TypedDict, total=False):
     validation_status: Annotated[str, _last_wins]
     validation_issues: Annotated[list[str], _last_wins]
     grounding: Annotated[dict, _last_wins]
+    # (b) Result-aware replan — Validator 실패 시 mark_replan 이 채우고 planner 가 읽어
+    # 전략을 바꾼다. {"n", "prev_kind", "prev_issues", "prev_tools", "prev_grounding"}.
+    # 없으면(=첫 turn) 룰 planner 기본 동작. n_replans 와 짝으로 폐회로 증거.
+    replan_hint: Annotated[dict, _last_wins]
 
     # Human-in-the-Loop (PRD §7.5.6)
     pending_interrupt: Annotated[dict, _last_wins]

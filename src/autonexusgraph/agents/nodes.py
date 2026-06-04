@@ -196,6 +196,46 @@ def triage_node(state: AgentState) -> AgentState:
     return state
 
 
+# ── (b) Result-aware replan adaptation ──────────────────────
+def _replan_escalate_kind(kind: str, hint: dict) -> str:
+    """직전 실패 원인에 따라 question_kind 를 승격 — 같은 계획 재시도 대신 다른 전략.
+
+    - grounding / answer_too_short / 저신뢰 엣지 → 근거 부족 → multi_hop/narrative 로 확장
+      (graph+sql+research 조합으로 evidence 보강).
+    - hallucinated_numbers → 자유서술 확장은 역효과(환각 가능성↑) → 정형 소스 유지
+      (narrative 였으면 structural 로 축소, 그 외 kind 유지).
+    """
+    issues = hint.get("prev_issues") or []
+    if any(str(i).startswith("hallucinated_numbers") for i in issues):
+        return "structural" if kind == "narrative" else kind
+    _ESCALATE = {
+        "factual": "multi_hop",
+        "structural": "multi_hop",
+        "narrative": "multi_hop",
+        "multi_hop": "multi_hop",
+        "unknown": "narrative",
+    }
+    return _ESCALATE.get(kind, "narrative")
+
+
+def _apply_replan_widen(state: "AgentState") -> None:
+    """replan 시 retrieval 폭 확대 — research task 의 top_k 를 배수 증가(상한 20).
+
+    replan 횟수 n 이 클수록 더 넓게 검색. handler/finance 양 경로의 산출 tasks 에
+    공통 적용되도록 ``_planner_cost_gate`` 진입 시 호출.
+    """
+    hint = state.get("replan_hint") or {}
+    if not hint:
+        return
+    n = int(hint.get("n") or 1)
+    for t in state.get("tasks") or []:
+        if not isinstance(t, dict) or t.get("agent") != "research":
+            continue
+        args = t.setdefault("args", {})
+        cur = int(args.get("top_k") or 6)
+        args["top_k"] = min(cur + 4 * n, 20)
+
+
 # ── Planner ─────────────────────────────────────────────────
 def planner_node(state: AgentState) -> AgentState:
     """질문 유형 + 회사 → task DAG (PRD §7.5.2 / §7.5.3).
@@ -209,13 +249,21 @@ def planner_node(state: AgentState) -> AgentState:
 
     여전히 ``state["plan"]`` (flat list) 도 채워서 executor 폴백 호환.
     """
-    from .dag import make_task
+    from .dag import make_spawn_task, make_task
+
+    from .state import _ClearedDict, _ClearedList
+
+    # 축6: 누적 채널 per-turn 리셋 — 마커로 reducer 에 교체 지시. checkpointer 다중턴
+    # 잔류·병렬 fan-in 누적 오염 방지. 함수체인(reducer 미적용)에선 빈 컬렉션과 동일.
+    # planner 가 gather 단계 시작점이므로 여기서 비우면 workers 가 깨끗이 누적.
+    state["task_results"] = _ClearedDict()
+    state["tool_results"] = _ClearedList()
+    state["evidence_chunks"] = _ClearedList()
 
     # triage 가 입력 거부를 결정 (prompt_injection 등) — task 생성 건너뛰고
     # synthesizer 가 결정적 거부 답변을 생성하도록 위임.
     if state.get("aborted_reason") == "prompt_injection":
         state["tasks"] = []
-        state["task_results"] = {}
         state["plan"] = []
         return state
 
@@ -223,6 +271,18 @@ def planner_node(state: AgentState) -> AgentState:
     targets = state.get("target_companies") or []
     year_hint = extract_year_hint(state.get("question_rewritten") or state.get("question", ""))
     q = state.get("question_rewritten") or state.get("question", "")
+
+    # (b) replan 이면 직전 실패(replan_hint)를 반영해 전략(kind) 승격 — 동일 계획
+    # 재시도 회피. 첫 turn 은 replan_hint 없음 → 룰 planner 기본 동작 유지.
+    replan_hint = state.get("replan_hint") or {}
+    if replan_hint:
+        new_kind = _replan_escalate_kind(kind, replan_hint)
+        if new_kind != kind:
+            log.info("[planner] replan#%s — kind 승격 %s→%s (issues=%s)",
+                     replan_hint.get("n"), kind, new_kind,
+                     (replan_hint.get("prev_issues") or [])[:2])
+        kind = new_kind
+        state["question_kind"] = kind
 
     # ── 도메인 분기 — 등록 handler 에 plan 위임 (PRD §10.12) ─────────
     # finance 외 도메인은 외부 패키지가 등록한 handler.plan_tasks 가 task list 반환.
@@ -233,7 +293,7 @@ def planner_node(state: AgentState) -> AgentState:
     if handler is not None and hasattr(handler, "plan_tasks"):
         tasks = call_handler_method(state, handler, "plan_tasks", state, question=q)
         state["tasks"] = tasks or []
-        state["task_results"] = {}
+        # task_results 는 planner 진입부에서 이미 마커로 리셋됨 — 재대입 금지(마커 보존).
         state["plan"] = [
             {"tool": t["intent"], "args": t["args"],
              "purpose": f"{t['agent']}:{t['intent']}"}
@@ -301,12 +361,34 @@ def planner_node(state: AgentState) -> AgentState:
                 {"parent_corp_code": cc, "limit": 30},
             ))
         for cc in targets:
-            # SQL 은 Graph 결과를 보고 corp_code 확정 — 의존성 표현
+            # 모회사 자체 매출 (parent revenue) — graph 완료 후 실행 (의존성 순서).
             tasks.append(make_task(
                 _next_id("sql_"), "sql", "get_revenue",
                 {"corp_code": cc, "year": year_hint},
                 depends_on=graph_ids,
             ))
+        # (a) Closed-loop 데이터 흐름: 발견된 자회사들의 매출 비교 — corp_codes 를
+        # graph 결과(child_corp_code)에서 **런타임 도출**. depends_on 이 선언만이 아니라
+        # 실제 데이터가 흐른다. year 없으면 compare_companies 가 동작 못 하므로 생략.
+        if year_hint:
+            for gid in graph_ids:
+                tasks.append(make_task(
+                    _next_id("sql_"), "sql", "compare_companies",
+                    {"corp_codes": {"$from": gid, "field": "child_corp_code",
+                                    "collect": True},
+                     "year": year_hint, "metric": "revenue"},
+                    depends_on=[gid],
+                ))
+        # ReAct mid-execution fan-out: 발견된 자회사마다 영업이익을 개별 조회.
+        # compare(revenue 일괄)와 보완 차원 — 자회사 수를 plan 시점엔 모르므로 정적
+        # DAG 로 표현 불가. supervisor 의 reflect 가 graph 완료 후 런타임에 펼친다.
+        if year_hint:
+            for gid in graph_ids:
+                tasks.append(make_spawn_task(
+                    _next_id("spawn_"), from_id=gid, for_each="child_corp_code",
+                    agent="sql", intent="get_operating_income", arg="corp_code",
+                    base_args={"year": year_hint},
+                ))
         if q:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
@@ -327,11 +409,14 @@ def planner_node(state: AgentState) -> AgentState:
             ))
 
     state["tasks"] = tasks
-    state["task_results"] = {}
+    # task_results 는 planner 진입부에서 이미 마커로 리셋됨 — 재대입 금지(마커 보존).
 
-    # 호환용 legacy plan — executor 폴백 (tasks 빈 경우 사용)
+    # 호환용 legacy plan — executor 폴백 (tasks 빈 경우 사용).
+    # _spawn 템플릿은 reflect 전용 — 도구 호출 불가하므로 legacy plan 에서 제외.
     plan: list[dict] = []
     for t in tasks:
+        if t.get("agent") == "_spawn":
+            continue
         plan.append({
             "tool": t["intent"],
             "args": t["args"],
@@ -423,12 +508,81 @@ def _planner_cost_gate(state: "AgentState", kind: str, targets: list,
     """
     domain = str(state.get("domain") or "finance")
 
+    # (b) replan retrieval 확대 — handler/finance 양 경로의 산출 tasks 에 공통 적용.
+    _apply_replan_widen(state)
+
     if _handle_cost_resume(state):
         return state
 
     if not state.get("n_replans") and not state.get("interrupt_handled"):
         _request_cost_approval(state, kind, targets, n_tasks, domain)
     return state
+
+
+# ── (d) 공통 빈결과 회복 — executor(legacy) + synthesizer(DAG) 양 경로 대칭 ──
+def _attempt_fallback_recovery(state: AgentState) -> bool:
+    """모든 도구가 빈 결과 + 검색 미수행 → 도메인 인식 fallback 검색으로 회복.
+
+    diagnosis(축5): 이 회복이 legacy ``executor_node`` 에만 있고 DAG/worker 경로엔
+    없어 비대칭이었다. state["tool_results"]/["evidence_chunks"] 를 직접 보고/갱신하므로
+    두 경로에서 동일하게 호출 가능 — DAG 경로도 "정보 부족" 직행 대신 회복 시도.
+
+    Returns:
+        True  — 회복 검색이 결과를 반환해 evidence 누적됨 (fallback_used=True)
+        False — 회복 불필요(이미 evidence 있음)·불가(검색 이미 수행·예산초과 등)·무소득
+    """
+    if state.get("aborted_reason") in ("turn_budget", "cost_rejected", "prompt_injection"):
+        return False
+    if state.get("evidence_chunks"):
+        return False   # 이미 본문 근거 확보 — 회복 불필요
+    results = state.get("tool_results") or []
+    all_empty = all(not (r.get("result")) for r in results) if results else True
+    searched_tools = {"search_documents", "search_documents_auto"}
+    already_searched = any(r.get("tool") in searched_tools for r in results)
+    if not all_empty or already_searched or not state.get("question"):
+        return False
+
+    from .. import tools as toolbox
+    domain = str(state.get("domain") or "finance").lower()
+    q_text = state.get("question_rewritten") or state["question"]
+    fb_tool: str | None = None
+    fb_fn = None
+    fb_args: dict = {}
+    # handler 가 (tool, fn, args) 제공하면 도메인 검색, 아니면 finance 기본.
+    fb = call_handler_method(state, get_handler(domain), "fallback_search",
+                             state, query=q_text)
+    if fb is not None:
+        fb_tool, fb_fn, fb_args = fb
+        log.info("[recovery:%s] fallback via handler — tool=%s", domain, fb_tool)
+    if fb_fn is None:
+        fb_tool = "search_documents"
+        fb_fn = getattr(toolbox, "search_documents", None)
+        targets = state.get("target_companies") or []
+        fb_args = {
+            "query": q_text, "top_k": 6,
+            "corp_code": targets[0] if len(targets) == 1 else (targets or None),
+        }
+        log.info("[recovery] all empty → fallback search_documents (finance)")
+    if fb_fn is None:
+        return False
+
+    from .workers import _maybe_inject_rerank
+    _maybe_inject_rerank(state, fb_fn, fb_args)
+    try:
+        fb_out = fb_fn(**fb_args)
+    except Exception as e:   # noqa: BLE001
+        log.warning("[recovery] fallback %s failed: %s", fb_tool, e)
+        return False
+    if not fb_out:
+        return False
+    state.setdefault("tool_results", []).append({
+        "tool": fb_tool, "purpose": "fallback_recovery",
+        "args": fb_args, "result": fb_out,
+    })
+    state.setdefault("evidence_chunks", []).extend(fb_out)
+    state["fallback_used"] = True
+    log.info("[recovery:%s] %s → %d chunks 회복", domain, fb_tool, len(fb_out))
+    return True
 
 
 # ── Executor ────────────────────────────────────────────────
@@ -462,59 +616,11 @@ def executor_node(state: AgentState) -> AgentState:
         if tool_name == "search_documents":
             evidence.extend(out or [])
 
-    # ── Fallback recovery (흡수: _legacy/v1 similar_hints 핵심) ────────────
-    # 모든 도구가 빈 결과만 반환했고 검색이 안 돌았으면, 일반 retrieve 시도 → 사용자에게
-    # "정보 부족" 만 보내는 대신 회복 경로 제공. 도메인 인식:
-    #   - 등록된 handler 가 있으면 handler.fallback_search 로 (tool, fn, args) 제공
-    #   - 그렇지 않으면 (또는 handler 가 None 반환) finance 기본 search_documents
-    if state.get("aborted_reason") != "turn_budget":
-        all_empty = all(not (r.get("result")) for r in results) if results else True
-        searched_tools = {"search_documents", "search_documents_auto"}
-        already_searched = any(r["tool"] in searched_tools for r in results)
-        if all_empty and not already_searched and state.get("question"):
-            domain = str(state.get("domain") or "finance").lower()
-            q_text = state.get("question_rewritten") or state["question"]
-            fb_tool: str | None = None
-            fb_fn = None
-            fb_args: dict = {}
-            # call_handler_method 가 log + safety_signals 적재 (이전엔 log 만,
-            # signals 누락 — L1 통일로 자동 보강).
-            fb = call_handler_method(state, get_handler(domain),
-                                     "fallback_search", state, query=q_text)
-            if fb is not None:
-                fb_tool, fb_fn, fb_args = fb
-                log.info("[executor:%s] fallback via handler — tool=%s",
-                         domain, fb_tool)
-            if fb_fn is None:   # handler 미등록 or None 반환 → finance 기본
-                fb_tool = "search_documents"
-                fb_fn = getattr(toolbox, "search_documents", None)
-                targets = state.get("target_companies") or []
-                fb_args = {
-                    "query": q_text,
-                    "top_k": 6,
-                    "corp_code": targets[0] if len(targets) == 1 else (targets or None),
-                }
-                log.info("[executor] all empty → fallback search_documents (finance)")
-            if fb_fn is not None:
-                # 평가 매트릭스 rerank ablation — fallback 검색에도 동일 전파.
-                from .workers import _maybe_inject_rerank
-                _maybe_inject_rerank(state, fb_fn, fb_args)
-                try:
-                    fb_out = fb_fn(**fb_args)
-                    if fb_out:
-                        results.append({
-                            "tool": fb_tool,
-                            "purpose": "fallback_recovery",
-                            "args": fb_args,
-                            "result": fb_out,
-                        })
-                        evidence.extend(fb_out)
-                        state["fallback_used"] = True
-                except Exception as e:   # noqa: BLE001
-                    log.warning("[executor] fallback %s failed: %s", fb_tool, e)
-
     state["tool_results"] = results
     state["evidence_chunks"] = evidence
+    # ── Fallback recovery — DAG/worker 경로와 공유하는 헬퍼로 위임 (축5 대칭화).
+    # 모든 도구가 빈 결과 + 검색 미수행이면 도메인 인식 fallback 검색으로 회복.
+    _attempt_fallback_recovery(state)
     return state
 
 
@@ -556,6 +662,13 @@ def synthesizer_node(state: AgentState,
         state["citations"] = []
         state["grounding"] = {"ok": False, "warnings": ["prompt_injection"]}
         return state
+
+    # (d) DAG/worker 경로 빈결과 회복 — synth 직전 단일 chokepoint(langgraph/폴백 공통).
+    # 모든 worker 가 빈 결과만 냈으면 "정보 부족" 직행 대신 도메인 fallback 검색으로
+    # evidence 확보 시도. executor(legacy) 와 동일 헬퍼 — 회복 경로 대칭화.
+    if _attempt_fallback_recovery(state):
+        log.info("[synth] 빈결과 회복 — fallback evidence %d chunks",
+                 len(state.get("evidence_chunks") or []))
 
     # Pre-synth number guard (PRD §7.3) — 화이트리스트 + evidence 라벨링
     from .number_guard import (
@@ -716,6 +829,45 @@ def synthesizer_node(state: AgentState,
     return state
 
 
+def _memory_block(state: AgentState) -> str:
+    """(c) Multi-turn 기억 주입 (PRD §7.6.2) — 직전 대화 + 세션 entity 요약.
+
+    diagnosis: 기억이 target_companies carry-over 외에는 어떤 LLM 프롬프트에도 안 실려
+    사실상 stateless. 이 블록이 synth 입력에 이전 turn 맥락을 명시 주입해 후속질문
+    ("그 중 가장 큰 곳은?", "작년은?")에 일관된 답을 가능케 한다.
+
+    first turn(history 없음 + carry-over 없음)에는 빈 문자열 — 노이즈 회피.
+    """
+    history = state.get("history") or []
+    carryover = bool(state.get("session_carryover"))
+    if not history and not carryover:
+        return ""
+    parts: list[str] = []
+    if history:
+        hl: list[str] = []
+        for h in history[-4:]:   # 직전 ~2 turn (user/assistant)
+            if not isinstance(h, dict):
+                continue
+            role = h.get("role") or h.get("speaker") or ""
+            content = str(h.get("content") or h.get("text") or "").strip()[:200]
+            if content:
+                hl.append(f"  {role}: {content}")
+        if hl:
+            parts.append("[이전 대화]\n" + "\n".join(hl))
+    # 세션 entity 요약 — summarize() 를 실제로 연결 (이전엔 호출처 0건).
+    try:
+        prev = session.get(state.get("thread_id") or "")
+        summ = session.summarize(prev) if prev else ""
+        if summ:
+            parts.append(f"[이어지는 컨텍스트 엔티티] {summ}")
+    except Exception:   # noqa: BLE001 — 기억 주입 실패가 답변을 막지 않도록.
+        pass
+    if carryover:
+        parts.append("(이번 질문은 이전 turn 의 대상 엔티티를 이어받았습니다 — "
+                     "지시어는 그 엔티티로 해석하세요.)")
+    return ("\n".join(parts) + "\n") if parts else ""
+
+
 def _build_context(state: AgentState, *,
                     sanitized_evidence: list[dict] | None = None) -> str:
     """tool_results + evidence_chunks → LLM 입력 텍스트.
@@ -725,6 +877,10 @@ def _build_context(state: AgentState, *,
     """
     parts: list[str] = []
     parts.append(f"[질문]\n{state.get('question','')}\n")
+
+    mem = _memory_block(state)
+    if mem:
+        parts.append(mem)
 
     parts.append("[질문 유형] " + (state.get('question_kind') or 'unknown') + "\n")
 

@@ -15,12 +15,96 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .dag import all_done, task_summary, topologically_valid, unblocked_tasks
+from .dag import (
+    all_done,
+    make_task,
+    task_summary,
+    topologically_valid,
+    unblocked_tasks,
+)
 from .policy import turn_budget_exceeded
 from .state import AgentState
 from .workers import dispatch_one
 
 log = logging.getLogger(__name__)
+
+# ReAct 동적 fan-out 폭주 방지 — 한 turn 에 reflect 가 생성할 수 있는 child 총량 상한.
+MAX_DYNAMIC_TASKS = 20
+
+
+def mid_execution_reflect(state: AgentState) -> bool:
+    """ReAct inner loop — 완료된 batch 결과를 관측해 bounded 후속 task 동적 생성.
+
+    diagnosis(축1/3 open-loop의 남은 절반): planner 가 전체 DAG 를 선확정하고 도구
+    결과를 보고 후속 task 를 바꾸지 못했다. 이 함수가 supervisor 재진입마다 돌며
+    spawn 템플릿(agent="_spawn")의 upstream 이 done 이면 결과 행마다 child 를 펼친다 —
+    정적 plan 으로는 크기를 알 수 없던 "발견 기반 확장"(observe→act).
+
+    가드 (자율성 폭주 차단):
+      - turn_budget_exceeded → spawn 중단(템플릿 skipped)
+      - MAX_DYNAMIC_TASKS → 초과분 drop + safety_signal 기록(silent 절단 금지)
+      - 템플릿을 done 으로 표시 → 동일 upstream 재확장 방지(무한 fan-out 차단)
+      - child depends_on=[] (upstream 이미 done) → topological 무결성 유지
+
+    Returns: 이번 호출에 child 를 하나라도 생성했으면 True.
+    """
+    tasks: list[dict] = state.get("tasks") or []
+    results = state.get("task_results") or {}
+    spawned_any = False
+
+    for tmpl in tasks:
+        if tmpl.get("agent") != "_spawn" or tmpl.get("status") != "pending":
+            continue
+        spec = tmpl.get("spawn") or {}
+        from_id = spec.get("from")
+        up = next((t for t in tasks if t.get("id") == from_id), None)
+        if up is None or up.get("status") != "done":
+            continue   # upstream 아직 미완료 — 다음 라운드까지 대기
+
+        if turn_budget_exceeded(state):
+            tmpl["status"] = "skipped"
+            tmpl["result"] = {"error": "turn_budget"}
+            continue
+
+        rows = results.get(from_id)
+        rows = rows if isinstance(rows, list) else ([rows] if rows else [])
+        field = spec.get("for_each")
+        values: list = []
+        seen: set = set()
+        for r in rows:
+            v = r.get(field) if isinstance(r, dict) else None
+            if v is not None and v not in seen:
+                seen.add(v)
+                values.append(v)
+
+        remaining = MAX_DYNAMIC_TASKS - sum(1 for t in tasks if t.get("_dynamic"))
+        capped = values[:max(0, remaining)]
+        dropped = len(values) - len(capped)
+
+        children: list[dict] = []
+        for i, v in enumerate(capped):
+            child = make_task(
+                f"dyn_{tmpl['id']}_{i}", spec["agent"], spec["intent"],
+                {**spec.get("base_args", {}), spec["arg"]: v},
+            )
+            child["_dynamic"] = True
+            children.append(child)
+
+        tasks.extend(children)
+        tmpl["status"] = "done"
+        tmpl["result"] = {"spawned": len(children), "dropped": dropped,
+                          "from": from_id, "field": field}
+        if dropped:
+            state.setdefault("safety_signals", []).append(
+                f"mid_replan_capped:{from_id}:+{len(children)}/-{dropped}")
+            log.warning("[reflect] %s — MAX_DYNAMIC_TASKS 초과: %d spawn / %d drop",
+                        from_id, len(children), dropped)
+        else:
+            log.info("[reflect] spawn %d children from %s.%s",
+                     len(children), from_id, field)
+        spawned_any = spawned_any or bool(children)
+
+    return spawned_any
 
 
 def supervisor_node(state: AgentState) -> AgentState:
@@ -58,6 +142,9 @@ def supervisor_node(state: AgentState) -> AgentState:
                     t["result"] = {"error": "turn_budget"}
             state["aborted_reason"] = "turn_budget"
             break
+
+        # ReAct — 직전 batch 결과 관측 후 동적 task 생성(spawn 템플릿 펼침).
+        mid_execution_reflect(state)
 
         ready = unblocked_tasks(tasks)
         if not ready:
@@ -109,7 +196,11 @@ def sup_send_directives(state: AgentState):
     }
     sends = []
     for t in ready:
-        node = NODE_BY_AGENT.get(str(t.get("agent")))
+        agent = str(t.get("agent"))
+        if agent == "_spawn":
+            # spawn 템플릿은 reflect(supervisor 노드)가 처리 — Send 대상 아님.
+            continue
+        node = NODE_BY_AGENT.get(agent)
         if not node:
             t["status"] = "skipped"
             t["result"] = {"error": f"unknown agent: {t.get('agent')!r}"}
@@ -128,4 +219,5 @@ def supervisor_done(state: AgentState) -> str:
     return "dispatch"
 
 
-__all__ = ["supervisor_node", "sup_send_directives", "supervisor_done"]
+__all__ = ["supervisor_node", "sup_send_directives", "supervisor_done",
+           "mid_execution_reflect", "MAX_DYNAMIC_TASKS"]
