@@ -32,6 +32,14 @@ class BudgetAwareLLMClient(LLMClient):
         self._tracker = tracker
         self.model = inner.model
 
+    def __getattr__(self, name: str):
+        """알려지지 않은 속성은 inner 로 위임 (auto-wrap 시 LoggingLLMClient 가
+        `_last_usage`/`set_caller` 등을 BA 경유로 찾게 함). _inner 미설정 시 무한
+        재귀 방지."""
+        if name == "_inner":
+            raise AttributeError(name)
+        return getattr(self._inner, name)
+
     def chat(self, messages, *, temperature=0.0, max_tokens=None,
              purpose: str | None = None, **kwargs) -> LLMResponse:
         self._tracker.guard()
@@ -51,11 +59,28 @@ class BudgetAwareLLMClient(LLMClient):
     def chat_stream(self, messages, *, temperature=0.0, max_tokens=None,
                     purpose: str | None = None, **kwargs) -> Iterator[str]:
         self._tracker.guard()
-        # stream 은 usage 가 stream 끝에 yield 되거나 별도 trace 가 어려움 — provider 별로 다름.
-        # OpenAI: 마지막 chunk 의 usage. Anthropic: message_delta event. 단순화: stream 후
-        # 같은 messages 로 비스트림 호출 안 함. 호출자가 통계 필요하면 chat() 사용.
-        yield from self._inner.chat_stream(messages, temperature=temperature,
-                                            max_tokens=max_tokens, **kwargs)
+        # stream 은 provider 가 usage 를 노출 안 하는 경우가 많아 char/3 보수적 추정.
+        # (과거: 여기서 record 를 안 해 스트리밍 비용이 tracker 누적에 빠져 guard 가
+        # 영영 안 터지는 누수가 있었음 — finally 에서 종료/중단 시 1회 record.)
+        from .cost import cost_of_call
+        t0 = time.monotonic()
+        chunks: list[str] = []
+        try:
+            for c in self._inner.chat_stream(messages, temperature=temperature,
+                                             max_tokens=max_tokens, **kwargs):
+                chunks.append(c)
+                yield c
+        finally:
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            in_est = sum(len(m.get("content", "") or "") for m in messages) // 3
+            out_est = sum(len(c) for c in chunks) // 3
+            self._tracker.record(
+                input_tokens=in_est,
+                output_tokens=out_est,
+                model=self.model,
+                purpose=purpose,
+                latency_ms=latency_ms,
+            )
 
     def chat_json(self, messages, schema, *, temperature=0.0,
                   purpose: str | None = None, **kwargs) -> dict[str, Any]:
@@ -90,15 +115,42 @@ class BudgetAwareLLMClient(LLMClient):
         return result
 
 
+def _chain_has_budget_guard(client: LLMClient) -> bool:
+    """client 의 wrap 체인(._inner 따라) 에 BudgetAwareLLMClient 가 이미 있는지.
+
+    get_llm_client() 가 auto-wrap 으로 BudgetAwareLLMClient 를 끼우므로, 호출자가
+    또 budget_aware_client 로 감싸면 같은 tracker 에 record 2회 → 이중 계산된다.
+    이를 막기 위해 체인을 검사한다.
+    """
+    seen = 0
+    cur: object | None = client
+    while cur is not None and seen < 10:        # 깊이 가드
+        if isinstance(cur, BudgetAwareLLMClient):
+            return True
+        cur = getattr(cur, "_inner", None)
+        seen += 1
+    return False
+
+
 def budget_aware_client(
     inner: LLMClient,
     *,
     caller: str,
     hard_limit: float | None = None,
-) -> BudgetAwareLLMClient:
-    """LLMClient + tracker 결합."""
+) -> LLMClient:
+    """LLMClient + tracker 결합. idempotent — 이미 가드된 체인은 재-wrap 안 함.
+
+    tracker tighten(hard_limit) 은 어느 경우든 수행하므로 호출자의 turn budget 은
+    항상 반영된다.
+    """
     tracker = get_tracker(caller=caller, model=inner.model, hard_limit=hard_limit)
+    if _chain_has_budget_guard(inner):
+        # auto-wrap 으로 이미 가드됨 — 한도만 tighten 하고 그대로 반환(이중 record 방지).
+        return inner
     return BudgetAwareLLMClient(inner, tracker)
 
 
-__all__ = ["BudgetAwareLLMClient", "budget_aware_client", "BudgetExceeded"]
+__all__ = [
+    "BudgetAwareLLMClient", "budget_aware_client", "BudgetExceeded",
+    "_chain_has_budget_guard",
+]
