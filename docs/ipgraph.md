@@ -10,7 +10,7 @@
 > 으로 추가하여 **§10.12 "코어 변경 < 5%"** 를 보존 (실측 현재 default baseline `414bc1b` 기준 코어 변경 **0/15,396 LOC = 0.00%**, `make audit-dod` 2026-06-01. 누적 reset 이력은 [eval/reports/core_diff_baseline_ledger.md](../eval/reports/core_diff_baseline_ledger.md)).
 >
 > **현재 구현 상태 (2026-06-01)**
-> - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**23 Cypher 템플릿**, `cypher_templates_ip.py:30` dict top-level) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 23 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 8 (research/sql + bridge 2 + cross_query_ip) + research 3 = **19 intents** (`agent_handler.py:26-42`).
+> - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**25 Cypher 템플릿**, `cypher_templates_ip.py:30` dict top-level) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 25 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 8 (research/sql + bridge 2 + cross_query_ip) + research 3 = **19 intents** (`agent_handler.py:26-42`).
 > - **데이터**: 부분 적재 — `ip.cpc_scheme` **10,695 row** + `ip.works` (OpenAlex) **629 row** + `ip.institution` 38 + `ip.work_institution` 638 + Neo4j `:CPCCode` **10,695 노드**. PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) **적용 완료 (2026-06-01)** — `ip.patents / ip.assignees / ip.inventors / ip.patent_assignees / ip.patent_inventors / ip.patent_cpc / ip.citations / ip.assignee_corp_map` 8 테이블 생성됨 (row=0). 후속: KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset → `ingestion/{kipris,uspto_odp}.py` 실행 + assignee → corp_entity 매핑.
 >
 > **선택 근거:** OpenAlex / **USPTO ODP (data.uspto.gov, PatentsView 후속 — 2026-03-20 이관 완료, REST 종료 → bulk dataset)** / CPC bulk 완전 무료, KIPRIS 로 한국 특허 커버, 거의 전부 정형이라 LLM 예산 거의 무소비.
@@ -224,7 +224,7 @@ CREATE TABLE ip.assignee_corp_map (
 ## 6. gold QA seed (E-2)
 
 `eval/qa_gold/gold_qa_ip_v0.jsonl` (**30 row**, IP-L1/L2/L3 각 10) — `gold_qa_auto_v0.jsonl` 스키마 베이스.
-`eval/qa_gold/gold_qa_cross_v0.jsonl` (**44 row** 실측) — level 기준 CD-L1=10 / CD-L2=8 / CD-L3=12 / CD-L4=8 + **6 row 는 IP 결합 변형** (qid `CD-L3-IP-`/`CD-L4-IP-` prefix, level 필드 미설정. ip 결합 시연 추가분).
+`eval/qa_gold/gold_qa_cross_v0.jsonl` (**49 row** 실측) — qid prefix 기준 CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + **IP 결합 8** (`CD-L3-IP` 4 + `CD-L4-IP` 4) + **CD-PROC 5** (공정 결합).
 
 | 레벨 | 예시 | 도구 경로 |
 |---|---|---|
@@ -251,7 +251,7 @@ CREATE TABLE ip.assignee_corp_map (
 1. ✅ CPC scheme bulk → CPCCode/SUBCLASS_OF (무인증, 온톨로지 골격) — `ip.cpc_scheme` 10,695 row + Neo4j `:CPCCode` 10,695 노드 적재 완료 (`loaders/load_cpc.py`)
 2. → **USPTO ODP bulk dataset** 채택 (M-4 — PatentsView REST 종료, ODP + Transition Guide) → US 특허 + 인용 → assignee→corp strong 매칭. **`ingestion/uspto_odp.py` (collect 7종) + `loaders/load_uspto_odp.py` (PG 7-table upsert + Neo4j `:Patent`/`:Assignee`/`:Inventor` 노드 + `ASSIGNED_TO`/`INVENTED`/`CLASSIFIED_AS`/`CITES` 엣지, 7-key edge meta 100%) 구현 완료 (2026-06-02 smoke E2E PASS — 합성 데이터 4 patents/3 assignees/2 inventors/4 link/2 citations 적재 + 멱등 재실행 OK + 7키 무결성 100% + 정리)** — bulk dataset 다운로드 (data.uspto.gov/bulkdata/datasets) 후 `raw/ip/uspto_odp/*.jsonl` 7 파일 배치 → `make load-uspto-odp` 1회로 적재. 18_ipgraph.sql + 19_ipgraph_bridge.sql 마이그레이션 **적용 완료** — `ip` 스키마 12 테이블 (`patents / assignees / inventors / patent_assignees / patent_inventors / patent_cpc / citations / cpc_scheme / assignee_corp_map / institution / work_institution / works`). 데이터 row 는 cpc_scheme=10,695 + works=629 + institution=38 + work_institution=638; 나머지 8 테이블 row=0 (USPTO ODP bulk 데이터 / KIPRIS API 키 대기).
 3. → KIPRIS 키 발급 → 한국 특허 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) — `ingestion/kipris.py` **XML 파서 완성 (2026-06-02, lxml/stdlib fallback)** + `loaders/load_kipris.py` 신규 (USPTO 헬퍼 source-pluggable 재사용 — `source_type='kipris'`, `jurisdiction='KR'`, `source_prefix='kipris'`). smoke E2E PASS — 합성 XML 2 patents/3 assignees/3 inventors/3 ASSIGNED_TO/3 INVENTED + 7-key edge meta 100% 검증 후 cleanup. `KIPRIS_API_KEY` 발급 → `make load-kipris`. **CPC IPC 매칭 시 PG patent_cpc FK 통과시키려면 `make load-cpc -- --include-subgroups` 먼저** (기본 적재는 subgroup 제외 — KIPRIS IPC 는 통상 subgroup 정밀도 `H01M10/052`).
-4. ✅ `ip_*` Cypher 템플릿 + tool pool + 화이트리스트 — `cypher_templates_ip.py` **23 templates** + `tools/{patents,graph,retrieve,bridge}.py` 4-tools + `IPGraphHandler.allowed_intents` 화이트리스트 완료
+4. ✅ `ip_*` Cypher 템플릿 + tool pool + 화이트리스트 — `cypher_templates_ip.py` **25 templates** + `tools/{patents,graph,retrieve,bridge}.py` 4-tools + `IPGraphHandler.allowed_intents` 화이트리스트 완료
 5. ⚠️ gold seed + CD-L3/L4 → 축소 매트릭스 — `gold_qa_ip_v0.jsonl` 30 row + `gold_qa_cross_v0.jsonl` 의 CD-IP 8 row 시드 완료. 매트릭스 LLM 실측은 (예정)
 6. → (옵션) OpenAlex `ip.works` **적재 완료 — 629 row** (`loaders/load_openalex.py`). 배터리·소재 L5/L6 — [docs/autograph.md](./autograph.md) §2.5.4 (auto.master_minerals 5 row 시드만)
 

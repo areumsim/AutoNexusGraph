@@ -61,17 +61,17 @@ flowchart TB
 
 | 무엇 | 왜 | 어떻게 (코드 진입점) |
 |---|---|---|
-| 3 도메인 + Bridge 를 한 turn 안에 묶는 GraphRAG 에이전트 | 단일 벡터 RAG 로는 "현대모비스 매출 ↔ 모비스가 공급하는 차종의 최근 리콜" 같은 멀티홉·교차도메인 질의 불가 | StateGraph 11 노드: Triage→Planner→Supervisor↔Workers(research/graph/sql/calculator)→Synthesizer→Validator (`agents/graph.py:110-123`) + Send-API 병렬 + **result-aware Replan**(실패원인 반영 재계획, 최대 2회 `validator.py MAX_REPLANS=2`) + **ReAct mid-execution** 동적 task 생성 + **LLM 자율 planner**(opt-in `AGENT_LLM_PLANNER`) — open-loop→closed-loop (v2.3) |
-| 도메인 plug-in 으로 N-domain 확장 | 4번째 도메인 추가 시 "코어 변경 < 5%" 가 확장성 정량 증거 (§10.12). 첫 plug-in 검증 = ip 도메인 = **inflection +1,877 LOC (13.32%) → baseline reset 후 0/15,396 LOC = 0.00%** ([정직 표기](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) — 두 숫자 같이 인용) ✅ | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV, 기본 `"autograph"`) 의 모듈을 첫 호출 시 soft-load (`_domain_handler.discover_plugins`, 라인 130). 외부 패키지가 `register_handler()` 부작용으로 등록 |
+| 3 도메인 + Bridge 를 한 turn 안에 묶는 GraphRAG 에이전트 | 단일 벡터 RAG 로는 "현대모비스 매출 ↔ 모비스가 공급하는 차종의 최근 리콜" 같은 멀티홉·교차도메인 질의 불가 | StateGraph 11 노드: Triage→Planner→Supervisor↔Workers(research/graph/sql/calculator)→Synthesizer→Validator (`agents/graph.py:115-131`) + Send-API 병렬 + **result-aware Replan**(실패원인 반영 재계획, 최대 2회 `validator.py MAX_REPLANS=2`) + **ReAct mid-execution** 동적 task 생성 + **LLM 자율 planner**(opt-in `AGENT_LLM_PLANNER`) — open-loop→closed-loop |
+| 도메인 plug-in 으로 N-domain 확장 | 4번째 도메인 추가 시 "코어 변경 < 5%" 가 확장성 정량 증거 (§10.12). 첫 plug-in 검증 = ip 도메인 = **inflection +1,877 LOC (13.32%) → baseline reset 후 0/15,396 LOC = 0.00%** ([정직 표기](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) — 두 숫자 같이 인용) ✅ | ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV, 기본 `"autograph"`) 의 모듈을 첫 호출 시 soft-load (`_domain_handler.discover_plugins`, 라인 111). 외부 패키지가 `register_handler()` 부작용으로 등록 |
 | 서비스 등급 (MCP·관측가능성·평가 실측) 정량 증명 | 데모가 아닌 운영 등급으로의 증명이 1차 목표 (§10.15~§10.17) | MCP 래퍼 59 tools (`src/autonexusgraph/mcp/`) · Langfuse 4.x OTEL (`agents/tracing.py`) · 축소 평가 매트릭스 4 어댑터 × FAST tier (`eval/runners/run_matrix_smoke.py`) |
 
 ### 핵심 용어 (자세한 정의는 [docs/learning_guide.md](./docs/learning_guide.md))
 
-- **bridge.corp_entity** — 한국 corp_code ↔ 글로벌 entity (manufacturer/supplier/assignee) 양방향 매칭. 우선순위 `wikidata_qid > LEI > sec_cik > business_no > name`. 함수: `bridge_corp_to_entity(corp_code, *, entity_type=None, min_confidence=0.0, include_candidate=True)` / `bridge_entity_to_corp` / `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:23, 47, 64`). `reviewed_status='rejected'` 자동 제외.
+- **bridge.corp_entity** — 한국 corp_code ↔ 글로벌 entity (manufacturer/supplier/assignee) 양방향 매칭. 설계 우선순위 `wikidata_qid > LEI > sec_cik > business_no > name` (현 로더 `src/autograph/loaders/load_bridge.py:38` 은 `wikidata_qid` 정확 → `name_norm` 정확 매칭 + confidence 등급 부여 qid 1.0 / business_no 0.95 / name 0.80 을 구현; LEI·sec_cik 우선순위 확정은 §11.1 열린 설계). 함수: `bridge_corp_to_entity(corp_code, *, entity_type=None, min_confidence=0.0, include_candidate=True)` / `bridge_entity_to_corp` / `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:23, 47, 64`). `reviewed_status='rejected'` 자동 제외.
 - **도메인 plug-in** — core 는 외부 도메인 패키지를 직접 import 하지 않는다. ENV 모듈을 첫 호출 시 soft-load 후 `register_handler` 부작용으로 활성. core ↔ 도메인 어댑터 분리.
 - **4 가드** — `prompt_safety` (injection 단발 차단) · `cypher_guard` (READ-ONLY 강제 + APOC write 블록, `safety/cypher_guard.py:assert_read_only`) · `number_guard` (큰 숫자 화이트리스트, `agents/number_guard.py`) · `language_guard` (한국어 비율 ≥ `FINGRAPH_MIN_KOREAN_RATIO=0.30`, `safety/language_guard.py:16`).
 - **cost tier** — 비용 가드는 3 계층: **세션** hard limit (`LLM_SESSION_HARD_LIMIT_USD`) → **도메인별 turn** budget (`config.turn_budget_for_domain`, ENV override) → **호출별 사전 추정** (Rewriter / Synthesizer / Title, `cost_estimator.py`) + `LLM_COST_AUTO_APPROVE_USD` (기본 $0.50) 초과 시 HITL 승인.
-- **AgentState** — TypedDict, **35 필드** (입력 7 / 전처리 4 / triage·planner 5 / 누적 5 / 합성 3 / 검증 4 / HITL 3 / 메타 4 — 검증에 `replan_hint` 추가). 누적 채널(`task_results`/`evidence_chunks`/`tool_results`)은 **dedup-merge reducer** 로 병렬 Send fan-in 무손실(공유 pre-fork 를 key 로 멱등 흡수), clear 는 `_ClearedDict`/`_ClearedList` 마커, 그 외는 `_last_wins` (`agents/state.py`).
+- **AgentState** — TypedDict, **36 필드** (입력 9 / 전처리 4 / triage·planner 5 / 누적 5 / 합성 3 / 검증 4 / HITL 3 / 메타 3 — 입력에 `rerank`·`llm_planner` ablation 토글, 검증에 `replan_hint` 포함, `agents/state.py:156-225`). 누적 채널(`task_results`/`evidence_chunks`/`tool_results`)은 **dedup-merge reducer** 로 병렬 Send fan-in 무손실(공유 pre-fork 를 key 로 멱등 흡수), clear 는 `_ClearedDict`/`_ClearedList` 마커, 그 외는 `_last_wins` (`agents/state.py`).
 
 ### 진입점 다이어그램
 
@@ -198,7 +198,7 @@ flowchart TB
 
 - **멀티도메인** — `finance` + `auto` + `ip` (코드/온톨로지/스키마 완료, 특허 데이터 적재 대기) + `cross_domain` 4 모드. 도메인은 hint 또는 키워드 자동 라우팅 (`src/autograph/policy.py::route_domain` + 후속 `src/ipgraph/policy.py::route_domain_ip`). 단일 에이전트가 도메인 + 그 교차 추론을 한 turn 안에 처리. core 는 외부 도메인 패키지를 직접 import 하지 않고 `_domain_handler.discover_plugins()` 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`, ip 활성 시 `autograph,ipgraph`) 를 기반으로 첫 호출 시 1회 soft-import — finance-only 환경에서는 ENV 를 빈 값으로 두면 됨
 - **금융 도메인** — DART 공시 / KRX 마스터 / ECOS / Wikidata / Wikipedia / SEC EDGAR / GLEIF / 연합뉴스 RSS / KCGS ESG → 코스피200+코스닥100 대상
-- **자동차 도메인** — NHTSA vPIC/Recalls/Complaints / Wikidata (manufacturers/models/suppliers) / (옵션) car.go.kr / KATRI / KNCAP / 한국교통안전공단 수리검사. BOM Level 0~5 — Manufacturer → Model → Variant → System(L3) → Module(L4) → Part(L5, 리콜·LLM 출처에서 부분 커버). **Level 6 (소재·공법) (예정)** — 배터리 셀 chem + 핵심광물 + 무역통계 (§10.2 / [docs/autograph.md §2.5.4](./docs/autograph.md))
+- **자동차 도메인** — NHTSA vPIC/Recalls/Complaints / Wikidata (manufacturers/models/suppliers) / (옵션) car.go.kr / KATRI / KNCAP / 한국교통안전공단 수리검사. BOM Level 0~5 — Manufacturer → Model → Variant → System(L3) → Module(L4) → Part(L5, 리콜·LLM 출처에서 부분 커버). **Level 6 (소재·공법) (부분 적재)** — 배터리 셀 chem + 핵심광물 일부 적재 (Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8, §0 위계 표), 무역통계는 (예정) (§10.2 / [docs/autograph.md §2.5.4](./docs/autograph.md))
 - **3-Store 하이브리드** — Neo4j (관계 그래프) + PostgreSQL (수치·메타) + **pgvector** (PostgreSQL 16 내장 확장, 청크 의미 벡터). 청크 ≤ 100만은 pgvector 통합 운영 (현재 finance 748K + auto 16K), 그 이상은 **Qdrant 분리 옵션**. 각 store 의 책임 분리는 §3 "저장소 역할 분리 원칙" 표
 - **Multi-Agent + Planning (LangGraph)** — Triage / Planner / Supervisor / Workers / Validator / Synthesizer 역할 분리 ([docs/operations/agents.md](./docs/operations/agents.md))
 - **채팅형 UI + 대화 히스토리** — thread 기반 multi-turn (FastAPI `/chat/stream` + Streamlit · §3)
@@ -226,7 +226,7 @@ flowchart TB
 └─ BGE-Reranker-v2-m3       : 한국어 재랭킹 (GPU, 옵션)
 
 [애플리케이션 계층]
-├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS + NHTSA/AI Hub/EPA + (예정) KIPRIS/USPTO ODP/CPC bulk 클라이언트
+├─ Ingestion Workers : DART/KRX/ECOS/Wikidata/Wikipedia/News/SEC/GLEIF/KCGS + NHTSA/AI Hub/EPA + KIPRIS/USPTO ODP/CPC/OpenAlex bulk 클라이언트 (CPC/OpenAlex 적재 완료, KIPRIS/USPTO ODP 데이터 대기)
 ├─ Loaders            : PG/Neo4j 멱등 적재 (P1 deterministic / P2 deterministic / P3 LLM / P4 cross-validate)
 ├─ Tools              : 사전 정의 함수 풀 (finance: financials/graph/retrieve · auto: spec/graph/retrieve/bridge · ip: patents/graph/retrieve/bridge — 코드 완료) — 자유 SQL/Cypher 금지
 ├─ Safety             : prompt_safety (XML escape + injection 감지 + high-risk 단발 차단) · cypher_guard (READ-ONLY + APOC write/dynamic-cypher procedure 블록) · language_guard
@@ -967,7 +967,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | Level 3: System | **중간** | ✅ 포함 | system_taxonomy.yaml 19 시스템 (KS/SAE) | wired |
 | Level 4: Module | **낮음~중간** | ⚠️ 부분 포함 (coverage 63.7%) | NHTSA component taxonomy + AI Hub + manual seed | 220 ✅ |
 | Level 5: Part | **낮음** | ❌ MVP 제외 | 리콜/결함 중심으로만 부분 진입 (post-MVP) | sparse |
-| Level 6: Material/Process | **낮음** | ⚠️ **부분 적재 (곁가지)** | USGS minerals + Wikidata cell chem | Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8 ✅ |
+| Level 6: Material (소재) | **낮음** | ⚠️ **부분 적재 (곁가지)** | USGS minerals + Wikidata cell chem | Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8 ✅ |
 
 **MVP 성공 기준은 Level 0~4 안정 구축**. Level 5 는 리콜에 등장한 부품만 부분 포함. Level 6 은 곁가지로 부분 진입 (USGS + Wikidata cell chem). 사용자 UI 의 BOM 트리 표시 시 "Level 4 까지 신뢰도 높음, 그 이하는 부분 데이터" 명시.
 
@@ -977,7 +977,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | L3 (System) | `system_taxonomy.yaml` 19 시스템 SSOT | 동일 — 표준 분류이므로 확장 없음 | (해당 없음) |
 | L4 (Module) | NHTSA component taxonomy 176 + AI Hub + manual seed = 220 | OEM 별 베스트셀러 모델 ≥ 90% module coverage | 부품사 IR cross-reference (현대모비스/한온/만도 …) 미수집 |
 | **L5 (Part)** | post-MVP — 리콜 텍스트 LLM 추출 → RECALL_OF 자연 발생만 | OEM 별 BOM "주요 부품 30~50종" coverage, Part ↔ Supplier 시점별 매핑 | 데이터 본질 부재 (`docs/mental_model.md §5.4`) — (a) 공개 채널 자체가 sparse, (b) 부품사 IR 라이선스/정확도, (c) Part 정체성 정의 (같은 부품번호가 OEM 별로 다름) |
-| **L6 (Material·Process)** | **부분 진입 (예정)** — 배터리 셀 NCM 조성 + 핵심광물 (Wikidata / USGS Mineral Commodity Summaries) — auto 의 L5/L6 확장 부록 | `(:Module {배터리팩})-[:CONTAINS_MODULE]->(:Cell)-[:MADE_OF]->(:Material {NCM811})-[:DERIVED_FROM]->(:Mineral {Ni})` BOM 하향. 알루미늄 합금 / 다이캐스팅 같은 공법 ontology + (:Module)-[:USES_PROCESS]->(:Process). 회사단위 셀 ↔ OEM 소싱은 grade C candidate — sparse. 상세 [docs/autograph.md](./docs/autograph.md) §2.5.4 | 산단공 합성 공정데이터 (15151075) 가 :Process 사전을 채우고 있음 — :Material / :Mineral 적재는 (예정) |
+| **L6 (Material·Process)** | **부분 적재** — 배터리 셀 NCM 조성 + 핵심광물 (Wikidata / USGS Mineral Commodity Summaries) — auto 의 L5/L6 확장 부록 | `(:Module {배터리팩})-[:CONTAINS_MODULE]->(:Cell)-[:MADE_OF]->(:Material {NCM811})-[:DERIVED_FROM]->(:Mineral {Ni})` BOM 하향. 알루미늄 합금 / 다이캐스팅 같은 공법 ontology + (:Module)-[:USES_PROCESS]->(:Process). 회사단위 셀 ↔ OEM 소싱은 grade C candidate — sparse. 상세 [docs/autograph.md](./docs/autograph.md) §2.5.4 | :Process 410 / :ProcessStep 550 (산단공 합성 15151075) + :Material 6 / :Mineral 5 부분 적재 완료 — 산단공 실 소재·설비 데이터는 후속 |
 
 **현재 작업 중인 것:**
 - DART 사업보고서 본문 파서 — 한국 OEM/부품사의 생산능력·가동률·공장명을 LLM 0% 정규식 + 표 파서로 추출 (가장 최근 커밋 `215f7e5`)
@@ -1158,8 +1158,8 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — 내부 기여 가이드 (개발환경 · `make smoke-e2e` 게이트 · 도메인 불변식 8항 · PR 절차)
 - [SECURITY.md](./SECURITY.md) — 보안 정책 (비공개 취약점 보고 · 구현된 통제 · 알려진 한계 정직표기)
 - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — 진단 포인터 (SSOT = [docs/faq.md](./docs/faq.md) Q1~Q7)
-- [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 34 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
-- [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 34 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
+- [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 36 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
+- [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 36 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트
 - [docs/design/](./docs/design/) — **ADR** (F-3) — 굳은 핵심 결정 4건 (LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출), context·decision·consequences
 - [docs/autograph.md](./docs/autograph.md) — **AutoGraph (auto 도메인) 단독** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약 / §2.5.4 배터리·소재 L5/L6 부분 적재)

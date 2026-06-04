@@ -596,8 +596,8 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 #### 3.7.1 Gold QA
 
 - `eval/qa_gold/gold_qa_v0.jsonl` — finance, **seed 30** ([잠정] 목표 100, `README §6`).
-- `eval/qa_gold/gold_qa_auto_v0.jsonl` — auto, **seed 46** ([잠정] 목표 100).
-- `eval/qa_gold/gold_qa_cross_v0.jsonl` — Cross-Domain, **44 row** (level 기준 CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형. qid prefix 기준은 CD-L3- 15 / CD-L4- 11) ([잠정] 확장 대기).
+- `eval/qa_gold/gold_qa_auto_v0.jsonl` — auto, **seed 56** ([잠정] 목표 100).
+- `eval/qa_gold/gold_qa_cross_v0.jsonl` — Cross-Domain, **49 row** (qid prefix 기준 CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + IP 결합 8 [CD-L3-IP 4 / CD-L4-IP 4] + CD-PROC 5) ([잠정] 확장 대기).
 - `eval/qa_gold/gold_qa_ip_v0.jsonl` — ip, **seed 30** (IP-L1/L2/L3 각 10. gold_answer 채우기는 KIPRIS/USPTO 적재 후).
 - lint: `make validate-gold-qa` (`scripts/audit/validate_gold_qa.py`).
 
@@ -876,7 +876,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 | 우선순위 | 질문 | 정의 절 | 진행 상태 | cross-link | 해결 가능 시점 |
 |---:|---|---|---|---|---|
-| ⭐⭐⭐ P0 | confidence_score calibration | [§5.2](#52-confidence_score-의-정량성) | **미실행** — 측정 가능 (gold QA 120 row 충족) | learning_guide §11.4.0 (Platt routine) + PRD §3.5 (cross-link 완료 2026-06-02) | LLM 키 활성 + `make eval-full` 후 5분 |
+| ⭐⭐⭐ P0 | confidence_score calibration | [§5.2](#52-confidence_score-의-정량성) | **미실행** — 측정 가능 (gold QA answerable 135 row 충족; ip 30 제외) | learning_guide §11.4.0 (Platt routine) + PRD §3.5 (cross-link 완료 2026-06-02) | LLM 키 활성 + `make eval-full` 후 5분 |
 | ⭐⭐⭐ P0 | 외부 작성 gold QA (자기충족 위험) | [§5.7](#57-평가셋의-자기충족-위험) | **wired (2026-06-02)** — 측정 routine `make audit-external-ratio` (실측 0/150 = 0.0%) + 변환 routine `make convert-allganize` 신규. **Allganize 흡수 후 즉시 30%+ 가능** | gold_qa_guide.md §6.3-6.4 (wired) + `scripts/audit/{convert_allganize_gold,external_curator_ratio}.py` | (a) `git clone allganize/RAG-Evaluation-Dataset-KO` → `make convert-allganize` 5분, (b) 별도 외부 큐레이터 발주는 후속 |
 | ⭐⭐⭐ P0 | Bridge candidate 검토 운영 SOP | [§5.3](#53-bridge-자동-매칭의-false-positive) | **미설계** (4,790 supplier candidate 영속 누적) | README §11.4 (P1 운영) / data_inventory §3 B10 | Streamlit 검토 UI + 6개월 자동 만료 정책 |
 | ⭐⭐ P1 | Cross-Domain QA "정답" 정의 | [§5.8](#58-cross-domain-qa-의-정답-정의) | **부분** — `snapshot_year` 필드 강제로 일부 해소 | gold_qa_guide §2.3 (정답 무결성 표) | snapshot_year 필드 추가 + valid_until 도입 |
@@ -910,7 +910,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 | 순번 | 항목 | 우선순위 판단 사유 |
 |---:|---|---|
-| P0-1 | **confidence calibration** | 가장 자주 인용되는 시스템 자랑 (PRD §3.5) 의 정량 근거. 측정 도구 wired (`calibrate_confidence.py`), 데이터 충족 (gold 120 row), LLM 키만 있으면 5 분 — **즉시 실행성 최고** |
+| P0-1 | **confidence calibration** | 가장 자주 인용되는 시스템 자랑 (PRD §3.5) 의 정량 근거. 측정 도구 wired (`calibrate_confidence.py`), 데이터 충족 (gold answerable 135 row; ip 30 제외), LLM 키만 있으면 5 분 — **즉시 실행성 최고** |
 | P0-2 | **외부 작성 gold QA** | 평가 매트릭스 전체의 신뢰성을 좌우. 현재 0% 외부 = sanity check 수준 (gold_qa_guide §6.1). 변환 routine wired (2026-06-02), `git clone allganize/...` + `make convert-allganize` 1 회로 30%+ 가능 — **즉시 실행성 최고** |
 | P0-3 | **Bridge candidate 운영 SOP** | 4,790 row supplier candidate 가 영구 누적 (data_inventory §3 B10). 시간이 지날수록 graph quality 저하 — **방치 시 시스템 가치 자체 위협**. 단 Streamlit UI 필요 = 즉시 실행 못함 → P0 이지만 "측정/디자인 우선" |
 | P1-1 | **Cross-Domain QA "정답" 정의** | snapshot_year 필드로 일부 해소 (gold_qa_guide §2.3). 완전 해소엔 `valid_until` 등 시계열 정합 추가 필요 — 외부 데이터 의존 (재무·리콜 시점 매칭). 즉시 실행 불가 → P1 |
@@ -938,7 +938,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 새로 합류한 사람이 멘탈 모델을 잡는 최단 경로:
 
-1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **34 필드**, 라인 99-161).
+1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **36 필드**, 라인 156-225).
 2. `src/autonexusgraph/agents/_domain_handler.py` — DomainHandler Protocol + 라우터 + ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` soft-import.
 3. `src/autograph/agent_handler.py` — auto/cross_domain 구현체.
 4. `src/autograph/policy.py:1-100` (10분) — 키워드 라우팅 / question kind 분류.

@@ -324,7 +324,7 @@ flowchart LR
 - arXiv 2304.04893 (EVKG) 의 EVO — 20 클래스·17 객체속성·54 데이터타입 속성 (EV 분류·부품·충전·커넥터·에너지원·규제·추진계·환경영향).
 - `ontology/auto/*.yaml` 의 EV/배터리 확장 시 EVO 클래스명·속성을 정렬 베이스로 인용 → "임의 설계" 아닌 "학계 온톨로지 정렬". SHACL/pydantic 검증 (§11.1) 과 시너지.
 
-#### EV 충전 인프라 (신규 노드)
+#### EV 충전 인프라
 
 ```
 (:ChargingStation {station_id, operator, charger_type, capacity_kw, install_year, sido, gungu})
@@ -442,7 +442,7 @@ curl -X POST localhost:8000/chat -H 'content-type: application/json' \
        "domain":"cross_domain"}'
 ```
 
-UI 사이드바에 도메인 라디오(`auto-detect | finance | auto | cross_domain`) 추가됨.
+UI 사이드바에 도메인 라디오(`auto-detect | finance | auto | ip | cross_domain`) 제공.
 
 ### 4.6 평가
 

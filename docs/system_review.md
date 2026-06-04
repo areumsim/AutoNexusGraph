@@ -88,7 +88,7 @@
 
 | 자랑 | 실제 |
 |---|---|
-| README §10.7 — Hybrid vs Vector multi-hop +30%p, DoD #17 (d) | ⚠️ **실측 미실시** — `make audit-eval-matrix` simulation 모드 wire-up 만 완료 (LLM 비용 0). full 모드 (`--full`) 사용자 환경 별도 트리거. 즉 "thesis headline" 이 아직 정량 증거 부재. 즉시 실행 가능 (gold QA 120 row 충족, LLM 키 + 비용 ~$5~20) |
+| README §10.7 — Hybrid vs Vector multi-hop +30%p, DoD #17 (d) | ⚠️ **실측 미실시** — `make audit-eval-matrix` simulation 모드 wire-up 만 완료 (LLM 비용 0). full 모드 (`--full`) 사용자 환경 별도 트리거. 즉 "thesis headline" 이 아직 정량 증거 부재. 즉시 실행 가능 (gold QA answerable 135 row 충족; ip 30 제외, LLM 키 + 비용 ~$5~20) |
 
 ### 3.6 "gold QA 평가셋"
 

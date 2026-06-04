@@ -13,8 +13,8 @@
 | 파일 | 도메인 | seed | 목표 | 적재 상태 | 답변 가능 여부 |
 |---|---|---:|---:|---|---|
 | `eval/qa_gold/gold_qa_v0.jsonl` | finance | 30 | 100 (L1 30 / L2 40 / L3 30) | ✅ DB 적재 완료 | ✅ 모든 row 답변 가능 |
-| `eval/qa_gold/gold_qa_auto_v0.jsonl` | auto | 46 | 100 (L1 30 / L2 40 / L3 30) | ✅ DB 적재 완료 | ✅ 대부분 답변 가능 (`:Part` 0 노드 라 L3 일부 sparse) |
-| `eval/qa_gold/gold_qa_cross_v0.jsonl` | cross_domain | 44 (CD-L1 10 / CD-L2 8 / CD-L3 12 / CD-L4 8 + 6 row는 IP 결합 변형으로 level 필드 미설정 — qid prefix 는 CD-L3-/L4- 사용) | 50+ | ✅ Bridge 적재 완료 | ⚠️ 일부 (CD-L4 시점 의존) 측정 미실시 |
+| `eval/qa_gold/gold_qa_auto_v0.jsonl` | auto | 56 | 100 (L1 30 / L2 40 / L3 30) | ✅ DB 적재 완료 | ✅ 대부분 답변 가능 (`:Part` 0 노드 라 L3 일부 sparse) |
+| `eval/qa_gold/gold_qa_cross_v0.jsonl` | cross_domain | 49 (qid prefix: CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + IP 결합 8 [CD-L3-IP 4 / CD-L4-IP 4] + CD-PROC 5) | 50+ | ✅ Bridge 적재 완료 | ⚠️ 일부 (CD-L4 시점 의존) 측정 미실시 |
 | `eval/qa_gold/gold_qa_ip_v0.jsonl` | ip | 30 | 100 (IP-L1/L2/L3 30 / 40 / 30) | ⚠️ **gold_answer_text 비어있음** — KIPRIS/USPTO 적재 후 채움 | ❌ 답변 측정 불가 (정답 미정) |
 | `eval/qa_gold/gold_qa_allganize_v0.example.jsonl` | finance (외부 벤치) | 1 (stub) | TBD | ❌ 미적재 | ❌ **외부 큐레이터 30% 정책 슬롯** — Allganize RAG-Evaluation-Dataset-KO 흡수 대기 |
 | `eval/qa_gold/gold_qa_v0.example.jsonl` | finance (테스트 픽스처) | 3 | — | 픽스처 | 패키지 동작 검증용, 데이터 의미 없음 |
@@ -44,7 +44,7 @@
 - **Allganize RAG-Evaluation-Dataset-KO** 같은 공개 외부 벤치 흡수 (`gold_qa_allganize_v0.example.jsonl` 슬롯)
 - LLM-as-judge 의 candidate LLM 과 judge LLM 을 **다른 family** 로 (예: Anthropic candidate vs OpenAI judge)
 
-**현재 상태 (정직 표기)**: 외부 큐레이터 30% **미실행**. 모든 seed (120 row) 가 시스템 작성자 작성. 평가 점수는 sanity check 수준이며, 정량 증거로 활용할 때 본 한계 명시 필수.
+**현재 상태 (정직 표기)**: 외부 큐레이터 30% **미실행**. 모든 seed (165 row = finance 30 + auto 56 + cross 49 + ip 30) 가 시스템 작성자 작성. 평가 점수는 sanity check 수준이며, 정량 증거로 활용할 때 본 한계 명시 필수.
 
 ### 2.3 정답 무결성 — 시간이 지나면 답이 바뀐다
 

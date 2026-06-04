@@ -109,10 +109,10 @@ PRD v2.1 부터 단일 에이전트가 **금융 (AutoNexusGraph) + 자동차 (Au
 **Cypher 템플릿 통합**: 3 도메인의 템플릿 dict 가 `tools` import 시 **side-effect** 로 코어 `autonexusgraph.tools.cypher_templates.TEMPLATES` 에 병합.
 
 - finance: `TEMPLATES` **22** (정적 14 + 동적 `find_paths_{1..5}hops` 5 + `get_subgraph_d{1..3}` 3) — `tools/cypher_templates.py:89, list_templates()`
-- auto: `AUTO_TEMPLATES` **24** (정적 20 + 동적 `auto_find_paths_{1..4}hops` 4) — `src/autograph/cypher_templates_auto.py`
+- auto: `AUTO_TEMPLATES` **27** (정적 dict 24 + 동적 `auto_find_paths_{1..4}hops` → 런타임 27) — `src/autograph/cypher_templates_auto.py`
 - ip: `IP_TEMPLATES` **25** — `src/ipgraph/cypher_templates_ip.py`
 
-worker 는 `render_template("auto_recalls_by_variant", ...)` / `render_template("list_subsidiaries", ...)` / `render_template("ip_lookup_patent", ...)` 를 **동일 함수** 로 호출 — 같은 cypher_guard / param schema 검증 통과. 총 71 템플릿.
+worker 는 `render_template("auto_recalls_by_variant", ...)` / `render_template("list_subsidiaries", ...)` / `render_template("ip_lookup_patent", ...)` 를 **동일 함수** 로 호출 — 같은 cypher_guard / param schema 검증 통과. 총 74 템플릿 (finance 22 + auto 27 + ip 25, 런타임 레지스트리 기준).
 
 **회귀 안전성**: domain 미지정 finance gold (기존 `eval/qa_gold/gold_qa_v0.jsonl`) 는
 `route_domain` 이 키워드 부재로 `"finance"` 반환 → 기존 finance planner 동일 경로.
