@@ -34,7 +34,7 @@
         validate-gold-qa eval-cross eval-ip \
         ingest-datagokr-recalls ingest-datagokr-inspections \
         ingest-car-go-kr ingest-katri ingest-kncap \
-        load-manufactured-at load-datagokr-recalls load-datagokr-inspections \
+        load-manufactured-at load-performed-at load-performed-at-dry load-datagokr-recalls load-datagokr-inspections \
         load-kncap \
         load-sandang-processes load-sandang-processes-dry \
         ingest-factoryon-company ingest-factoryon-factory-no ingest-factoryon-complex \
@@ -129,6 +129,7 @@ help:
 	@echo "  ingest-katri                      [PLACEHOLDER] KATRI / bigdata-tic.kr — OAuth client_id/secret 발급 필요"
 	@echo "  ingest-kncap                      [PLACEHOLDER] KNCAP — 공식 API 미공개, 수동 CSV 또는 KNCAP_API_KEY 설정 시 동작"
 	@echo "  load-manufactured-at              모델↔공장 seed → MANUFACTURED_AT"
+	@echo "  load-performed-at                 회사귀속 공정 seed → PERFORMED_AT (DoD #19)"
 	@echo ""
 	@echo "  clean           __pycache__/.pytest_cache 삭제"
 
@@ -723,6 +724,14 @@ load-kncap:
 
 load-manufactured-at:
 	$(PYTHON) -m autograph.loaders.load_manufactured_at
+
+# 회사 귀속 공정 — (:ProcessStep)-[:PERFORMED_AT]->(:Plant). manual_seed B등급.
+# 선행: load-auto-seed-standards-plants (:Plant code). DoD #19 (≥30 회사 귀속).
+load-performed-at:
+	$(PYTHON) -m autograph.loaders.load_performed_at
+
+load-performed-at-dry:
+	$(PYTHON) -m autograph.loaders.load_performed_at --dry-run
 
 # ─── 제조 공정 / 생산 — 사용자 명시 P0 ─────────────────────────
 # 산단공 합성 공정데이터 (15151075) — 수동 CSV 다운로드 → :Process 사전.

@@ -36,7 +36,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 | `:ProcessStep` | **550** | C | `loaders/load_auto_process_routes.py` | ✅ |
 | `INSTANTIATES` | **550** | C | 〃 | ✅ 7키 100% |
 | `PRECEDES` (선형 체인) | **410** | C | 〃 | ✅ 7키 100%, depth cap 질의서 *0..10 |
-| `PERFORMED_AT` | 0 | — | — | ⏳ 팩토리온 키 + 공정↔공장 직접 출처 부재 |
+| `PERFORMED_AT` | **35** | B | `loaders/load_performed_at.py` | ✅ 회사귀속 9 OEM 공장 (manual_seed) |
 | `PRODUCED_BY` | 0 | — | — | ⏳ 산단공 `part_id` 부재 |
 | `CONSUMES_MATERIAL` / `USES_EQUIPMENT` | 0 | — | — | ⏳ 산단공 소재·설비 정보 부재 |
 | `CAUSED_BY_PROCESS` | 0 | — | — | ⏳ US 영문 리콜 ↔ 한글 합성공정 환각위험(P3 dry-run $0.51) |
@@ -67,14 +67,14 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 ## 6. DoD ([README §10 #18~20](../README.md#10-dod-definition-of-done--20-항))
 
 - **#18 BoP 모델**: ✅ 달성 (410/550/410 + 7엣지 + audit PASS).
-- **#19 회사 귀속 인스턴스**: ⚠️ 미달 (PERFORMED_AT 0 < 30; 비귀속 위반 0 ✅). 활성화 트리거: 팩토리온 `DATA_GO_KR_API_KEY`.
+- **#19 회사 귀속 인스턴스**: ✅ 충족 (PERFORMED_AT 35 ≥ 30; 비귀속 위반 0 ✅). `load_performed_at.py` + `performed_at_seed.yaml`(manual_seed B등급), 한국 OEM 9공장 × 자동차 4대공정+파워트레인. ontology PERFORMED_AT `enabled:true`(2026-06-04).
 - **#20 공정 cross + 내부 데이터 수용 규격**: ⚠️ 부분 (AUTO 10·CD 5 ✅; cross 실증 2종 answerable, 2종 refusal). **수용 규격 = `load_performed_at.py` source allowlist hard-check + `process_confidence.py` row 단위 격상 (8 시그널 C→B/A)** — 내부 데이터 들어오면 코드 변경 없이 즉시 적재 가능.
 
 ## 7. 활성화 트리거 (보류분 해소 조건)
 
 | 보류 | 트리거 |
 |---|---|
-| PERFORMED_AT / :Plant 확대 | 팩토리온 `DATA_GO_KR_API_KEY` 발급 → `load_factoryon.py` |
+| PERFORMED_AT 확대 | DART 생산·설비 파생 + factoryon 90행 plant 매칭 (현 35 = manual_seed 9 OEM 공장) |
 | process_metrics (cycle_time/yield) | KAMP 15089213 CSV 확보 → `load_kamp_process_metrics.py` |
 | CAUSED_BY_PROCESS | KOTSA 한글 리콜(키) 또는 영문 공정 taxonomy → P3+P4 |
 | PRODUCED_BY / CONSUMES_MATERIAL | 부품↔공정·공정↔소재 결정적 매핑 출처 |

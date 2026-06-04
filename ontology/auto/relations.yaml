@@ -336,11 +336,13 @@ relations:
     provenance: deterministic       # DART(B) / 팩토리온(A) — 합성·익명 출처 금지
     pass: P2
     confidence_default: 0.80
-    enabled: false                  # Step 2 — 직접 출처 coverage 확인 후 활성화
+    enabled: true                   # 활성화 (2026-06-04) — manual_seed 35 엣지 적재 (DoD #19 ≥30)
     notes: |
       회사 귀속 핵심 엣지. 공장(:Plant)은 real(A/B) 이나 어떤 공정이 도는지는
       추론일 수 있음 — 추론분은 confidence 하향·validated_status='candidate' 로
       등급 정합 유지. plant real 등급을 inferred 공정 엣지에 전가 금지 (PRD §8).
+      적재: `load_performed_at.py` (ontology/auto/performed_at_seed.yaml, manual_seed
+      B등급 conf 0.85). 한국 OEM 9 공장 × 자동차 4대공정+파워트레인 = 35 엣지.
 
   CAUSED_BY_PROCESS:                # Recall → Process (품질 이벤트 ↔ 공정, P3 후보)
     from: Recall

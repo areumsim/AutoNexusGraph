@@ -123,6 +123,22 @@ def load_manufactured_at_seed() -> list[dict[str, Any]]:
     return data.get("mappings") or []
 
 
+def load_performed_at_seed() -> dict[str, Any]:
+    """performed_at_seed.yaml → {processes:[...], mappings:[...]}.
+
+    회사 귀속 공정 시드 ((:ProcessStep)-[:PERFORMED_AT]->(:Plant)). 파일 부재 시
+    빈 구조 — loader 가 graceful 0 건으로 종료.
+    """
+    p = _ONTOLOGY_DIR / "performed_at_seed.yaml"
+    if not p.exists():
+        return {"processes": [], "mappings": []}
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    return {
+        "processes": data.get("processes") or [],
+        "mappings": data.get("mappings") or [],
+    }
+
+
 @lru_cache(maxsize=1)
 def _alias_to_canonical_system() -> dict[str, str]:
     """raw system code (대소문자, alias) → canonical SCREAMING_SNAKE_CASE.

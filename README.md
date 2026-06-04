@@ -19,7 +19,7 @@
 | **보조축 (수평 cross)** | **ip** = 특허·기술혁신 | assignee→corp 브리지를 타는 **수평 cross 진입 어댑터** (corp_entity 브리지 전용). 풀 도메인 어댑터 완료, 데이터 부분 적재 | 구현 (CPC 10,695 + OpenAlex 629) |
 | **곁가지 (L6)** | 배터리·소재 | 공개 거시(USGS) + Wikidata chem | (부분 적재 — Material 6 / Mineral 5 / DERIVED_FROM 17 / MADE_OF 8) |
 
-**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. 다만 **회사 귀속 인스턴스 (`PERFORMED_AT` / `PRODUCED_BY` 등) 는 0 — 팩토리온 90행·한글 리콜 941행은 적재됐으나 ProcessStep↔Plant 매핑 미구축 + factoryon 커버리지 sparse 로 보류 (KAMP 메트릭만 데이터 부재)**. "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
+**process 가 "주요 축"인 근거 (정직):** BoP 모델(`:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410, C grade taxonomy) 은 이미 적재 완료. **회사 귀속 인스턴스 `PERFORMED_AT` 35 적재** (manual_seed B등급, 한국 OEM 9공장 × 자동차 4대공정+파워트레인, DoD #19 ≥30 충족). 나머지 `PRODUCED_BY`/`CONSUMES_MATERIAL` 등은 0 (산단공 part_id·소재 정보 부재). "주요 축" = **1급 BoM⟂BoP 직교 모델 + sparse 인스턴스** 라는 뜻이지 "데이터가 풍부한 본체"라는 뜻이 아니다. 성공 기준은 "지금 몇 개 질문에 답하나"가 아니라 **"내부 데이터가 들어왔을 때 코드·온톨로지·도구를 거의 안 바꾸고 꽂을 수 있는가(수용 능력)"** 다.
 
 > **정직성 가드 2개 필수:** (1) "준비된 빈 축" 명시 — 합성·공개데이터(산단공·KAMP)는 패턴/검증용이지 사실 주장용 아님 (회사 귀속 엣지 hard-check 차단). (2) **내부 데이터 수용 규격**(로더 계약 + 등급 승급 C합성→A내부)을 결과물로 보유 (DoD §10.20). 상세 [docs/process_graph.md](./docs/process_graph.md).
 
@@ -126,7 +126,7 @@
 | Neo4j Standard / Plant / Complaint | (seed 후) | `standards.yaml` 22 + `plants.yaml` 18 + `manufactured_at_seed.yaml` 46 모델↔공장 |
 | `auto.staging_relations` (P3 LLM + Wikidata P176) | extract-auto-p3 후 | SUPPLIED_BY / RECALL_OF 후보 — P4 검증 후 그래프 적재 |
 | `auto.processes` (산단공 합성 15151075) | **550 row / 410 공정명** | C 등급 (0.50) — 공정명 정규형 사전. agent tool `search_processes` / `lookup_process` |
-| **ProcessGraph (BoP 축)** Neo4j `:Process` / `:ProcessStep` / `PRECEDES` / `INSTANTIATES` | **410 / 550 / 410 / 550** | C 등급 — 산단공 공정사전 → BoP routing (회사 비귀속). `tools/process.py` + `auto_proc_*`. **회사 귀속(PERFORMED_AT) / 품질(CAUSED_BY_PROCESS) / 메트릭(KAMP)은 (scaffold)** — factoryon 90행·리콜 941행 적재됐으나 ProcessStep↔Plant 매핑 미구축으로 보류 (KAMP 메트릭만 데이터 부재), SSOT [docs/process_graph.md](./docs/process_graph.md) |
+| **ProcessGraph (BoP 축)** Neo4j `:Process` / `:ProcessStep` / `PRECEDES` / `INSTANTIATES` | **410 / 550 / 410 / 550** | C 등급 — 산단공 공정사전 → BoP routing (회사 비귀속). `tools/process.py` + `auto_proc_*`. **회사 귀속 `PERFORMED_AT` 35 적재** (manual_seed B등급, DoD #19 충족). 품질(CAUSED_BY_PROCESS) / 메트릭(KAMP)은 (scaffold) — 데이터 대기, SSOT [docs/process_graph.md](./docs/process_graph.md) |
 | `auto.plant_capacity` + `plant_production` (DART III. 생산·설비) | **107 + 77 row** (Hyundai 12 plants × 4~7년 + Kia 5 plants × 6년) | B 등급 (0.80) — Hyundai/Kia. agent tool `get_plant_capacity` / `get_oem_production` / `list_plants_by_oem`. Kia 파서는 `품목/소재지` schema 변형 대응 |
 | `auto.plant_utilization` (DART III. (3) 가동률) | **53 row** | B 등급 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct |
 | `auto.macro_production_yearly` (KAMA 15051116) | **21 row** (2005~2025) | A 등급 (0.95) — 연 단위 한국·세계 생산량. 2024 한국 점유 4.55%. agent tool `get_macro_production` |
@@ -893,12 +893,12 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 > 설계 SSOT = **[docs/process_graph.md](./docs/process_graph.md)**. §11.2 BOM 깊이 (auto 수직 심화) 와 한 쌍.
 
 18. ✅ **BoP 모델 안정** — `:Process` / `:ProcessStep` / `:Equipment` / `:Material` / `:Plant` **5 노드** + `PRODUCED_BY` / `PRECEDES` / `INSTANTIATES` / `USES_EQUIPMENT` / `CONSUMES_MATERIAL` / `PERFORMED_AT` / `CAUSED_BY_PROCESS` **7 엣지** 등록 (`ontology/auto/entities.yaml` + `relations.yaml` 확장, 별도 `process.yaml` 미생성 — 로더/감사 무수정 자동 동작). **현 측정**: `:Process` 410 / `:ProcessStep` 550 / `INSTANTIATES` 550 / `PRECEDES` 410 / 7 엣지 모두 ontology 등록 / `audit-ontology` PASS. **정량 게이트 충족** (≥400/≥400/≥300/7엣지/PASS).
-19. ⚠️ **회사 귀속 공정 인스턴스** — DART 사업보고서 III. 생산·설비 (B) + 팩토리온 15087611 (A) + manual_plant_process_seed (A) → `:Plant` / `PERFORMED_AT` 생성. **모든 회사 귀속 엣지 grade A/B 100%** (`load_performed_at.py` source allowlist hard-check 로 산단공 / KAMP / AI Hub 익명·합성 출처는 PERFORMED_AT 적재 차단). **현 측정**: `PERFORMED_AT` **0** (목표 ≥ 30 미달) — 팩토리온 `DATA_GO_KR_API_KEY` 부재 + ProcessStep↔Plant 직접 출처 부재. 회사 비귀속 출처 위반 0건은 ✅. 기존 `MANUFACTURED_AT` 99 + `OWNS_PLANT` 53 으로 회사→공장 귀속은 별도 존재. **활성화 트리거**: 팩토리온 키.
+19. ✅ **회사 귀속 공정 인스턴스** — DART 사업보고서 III. 생산·설비 (B) + 팩토리온 15087611 (A) + manual_plant_process_seed (A) → `:Plant` / `PERFORMED_AT` 생성. **모든 회사 귀속 엣지 grade A/B 100%** (`load_performed_at.py` source allowlist hard-check 로 산단공 / KAMP / AI Hub 익명·합성 출처는 PERFORMED_AT 적재 차단). **현 측정**: `PERFORMED_AT` **35** (목표 ≥ 30 ✅) — `load_performed_at.py` + `performed_at_seed.yaml`(manual_seed B등급 conf 0.85), 한국 OEM 9공장 × 자동차 4대공정+파워트레인. 산단공 익명 스텝 무오염, 회사 비귀속 출처 위반 0건 ✅. 기존 `MANUFACTURED_AT` 99 + `OWNS_PLANT` 53 으로 회사→공장 귀속은 별도 존재. **활성화 트리거**: 팩토리온 키.
 20. ⚠️ **공정 cross 시연 (CD-Process)** — (a) 공정 ↔ 재무 (`Supplier → SUPPLIED_BY⁻¹ → Part → PRODUCED_BY → ProcessStep → PERFORMED_AT → Plant → operator_corp_code → finance` 4hop) (b) 공정 결함 전파 (`CAUSED_BY_PROCESS + INSTANTIATES + PRECEDES`) (c) 소재 리스크 (`CONSUMES_MATERIAL → Material → DERIVED_FROM → Mineral`) — 중 **2종 이상 Cross-Domain QA 통과**. **현 측정**: `gold_qa_auto_v0.jsonl` 공정 문항 ≥ 10 (AUTO0047+9) ✅ / `gold_qa_cross_v0.jsonl` CD-Process ≥ 5 ✅. **cross 실증**: **소재 리스크** (Module→Material→Mineral, NCM811→[Ni,Co,Mn,Li]) + **생산 vs 거시** (가동률 ↔ KAMA 거시) 2종 answerable / 공정↔재무·결함전파는 PERFORMED_AT·CAUSED_BY_PROCESS 미적재로 refusal. 정직 정책으로 허위 엣지 0건. **정량 게이트 부분 충족** (AUTO ≥ 10 / CD ≥ 5 ✅, cross 정확도 ≥ 50% 는 LLM 키 후 측정).
 
 ### 핵심 정직 결론
 
-BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공정 인스턴스(#19)** 와 **LLM 품질 연결(#20 일부)** 은 *데이터·키 부재*로 보류 — **허위 엣지를 만들지 않고 coverage 를 그대로 표기**. 잔여 트리거 (factoryon 커버리지 확대 / ProcessStep↔Plant 매핑 구축 / KAMP CSV) 가 풀리면 즉시 회사 귀속 엣지 적재 가능 — **DoD #20 "내부 데이터 수용 규격"** 가 코드로 보유 (`load_performed_at.py` source allowlist + `process_confidence.py` row 단위 격상 §4.0.1).
+BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공정 인스턴스(#19)** 는 충족 (`PERFORMED_AT` 35, manual_seed B등급). **LLM 품질 연결(#20 일부)** 은 LLM 키 대기 — **허위 엣지를 만들지 않고 coverage 를 그대로 표기**. 잔여 (CAUSED_BY_PROCESS / KAMP CSV) 가 풀리면 즉시 적재 가능 — **DoD #20 "내부 데이터 수용 규격"** 가 코드로 보유 (`load_performed_at.py` source allowlist + `process_confidence.py` row 단위 격상 §4.0.1).
 
 ---
 
@@ -987,7 +987,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 
 1. **eval 실측 (gate-zero)** — LLM 키 → 축소 매트릭스 (§10.17 d) → thesis headline (Hybrid > Vector multi-hop +30%p). **측정 전엔 아무것도 입증 안 됨.**
 2. **answerability 측정** — % grounded vs 정보부족. cross-domain 의 정직한 평가 (특히 process refusal 보존 패턴).
-3. **ProcessGraph 주요 축 (§10.18~20)** — process.yaml + DART 가동률 파서 (완료) + 팩토리온 키 → `PERFORMED_AT` ≥ 30 + **내부 데이터 수용 규격** (로더 계약 + 등급 승급 C합성→A내부).
+3. **ProcessGraph 주요 축 (§10.18~20)** — process.yaml + DART 가동률 파서 (완료) + `PERFORMED_AT` 35 ✅ (manual_seed) + **내부 데이터 수용 규격** (로더 계약 + 등급 승급 C합성→A내부).
 4. **상용 신호 (§12.1 P0+)** — MCP 래퍼 + Langfuse 실측 ON + 온톨로지 SHACL/pydantic 검증 + 축소 평가 매트릭스 (full LLM 트리거).
 5. **ip 보조축 (경량)** — CPC bulk (완료) + OpenAlex (완료) + assignee→corp 매핑 + USPTO ODP bulk + IP-L1~L2 cross 시연. KIPRIS 후순위.
 6. **gold QA 확장** — finance 100 / auto 100 / cross 50 / ip 100 + 외부 큐레이터 30% (자기충족성 완화).
