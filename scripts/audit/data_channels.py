@@ -12,7 +12,7 @@
       + Neo4j MANUFACTURED_AT
     - KAMA 매크로 — CSV / auto.macro_production_yearly + macro_industry_monthly
     - 팩토리온 (15087611) — API / (스키마 미정)
-    - 한국 리콜 (15089863) — API / auto.events_recalls WHERE source='datagokr_kotsa'
+    - 한국 리콜 (3048950 CSV, 구 15089863 API 폐기) — auto.events_recalls WHERE source='datagokr_kotsa'
 
 출력:
     eval/reports/data_channels_latest.md (기본)
@@ -168,19 +168,19 @@ def collect() -> list[ChannelStatus]:
         notes="DATA_GO_KR_API_KEY 필요. wire 완료 (load_factoryon.py)",
     ))
 
-    # 한국 리콜 (15089863)
-    datagokr_recalls_dir = raw_root / "auto" / "datagokr_recalls"
-    datagokr_files = _count_files(datagokr_recalls_dir, "page_*.json")
+    # 한국 리콜 (3048950 CSV — 구 15089863 오픈API 폐기, 무인증 파일데이터)
+    datagokr_recall_csvs = _count_files(raw_root / "datagokr",
+                                         "*자동차결함 리콜현황*.csv")
     datagokr_pg = _try_pg_count(
         "SELECT count(*) FROM auto.events_recalls WHERE source='datagokr_kotsa'"
     )
     out.append(ChannelStatus(
-        name="한국 리콜 (15089863, KOTSA)",
-        raw_count=datagokr_files,
-        raw_detail="page JSON (key 필요)",
+        name="한국 리콜 (3048950, KOTSA)",
+        raw_count=datagokr_recall_csvs,
+        raw_detail="CSV 파일 다운",
         pg_count=datagokr_pg,
         pg_detail="auto.events_recalls",
-        notes="DATA_GO_KR_API_KEY 필요",
+        notes="키 불필요 (파일 다운로드)",
     ))
 
     # 한국 수리검사 (15155857)

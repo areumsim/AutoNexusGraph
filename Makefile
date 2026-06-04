@@ -123,7 +123,7 @@ help:
 	@echo "  validate-gold-qa                  eval/qa_gold/*.jsonl 스키마/엔티티 lint"
 	@echo ""
 	@echo "── 외부 데이터 (graceful skip 패턴 — 키 없으면 스킵) ──"
-	@echo "  ingest-datagokr-recalls           data.go.kr 15089863 한국 리콜"
+	@echo "  ingest-datagokr-recalls           data.go.kr 3048950 한국 리콜 CSV (무인증)"
 	@echo "  ingest-datagokr-inspections       data.go.kr 15155857 수리검사"
 	@echo "  ingest-car-go-kr                  [PLACEHOLDER] car.go.kr — 키 미설정 시 raw/auto/car_go_kr/ CSV 수동 다운로드 후 normalize"
 	@echo "  ingest-katri                      [PLACEHOLDER] KATRI / bigdata-tic.kr — OAuth client_id/secret 발급 필요"

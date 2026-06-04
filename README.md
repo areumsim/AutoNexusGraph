@@ -518,7 +518,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 **수집 범위 (1차):** 코스피 200 + 코스닥 100 약 300개사, 최근 3개 회계연도.
 **제조 데이터 끝까지 채움 (wired, partial — 키 확보 대기):**
 - `DATA_GO_KR_API_KEY` → 팩토리온 [15087611](https://www.data.go.kr/data/15087611/openapi.do) (ingestion `factoryon_registry.py` + loader `load_factoryon.py` → `auto.factoryon_registry` PG `24_auto_factoryon.sql`. `make load-factoryon`)
-- 자동차 리콜 [15089863](https://www.data.go.kr/data/15089863/openapi.do) + 검사 [15155857](https://www.data.go.kr/data/15155857/fileData.do) (ingestion + `load_datagokr_*.py`)
+- 자동차 리콜 [3048950 (CSV)](https://www.data.go.kr/data/3048950/fileData.do) (구 오픈API 15089863 폐기) + 검사 [15155857](https://www.data.go.kr/data/15155857/fileData.do) (ingestion + `load_datagokr_*.py`)
 - DART 사업보고서 **가동률 표** 파서 — `dart_production_parser._parse_utilization_table` → `auto.plant_utilization` PG 적재 (`load_dart_production.py:199`). 완료.
 - KOSIS 산업 통계 — `kosis_client.py` + 신규 loader `load_kosis_industry.py` → `macro.kosis_series` (`make load-kosis`). KOSIS_API_KEY 필요.
 - Wikidata 배터리 셀 chem (cathode) — 신규 `wikidata_cell_chem.py` (CC0, 무인증). materials_seed.yaml 의 manual seed 보강. **회사단위 셀↔OEM 소싱은 grade C candidate 정직 표기** (§2.3).
@@ -534,7 +534,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 | 리콜 캠페인 | NHTSA Recalls API | 공공 | 불필요 | `auto.events_recalls` + Neo4j Recall |
 | 결함 신고 | NHTSA Complaints API | 공공 | 불필요 | `auto.events_complaints` + `vec.chunks` |
 | 제조사·모델·공급사 QID·LEI·사업자번호 | Wikidata SPARQL | CC0 | 불필요 (rate limit) | `auto.master_*` + `bridge.corp_entity` |
-| 자동차 리콜정보 (한국) | data.go.kr [15089863](https://www.data.go.kr/data/15089863/openapi.do) | 공공 | `DATA_GO_KR_API_KEY` | (키 확보 후) `auto.events_recalls` |
+| 자동차 리콜정보 (한국) | data.go.kr [3048950 (CSV)](https://www.data.go.kr/data/3048950/fileData.do) | 공공 | (무인증 CSV) | (CSV 다운 후) `auto.events_recalls` |
 | 자동차검사관리 수리검사내역 (사고·침수·도난 차량 검사) | data.go.kr [15155857](https://www.data.go.kr/data/15155857/fileData.do) (파일 다운) | 공공 | 불필요 (파일) | `data/raw/datagokr/` → (적재 후) `auto.events_inspections` |
 | 시험인증 (KATRI / 부품 인증) | bigdata-tic.kr Open API | 공공 (회원) | OAuth `BIGDATA_TIC_CLIENT_ID/SECRET` | (키 확보 후) `auto.cert_*` |
 | 안전등급 (NCAP) | NHTSA SafetyRatings API | 공공 (US Gov) | 불필요 | `auto.spec_measurements` (safety.ncap.* / safety.feature.*) + Neo4j `(:VehicleVariant)-[:SAFETY_RATED_BY]->(:Standard {code:'NCAP_US'})` |
@@ -556,8 +556,8 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 
 | 데이터 | 출처 | 라이선스 | 인증 | 적재 위치 | 상태 |
 |---|---|---|---|---|---|
-| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개**) | `KIPRIS_API_KEY` | `ip.patents` + Neo4j Patent | (예정) |
-| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료(410 Gone), **ODP bulk dataset + Transition Guide** 채택 | `ip.patents` + `ip.citations` | (예정) |
+| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개**) | `KIPRIS_API_KEY` | `ip.patents` + Neo4j Patent | (scaffold, 보조) |
+| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료(410 Gone), **ODP bulk dataset + Transition Guide** 채택 | `ip.patents` + `ip.citations` | (scaffold, 보조) |
 | CPC 분류 체계 (계층 depth ≥ 4) | CPC scheme bulk (USPTO / EPO) | 공공 | 불필요 | `ip.cpc_scheme` + Neo4j CPCCode/SUBCLASS_OF | ✅ **10,695 row 적재** (§1 IPGraph 현황표) |
 | 글로벌 논문·연구 (assignee↔institution↔author) | OpenAlex API | CC0 | **무료 키 필요 (하루 10만 크레딧, 2025-02 이후)** | `ip.works` + Neo4j Work/Institution/Author | ✅ **629 row 적재** — 특허×논문 cross 승격은 institution↔corp_entity 매핑 후속 |
 
@@ -772,7 +772,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | P3/P4 추출 (auto) | `autograph.extractors.run_p3` (SUPPLIED_BY/RECALL_OF 활성) + `cross_validate`. `auto.staging_relations.p4_decision` ∈ candidate / validated / needs_review / rejected. `make extract-validate-auto` |
 | 평가 메트릭 | bridge_quality / main_hop_efficiency / confidence_weighted / latency (`eval/metrics/`) + `scripts/audit/{bom_coverage,edge_meta_invariants,dod_audit,validate_gold_qa}.py` |
 | gold QA seed | `gold_qa_v0.jsonl` finance **30** / `gold_qa_auto_v0.jsonl` auto **46** / `gold_qa_cross_v0.jsonl` CD **44** (level: CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형) / `gold_qa_ip_v0.jsonl` ip **30** (IP-L1/L2/L3 각 10) |
-| 외부 데이터 인터페이스 | data.go.kr (15089863/15155857), car.go.kr, KATRI (bigdata-tic), KNCAP 5 소스 ingestion + loader (graceful skip — 인증 키 부재 시 skip) |
+| 외부 데이터 인터페이스 | data.go.kr (3048950 리콜 CSV / 15155857 검사), car.go.kr, KATRI (bigdata-tic), KNCAP 5 소스 ingestion + loader (graceful skip — 인증 키 부재 시 skip) |
 
 ### 미구현 / wired-but-disabled / 측정 대기
 
@@ -801,9 +801,9 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | USES_PROCESS / MADE_OF (L6) | wired (ontology 정의) | `:Process` 노드 사전 산단공 적재 / `:Material` 노드 미구현. 엣지 적재 routine 미구현 |
 | DART 사업보고서 가동률 표 | 구현 완료 (2026-06-01) | `src/autograph/extractors/dart_production_parser.py::_parse_utilization_table` + `_parse_pct` 가 표 컬럼 정규화 + 가동률(util_pct) 추출. `auto.plant_utilization` 53 row 적재 완료 (§1 — Hyundai HMC 116.6% / 베트남 HTMV 54.1% 등 explicit util_pct, B 등급 0.80) |
 | **IPGraph 도메인 어댑터** | **코드 구현 완료 (working tree, uncommitted)** — 도메인3 | `src/ipgraph/{agent_handler,policy,ontology,cypher_templates_ip}.py + tools/* + loaders/* + ingestion/*` + `ontology/ip/*` (audit-ontology 4/4 PASS) + tool pool 4종 + cypher `ip_*` 25 templates + gold seed 30 + cross_ip 8. `make audit-ipgraph` PASS. core 변경 0 LOC = 0.00% (§10.12). 상세 SSOT [docs/ipgraph.md](./docs/ipgraph.md) |
-| **`ip.assignee_corp_map`** | **(예정)** — 테이블 생성, mapping 데이터 0 | `19_ipgraph_bridge.sql` **적용 완료 (2026-06-01)** — assignee 적재 + auto/reviewed 매핑 SOP 대기. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
-| **KIPRIS / USPTO ODP (PatentsView 후속) / CPC bulk / OpenAlex** | **CPC bulk 10,695 + OpenAlex works 629 ✅ / KIPRIS·USPTO ODP (예정)** | `loaders/load_cpc.py` + `loaders/load_openalex.py` 적재 완료. PatentsView 는 **2026-03-20 USPTO Open Data Portal (data.uspto.gov) 로 이관 완료** — REST API 종료, **bulk dataset 채택**. `ingestion/{kipris,uspto_odp}.py` 구현됨, 키 발급 + bulk 적재 대기 |
-| **배터리·소재 (auto L5/L6)** | **(예정)** — ontology 정의만, 데이터 0 | Wikidata cell chem + USGS minerals + 무역통계. 회사단위 셀 ↔ OEM 소싱은 grade C candidate 정직 표기 |
+| **`ip.assignee_corp_map`** | **(scaffold)** — 테이블·loader 있음, mapping 데이터 0 | `19_ipgraph_bridge.sql` **적용 완료 (2026-06-01)** + `loaders/load_assignee_corp_map.py` — assignee 적재 + auto/reviewed 매핑 SOP 대기. `bridge.corp_entity` 직접 변경 회피, supplier candidate 운영 SOP 재사용 |
+| **KIPRIS / USPTO ODP (PatentsView 후속) / CPC bulk / OpenAlex** | **CPC bulk 10,695 + OpenAlex works 629 ✅ / KIPRIS·USPTO ODP (scaffold, 보조)** | `loaders/load_cpc.py` + `loaders/load_openalex.py` 적재 완료. PatentsView 는 **2026-03-20 USPTO Open Data Portal (data.uspto.gov) 로 이관 완료** — REST API 종료, **bulk dataset 채택**. `ingestion/{kipris,uspto_odp}.py` 구현됨, 키 발급 + bulk 적재 대기 |
+| **배터리·소재 (auto L5/L6)** | **(부분 적재)** — Material 6 (materials_seed cathode chem) / Mineral 5 (`auto.master_minerals`) + DERIVED_FROM·MADE_OF 엣지 적재, L6 본격 진입 전 | Wikidata cell chem + USGS minerals + 무역통계. 회사단위 셀 ↔ OEM 소싱은 grade C candidate 정직 표기 |
 | **MCP 래퍼** | **(wired)** — `src/autonexusgraph/mcp/`. typed tool pool (52 tools: finance 21 + auto 31) + 자동 JSON Schema 변환 + stdio server + `ListToolsRequest` 핸들러 round-trip 실측 PASS (2026-06-02). `make audit-mcp` SDK 미설치 fail-soft | typed tool pool 위에 얇은 MCP server. 2026 상호운용 표준 신호 (Claude/OpenAI Agents SDK 양쪽 MCP 채택). `pip install -e ".[mcp]"` (이제 `[all]` extras 에도 포함) 후 `python -m autonexusgraph.mcp` |
 | **Langfuse 실측 ON** | **(wired)** — DoD #17 (b) | Langfuse 4.x OTEL native + ContextVar 격리. `make audit-trace` (LLM 비용 0 simulation 또는 `--full` 실 agent run) 가 `data/reports/audit_trace_*.json` 생성 → `make audit-dod` 자동 반영. `TRACE_BACKEND=langfuse` + `LANGFUSE_*` 키 필요 |
 | **온톨로지 pydantic strict 검증** | **PASS yaml 6/6 · cross-check PASS** (audit-ontology 2026-06-01) | `scripts/audit/ontology_validate.py` (Pydantic strict, `extra='forbid'`) — `ontology/{auto,ip}/{entities,relations}.yaml + ontology/{entities,relations}.yaml` 6 yaml 모두 통과. **cypher↔yaml cross-check** (default on): `cypher_templates_<domain>.py` 의 엣지 타입이 `relations.yaml` 에 정의되어 있는지 검증, cross-domain reference (예: ip cypher 가 auto.SUPPLIED_BY 참조) 는 기본 WARN(⚠️ 가시화), **Y-2: `make audit-ontology ARGS="--strict-cross"` 로 ERROR 강등 선택 가능**. 보완 완료: `LED_TO_RECALL` (auto/relations.yaml:162), `MAPPED_TO` (ip/relations.yaml:88) — 둘 다 yaml 에 정의됨 (audit-ontology 실측 PASS) |
@@ -1304,7 +1304,7 @@ make smoke-e2e                       # pytest + audit-ontology (cypher cross-che
 # 1. 인제스션 (.env 의 AUTO_INGEST_MAKES / AUTO_INGEST_YEAR_MIN/MAX 기반)
 make ingest-auto-all                # = vpic + recalls + complaints + safety + wikipedia + epa + investigations + sec-oem
 # 한국 시장 / KATRI / KNCAP (graceful skip — 키 없으면 0 byte)
-make ingest-datagokr-recalls        # data.go.kr 15089863 (DATA_GO_KR_API_KEY 필요)
+make ingest-datagokr-recalls        # data.go.kr 3048950 리콜 CSV (무인증, 수동 다운)
 make ingest-datagokr-inspections    # data.go.kr 15155857 (CSV 수동 다운)
 make ingest-katri                   # bigdata-tic.kr (BIGDATA_TIC_CLIENT_ID/SECRET 필요)
 make ingest-kncap                   # KNCAP (KNCAP_API_KEY 또는 수동 CSV)
