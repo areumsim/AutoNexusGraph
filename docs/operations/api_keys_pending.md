@@ -189,3 +189,153 @@ auth 실패 → 답변 공백 → em/f1/hits **전부 0.000, cost $0.0000** (빌
 3. [ ] `patents-public-data.patents.publications` BigQuery 스키마 점검
 4. [ ] (선택) Anthropic API 키 재발급 — Agent 우회 가능하므로 미발급 OK
 5. [ ] (선택) KIPRIS PLUS API 키 발급 — 한국 특허 정밀 보강
+
+---
+
+## LLM 키 발급 즉시 실행 — One-Shot Runbook (2026-06-04 정리)
+
+다음 주 LLM 키 발급 직후 즉시 실행 가능한 명령 sequence. 키 발급 → 검증 → 평가 매트릭스 실측 → 결과 정리까지.
+
+### Step 0 — 키 검증 (1 분, 비용 0)
+
+`.env` 의 LLM 키 교체 후 즉시 검증. 셋 중 1개만 통과해도 OK.
+
+```bash
+# OPENAI
+PYTHONPATH=src python3 -c "
+from autonexusgraph.llm.base import get_llm_client
+c = get_llm_client(role='synthesizer')
+print('provider:', c.provider, 'model:', c.model)
+print(c.chat([{'role':'user','content':'say OK'}], max_tokens=5).content)
+"
+# 기대: 'OK' 또는 'OK.' (HTTP 200)
+```
+
+실패 시: 401/400 응답 메시지를 `data/reports/llm_key_check_<ts>.log` 로 보존 후 다른 provider 시도.
+
+### Step 1 — 평가 매트릭스 full 실측 (15-30 분, $5-20)
+
+S-4 P0+ 게이트의 핵심. 4 어댑터 × FAST tier 1종 × rerank{on/off} = 8 cells.
+
+```bash
+# 1-a. 사전 dry-run (LLM 호출 0, 시뮬레이션만)
+make audit-eval-matrix     # simulation = 8 cells enumerate
+
+# 1-b. full 실측 (LLM 호출 발생, 비용 추정 $5-20)
+make audit-eval-matrix-full
+# → eval/reports/<run>/summary.md 생성
+# → eval/reports/<run>/per_cell_metrics.json 생성
+```
+
+**예산 가드**: `LLM_SESSION_HARD_LIMIT_USD=5.00` (코드 기본) — 한 세션 누적 $5 초과 시 자동 중단. 더 큰 예산 필요 시 `export LLM_SESSION_HARD_LIMIT_USD=20.00`.
+
+**중단 시 재개**: cost_log.jsonl 기반 누적이라 재실행 시 이전 cells 결과 + 신규 cells 만 추가 실행.
+
+### Step 2 — Confidence Calibration (5 분, LLM 호출 0)
+
+Step 1 의 predictions.jsonl 기반 Platt scaling. Q-2 P1 항목.
+
+```bash
+make audit-calibrate
+# → data/reports/calibration_<run>_<adapter>_em.{json,png}
+```
+
+**EM 데이터 부족 시** (gold answer 비어있음 등): F1 metric 우회.
+```bash
+make audit-calibrate ARGS="--adapter hybrid --metric f1 --em-threshold 0.5"
+```
+
+**해석**: `a ≥ 0.9~1.1` = well-calibrated, `a < 0.9` = overconfident (README §4.0 등급 0.95 → 0.88 하향 검토), `a > 1.1` = underconfident.
+
+### Step 3 — Langfuse cloud export (선택, LANGFUSE 키 발급 시)
+
+S-2 P0+ 게이트의 cloud export. PG 적재는 이미 ✅ — Langfuse cloud 만 미실행.
+
+```bash
+# .env 에 LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST 추가
+export LANGFUSE_PUBLIC_KEY=pk-lf-...
+export LANGFUSE_SECRET_KEY=sk-lf-...
+export LANGFUSE_HOST=https://cloud.langfuse.com   # 또는 self-host
+
+make audit-trace --full
+# → Langfuse dashboard 에 turn별 token/cost/replan 송신 검증
+```
+
+### Step 4 — DoD 20항 트래픽라이트 재측정 (5 분)
+
+```bash
+make audit-dod
+# → eval/reports/dod_v3.0.md 갱신
+# 변경 사항:
+#   §10.7 Hybrid > Vector multi-hop  : ⊘ → 실측값
+#   §10.8 CD-L1~L4 정답률            : ⊘ → 실측값
+#   §10.9 EM 95%+                    : ⊘ → 실측값
+#   §10.10 Ragas Faithfulness 90%+   : ⊘ → 실측값
+#   §10.17 (d) 평가 매트릭스         : (wired, partial) → (wired) 또는 ✅
+```
+
+### Step 5 — 결과 정리 + PR
+
+```bash
+# 5-a. 측정 결과 본문 갱신 (수동 - 보고서 인용)
+# README §6 "현재 측정 결과" 표 + §10 DoD 20항 표 + BACKLOG.md S-4 행
+
+# 5-b. PR 생성
+git checkout -b feat/llm-eval-matrix-measured
+git add eval/reports/<run>/summary.md eval/reports/dod_v3.0.md \
+        README.md BACKLOG.md data/reports/calibration_*.json
+git commit -m "feat(eval): S-4 평가 매트릭스 full 실측 + Platt calibration
+
+- 8 cells full 실측 (4 어댑터 × FAST tier × rerank{on/off})
+- DoD §10.7~§10.10 / §10.17(d) ⊘ → 실측 갱신
+- Platt scaling calibration: a=<>, b=<> (overconfident/calibrated 판정)
+"
+gh pr create --base main --title "feat(eval): S-4 P0+ 평가 매트릭스 full 실측 + Platt calibration"
+```
+
+---
+
+## DoD unblock 매트릭스 (각 키 → unblock DoD 항)
+
+| 키 | 즉시 unblock DoD | BACKLOG |
+|---|---|---|
+| **LLM 키 1개** (OpenAI / Anthropic / Google 중) | §10.7 (Hybrid +30%p), §10.8 (CD 정답률), §10.9 (EM 95%+), §10.10 (Faithfulness 90%+), §10.13 (메인 홉 효율), §10.17 (d) 평가 매트릭스 | E-1, E-2, S-4, Q-2 |
+| **LANGFUSE 키** | §10.17 (b) Langfuse cloud export | S-2 (PG 경로는 이미 PASS) |
+| **GCP Service Account** (BigQuery) | §10.15~10.17 — IPGraph 데이터 적재 → cross-domain CD-L4-IP | D-2 우회 (USPTO BigQuery), IP-1~6 |
+| **KIPRIS_API_KEY** | (한국 특허 추가) — IP 보조축 데이터 보강 | D-2, IP-1, IP-2, IP-4, IP-5, IP-6 |
+| **USPTO ODP API 키** (2026-06-18 이후 mandatory) | D-3 BigQuery 대체 시 backup 경로 | D-3 |
+| **KOSIS_API_KEY** (선택) | §10 외 — 매크로 통계 보강 | D-8 |
+
+---
+
+## Bulk 데이터 (키 불필요 — 즉시 다운로드 가능)
+
+`make audit-eval-matrix-full` 와 병렬 진행 가능.
+
+```bash
+# USPTO ODP bulk dataset (14일 후 API mandatory 전 대비)
+# data.uspto.gov/bulkdata/datasets — wget/curl 로 7 jsonl 다운
+# raw 위치: data/raw/ip/uspto_odp/*.jsonl
+make load-uspto-odp   # PG ip.* 7 테이블 + Neo4j :Patent/:Assignee/:Inventor + ASSIGNED_TO/INVENTED/CLASSIFIED_AS/CITES 적재
+
+# CPC scheme subgroup 250K bulk
+# USPTO CPCSubgroupList202605.zip 또는 EPO bulk
+make load-cpc -- --include-subgroups   # KIPRIS IPC subgroup 매칭 FK 통과 위해 선행 필요
+
+# KAMP 데이터셋 CSV (data.go.kr 15089213)
+# 회원가입 후 CSV 다운 → data/raw/kamp/<dataset_id>/*.csv
+# (make 타겟 미정의 — 직접 모듈 호출)
+PYTHONPATH=src python3 -m autograph.loaders.load_kamp_process_metrics   # auto.process_metrics (corp_code 부재 = 익명, 회사 귀속 hard-check 차단)
+```
+
+---
+
+## 본 runbook 자체의 검증 (`make` 타겟 살아있는지)
+
+```bash
+# 본 runbook 인용 타겟 grep — 0 missing 기대
+make -n audit-eval-matrix audit-eval-matrix-full audit-calibrate audit-trace audit-dod \
+       load-uspto-odp load-cpc 2>&1 | grep -E "^make.*Error|No rule" || echo "✓ all targets exist"
+```
+
+(2026-06-04 시점 — 위 7 타겟 Makefile 정의됨. `load-kamp-process-metrics` 는 타겟 미정의 — `python3 -m autograph.loaders.load_kamp_process_metrics` 직접 호출.)
