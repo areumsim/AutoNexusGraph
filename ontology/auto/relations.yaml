@@ -275,7 +275,11 @@ relations:
     provenance: deterministic       # DART 공정도설명 + 산단공 매칭 (Step 3)
     pass: P2
     confidence_default: 0.80         # B (DART 매칭) — 산단공 단독은 C 로 하향
-    enabled: false                  # Step 3 활성화 (인스턴스 적재 후)
+    enabled: true                   # 활성화 (2026-06-04) — load_produced_by.py 46 candidate
+    notes: |
+      ontology 상정 deterministic BoP routing(DART 공정도 + 산단공 part_id)은
+      part_id 부재로 불가 → :Part NHTSA system → 공정 카테고리 추론 (candidate/0.50).
+      외주 부품은 의장(조립) BoP 진입. 진짜 deterministic 출처 들어오면 격상.
     notes: |
       부품이 어떤 공정 단계로 만들어지는가. (:Part)-[:PRODUCED_BY]->(:ProcessStep).
 

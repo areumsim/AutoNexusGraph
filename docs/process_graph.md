@@ -37,7 +37,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 | `INSTANTIATES` | **550** | C | 〃 | ✅ 7키 100% |
 | `PRECEDES` (선형 체인) | **410** | C | 〃 | ✅ 7키 100%, depth cap 질의서 *0..10 |
 | `PERFORMED_AT` | **94** | B(35)+A공장/candidate공정(59) | `load_performed_at.py` + `load_factoryon_plants.py` | ✅ manual_seed 35 validated + factoryon 59 candidate |
-| `PRODUCED_BY` | 0 | — | — | ⏳ 산단공 `part_id` 부재 |
+| `PRODUCED_BY` | **46** | C(candidate) | `loaders/load_produced_by.py` | ✅ :Part system→공정 추론 (candidate 0.50, 외주=의장) |
 | `CONSUMES_MATERIAL` / `USES_EQUIPMENT` | 0 | — | — | ⏳ 산단공 소재·설비 정보 부재 |
 | `CAUSED_BY_PROCESS` | **96** | C(candidate) | `loaders/load_recall_process_map.py` | ✅ 한글 리콜 결함→공정 (deterministic 키워드+결함지시어, conf 0.50) |
 | `auto.process_metrics` (KAMP) | 0 rows | B | `loaders/load_kamp_process_metrics.py` + `init/25_*.sql` | ⏳ scaffold (corp_code 부재=익명) |

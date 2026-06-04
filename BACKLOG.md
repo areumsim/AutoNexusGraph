@@ -62,7 +62,7 @@
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
 | G-1 | **`PERFORMED_AT` (회사 귀속 공정)** ≥ 30 | ✅ **충족 94** — manual_seed 35 validated(`load_performed_at.py`, B 0.85) + factoryon 59 candidate(`load_factoryon_plants.py`, :Plant A등급 + 업종→공정 추론 0.60). :Plant 29→103, OWNS_PLANT 53→60. 산단공 익명 스텝 무오염, 비귀속 위반 0 | (완료) | (잔여) DART 생산·설비 파생 추가 + factoryon 일반부품 업종 공정 매핑 정밀화 | README §10.19, docs/process_graph.md §2 |
-| G-2 | **`PRODUCED_BY` (Part→ProcessStep)** | (scaffold, 0) | P1 | 산단공 `part_id` 부재 — 부품↔공정 결정적 매핑 출처 확보 | docs/process_graph.md §2 |
+| G-2 | **`PRODUCED_BY` (Part→ProcessStep)** | ✅ **46 candidate** — `load_produced_by.py`. :Part 46개 NHTSA system → 공정 카테고리 추론 (파워트레인18/가공15/의장11/프레스2). 산단공 part_id 부재로 deterministic BoP routing 불가 → candidate/0.50, 외주부품=의장(조립 진입). Part→ProcessStep→Process BoP 경로 완성 | (완료) | (잔여) 산단공 part_id 또는 DART 공정도 확보 시 B 격상 | docs/process_graph.md §2 |
 | G-3 | **`CONSUMES_MATERIAL` / `USES_EQUIPMENT`** | (scaffold, 0) | P2 | 산단공 소재·설비 정보 부재 — Wikidata + manual seed | docs/process_graph.md §2 |
 | G-4 | **`CAUSED_BY_PROCESS` (Recall→Process)** | ✅ **96 candidate** — `load_recall_process_map.py`. KOTSA 한글 리콜 941행 결함요약 + 공정키워드+결함지시어 deterministic 매칭 (조립71/가공11/용접11/사출2/프레스1), 전부 candidate/0.50 (인과 추론, 단독 근거 금지). 단조(첨단조향) 노이즈 차단. 한글-한글 매칭으로 환각위험 회피 | (완료) | (잔여) LLM P3 cross-validate 정밀화 | docs/process_graph.md §2 |
 | G-5 | **`MAPPED_TO` (BOM↔공정 cross)** | wired (yaml 정의) | P3 | 부품↔공정 결정적 매핑 (G-2 와 같은 트리거) | ontology/ip/relations.yaml:88 |
