@@ -10,7 +10,7 @@
 > 으로 추가하여 **§10.12 "코어 변경 < 5%"** 를 보존 (실측 현재 default baseline `414bc1b` 기준 코어 변경 **0/15,396 LOC = 0.00%**, `make audit-dod` 2026-06-01. 누적 reset 이력은 [eval/reports/core_diff_baseline_ledger.md](../eval/reports/core_diff_baseline_ledger.md)).
 >
 > **현재 구현 상태 (2026-06-01)**
-> - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**25 Cypher 템플릿**) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 25 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 5 + research 3 = **16 intents** (`agent_handler.py:26-42`).
+> - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**25 Cypher 템플릿**) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 25 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 8 (research/sql + bridge 2 + cross_query_ip) + research 3 = **19 intents** (`agent_handler.py:26-42`).
 > - **데이터**: 부분 적재 — `ip.cpc_scheme` **10,695 row** + `ip.works` (OpenAlex) **629 row** + `ip.institution` 38 + `ip.work_institution` 638 + Neo4j `:CPCCode` **10,695 노드**. PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) **적용 완료 (2026-06-01)** — `ip.patents / ip.assignees / ip.inventors / ip.patent_assignees / ip.patent_inventors / ip.patent_cpc / ip.citations / ip.assignee_corp_map` 8 테이블 생성됨 (row=0). 후속: KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset → `ingestion/{kipris,uspto_odp}.py` 실행 + assignee → corp_entity 매핑.
 >
 > **선택 근거:** OpenAlex / **USPTO ODP (data.uspto.gov, PatentsView 후속 — 2026-03-20 이관 완료, REST 종료 → bulk dataset)** / CPC bulk 완전 무료, KIPRIS 로 한국 특허 커버, 거의 전부 정형이라 LLM 예산 거의 무소비.
@@ -34,8 +34,7 @@
 
 ## 1. DomainHandler — 실 Protocol 1:1 미러 (M-1)
 
-> 이전 design 의 6 메서드(detect/tools/cypher_templates/ontology_path/turn_budget_usd/bridge_resolver) 는 실제 Protocol 과 **0% 일치**였다.
-> SSOT = `src/autonexusgraph/agents/_domain_handler.py:44-81`. `src/autograph/agent_handler.py` (167 LOC) 를 1:1 미러링.
+> SSOT = `src/autonexusgraph/agents/_domain_handler.py:44-81`. `src/autograph/agent_handler.py` 를 1:1 미러링.
 
 ```python
 # src/ipgraph/agent_handler.py
@@ -59,6 +58,17 @@ class IPGraphHandler:
 
 register_handler(IPGraphHandler())                   # src/ipgraph/__init__.py 의 `from . import agent_handler` 부작용 등록
 ```
+
+**6 메서드 책임** (Protocol SSOT `_domain_handler.py:44-80`):
+
+| 메서드 | 책임 | 호출 노드 | 반환 |
+|---|---|---|---|
+| `identify_targets` | 질문 텍스트에서 entity 추출 (assignee 이름 / corp_code / CPC `_CPC_PATTERN`) → state 에 채움 | triage | None (state 부수 효과) |
+| `plan_tasks` | 질문 유형별 task DAG 생성 (IP-L1 단순 카운트 / IP-L2 multi-hop CPC + citation / IP-L3 cross-domain assignee↔corp) | planner | None (state["tasks"] 채움) |
+| `toolbox_modules` | 도구 함수 풀 모듈 리스트 | supervisor → workers (_toolbox_for) | `[ipgraph.tools]` (`ipgraph/tools/__init__.py` re-export) |
+| `allowed_intents(kind)` | kind 별 화이트리스트 — graph/sql/research | workers (_resolve_tool 직전) | `IP_GRAPH_ALLOWED` 8 / `IP_SQL_ALLOWED` 8 / `IP_RESEARCH_INTENTS` 3 |
+| `fallback_search(state, query)` | tool 미매칭 또는 빈결과 시 fallback (`search_patents` 일반 검색) | executor/worker_research | `("search_patents", fn, kwargs)` 또는 `None` |
+| `retrieve_module` | retrieve 함수 보유 모듈 (vector 검색) | research_worker | `ipgraph.tools.retrieve` |
 
 ### 라우팅 — 별도 register_router (M-2)
 
@@ -144,29 +154,29 @@ edges:
 ## 4. 에이전트 도구 (`src/ipgraph/tools/*`) — autograph 4-tools 미러
 
 ### `tools/patents.py` (PG)
-- `lookup_patent(query, limit)` / `get_patent_info(pub_no)`
-- `list_patents_by_assignee(assignee_or_corp, year_range=None, cpc=None, limit=50)`
-- `count_patents_by_field(assignee_or_corp, cpc_section, year_range=None)`
-- `compare_assignees_patent_volume(assignees, year, cpc=None)`
+- `lookup_patent(query, limit)` (`patents.py:19`) / `get_patent_info(pub_no)` (`:47`)
+- `list_patents_by_assignee(assignee_id, year_range, cpc, limit=50)` (`:80`)
+- `count_patents_by_field(assignee_id, cpc_section, year_range)` (`:128`)
+- `compare_assignees_patent_volume(assignee_ids, year, cpc)` (`:162`)
 
 ### `tools/graph.py` (Neo4j — `ip_*` 템플릿)
-- `lookup_assignee_graph(query)` / `list_patents_of_assignee(assignee, snapshot_year=None)`
-- `get_inventors_of_patent(pub_no)` / `find_co_assignees(assignee)`
-- `list_patents_in_cpc(cpc_code, include_subclasses=True)` / `list_assignees_in_field(cpc_code, top_k=20)`
-- `get_citation_network(pub_no, depth=2, limit_nodes=300, max_total=1000, direction='both')` — **(M-7) cap 강제** (`cited_by|cites|both`)
-- `most_cited_patents(assignee_or_cpc, top_k=10)`
+- `lookup_assignee_graph(query, limit=10)` (`graph.py:55`) / `list_patents_of_assignee(assignee_id, snapshot_year, limit=50)` (`:60`)
+- `get_inventors_of_patent(pub_no, limit=50)` (`:69`) / `find_co_assignees(assignee_id, limit=20)` (`:73`)
+- `list_patents_in_cpc(cpc_code, include_subclasses=True)` (`:80`) / `list_assignees_in_field(cpc_code, top_k=20)` (`:87`)
+- `get_citation_network(pub_no, depth=1, limit_nodes=300, max_total=1000, direction='both')` (`:94`) — **(M-7) cap 강제** (`cited_by|cites|both`)
+- `most_cited_patents(assignee_or_cpc, top_k=10)` (`:125`)
 
 ### `tools/retrieve.py`
-- `search_patents(query, top_k=8, assignee_id=…, cpc=…, jurisdiction=…)` — abstract+claims pgvector + 메타
+- `search_patents(query, top_k=8, assignee_id=…, cpc=…, jurisdiction=…)` (`retrieve.py:55`) — abstract+claims pgvector + 메타
 - `search_by_metadata_ip(...)` / `get_chunk_ip(chunk_id)`
 
 ### `tools/bridge.py` (corp_entity 재사용)
-- `bridge_assignee_to_corp(assignee_id)` / `bridge_corp_to_assignee(corp_code)`
-- `cross_query_ip(...)` — 특허 ↔ finance(R&D비) ↔ auto(부품·리콜)
+- `bridge_assignee_to_corp(assignee_id)` (`bridge.py:21`) / `bridge_corp_to_assignee(corp_code)` (`:56`)
+- `cross_query_ip(corp_code, ...)` (`:95`) — 특허 ↔ finance(R&D비) ↔ auto(부품·리콜)
 
-### Bridge 구현 — 신규 join 테이블 (M-3)
+### Bridge 구현 — `ip.assignee_corp_map` join 테이블 (M-3)
 
-`bridge.corp_entity` **컬럼·데이터 직접 변경 없음.** 신규 join 테이블 추가 → core/bridge 스키마 변경 0 → §10.12 보존.
+`bridge.corp_entity` **컬럼·데이터 직접 변경 없음.** 별도 join 테이블 추가 → core/bridge 스키마 변경 0 → §10.12 보존.
 
 ```sql
 -- 19_ipgraph_bridge.sql  (E-1)
@@ -254,12 +264,22 @@ CREATE TABLE ip.assignee_corp_map (
 
 ---
 
-## 부록: 재사용 기존 자산
+## 부록 A — 재사용 기존 자산
 
-- `src/autograph/agent_handler.py` (167 LOC) — 핸들러 1:1 미러 베이스
-- `src/autonexusgraph/agents/_domain_handler.py:44-81` — Protocol SSOT / `:108-148` — `discover_plugins()`
-- `src/autograph/policy.py::route_domain` — router 패턴 (detect 흡수처)
-- `src/autograph/cypher_templates_auto.py` (457 LOC) — 명명·검증 패턴
-- `src/autograph/tools/{spec,graph,retrieve,bridge}.py` (835 LOC) — 4-tools 구조
-- `eval/metrics/core_diff.py:38-178` — baseline 정책 + reset 박을 곳
+- `src/autograph/agent_handler.py` — 핸들러 1:1 미러 베이스
+- `src/autonexusgraph/agents/_domain_handler.py:44-81` — Protocol SSOT / `:111-150` — `discover_plugins()`
+- `src/autograph/policy.py::route_domain` — router 패턴
+- `src/autograph/cypher_templates_auto.py` — 명명·검증 패턴
+- `src/autograph/tools/{spec,graph,retrieve,bridge}.py` — 4-tools 구조
+- `eval/metrics/core_diff.py:38-178` — baseline 정책 + reset
 - `ontology/auto/*.yaml` 8종 — ontology/ip 구조 베이스
+
+## 부록 B — 적용하면 좋을 최신 기술 `(미적용, 참고)`
+
+특허·기술혁신 도메인 KG 의 최신 연구. 향후 IPGraph 데이터 적재 (KIPRIS / USPTO ODP) 후 단계적 도입 검토.
+
+- **Patent2Vec / PatentBERT** — 특허 abstract+claims 의 도메인 특화 임베딩. ([Lee et al, "PatentBERT", arXiv:1906.02124](https://arxiv.org/abs/1906.02124)) Patent classification (CPC 자동 할당) + similarity search 정확도 향상. **적용**: 현재 BGE-M3 위에 patent-specific instruction fine-tune. **기대효과**: assignee 분류·유사 특허 검색 정확도↑. **비용**: GPU fine-tune 12GB+ (4B 모델).
+- **Citation Graph embeddings** — node2vec / GraphSAGE 로 인용 네트워크 임베딩. ([Han et al, "Heterogeneous Citation Network Embedding", arXiv:2005.06104](https://arxiv.org/abs/2005.06104)) PageRank 대비 multi-modal (cite + author + CPC) 결합. **적용**: `gds.beta.node2vec` (Neo4j GDS) 또는 별도 PyG. **기대효과**: "기술 영향력" 순위 + 유사 특허 클러스터링. **비용**: 적재 후 Neo4j GDS 라이선스 확인 필요.
+- **Knowledge-aware patent retrieval** ([Krestel et al, "A Survey on Deep Learning for Patent Analysis", arXiv:2104.13860](https://arxiv.org/abs/2104.13860)) — 특허 본문 + CPC 계층 + citation 결합 retrieval. RAG 형태로 prior art 검색 자동화.
+- **LLM 기반 특허 검색·요약 (PaECTER, ChatGPT-Patent)** — Patent claim parsing + 청구항 분해 + 검색. **본 시스템 적용**: synthesizer prompt 에 "특허 claim 인용 시 출처 + claim 번호 명시" 강제 (number_guard 의 patent_no 화이트리스트 확장).
+- **assignee disambiguation** — 동일 회사의 다양한 표기 (예: "Hyundai Motor Co.", "현대자동차주식회사", "HYUNDAI MOTOR COMPANY") 매칭. ([Kim & Yoon, "Author name disambiguation in scientific data", 2015](https://doi.org/10.1108/AJIM-05-2014-0061)) → 본 시스템의 `ip.assignee_corp_map` strong/medium/weak 정책의 baseline.

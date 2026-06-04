@@ -618,11 +618,11 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 - LLM: OpenAI / Anthropic / Local 각각.
 - Cross-Domain 은 Hybrid+Bridge 단독 (다른 어댑터는 Bridge 미사용).
 
-#### 3.7.4 DoD (Definition of Done) — 14 항
+#### 3.7.4 DoD (Definition of Done) — 20 항
 
-[확정] PRD §10 의 14 DoD 중 측정 가능한 5 항 완료 (커밋 `e7f1224`, `b1be342`). 나머지는 LLM 실측·trace 필요.
+[확정] README §10 의 20 DoD 중 측정 가능한 항목 완료, 나머지는 LLM 실측·trace 필요.
 
-`make audit-dod` 가 14 항 트래픽라이트 종합 리포트 생성 (`eval/reports/dod_v2.1.md`, gitignored).
+`make audit-dod` 가 **20 항** 트래픽라이트 종합 리포트 생성 (`eval/reports/dod_v3.0.md`, gitignored).
 
 ### 3.8 안전 가드 — 다층 방어
 
@@ -784,8 +784,8 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 ### 5.1 도메인 일반성 가정의 미검증
 
 - **[가정]** 3번째 도메인 추가 비용 < 5% 코어 변경.
-- 자동차 추가 시 코어 변경 4.47% — 5% 미만 (`README §10.12 회귀 논쟁`). 그러나 그 안에 `agents/nodes.py` 가 `autograph.policy` 를 import 한 흔적 — 진짜 "코어 = autograph 무지" 상태인가? `_domain_handler.py:117-130` 의 자동 폴백이 정말 finance 무지 상태로 동작하는지 통합 테스트 없음 (`docs/autograph.md §6` 의 "통합 테스트(pytest -m integration)는 마커가 부여된 케이스가 코드베이스에 없어 0개 실행").
-- **[위험]** 3번째 도메인 추가 시 비슷한 4% 가 추가로 발생 → 누적 9% → 5% 가정 깨짐.
+- ip 도메인 추가 후 baseline reset 정책 채택 (README §10.15) — inflection +1,877 LOC (13.32%) 와 reset 후 0/15,396 = **0.00%** 두 수치 모두 정직 인용 ([core_diff_baseline_ledger §D](../eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5)). `_domain_handler.py:117-130` 의 자동 폴백이 finance 무지 상태로 동작하는지 통합 테스트는 [docs/autograph.md §6](autograph.md) 의 마커 0 케이스 한계.
+- **[위험]** 누적 변경량으로는 < 5% 가 신뢰 어려움 — baseline reset 정책으로 우회. 4번째 도메인 추가 시 reset 정책의 정직성 자체가 재검증 대상.
 - **[열린 질문]** "코어 변경 0%" 가 가능한 인터페이스 (e.g. handler 가 더 많은 메서드 보유) 가 무엇인가?
 
 ### 5.2 confidence_score 의 정량성
@@ -938,7 +938,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 새로 합류한 사람이 멘탈 모델을 잡는 최단 경로:
 
-1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict 33 필드).
+1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **34 필드**, 라인 99-161).
 2. `src/autonexusgraph/agents/_domain_handler.py` — DomainHandler Protocol + 라우터 + ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` soft-import.
 3. `src/autograph/agent_handler.py` — auto/cross_domain 구현체.
 4. `src/autograph/policy.py:1-100` (10분) — 키워드 라우팅 / question kind 분류.
@@ -1069,20 +1069,20 @@ from . import agent_handler  # 등록 부작용
 | **BOM** | Bill of Materials. 자동차 도메인의 계층 척추 (L0~L6) | `README §11.2`, `docs/autograph.md §2.5.4` |
 | **Bridge** | Cross-domain 매칭 테이블 `bridge.corp_entity` | `README §3.5` |
 | **CD-L1~L4** | Cross-Domain QA 난이도 4단계 | `PRD §2.2` |
-| **Cypher template registry** | 사전 정의 22개 Cypher | `src/autonexusgraph/tools/cypher_templates.py` |
-| **DAG** | Directed Acyclic Graph. Planner 가 만드는 task 의존 그래프 | `docs/operations/agents.md (구 PRD §7.5).3` |
+| **Cypher template registry** | 사전 정의 Cypher 템플릿 (finance/auto/ip 도메인별) | `src/autonexusgraph/tools/cypher_templates.py` |
+| **DAG** | Directed Acyclic Graph. Planner 가 만드는 task 의존 그래프 | `docs/operations/agents.md §7.5.3` |
 | **DART** | 대한민국 금융감독원 전자공시. corp_code SSOT | `README §4` |
-| **DoD** | Definition of Done. 14항 트래픽라이트 | `PRD §10` |
+| **DoD** | Definition of Done. 20항 트래픽라이트 | `README §10` |
 | **DomainHandler** | 코어가 도메인을 위임하는 Protocol | `src/autonexusgraph/agents/_domain_handler.py:36` |
 | **edge_required_meta** | auto 엣지 의무 7키 (source_type, confidence_score, …) | `README §3.7`, `ontology/auto/relations.yaml:19` |
-| **Entity Resolution (ER) 마스터** | `master.entities` + `master.entity_map`. 다형 ID 공간 | `PRD §4.5` |
+| **Entity Resolution (ER) 마스터** | `master.entities` + `master.entity_map`. 다형 ID 공간 | `README §3.4` |
 | **GLEIF** | Global Legal Entity Identifier Foundation. LEI 공급 | `README §4` |
 | **gold QA** | 평가용 정답 큐레이션 데이터 | `eval/qa_gold/README.md` |
-| **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `docs/operations/agents.md (구 PRD §7.5).6` |
+| **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `docs/operations/agents.md §7.5.6` |
 | **idempotent (멱등) 파이프라인** | 재실행해도 같은 결과. raw → DB 모든 단계 | `README §2` |
 | **KATRI** | 자동차안전연구원. bigdata-tic.kr OAuth | `docs/autograph.md §5` |
 | **KCGS** | 한국기업지배구조원. ESG 등급 공급 | `docs/data_lineage.md §1.8 KCGS ESG` |
-| **KNCAP** | 한국 신차 안전도 평가. car.go.kr | `PRD §3.2`, `docs/autograph.md §5` |
+| **KNCAP** | 한국 신차 안전도 평가. car.go.kr | `README §4`, `docs/autograph.md §5` |
 | **KOTSA** | 한국교통안전공단. 수리검사 데이터 | `README §4`, `docs/autograph.md §5` |
 | **LangGraph** | Multi-agent StateGraph 프레임워크 | `docs/operations/agents.md (구 PRD §7.5)` |
 | **LEI** | Legal Entity Identifier (GLEIF 발급) | `README §4` |
