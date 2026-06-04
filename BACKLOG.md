@@ -89,7 +89,7 @@
 |---|---|---|:---:|---|---|
 | S-1 | **MCP 래퍼** — typed tool pool 59 tools (finance 21 + auto 38) | (wired) — `make audit-mcp` SDK 설치 시 **PASS** (build_mcp_server boot + 59 tools, 2026-06-04), 미설치 시 SKIPPED(fail-soft) | **P0+** | `pip install -e ".[mcp]"` 또는 `[all]` extras → `python -m autonexusgraph.mcp` stdio server | README §10.17 (a) |
 | S-2 | **Langfuse 실측 ON (turn별 token/cost/replan)** | (wired) — Langfuse 4.x OTEL native | **P0+** | `.env`: `TRACE_BACKEND=langfuse` + `LANGFUSE_*` 키 → `make audit-trace` (simulation 또는 `--full`) | README §10.17 (b) |
-| S-3 | **온톨로지 SHACL/pydantic 검증** | (wired) — 6 yaml PASS, cypher cross-check PASS | P1 | 보조 yaml (extractors.yaml / system_taxonomy.yaml / plants.yaml) 별도 모델 추가 | README §10.17 (c) |
+| S-3 | **온톨로지 SHACL/pydantic 검증** | ✅ **완료** — 핵심 6 yaml + **보조 4 yaml(Y-1: `auto`/`finance` extractors · system_taxonomy · plants, `extra='forbid'` strict)** + cypher↔yaml cross-check 모두 PASS. cross-domain ref strict 모드(Y-2 `--strict-cross`). `make audit-ontology`(`ontology_validate.py` + `tests/test_ontology_aux.py` 5건). **잔여**: SHACL 정식 shape 그래프는 pydantic v2 로 대체(의도된 trade-off, PRD §11.1) | (완료) | — | README §10.17 (c) |
 | S-4 | **축소 평가 매트릭스 실측 (4 어댑터 × FAST tier 1종 + rerank ablation)** | (wired, partial) — 8 cells enumerate simulation 모드 PASS | **P0+** | LLM 키 + `make audit-eval-matrix --full` → `eval/reports/<run>/summary.md` PR 첨부 + Allganize 외부 벤치 stub 채움 | README §10.17 (d) |
 | S-5 | **§10.12 baseline reset 정책 dashboard 자동 반영** | (wired) — baseline reset 2회 이력 | P1 | `make audit-dod` 출력에 baseline commit + 누적 reset 이력 + "도메인 추가 마다 reset" 명시 (대부분 완료, dashboard 표시만 보강) | README §10.12 |
 
