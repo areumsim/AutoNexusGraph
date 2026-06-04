@@ -22,9 +22,7 @@ class SqlVecAdapter(AgentAdapter):
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — sql_vec 는 finance 전용.
         from autonexusgraph.tools.financials import lookup_company, get_revenue, get_operating_income
         from autonexusgraph.tools.retrieve import search_documents
-        from autonexusgraph.llm.base import get_llm_client
-        from autonexusgraph.llm.budget_aware import budget_aware_client
-        from autonexusgraph.llm.cost_tracker import BudgetExceeded
+        from .base import synthesize
 
         t0 = time.monotonic()
         # 회사 / 연도 룰 추출
@@ -73,24 +71,13 @@ class SqlVecAdapter(AgentAdapter):
             for h in hits[:4]
         )
 
-        try:
-            client = budget_aware_client(
-                get_llm_client(role="synthesizer"),
-                caller="eval_sql_vec_synth",
-            )
-            resp = client.chat(
-                [
-                    {"role": "system", "content": "SQL 수치와 본문 근거만 인용해 답하세요."},
-                    {"role": "user", "content": f"질문: {question}\n\nSQL:\n{ctx_sql}\n\n본문:\n{ctx_vec}"},
-                ],
-                temperature=0.0, max_tokens=600,
-            )
-            answer = resp.content
-            cost = resp.usage.cost_usd
-            tokens = resp.usage.total_tokens
-            refused = False
-        except BudgetExceeded:
-            answer, cost, tokens, refused = "", 0.0, 0, True
+        answer, cost, tokens, refused = synthesize(
+            [
+                {"role": "system", "content": "SQL 수치와 본문 근거만 인용해 답하세요."},
+                {"role": "user", "content": f"질문: {question}\n\nSQL:\n{ctx_sql}\n\n본문:\n{ctx_vec}"},
+            ],
+            caller="eval_sql_vec_synth", max_tokens=600,
+        )
 
         return AgentResponse(
             answer=answer,

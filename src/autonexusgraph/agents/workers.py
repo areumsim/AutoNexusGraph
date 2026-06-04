@@ -92,6 +92,25 @@ def _allowed_intents(state: AgentState, kind: str) -> set[str]:
     return set()
 
 
+def _maybe_inject_rerank(state: AgentState, fn, args: dict) -> None:
+    """state['rerank'] (평가 매트릭스 ablation) → 검색 함수 args 에 전파.
+
+    None (기본 production) 이면 미주입 → 도구 자체 default(rerank=True) 사용.
+    함수가 ``rerank`` 파라미터를 받을 때만 주입 — get_chunk/search_by_metadata 등
+    rerank 없는 retrieve 함수에 TypeError 를 내지 않도록 inspect 로 가드.
+    args 에 이미 값이 있으면 보존(setdefault).
+    """
+    rr = state.get("rerank")
+    if rr is None or fn is None:
+        return
+    try:
+        import inspect
+        if "rerank" in inspect.signature(fn).parameters:
+            args.setdefault("rerank", rr)
+    except (TypeError, ValueError):   # signature 추출 불가 — 안전하게 미주입.
+        pass
+
+
 # ── Research worker ─────────────────────────────────────────
 def research_worker(state: AgentState, task: dict) -> AgentState:
     """벡터 검색 (pgvector + 메타 필터).
@@ -112,6 +131,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
     fn = getattr(retrieve_mod, intent, None) if retrieve_mod else None
     if fn is not None:
         args.setdefault("query", state.get("question_rewritten") or state.get("question", ""))
+        _maybe_inject_rerank(state, fn, args)
         try:
             out = fn(**args)
             _record(state, task, status="done", result=out)
@@ -125,6 +145,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
     # finance (또는 unknown intent) — 기존 동작 보존.
     try:
         if intent == "search_documents":
+            _maybe_inject_rerank(state, search_documents, args)
             out = search_documents(**args)
         elif intent == "search_by_metadata":
             out = search_by_metadata(**args)
@@ -133,6 +154,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
         else:
             # 기본은 search_documents — args 에 query 가 있어야 함
             args.setdefault("query", state.get("question_rewritten") or state.get("question", ""))
+            _maybe_inject_rerank(state, search_documents, args)
             out = search_documents(**args)
         _record(state, task, status="done", result=out)
         if isinstance(out, list):

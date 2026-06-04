@@ -7,7 +7,7 @@
   - thesis headline 자동 계산 — ``hybrid_fast_rerank1`` vs ``vector_fast_rerank0``
     multi-hop EM 차이 (PRD §10.7 +30%p 목표)
 
-기본 = ``--simulation`` (LLM 비용 0, mock AgentResponse). ``--full`` 옵션 시 실제
+기본 = simulation (LLM 비용 0, mock AgentResponse). ``--full`` 옵션 시 실제
 ``run_qa_eval`` 를 cell 마다 호출 → LLM 비용 발생.
 
 산출:
@@ -106,6 +106,7 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
 
     # manifest.json 의 summary + DoD #13/#14 메트릭 추출.
     multi_hop_em: float | None = None
+    multi_hop_hits: float | None = None    # hits@k fallback (gold_answer_text 부재 시)
     em: float | None = None
     f1: float | None = None
     cost_usd: float = 0.0
@@ -122,6 +123,9 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
             cell_summary = summary.get(cell["label"]) or summary.get(cell["adapter"]) or {}
             if cell_summary:
                 multi_hop_em = cell_summary.get("multi_hop_em")
+                # hits@k fallback — run_qa_eval.py:359 가 manifest 에 생성. 이 추출이
+                # 없으면 compute_thesis_headline 의 hits fallback 이 항상 None 으로 죽음.
+                multi_hop_hits = cell_summary.get("multi_hop_hits")
                 em = cell_summary.get("em")
                 f1 = cell_summary.get("f1")
                 cost_usd = float(cell_summary.get("cost_usd_total") or 0.0)
@@ -144,6 +148,7 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
         "em":                   em,
         "f1":                   f1,
         "multi_hop_em":         multi_hop_em,
+        "multi_hop_hits":       multi_hop_hits,
         "cost_usd":             cost_usd,
         "ev_avg_correct":       ev_avg_correct,         # DoD #13
         "latency_internal_pass": latency_internal_pass,  # DoD #14
@@ -274,10 +279,9 @@ def main() -> int:
                    help="csv — fast,smart (기본 fast)")
     p.add_argument("--reranks", default="on,off",
                    help="csv — on,off (기본 둘 다 — ablation)")
-    p.add_argument("--simulation", action="store_true",
-                   help="LLM 호출 없이 셀 enumeration 만 (기본 True)")
     p.add_argument("--full", action="store_true",
-                   help="실제 run_qa_eval 호출 (LLM 비용 발생). simulation 와 상호 배타.")
+                   help="실제 run_qa_eval 호출 (LLM 비용 발생). 미지정 시 simulation "
+                        "(LLM 비용 0, 셀 enumeration 만).")
     p.add_argument("--out-dir", type=Path,
                    default=ROOT / "data" / "reports",
                    help="JSON 리포트 저장 디렉토리")

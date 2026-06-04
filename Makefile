@@ -644,7 +644,7 @@ audit-eval-matrix-full:
 
 audit-mcp:
 	# PRD §10 DoD #17 (a) — MCP 래퍼 wire-up.
-	# mcp SDK 미설치 시 SKIPPED + tool discovery 52건만 검증.
+	# mcp SDK 미설치 시 SKIPPED + tool discovery 59건만 검증 (finance 21 + auto 38).
 	# 설치 시 build_mcp_server boot + tool list 검증.
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/mcp_smoke.py
 

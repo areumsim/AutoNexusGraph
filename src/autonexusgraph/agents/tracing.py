@@ -39,7 +39,7 @@ from .hop_metrics import trace_hop_summary
 logger = logging.getLogger(__name__)
 
 # ─── 백엔드 결정 ────────────────────────────────────────────────
-_BACKEND_CACHE: str | None = None
+# backend 자체는 매번 env/config 재해석 (저렴) — client/auth 만 캐시.
 _LANGFUSE_CLIENT_CACHE: Any | None = None
 _AUTH_CACHE: bool | None = None
 
@@ -61,8 +61,7 @@ def _resolve_backend() -> str:
 
 def reset_cache() -> None:
     """테스트에서 backend env 바꾼 뒤 캐시 무효화."""
-    global _BACKEND_CACHE, _LANGFUSE_CLIENT_CACHE, _AUTH_CACHE
-    _BACKEND_CACHE = None
+    global _LANGFUSE_CLIENT_CACHE, _AUTH_CACHE
     _LANGFUSE_CLIENT_CACHE = None
     _AUTH_CACHE = None
 

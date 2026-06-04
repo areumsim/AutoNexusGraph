@@ -15,9 +15,11 @@ class HybridAdapter(AgentAdapter):
     version = "0.1"
 
     def __init__(self, *, rerank: bool = True, llm_tier: str = "fast") -> None:
-        """Hybrid 어댑터 — 본 단계는 매트릭스 시그니처 명시. rerank 의 실 효과는
-        run_agent 내부 retriever (autonexusgraph.tools.retrieve.search_documents)
-        가 받게 별도 작업 (다음 사이클). 본 단계는 매트릭스 셀 라벨 보장만.
+        """Hybrid 어댑터 — 본 프로젝트의 production agent (Triage/Planner/Executor/Synth).
+
+        rerank 토글은 ``run_agent(rerank=...)`` 로 전달되어 research_worker 가
+        ``search_documents(rerank=...)`` 까지 전파 (PRD §10 DoD #17 (d) ablation).
+        → ``hybrid_fast_rerank0`` 셀이 ``hybrid_fast_rerank1`` 과 실제로 분리됨.
         """
         super().__init__(rerank=rerank, llm_tier=llm_tier)
 
@@ -27,7 +29,7 @@ class HybridAdapter(AgentAdapter):
 
         t0 = time.monotonic()
         try:
-            state = run_agent(question, domain=domain)
+            state = run_agent(question, domain=domain, rerank=self.rerank)
         except Exception as e:
             return AgentResponse(
                 refused=True, refusal_reason=f"agent_failed:{e}",

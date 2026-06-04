@@ -36,8 +36,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Final
 
-import yaml
-
 # core ontology — finance + cross-domain 공통 schema_version SoT.
 _ONTOLOGY_RELATIONS_YAML: Final[Path] = (
     Path(__file__).resolve().parents[3] / "ontology" / "relations.yaml"
@@ -48,13 +46,18 @@ _ONTOLOGY_RELATIONS_YAML: Final[Path] = (
 def default_schema_version() -> str:
     """``ontology/relations.yaml`` 헤더의 schema_version (core SoT).
 
-    헤더 없거나 파일 없으면 'v0' (legacy 호환). 모든 ontology yaml 이 동일
-    schema_version 을 유지 — audit-ontology 가 PASS 시 'v2.2'.
+    raw yaml 이 아니라 ``load_and_validate`` (pydantic strict) 경유 — finance
+    relations.yaml 도 **소비 시점에 검증**된다 (auto/ip 와 동일 게이트, 검증 이원화
+    해소). 헤더 없거나 파일/검증 실패 시 'v0' (legacy graceful). audit-ontology
+    PASS 시 'v2.2'.
     """
     if not _ONTOLOGY_RELATIONS_YAML.is_file():
         return "v0"
-    data = yaml.safe_load(_ONTOLOGY_RELATIONS_YAML.read_text(encoding="utf-8"))
-    return (data or {}).get("schema_version") or "v0"
+    # OntologyValidationError 는 일부러 전파 — finance relations.yaml 이 스키마를
+    # 위반하면 auto/ip 처럼 적재가 fail-loud (검증 우회 방지). 파일은 audit-ontology
+    # 가 PASS 로 보증 → 정상 환경에선 예외 없음.
+    from autonexusgraph.ontology import load_and_validate
+    return load_and_validate(_ONTOLOGY_RELATIONS_YAML).schema_version or "v0"
 
 
 def edge_meta_set_clause(

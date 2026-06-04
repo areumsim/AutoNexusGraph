@@ -2,9 +2,10 @@
 """PRD §10 DoD #17 (b) — Langfuse 실측 audit (turn별 token/cost/replan).
 
 검증 흐름 (LLM 비용 0 — simulation 기본):
-  1. ``TRACE_BACKEND=langfuse`` + ``LANGFUSE_PUBLIC_KEY/SECRET_KEY`` 미설정 시
-     SKIPPED (exit 0).
-  2. ``start_turn_context`` enter — 새 CostTracker + Langfuse span.
+  1. PG 경로(token/cost/replan 적재)와 Langfuse export 를 **분리** 검증.
+     - PG 미가용(키리스 CI 등) 시에만 전체 SKIPPED (exit 0).
+     - LANGFUSE 키 부재 시: PG 경로는 검증하고 Langfuse 는 skipped 표기(PASS 유지).
+  2. ``start_turn_context`` enter — 새 CostTracker (+ 키 있으면 Langfuse span).
   3. ``tracker.record(...)`` 로 가짜 토큰 적재 (input=100/output=50, mock 모델).
   4. ``turn.state`` 에 n_replans=2 + answer 박기.
   5. exit → tracker.finalize → PG ops.llm_usage 의 meta JSONB 영구 적재 +
@@ -17,8 +18,9 @@
 ``--full`` flag — 실제 agent run (LLM 비용 발생). CI 에서는 simulation 권장.
 
 종료 코드:
-    0: PASS 또는 SKIPPED (langfuse 미설정)
-    1: FAIL (PG row 없음 / 메타 결손 / Langfuse auth 실패)
+    0: PASS (PG 적재 검증 OK; Langfuse 는 키 있으면 OK, 없으면 skipped) 또는
+       SKIPPED (PG 미가용)
+    1: FAIL (PG row 없음 / 메타 결손 / Langfuse 키 있는데 auth 실패)
 """
 
 from __future__ import annotations
@@ -38,17 +40,19 @@ sys.path.insert(0, str(ROOT))
 log = logging.getLogger(__name__)
 
 
-def _ensure_keys() -> tuple[bool, str]:
-    """Langfuse 실측 가능 조건 — env 확인. (활성, 사유) 반환.
+def _langfuse_ready() -> tuple[bool, str]:
+    """Langfuse 클라우드 export 실측 가능 조건 — backend + 키. (활성, 사유) 반환.
+
+    **PG token/cost/replan 적재 경로와는 독립** — 이 게이트는 오직 Langfuse 측
+    auth_check 검증 수행 여부만 결정한다. PG 경로는 backend/키 없이도 항상 검증.
 
     `.env` fallback: `_resolve_backend()` 가 `get_settings()` (pydantic-settings) 로
     `.env` 의 `TRACE_BACKEND` 도 인식 — `os.getenv` 단독 검사 시 process env 만 보는
-    버그 회피.
+    버그 회피. 키도 동일하게 .env fallback 후 process env 에 주입.
     """
     from autonexusgraph.agents.tracing import _resolve_backend
     if _resolve_backend() != "langfuse":
         return False, "TRACE_BACKEND != langfuse"
-    # LANGFUSE_* 키도 동일하게 .env fallback. pydantic-settings 가 lower-case 로 노출.
     pub = os.getenv("LANGFUSE_PUBLIC_KEY")
     sec = os.getenv("LANGFUSE_SECRET_KEY")
     if not (pub and sec):
@@ -65,6 +69,21 @@ def _ensure_keys() -> tuple[bool, str]:
     os.environ.setdefault("LANGFUSE_PUBLIC_KEY", pub)
     os.environ.setdefault("LANGFUSE_SECRET_KEY", sec)
     return True, "ok"
+
+
+def _pg_available() -> bool:
+    """PG 연결 가능 여부 — token/cost/replan 적재 검증 전제. 불가 시 audit SKIP.
+
+    (키리스 CI 등 인프라 부재 환경에서 FAIL 이 아닌 SKIP 으로 처리하기 위한 probe.)
+    """
+    try:
+        from autonexusgraph.db.postgres import get_pool
+        with get_pool().connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        return True
+    except Exception:   # noqa: BLE001
+        return False
 
 
 def _simulate_turn(thread_id: str) -> dict:
@@ -203,12 +222,16 @@ def main() -> int:
     args = p.parse_args()
     logging.basicConfig(level=args.log_level)
 
-    active, reason = _ensure_keys()
-    if not active:
-        _emit({"skipped": True, "reason": reason}, args.out_dir)
+    # Langfuse export 가능 여부 (PG 경로와 독립). 키 있으면 process env 주입까지.
+    lf_active, lf_reason = _langfuse_ready()
+
+    # PG 미가용(키리스 CI 등) 이면 token/cost 적재 검증 자체가 불가 → SKIP (exit 0).
+    if not _pg_available():
+        _emit({"skipped": True,
+               "reason": "PG 미가용 — token/cost/replan 적재 검증 불가"}, args.out_dir)
         return 0
 
-    # 1. turn 발화
+    # 1. turn 발화 (PG token/cost/replan 경로 — Langfuse 키 없어도 동작).
     try:
         if args.full:
             final_state = _run_real_agent(args.thread_id)
@@ -218,25 +241,29 @@ def main() -> int:
         _emit({"passed": False, "reason": f"turn 실행 실패: {e}"}, args.out_dir)
         return 1
 
-    # 2. PG 검증
+    # 2. PG 검증 — 핵심 게이트 (항상 수행).
     pg = _verify_pg(args.thread_id)
-    # 3. Langfuse 검증
-    lf = _verify_langfuse()
+    # 3. Langfuse 검증 — 키 있을 때만. 없으면 skipped (PASS 막지 않음).
+    lf = _verify_langfuse() if lf_active else {"skipped": True, "reason": lf_reason}
 
-    overall = pg.get("passed", False) and lf.get("passed", False)
+    lf_ok = lf.get("passed", False) or lf.get("skipped", False)
+    overall = pg.get("passed", False) and lf_ok
+    lf_repr = ("langfuse=OK" if lf.get("passed")
+               else f"langfuse=skipped({lf.get('reason', '')})")
     summary = (
         f"PG row cost=${pg.get('row', {}).get('cost_usd', 0):.4f} "
         f"tokens={pg.get('row', {}).get('input_tokens', 0)}/"
         f"{pg.get('row', {}).get('output_tokens', 0)} "
-        f"n_replans={pg.get('row', {}).get('meta', {}).get('n_replans', '?')}"
+        f"n_replans={pg.get('row', {}).get('meta', {}).get('n_replans', '?')} | {lf_repr}"
     ) if overall else ""
 
     result = {
         "passed":   overall,
-        "reason":   pg.get("reason") or lf.get("reason") or "",
+        "reason":   pg.get("reason") or (lf.get("reason") if not lf_ok else "") or "",
         "summary":  summary,
         "mode":     "full" if args.full else "simulation",
         "thread_id": args.thread_id,
+        "langfuse_active": lf_active,
         "pg":       pg,
         "langfuse": lf,
         "final_state_keys": sorted((final_state or {}).keys())[:20],

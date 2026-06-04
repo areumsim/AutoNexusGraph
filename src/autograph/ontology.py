@@ -25,59 +25,29 @@ from typing import Any
 
 import yaml
 
-from autonexusgraph.ontology import OntologyFile, load_and_validate
+from autonexusgraph.ontology.loaders import make_domain_loaders
 
 
 # repo_root/ontology/auto/
 _ONTOLOGY_DIR = Path(__file__).resolve().parents[2] / "ontology" / "auto"
 
-
-@lru_cache(maxsize=1)
-def _load_entities_file() -> OntologyFile:
-    """entities.yaml 의 pydantic-validated OntologyFile 캐시."""
-    return load_and_validate(_ONTOLOGY_DIR / "entities.yaml")
-
-
-@lru_cache(maxsize=1)
-def _load_relations_file() -> OntologyFile:
-    """relations.yaml 의 pydantic-validated OntologyFile 캐시."""
-    return load_and_validate(_ONTOLOGY_DIR / "relations.yaml")
-
-
-@lru_cache(maxsize=1)
-def load_entities() -> dict[str, dict[str, Any]]:
-    """entities.yaml → {label: spec}. raw dict 환원 — 기존 호출자 호환."""
-    ont = _load_entities_file()
-    return {label: spec.model_dump(by_alias=True, exclude_none=False)
-            for label, spec in (ont.entities or {}).items()}
+# ── 공통 entities/relations 로더 (ipgraph/ontology.py 와 동일 구현 1곳) ──
+# entity/relation 표준 헬퍼 10개는 도메인 무관 → autonexusgraph.ontology.loaders
+# 팩토리로 단일화. 아래 바인딩으로 기존 module-level 함수명·시그니처 보존.
+_L = make_domain_loaders(_ONTOLOGY_DIR)
+_load_entities_file = _L._load_entities_file
+_load_relations_file = _L._load_relations_file
+load_entities = _L.load_entities
+load_relations = _L.load_relations
+load_edge_required_meta = _L.load_edge_required_meta
+ontology_schema_version = _L.ontology_schema_version       # relations.yaml 헤더 SoT
+entity_key_property = _L.entity_key_property
+entity_labels = _L.entity_labels
+relation_types = _L.relation_types
+relation_endpoints = _L.relation_endpoints
 
 
-@lru_cache(maxsize=1)
-def load_relations() -> dict[str, dict[str, Any]]:
-    """relations.yaml → {rel_type: spec}. raw dict 환원 — 기존 호출자 호환."""
-    ont = _load_relations_file()
-    return {rt: spec.model_dump(by_alias=True, exclude_none=False)
-            for rt, spec in (ont.relations or {}).items()}
-
-
-@lru_cache(maxsize=1)
-def load_edge_required_meta() -> tuple[str, ...]:
-    """relations.yaml::edge_required_meta — 모든 엣지가 가져야 할 속성 키."""
-    ont = _load_relations_file()
-    return tuple(ont.edge_required_meta or ())
-
-
-@lru_cache(maxsize=1)
-def ontology_schema_version() -> str:
-    """온톨로지 헤더의 schema_version — 엣지 적재 helper 가 본 값을 자동 부여한다.
-
-    relations.yaml 헤더의 ``schema_version`` 이 SoT. 없으면 'v0' (legacy)
-    반환 — 점진적 도입 호환.
-    """
-    ont = _load_relations_file()
-    return ont.schema_version or "v0"
-
-
+# ── auto 도메인 전용 보조 yaml 로더 (공통 팩토리 범위 밖) ──
 @lru_cache(maxsize=1)
 def load_extractors() -> dict[str, dict[str, Any]]:
     """extractors.yaml → {extractor_name: spec}."""
@@ -168,38 +138,6 @@ def canonical_system_code(raw: str | None) -> str:
         return "UNKNOWN"
     table = _alias_to_canonical_system()
     return table.get(key, table.get(key.upper(), table.get(key.lower(), "UNKNOWN")))
-
-
-def entity_key_property(label: str) -> str | list[str]:
-    """라벨의 자연 키 속성명. neo4j_init 가 CONSTRAINT 만들 때 사용.
-
-    반환 타입:
-        - str: 단일 키 (auto 도메인 다수 — 'id', 'code', 'entity_id')
-        - list[str]: 복합 키 (finance Person ['name', 'birth_year'] 등)
-
-    호출자는 isinstance check 또는 ``_constraint`` (neo4j_init.py) 같은
-    헬퍼로 분기.
-    """
-    spec = load_entities().get(label)
-    if not spec:
-        raise KeyError(f"unknown entity label: {label}")
-    return spec.get("key", "id")
-
-
-def entity_labels() -> list[str]:
-    """ontology 가 정의한 자동차 도메인의 모든 라벨."""
-    return list(load_entities().keys())
-
-
-def relation_types() -> list[str]:
-    """ontology 가 정의한 모든 관계 타입."""
-    return list(load_relations().keys())
-
-
-def relation_endpoints(rel_type: str) -> tuple[str, str]:
-    """관계 from→to 라벨. cross_validate / prompt 에서 사용."""
-    spec = load_relations()[rel_type]
-    return spec["from"], spec["to"]
 
 
 def render_entity_table_for_prompt() -> str:

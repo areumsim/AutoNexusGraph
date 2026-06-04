@@ -496,6 +496,9 @@ def executor_node(state: AgentState) -> AgentState:
                 }
                 log.info("[executor] all empty → fallback search_documents (finance)")
             if fb_fn is not None:
+                # 평가 매트릭스 rerank ablation — fallback 검색에도 동일 전파.
+                from .workers import _maybe_inject_rerank
+                _maybe_inject_rerank(state, fb_fn, fb_args)
                 try:
                     fb_out = fb_fn(**fb_args)
                     if fb_out:

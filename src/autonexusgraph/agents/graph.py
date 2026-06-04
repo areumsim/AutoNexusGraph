@@ -227,14 +227,19 @@ def _run_with_fallback_chain(state: AgentState) -> AgentState:
 def run_agent(question: str, *,
               thread_id: str = "default",
               history: list[dict] | None = None,
-              domain: str | None = None) -> AgentState:
+              domain: str | None = None,
+              rerank: bool | None = None) -> AgentState:
     """단일 turn 실행 (blocking). PRD §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
 
     ``start_turn_context`` 가 ContextVar 격리된 CostTracker + Langfuse span 을
     enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG ops.llm_usage 의
     meta JSONB 에 thread_id/turn_id/n_replans/domain 영구 적재.
+
+    ``rerank`` (PRD §10 DoD #17 (d) 평가 매트릭스 ablation): None=기본(retrieve 도구
+    default), True/False 명시 시 research_worker 가 search_documents(rerank=...) 로 전파.
     """
-    state: AgentState = _init_state(question, thread_id, history, domain=domain)
+    state: AgentState = _init_state(question, thread_id, history, domain=domain,
+                                    rerank=rerank)
     with start_turn_context(thread_id or "default", state) as turn:
         if _HAS_LANGGRAPH:
             try:
@@ -251,7 +256,8 @@ def run_agent(question: str, *,
 def run_agent_stream(question: str, *,
                      thread_id: str = "default",
                      history: list[dict] | None = None,
-                     domain: str | None = None
+                     domain: str | None = None,
+                     rerank: bool | None = None
                      ) -> Iterator[tuple[str, AgentState]]:
     """노드별 partial state stream — UI/SSE 용 (PRD §7.6.5).
 
@@ -259,7 +265,8 @@ def run_agent_stream(question: str, *,
     ('__interrupt__', state). generator close 시 ``start_turn_context.__exit__`` 가
     트리거되어 PG/Langfuse 적재 완료.
     """
-    state: AgentState = _init_state(question, thread_id, history, domain=domain)
+    state: AgentState = _init_state(question, thread_id, history, domain=domain,
+                                    rerank=rerank)
     with start_turn_context(thread_id or "default", state) as turn:
         # A1 (P0+ #1 결함 fix): 매 yield 직후 turn.state 갱신 — generator close /
         # client disconnect 시점에도 마지막 partial 까지 PG/Langfuse 에 기록되도록.
@@ -272,7 +279,8 @@ def run_agent_stream(question: str, *,
                 return
             except Exception as exc:   # noqa: BLE001
                 log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
-                state = _init_state(question, thread_id, history, domain=domain)
+                state = _init_state(question, thread_id, history, domain=domain,
+                                    rerank=rerank)
                 turn.state = state   # type: ignore[assignment]
         for node_name, partial in _stream_with_fallback_chain(state):
             turn.state = partial   # type: ignore[assignment]
@@ -416,7 +424,8 @@ def _stream_with_fallback_chain(state: AgentState) -> Iterator[tuple[str, AgentS
 
 
 def _init_state(question: str, thread_id: str, history: list[dict] | None,
-                *, domain: str | None = None) -> AgentState:
+                *, domain: str | None = None,
+                rerank: bool | None = None) -> AgentState:
     """초기 state. domain 미지정 시 등록 라우터 검색 → 모두 None 이면 finance.
 
     domain 라우팅 흐름 (PRD §7.5.11 + §10.12):
@@ -435,7 +444,7 @@ def _init_state(question: str, thread_id: str, history: list[dict] | None,
     if not domain:
         from ._domain_handler import auto_detect_domain
         domain = auto_detect_domain(question, hint=None)
-    return {
+    state: AgentState = {
         "thread_id": thread_id,
         "question": question,
         "history": history or [],
@@ -446,6 +455,9 @@ def _init_state(question: str, thread_id: str, history: list[dict] | None,
         "tasks": [],
         "task_results": {},
     }
+    if rerank is not None:
+        state["rerank"] = rerank
+    return state
 
 
 __all__ = [

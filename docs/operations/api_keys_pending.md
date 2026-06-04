@@ -11,6 +11,27 @@
 
 ## P0 — 즉시 필요
 
+### 0. LLM provider 키 3종 전부 만료 — S-4 thesis 실측 차단 (2026-06-04 확인)
+
+**현상**: `.env` 의 세 LLM provider 키가 **모두 무효** — 실측(코드로 직접 chat 호출) 확인:
+- `OPENAI_API_KEY` (`sk-proj-…L_EA`) → **HTTP 401 "Incorrect API key provided"**
+- `GOOGLE_API_KEY` → **HTTP 400 "API key expired. Please renew the API key." (API_KEY_INVALID)**
+- `ANTHROPIC_API_KEY` (`sk-ant-a…`) → **HTTP 401** (아래 #2 와 동일)
+
+**영향**: `make audit-eval-matrix-full` 은 8 cells 전부 정상 실행되나 synthesizer 호출마다
+auth 실패 → 답변 공백 → em/f1/hits **전부 0.000, cost $0.0000** (빌링 전 실패 = 과금 0).
+→ **PRD §10.7 Hybrid>Vector thesis (S-4) 수치 측정 불가**. `LLM_PROVIDER=auto`, `LLM_MODEL_FAST=gpt-4o-mini`.
+
+**현재 상태 (코드측 준비 완료)**: rerank ablation 이 `run_agent → search_documents` 까지 실제
+전파되도록 수정 완료 (hybrid_rerank0 ≠ hybrid_rerank1 분리) + thesis hits@k fallback 부활.
+**유효한 키 1개만 들어오면** `make audit-eval-matrix-full` 재실행으로 즉시 실측 가능.
+
+**다음 액션 (예정: 다음 주 키 갱신)**: 셋 중 1개 이상 재발급 → `.env` 교체 →
+`PYTHONPATH=src python -c "from autonexusgraph.llm.base import get_llm_client; print(get_llm_client(role='synthesizer').chat([{'role':'user','content':'OK'}],max_tokens=3).content)"` 로
+검증 후 `make audit-eval-matrix-full` → `eval/reports/<run>/summary.md` 첨부.
+
+---
+
 ### 1. GCP Service Account 키 (Google Patents BigQuery)
 
 **용도**: `patents-public-data.patents.publications` BigQuery 쿼리 → 자동차 OEM(현대/기아/Toyota/Ford/VW/BMW/Mercedes/Tesla 등) 특허 추출 → `ip.patents`/`ip.assignees`/`ip.inventors` 적재.

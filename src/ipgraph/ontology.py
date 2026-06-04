@@ -11,74 +11,26 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
-from typing import Any
 
-from autonexusgraph.ontology import OntologyFile, load_and_validate
+from autonexusgraph.ontology.loaders import make_domain_loaders
 
 
 # repo_root/ontology/ip/
 _ONTOLOGY_DIR = Path(__file__).resolve().parents[2] / "ontology" / "ip"
 
-
-@lru_cache(maxsize=1)
-def _load_entities_file() -> OntologyFile:
-    return load_and_validate(_ONTOLOGY_DIR / "entities.yaml")
-
-
-@lru_cache(maxsize=1)
-def _load_relations_file() -> OntologyFile:
-    return load_and_validate(_ONTOLOGY_DIR / "relations.yaml")
-
-
-@lru_cache(maxsize=1)
-def load_entities() -> dict[str, dict[str, Any]]:
-    """entities.yaml → {label: spec}. raw dict 환원 — 기존 호출자 호환."""
-    ont = _load_entities_file()
-    return {label: spec.model_dump(by_alias=True, exclude_none=False)
-            for label, spec in (ont.entities or {}).items()}
-
-
-@lru_cache(maxsize=1)
-def load_relations() -> dict[str, dict[str, Any]]:
-    """relations.yaml → {rel_type: spec}."""
-    ont = _load_relations_file()
-    return {rt: spec.model_dump(by_alias=True, exclude_none=False)
-            for rt, spec in (ont.relations or {}).items()}
-
-
-@lru_cache(maxsize=1)
-def load_edge_required_meta() -> tuple[str, ...]:
-    ont = _load_relations_file()
-    return tuple(ont.edge_required_meta or ())
-
-
-@lru_cache(maxsize=1)
-def ontology_schema_version() -> str:
-    """yaml 헤더 schema_version SoT (v2.2)."""
-    ont = _load_relations_file()
-    return ont.schema_version or "v0"
-
-
-def entity_key_property(label: str) -> str | list[str]:
-    spec = load_entities().get(label)
-    if not spec:
-        raise KeyError(f"unknown ip entity label: {label}")
-    return spec.get("key", "id")
-
-
-def entity_labels() -> list[str]:
-    return list(load_entities().keys())
-
-
-def relation_types() -> list[str]:
-    return list(load_relations().keys())
-
-
-def relation_endpoints(rel_type: str) -> tuple[str, str]:
-    spec = load_relations()[rel_type]
-    return spec["from"], spec["to"]
+# 공통 팩토리 바인딩 — autograph/ontology.py 와 동일 구현 1곳 (중복 제거).
+_L = make_domain_loaders(_ONTOLOGY_DIR, entity_noun="ip entity")
+_load_entities_file = _L._load_entities_file
+_load_relations_file = _L._load_relations_file
+load_entities = _L.load_entities
+load_relations = _L.load_relations
+load_edge_required_meta = _L.load_edge_required_meta
+ontology_schema_version = _L.ontology_schema_version       # yaml 헤더 SoT (v2.2)
+entity_key_property = _L.entity_key_property
+entity_labels = _L.entity_labels
+relation_types = _L.relation_types
+relation_endpoints = _L.relation_endpoints
 
 
 __all__ = [

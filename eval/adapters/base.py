@@ -66,6 +66,30 @@ class AgentResponse:
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
+def synthesize(messages: list[dict], *, caller: str,
+               max_tokens: int = 800,
+               temperature: float = 0.0) -> tuple[str, float, int, bool]:
+    """근거→답변 합성 LLM 1회 — vector/graph/sql_vec 어댑터 공통 보일러플레이트.
+
+    budget_aware_client(get_llm_client('synthesizer')) → chat → BudgetExceeded 패턴을
+    1곳으로 모음. 어댑터별 system/user 메시지만 다르므로 ``messages`` 로 주입.
+
+    Returns:
+        (answer, cost_usd, tokens_used, refused) — BudgetExceeded 시
+        ("", 0.0, 0, True). cost_tracker 통합은 budget_aware_client 가 처리.
+    """
+    from autonexusgraph.llm.base import get_llm_client
+    from autonexusgraph.llm.budget_aware import budget_aware_client
+    from autonexusgraph.llm.cost_tracker import BudgetExceeded
+
+    try:
+        client = budget_aware_client(get_llm_client(role="synthesizer"), caller=caller)
+        resp = client.chat(messages, temperature=temperature, max_tokens=max_tokens)
+        return resp.content, resp.usage.cost_usd, resp.usage.total_tokens, False
+    except BudgetExceeded:
+        return "", 0.0, 0, True
+
+
 class AgentAdapter(ABC):
     """모든 시스템 어댑터의 공통 ABC.
 

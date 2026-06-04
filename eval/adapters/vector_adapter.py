@@ -21,9 +21,7 @@ class VectorAdapter(AgentAdapter):
 
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — vector-only 는 도메인 무관.
         from autonexusgraph.tools.retrieve import search_documents
-        from autonexusgraph.llm.base import get_llm_client
-        from autonexusgraph.llm.budget_aware import budget_aware_client
-        from autonexusgraph.llm.cost_tracker import BudgetExceeded
+        from .base import synthesize
 
         t0 = time.monotonic()
         try:
@@ -46,27 +44,13 @@ class VectorAdapter(AgentAdapter):
             f"score={h.get('score', 0):.3f}]\n{h.get('text','')[:800]}"
             for h in hits[:5]
         )
-        try:
-            client = budget_aware_client(
-                get_llm_client(role="synthesizer"),
-                caller="eval_vector_synth",
-            )
-            resp = client.chat(
-                [
-                    {"role": "system", "content": "근거 본문만 인용해 한국어로 답하세요."},
-                    {"role": "user", "content": f"질문: {question}\n\n근거:\n{ctx}"},
-                ],
-                temperature=0.0, max_tokens=800,
-            )
-            answer = resp.content
-            cost = resp.usage.cost_usd
-            tokens = resp.usage.total_tokens
-            refused = False
-        except BudgetExceeded:
-            answer = ""
-            cost = 0.0
-            tokens = 0
-            refused = True
+        answer, cost, tokens, refused = synthesize(
+            [
+                {"role": "system", "content": "근거 본문만 인용해 한국어로 답하세요."},
+                {"role": "user", "content": f"질문: {question}\n\n근거:\n{ctx}"},
+            ],
+            caller="eval_vector_synth", max_tokens=800,
+        )
 
         return AgentResponse(
             answer=answer,

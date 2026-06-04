@@ -1,6 +1,7 @@
 """Tool 자동 discovery + type hint → JSON Schema 변환.
 
-PRD §10 DoD #17 (a) — 외부 MCP 클라이언트에 28+ tools 자동 노출.
+PRD §10 DoD #17 (a) — 외부 MCP 클라이언트에 typed tool pool 자동 노출
+(finance 21 + auto 38 = 59 tools, BACKLOG S-1 SSOT; ``__all__`` 기준 자동 산정).
 
 핵심:
 - ``build_tool_manifest(domain)`` — 도메인별 tool 함수 list
@@ -150,6 +151,7 @@ def _signature_to_jsonschema(fn: Callable[..., Any]) -> dict[str, Any]:
 
 def _annotation_to_schema(ann: Any) -> dict[str, Any]:
     """type annotation → JSON Schema fragment. Optional / list / dict 처리."""
+    import types
     import typing
     if ann is inspect.Parameter.empty or ann is None or ann is type(None):
         return {"type": "string"}
@@ -158,7 +160,9 @@ def _annotation_to_schema(ann: Any) -> dict[str, Any]:
     origin = typing.get_origin(ann)
     args = typing.get_args(ann)
     # Optional[X] / Union[X, None] → X 의 schema (nullable 표기).
-    if origin is typing.Union:
+    # PEP 604 (``X | None``) 의 origin 은 ``types.UnionType`` — 본 코드베이스가
+    # 광범위하게 쓰는 문법이므로 typing.Union 과 함께 처리해야 fallback 으로 안 샌다.
+    if origin is typing.Union or origin is types.UnionType:
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
             base = _annotation_to_schema(non_none[0])

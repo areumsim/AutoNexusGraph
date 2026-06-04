@@ -25,9 +25,7 @@ class GraphAdapter(AgentAdapter):
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — graph-only 는 finance 그래프만 본다.
         from autonexusgraph.agents.policy import classify_question
         from autonexusgraph.tools.graph import lookup_company, list_subsidiaries, get_executives, get_major_shareholders
-        from autonexusgraph.llm.base import get_llm_client
-        from autonexusgraph.llm.budget_aware import budget_aware_client
-        from autonexusgraph.llm.cost_tracker import BudgetExceeded
+        from .base import synthesize
 
         t0 = time.monotonic()
         kind = classify_question(question)
@@ -68,24 +66,13 @@ class GraphAdapter(AgentAdapter):
         ctx = "\n".join(
             f"[{g['tool']}] {str(g['result'])[:500]}" for g in graph_out
         )
-        try:
-            client = budget_aware_client(
-                get_llm_client(role="synthesizer"),
-                caller="eval_graph_synth",
-            )
-            resp = client.chat(
-                [
-                    {"role": "system", "content": "그래프 출력만 근거로 한국어 답변."},
-                    {"role": "user", "content": f"질문: {question}\n\n그래프 결과:\n{ctx}"},
-                ],
-                temperature=0.0, max_tokens=600,
-            )
-            answer = resp.content
-            cost = resp.usage.cost_usd
-            tokens = resp.usage.total_tokens
-            refused = False
-        except BudgetExceeded:
-            answer, cost, tokens, refused = "", 0.0, 0, True
+        answer, cost, tokens, refused = synthesize(
+            [
+                {"role": "system", "content": "그래프 출력만 근거로 한국어 답변."},
+                {"role": "user", "content": f"질문: {question}\n\n그래프 결과:\n{ctx}"},
+            ],
+            caller="eval_graph_synth", max_tokens=600,
+        )
 
         return AgentResponse(
             answer=answer,
