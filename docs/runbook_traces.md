@@ -200,8 +200,8 @@ export OPENAI_API_KEY=...   # 또는 ANTHROPIC_API_KEY / GOOGLE_API_KEY
 
 # 2. eval 실행
 make eval-full       # finance 30 row
-make eval-auto       # auto 46 row
-make eval-cross      # cross 44 row
+make eval-auto       # auto 56 row (L1~L3 + AUTO-PROC 10)
+make eval-cross      # cross 49 row (CD-L1~L4 + CD-PROC 5 + IP 결합 변형)
 # (ip 도메인은 KIPRIS/USPTO 적재 후 — make eval-ip)
 
 # 3. 본 trace 갱신

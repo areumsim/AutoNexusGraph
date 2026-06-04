@@ -1762,7 +1762,7 @@ make audit-calibrate ARGS="--adapter hybrid --metric f1 --em-threshold 0.5"
 ##### 11.4.0-legacy 5분 recipe (참고)
 
 **실행 가능 조건**:
-1. gold QA 최소 100 row 측정 완료 (현재 finance 30 / auto 46 / cross 44 — 총 120, 조건 충족)
+1. gold QA 최소 100 row 측정 완료 (현재 finance 30 / auto 56 / cross 49 — 총 135, ip 30 별도 — gold_answer 미적재. 조건 충족)
 2. LLM 키 활성 + `make eval-full` 실행 → `eval/reports/<run>/predictions.jsonl` 생성
 
 **실행 절차** (5분):

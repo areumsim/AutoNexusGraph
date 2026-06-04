@@ -466,7 +466,7 @@ psql ... -c "SELECT COUNT(*) FROM ip.patents WHERE jurisdiction='KR' AND filing_
 ## 8. 운영 체크리스트 — 분기별 검토
 
 ```
-□ gold QA seed → 목표 row 진행률 (finance 30/100, auto 46/100, cross 44/50+, ip 30/100)
+□ gold QA seed → 목표 row 진행률 (finance 30/100, auto 56/100, cross 49/50+, ip 30/100)
 □ 외부 큐레이터 비율 ≥ 30% (현재 0%)
 □ Allganize 외부 벤치 흡수 완료 여부
 □ ip 도메인 gold_answer 채움 (KIPRIS/USPTO 적재 후)
