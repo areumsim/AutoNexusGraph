@@ -73,8 +73,7 @@ def append(entry: dict[str, Any]) -> None:
         with _lock:
             with path.open("a", encoding="utf-8") as f:
                 f.write(line + "\n")
-    except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
-        # LLM 호출 흐름을 막지 않기 위해 silent.
+    except Exception as exc:   # noqa: BLE001 — [cost_log] JSONL append 실패 흡수 → debug log (LLM 호출 흐름 차단 방지)
         log.debug("[cost_log] append failed: %s", exc)
 
 

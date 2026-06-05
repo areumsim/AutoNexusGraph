@@ -79,7 +79,7 @@ def _fetch_one_applicant(applicant: str, *, year: int | None,
             )
             with urllib.request.urlopen(req, timeout=20) as resp:
                 payload = resp.read().decode("utf-8")
-        except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as e:   # noqa: BLE001 — [kipris] fetch 실패 (네트워크/auth) 흡수 → log + break (남은 page 포기)
             log.warning("[kipris] fetch 실패 (%s page=%d): %s",
                         applicant, page, e)
             break

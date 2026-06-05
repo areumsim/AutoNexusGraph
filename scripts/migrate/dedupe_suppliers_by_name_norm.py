@@ -33,7 +33,7 @@ def dedupe(*, dry_run: bool = False) -> dict:
     with get_session() as s:
         try:
             s.run("RETURN apoc.version()").single()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — apoc.version() 호출 실패 흡수 → apoc 미설치 안내 + 중단 (mergeNodes 의존, 진행 불가)
             log.error("apoc 필요(apoc.refactor.mergeNodes). 중단: %s", e)
             return {"groups": 0, "merged": 0, "error": "apoc_missing"}
 

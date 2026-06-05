@@ -109,7 +109,7 @@ def load_complaint_components(*, dry_run: bool = False,
             try:
                 s.run(_MERGE_COMPLAINT_OF, rows=chunk).consume()
                 stats.edges_created += len(chunk)
-            except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as e:   # noqa: BLE001 — [complaint→comp] Neo4j UNWIND chunk 실패 흡수 → errors 카운트 + 다음 chunk
                 stats.errors.append(f"chunk[{i}]: {e}")
 
     log.info(

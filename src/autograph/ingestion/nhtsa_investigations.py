@@ -100,7 +100,7 @@ def fetch_flat_inv(*, force: bool = False) -> Path:
         size = _download(FLAT_INV_URL, dest)
         log.info("[inv] downloaded %s (%.1f MB)", dest, size / 1024 / 1024)
         ckpt.mark_done(key, {"size": size, "url": FLAT_INV_URL})
-    except Exception as e:  # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+    except Exception as e:  # noqa: BLE001 — [inv] download 실패 boundary → checkpoint mark_failed + raise (silent 아님)
         log.exception("[inv] download failed")
         ckpt.mark_failed(key, str(e))
         raise

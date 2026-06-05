@@ -781,8 +781,7 @@ def synthesizer_node(state: AgentState,
             "ok": False, "error_type": "BudgetExceeded", "error": str(e),
             "llm_called": False, "fallback_used": "budget",
         }
-    except Exception as e:    # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
-        # fail-soft 유지 (eval 진행 보장) — 단, 실패 정보를 state 에 명시.
+    except Exception as e:    # noqa: BLE001 — [synth] LLM 합성 실패 흡수 → 결정적 brief 폴백 + state 에 실패 정보 명시 (eval 진행 보장)
         log.warning("[synth] LLM failed: %s: %s", type(e).__name__, e)
         from .answering import build_deterministic_brief
         state["answer"] = (

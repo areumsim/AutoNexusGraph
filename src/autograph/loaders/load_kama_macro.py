@@ -219,7 +219,7 @@ def run(*, root: Path | None = None,
                 else:
                     y_upd += 1
                 cur.execute("RELEASE SAVEPOINT sp_kama_y")
-            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:   # noqa: BLE001 — [load:kama_macro:yearly] 연간 row UPSERT 실패 흡수 → SAVEPOINT rollback + skip + 다음 year
                 cur.execute("ROLLBACK TO SAVEPOINT sp_kama_y")
                 log.warning("[load:kama_macro:yearly] %s 실패: %s", year, exc)
                 y_skip += 1
@@ -239,7 +239,7 @@ def run(*, root: Path | None = None,
                 else:
                     m_upd += 1
                 cur.execute("RELEASE SAVEPOINT sp_kama_m")
-            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:   # noqa: BLE001 — [load:kama_macro:monthly] 월별 row UPSERT 실패 흡수 → SAVEPOINT rollback + skip + 다음 month
                 cur.execute("ROLLBACK TO SAVEPOINT sp_kama_m")
                 log.warning("[load:kama_macro:monthly] %d-%02d 실패: %s",
                             year, month, exc)

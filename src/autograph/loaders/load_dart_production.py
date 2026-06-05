@@ -469,7 +469,7 @@ def _process_one_zip(cur, *, corp_code: str, rcept_no: str, zip_path: Path,
             else:
                 stats["capacity_updated"] += 1
             cur.execute("RELEASE SAVEPOINT sp_dart_cap")
-        except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as exc:   # noqa: BLE001 — [dart_prod] capacity UPSERT 실패 흡수 → SAVEPOINT rollback + skip 카운트 + 다음 row
             cur.execute("ROLLBACK TO SAVEPOINT sp_dart_cap")
             log.warning("[dart_prod] capacity %s/%s/%s 실패: %s",
                         corp_code, row.plant_code, row.year, exc)
@@ -487,7 +487,7 @@ def _process_one_zip(cur, *, corp_code: str, rcept_no: str, zip_path: Path,
             else:
                 stats["production_updated"] += 1
             cur.execute("RELEASE SAVEPOINT sp_dart_prod")
-        except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as exc:   # noqa: BLE001 — [dart_prod] production UPSERT 실패 흡수 → SAVEPOINT rollback + skip 카운트 + 다음 row
             cur.execute("ROLLBACK TO SAVEPOINT sp_dart_prod")
             log.warning("[dart_prod] production %s/%s/%s 실패: %s",
                         corp_code, row.plant_code, row.year, exc)
@@ -505,7 +505,7 @@ def _process_one_zip(cur, *, corp_code: str, rcept_no: str, zip_path: Path,
             else:
                 stats["utilization_updated"] += 1
             cur.execute("RELEASE SAVEPOINT sp_dart_util")
-        except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as exc:   # noqa: BLE001 — [dart_prod] utilization UPSERT 실패 흡수 → SAVEPOINT rollback + skip 카운트 + 다음 row
             cur.execute("ROLLBACK TO SAVEPOINT sp_dart_util")
             log.warning("[dart_prod] utilization %s/%s/%s 실패: %s",
                         corp_code, row.plant_code, row.year, exc)

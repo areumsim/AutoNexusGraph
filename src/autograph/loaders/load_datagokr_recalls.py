@@ -254,7 +254,7 @@ def run(csv_path: Path | None = None) -> dict:
                     inserted += 1
                 else:
                     updated += 1
-            except Exception as exc:  # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:  # noqa: BLE001 — [load:datagokr_recalls] 리콜 row UPSERT 실패 흡수 → SAVEPOINT rollback + skip + 다음 row
                 cur.execute("ROLLBACK TO SAVEPOINT sp_dg_recall")
                 log.warning("[load:datagokr_recalls] %s/%s 실패: %s",
                             filename, recall_no, exc)

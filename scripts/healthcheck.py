@@ -152,7 +152,7 @@ def main() -> int:
     for name in names:
         try:
             status, detail = CHECKS[name]()
-        except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as e:   # noqa: BLE001 — healthcheck 개별 checker 실패 흡수 → status='FAIL' 표시 + 다음 checker (전체 health probe 진행 보존)
             status, detail = "FAIL", f"checker crashed: {e}"
         line = f"{name:12s}  {status:8s}  {detail}"
         print(line)

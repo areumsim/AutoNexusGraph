@@ -291,7 +291,7 @@ def run_agent_stream(question: str, *,
                     turn.state = partial   # type: ignore[assignment]
                     yield (node_name, partial)
                 return
-            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:   # noqa: BLE001 — [run_agent_stream] LangGraph 실패 흡수 → 함수 체인 폴백 (LangGraph 미설치/오류 graceful)
                 log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
                 state = _init_state(question, thread_id, history, domain=domain,
                                     rerank=rerank, llm_planner=llm_planner)

@@ -218,7 +218,7 @@ def load_chunks() -> dict:
                     else:
                         skip += 1
                     cur.execute("RELEASE SAVEPOINT sp_chunk")
-                except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+                except Exception as exc:   # noqa: BLE001 — [load:openalex_chunks] chunk INSERT 실패 흡수 → SAVEPOINT rollback + skip 카운트 + 다음 chunk
                     cur.execute("ROLLBACK TO SAVEPOINT sp_chunk")
                     log.warning("[load:openalex_chunks] %s fail: %s", oa, exc)
                     skip += 1

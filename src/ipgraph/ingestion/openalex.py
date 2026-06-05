@@ -398,7 +398,7 @@ def run(*, max_institutions: int | None = None,
                 works = fetch_works_for_institution(
                     inst["openalex_id"], per_page=works_per_inst,
                     max_pages=1, from_year=from_year)
-            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:   # noqa: BLE001 — [openalex] works fetch 실패 흡수 → 빈 list + 다음 institution
                 log.warning("[openalex] works fetch fail %s: %s", inst["openalex_id"], exc)
                 works = []
 
@@ -431,7 +431,7 @@ def run(*, max_institutions: int | None = None,
                                                   pos, nw.get("publication_year"))
                         stats["work_inst_edges"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_wi")
-                    except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+                    except Exception as exc:   # noqa: BLE001 — [openalex:wi] work_institution edge 실패 흡수 → SAVEPOINT rollback + 다음 work
                         cur.execute("ROLLBACK TO SAVEPOINT sp_wi")
                         log.warning("[openalex:wi] %s/%s fail: %s",
                                     nw["openalex_id"], inst["ror_id"], exc)

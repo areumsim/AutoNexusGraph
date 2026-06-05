@@ -199,7 +199,7 @@ def run_oem(oem: str, *, dry_run: bool = False) -> dict:
                 else:
                     upd += 1
                 cur.execute("RELEASE SAVEPOINT sp_oem_ir")
-            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:   # noqa: BLE001 — [load:oem_ir] OEM IR row UPSERT 실패 흡수 → SAVEPOINT rollback + skip + 다음 row
                 cur.execute("ROLLBACK TO SAVEPOINT sp_oem_ir")
                 log.warning("[load:oem_ir:%s] %s 실패: %s",
                             oem, meta.get("url"), exc)

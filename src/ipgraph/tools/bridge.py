@@ -145,7 +145,7 @@ def cross_query_ip(corp_code: str,
             cur.execute(sql, params)
             for r in cur.fetchall():
                 counts[r[0]] = int(r[1])
-    except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+    except Exception as e:   # noqa: BLE001 — [ip.cross_query_ip] PG 조회 실패 흡수 → n_patents 0 으로 enrich 진행 (부분 성공 보존)
         log.warning("[ip.cross_query_ip] PG 실패: %s", e)
 
     enriched = [

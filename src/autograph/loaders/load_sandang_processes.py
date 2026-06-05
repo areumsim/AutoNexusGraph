@@ -166,7 +166,7 @@ def run(*, csv_path: str | None = None, dry_run: bool = False) -> dict:
                     inserted += 1
                 else:
                     updated += 1
-            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+            except Exception as exc:   # noqa: BLE001 — [load:sandang] 산단공 process row UPSERT 실패 흡수 → SAVEPOINT rollback + skip + 다음 row
                 cur.execute("ROLLBACK TO SAVEPOINT sp_sandang")
                 log.warning("[load:sandang] %s/%s/%s 실패: %s",
                             factory_no, process_order, process_name, exc)

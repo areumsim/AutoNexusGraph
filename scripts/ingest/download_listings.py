@@ -73,7 +73,7 @@ def main() -> int:
             path = out_dir / f"top_{label}_{n}.csv"
             _write_listings_csv(top, path)
             print(f"[OK] {path} ({len(top):,} rows; top cap: {top[0].name} = {top[0].market_cap:,})")
-        except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as e:   # noqa: BLE001 — [listings] market top N 다운로드 실패 흡수 → stderr 경고 + 다음 (market, n) 진행
             print(f"[WARN] {market} top {n} 실패: {e}", file=sys.stderr)
 
     # (선택) 전체 마스터도

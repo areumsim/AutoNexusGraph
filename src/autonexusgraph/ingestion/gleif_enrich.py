@@ -283,7 +283,7 @@ def enrich(*, rows: list[dict] | None = None,
                         stats["sec_lei_corp_filled"] += 1
                     stats["sec_lei_upserted"] += 1
                     cur.execute("RELEASE SAVEPOINT sp_sec_lei")
-                except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+                except Exception as exc:   # noqa: BLE001 — [gleif:sec_lei] LEI UPSERT 실패 흡수 → SAVEPOINT rollback + 다음 LEI 진행
                     cur.execute("ROLLBACK TO SAVEPOINT sp_sec_lei")
                     log.warning("[gleif:sec_lei] %s fail: %s", lei, exc)
 
@@ -318,7 +318,7 @@ def enrich(*, rows: list[dict] | None = None,
                         else:
                             stats["em_lei_updated"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_em")
-                    except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+                    except Exception as exc:   # noqa: BLE001 — [gleif:em] entity_map LEI 등록 실패 흡수 → SAVEPOINT rollback + 다음 corp 진행
                         cur.execute("ROLLBACK TO SAVEPOINT sp_em")
                         log.warning("[gleif:em] %s/%s fail: %s", cc, lei, exc)
 
@@ -352,7 +352,7 @@ def enrich(*, rows: list[dict] | None = None,
                             if mm == "lei":
                                 stats["bridge_match_upgraded"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_bridge")
-                    except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+                    except Exception as exc:   # noqa: BLE001 — [gleif:bridge] corp_entity LEI 보강 실패 흡수 → SAVEPOINT rollback + 다음 corp 진행
                         cur.execute("ROLLBACK TO SAVEPOINT sp_bridge")
                         log.warning("[gleif:bridge] %s/%s fail: %s", cc, lei, exc)
 
