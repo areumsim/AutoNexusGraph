@@ -102,7 +102,7 @@ def triage_node(state: AgentState) -> AgentState:
                 continue
             try:
                 hits = lookup_pg(word, limit=5)
-            except Exception:
+            except Exception:   # noqa: BLE001 — PG lookup 실패 흡수 → 빈 hits (다음 word 진행)
                 hits = []
             if not hits:
                 continue
@@ -643,7 +643,7 @@ def executor_node(state: AgentState) -> AgentState:
             continue
         try:
             out = fn(**args)
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — tool 실행 실패 흡수 → log + 다음 step (executor 진행)
             log.warning(f"[executor] {tool_name} failed: {e}")
             continue
         item = {"tool": tool_name, "purpose": step.get("purpose"), "args": args,

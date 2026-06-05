@@ -56,7 +56,7 @@ def _resolve_backend() -> str:
     try:
         from ..config import get_settings
         return get_settings().langgraph_checkpoint_backend
-    except Exception:
+    except Exception:   # noqa: BLE001 — config 로드 실패 흡수 → 기본값 'auto'
         return "auto"
 
 
@@ -68,7 +68,7 @@ def _resolve_schema() -> str:
     try:
         from ..config import get_settings
         return get_settings().langgraph_checkpoint_schema or "chat"
-    except Exception:
+    except Exception:   # noqa: BLE001 — config 로드 실패 흡수 → 기본값 'chat'
         return "chat"
 
 
@@ -83,7 +83,7 @@ def _resolve_dsn() -> str | None:
         s = get_settings()
         if getattr(s, "langgraph_checkpoint_dsn", ""):
             return s.langgraph_checkpoint_dsn
-    except Exception:
+    except Exception:   # noqa: BLE001 — config dsn 조회 실패 흡수 → env/postgres_dsn 폴백
         pass
     # 2) POSTGRES_DSN env
     raw = os.getenv("POSTGRES_DSN")
@@ -93,7 +93,7 @@ def _resolve_dsn() -> str | None:
     try:
         from ..config import get_settings
         return get_settings().postgres_dsn or None
-    except Exception:
+    except Exception:   # noqa: BLE001 — postgres_dsn 조회 실패 흡수 → None (체크포인트 비활성)
         return None
 
 

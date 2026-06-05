@@ -233,7 +233,7 @@ class CostTracker:
                     (self.state.run_id, self.state.caller, self.state.model,
                      json.dumps(self._build_meta())),
                 )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — cost telemetry 적재 실패 흡수 (LLM 호출 자체는 진행)
             log.warning(f"[COST] llm_usage init persist failed: {e}")
 
     def _persist_final(self, status: str) -> None:
@@ -258,7 +258,7 @@ class CostTracker:
                      status, json.dumps(self._build_meta()),
                      self.state.run_id),
                 )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — cost telemetry 적재 실패 흡수 (LLM 호출 결과 보존)
             log.warning(f"[COST] llm_usage final persist failed: {e}")
 
     def _persist_call(self, model: str, input_tokens: int, output_tokens: int,
@@ -277,7 +277,7 @@ class CostTracker:
                     (self.state.run_id, model, purpose, input_tokens,
                      output_tokens, cost, latency_ms),
                 )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — per-call telemetry 실패 흡수 (debug, llm_usage 통계로 충분)
             log.debug(f"[COST] llm_calls persist failed: {e}")
 
     # ── 컨텍스트 매니저 ────────────────────────────────────────

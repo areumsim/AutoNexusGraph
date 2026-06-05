@@ -178,7 +178,7 @@ def extract_one(
     try:
         out = client.chat_json(messages, schema=prompt["json_schema"],
                                 temperature=0.0, purpose=purpose)
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — P3 LLM 호출 실패 흡수 → None (다음 chunk, 부분 성공 보존)
         log.warning(f"[p3] chunk {chunk['id']} LLM failed: {e}")
         return None
 

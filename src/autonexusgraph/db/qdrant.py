@@ -40,5 +40,5 @@ def ping() -> bool:
         client = get_client()
         client.get_collections()
         return True
-    except Exception:
+    except Exception:   # noqa: BLE001 — Qdrant 미가용 흡수 → False (헬스체크)
         return False

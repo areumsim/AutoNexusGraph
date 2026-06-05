@@ -131,7 +131,7 @@ if user_input:
             title = generate_title_from_question(user_input)
             if title:
                 set_conversation_title(thread_id, title)
-        except Exception:
+        except Exception:   # noqa: BLE001 — title 생성/적재 실패 silent (nice-to-have, 메인 흐름 차단 안 함)
             pass
 
     # agent run — 노드별 진행 표시 (PRD §7.6.5) + HITL interrupt (PRD §7.5.6)
@@ -220,7 +220,7 @@ if user_input:
                 "validation_status": state.get("validation_status"),
                 "validation_issues": state.get("validation_issues"),
             }
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — agent 실행 실패 흡수 → UI 에 에러 메시지 표시 (앱 크래시 방지)
             answer = f"❌ 에이전트 실행 실패: {type(e).__name__}: {e}"
             citations = []
             turn_cost = 0.0

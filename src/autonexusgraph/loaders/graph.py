@@ -125,7 +125,7 @@ def load_graph_companies(
         if isinstance(extra, str):
             try:
                 extra = json.loads(extra)
-            except Exception:
+            except Exception:   # noqa: BLE001 — extra JSONB 파싱 실패 흡수 → 빈 dict
                 extra = {}
         elif extra is None:
             extra = {}

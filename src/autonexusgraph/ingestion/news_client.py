@@ -77,7 +77,7 @@ class NewsRssClient:
         for name, url in feeds.items():
             try:
                 items.extend(self.fetch(url, source_name=name))
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — feed 1개 실패 흡수 → log + 다음 feed (부분 성공 보존)
                 print(f"[WARN] {name} 실패: {e}")
         return items
 

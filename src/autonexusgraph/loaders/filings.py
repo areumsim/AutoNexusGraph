@@ -94,7 +94,7 @@ def load_filings(
                     cur.executemany(SQL_UPSERT, batch)
                     stats.inserted += len(batch)
                     stats.batches += 1
-                except Exception:
+                except Exception:   # noqa: BLE001 — batch 실패 카운트 후 raise (트랜잭션 rollback)
                     stats.failed += len(batch)
                     raise
     return stats

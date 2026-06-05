@@ -44,7 +44,7 @@ def ping() -> bool:
         with get_session() as session:
             result = session.run("RETURN 1 AS ok")
             return result.single()["ok"] == 1
-    except Exception:
+    except Exception:   # noqa: BLE001 — Neo4j 미가용 흡수 → False (헬스체크)
         return False
 
 

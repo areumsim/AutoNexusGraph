@@ -83,7 +83,7 @@ def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse
     try:
         state = run_agent(req.message, thread_id=req.thread_id,
                           history=history, domain=req.domain)
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — agent 실패 → HTTP 500 (HTTPException, raise)
         log.exception("[chat] agent failed")
         raise HTTPException(500, f"agent failed: {e}")
 
@@ -266,14 +266,14 @@ def health() -> dict:
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT 1")
         out["postgres"] = "ok"
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — PG ping 실패 → health response 에 error 표기
         out["postgres"] = f"error: {e}"
     try:
         from ..db.neo4j import get_session
         with get_session() as s:
             s.run("RETURN 1").consume()
         out["neo4j"] = "ok"
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — Neo4j ping 실패 → health response 에 error 표기
         out["neo4j"] = f"error: {e}"
     return out
 

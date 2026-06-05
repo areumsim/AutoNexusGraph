@@ -54,7 +54,7 @@ def load_history(thread_id: str, limit: int = 20) -> list[dict]:
                     "agent_trace": trace or {},
                     "created_at": created.isoformat() if created else None,
                 })
-    except Exception:
+    except Exception:   # noqa: BLE001 — PG 조회 실패 흡수 → 빈 history (UI 표시 우선)
         return []
     return list(reversed(out))
 
@@ -97,8 +97,7 @@ def persist_turn(
             ))
             row = cur.fetchone()
             return int(row[0]) if row else None
-    except Exception:
-        # UI 는 DB 적재 실패해도 화면은 보여야 함
+    except Exception:   # noqa: BLE001 — PG 적재 실패 흡수 → None (UI 화면 우선)
         return None
 
 
@@ -114,7 +113,7 @@ def set_conversation_title(thread_id: str, title: str) -> None:
     try:
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, (title[:200], thread_id))
-    except Exception:
+    except Exception:   # noqa: BLE001 — title UPDATE 실패 silent (nice-to-have)
         pass
 
 
@@ -128,7 +127,7 @@ def get_conversation_title(thread_id: str) -> str | None:
             )
             row = cur.fetchone()
             return row[0] if row else None
-    except Exception:
+    except Exception:   # noqa: BLE001 — title 조회 실패 흡수 → None (제목 미표시)
         return None
 
 
@@ -171,7 +170,7 @@ def generate_title_from_question(question: str) -> str:
         return title or fallback
     except BudgetExceeded:
         return fallback
-    except Exception:
+    except Exception:   # noqa: BLE001 — LLM 호출 실패 흡수 → fallback (질문 첫 30자)
         return fallback
 
 
@@ -193,7 +192,7 @@ def record_feedback(message_id: int, rating: int, comment: str | None = None) ->
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, (message_id, int(rating), comment))
         return True
-    except Exception:
+    except Exception:   # noqa: BLE001 — feedback UPSERT 실패 흡수 → False (UI 알림)
         return False
 
 
@@ -216,5 +215,5 @@ def list_recent_threads(limit: int = 10) -> list[dict]:
                  "updated_at": ts.isoformat() if ts else None, "n_messages": n}
                 for tid, title, ts, n in cur.fetchall()
             ]
-    except Exception:
+    except Exception:   # noqa: BLE001 — 사이드바 조회 실패 흡수 → 빈 리스트 (UI 표시 우선)
         return []

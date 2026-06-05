@@ -257,7 +257,7 @@ def start_turn_context(thread_id: str, state: dict, *,
     except BudgetExceeded:
         status = "aborted_budget"
         raise
-    except Exception:
+    except Exception:   # noqa: BLE001 — turn boundary → status='error' 마킹 후 raise (silent 아님)
         status = "error"
         raise
     finally:

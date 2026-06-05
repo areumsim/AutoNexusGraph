@@ -131,7 +131,7 @@ class ExtractorEngine:
                         if not other.done():
                             other.cancel()
                     raise
-                except Exception as e:
+                except Exception as e:   # noqa: BLE001 — extractor future 실패 흡수 → empty result + warning
                     result = ExtractorResult.empty(
                         ex.name, ex.version,
                         warnings=(f"future_error: {e}",),

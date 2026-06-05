@@ -47,7 +47,7 @@ def _build_row(target: dict, company_path: Path) -> dict[str, Any] | None:
     if company_path.exists():
         try:
             company = json.loads(company_path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception:   # noqa: BLE001 — JSON 파싱 실패 흡수 → 빈 dict (target 만 사용)
             company = {}
 
     # corp_name 우선순위: company.json > target.name_dart > target.name_krx
@@ -142,7 +142,7 @@ def load_companies(
                     # executemany 는 inserted/updated 구분 안 됨 — 합산만
                     stats.inserted += len(batch)
                     stats.batches += 1
-                except Exception:
+                except Exception:   # noqa: BLE001 — batch 실패 카운트 후 raise (트랜잭션 rollback)
                     stats.failed += len(batch)
                     raise
     return stats

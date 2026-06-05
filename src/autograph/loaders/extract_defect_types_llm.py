@@ -188,7 +188,7 @@ def upsert_defect_types(types: list[dict], *, model_tag: str) -> int:
         log.warning("[llm.taxonomy] upsert 실패 — rollback: %s", e)
         try:
             conn.rollback()
-        except Exception:
+        except Exception:   # noqa: BLE001 — rollback 자체 실패 silent (이미 연결 손상 가능성)
             pass
         raise
     return n

@@ -64,7 +64,7 @@ def ping() -> bool:
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
             return cur.fetchone()[0] == 1
-    except Exception:
+    except Exception:   # noqa: BLE001 — PG 미가용 흡수 → False (헬스체크)
         return False
 
 
@@ -83,7 +83,7 @@ def transaction() -> Iterator[Any]:
     try:
         yield conn
         conn.commit()
-    except Exception:
+    except Exception:   # noqa: BLE001 — 트랜잭션 실패 boundary → rollback 시도 후 raise (silent 아님)
         try:
             conn.rollback()
         except Exception:   # noqa: BLE001 — rollback 실패 = conn 손상 → cache 폐기

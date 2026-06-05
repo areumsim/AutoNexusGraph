@@ -165,11 +165,11 @@ def load_and_validate(path: Path | str) -> OntologyFile:
     p = Path(path)
     try:
         raw = yaml.safe_load(p.read_text(encoding="utf-8"))
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — yaml 파싱 실패 → OntologyValidationError 변환 (raise)
         raise OntologyValidationError(p, e) from e
     if not isinstance(raw, dict):
         raise OntologyValidationError(p, ValueError("최상위 구조가 dict 아님"))
     try:
         return validate_dict(raw)
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 검증 실패 → OntologyValidationError 변환 (raise)
         raise OntologyValidationError(p, e) from e
