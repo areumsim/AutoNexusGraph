@@ -247,29 +247,26 @@ def upsert_pg(rows: list[dict[str, Any]]) -> int:
     except Exception as e:   # noqa: BLE001 — PG 연결 실패 흡수 → graceful skip (db 미가동 환경)
         log.warning("[kamp.catalog] PG 미가용 — graceful skip: %s", e)
         return 0
+    # NOTE: get_connection() 은 @lru_cache(maxsize=1) 싱글톤 — close() 호출 금지.
+    # 닫으면 다음 호출자(다른 loader 포함)가 closed conn 을 받아 깨진다. 정리는
+    # db.postgres.close() 가 cache_clear 와 함께 일괄 처리.
     n = 0
     try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('anxg_auto.kamp_catalog')")
+            if cur.fetchone()[0] is None:
+                log.error("[kamp.catalog] anxg_auto.kamp_catalog 미생성 — "
+                          "make migrate-schema-pg MIGRATE_FILE=27_auto_kamp_catalog.sql 먼저")
+                return 0
+            for r in rows:
+                cur.execute(_UPSERT_SQL, r)
+                n += cur.rowcount or 0
+        conn.commit()
+    except Exception as e:   # noqa: BLE001 — PG 적재 실패 흡수 → rollback 후 log (다음 호출 시 재시도)
+        log.warning("[kamp.catalog] PG 적재 실패 (fail-soft): %s", e)
         try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT to_regclass('anxg_auto.kamp_catalog')")
-                if cur.fetchone()[0] is None:
-                    log.error("[kamp.catalog] anxg_auto.kamp_catalog 미생성 — "
-                              "make migrate-schema-pg MIGRATE_FILE=27_auto_kamp_catalog.sql 먼저")
-                    return 0
-                for r in rows:
-                    cur.execute(_UPSERT_SQL, r)
-                    n += cur.rowcount or 0
-            conn.commit()
-        except Exception as e:   # noqa: BLE001 — PG 적재 실패 흡수 → rollback 후 log (다음 호출 시 재시도)
-            log.warning("[kamp.catalog] PG 적재 실패 (fail-soft): %s", e)
-            try:
-                conn.rollback()
-            except Exception:   # noqa: BLE001 — rollback 자체 실패 silent (이미 연결 손상 가능성)
-                pass
-    finally:
-        try:
-            conn.close()
-        except Exception:   # noqa: BLE001 — close 실패 silent (이미 손상된 connection 가능성)
+            conn.rollback()
+        except Exception:   # noqa: BLE001 — rollback 자체 실패 silent (이미 연결 손상 가능성)
             pass
     return n
 

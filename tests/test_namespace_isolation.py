@@ -237,6 +237,66 @@ def test_no_bare_labels_in_cypher_templates():
         "\n".join(violations[:20])
 
 
+def test_no_close_on_singleton_get_connection():
+    """`get_connection()` 은 @lru_cache 싱글톤 — `conn.close()` 호출 금지.
+
+    회귀 가드: 본 세션 검토 중 kamp_catalog.upsert_pg 에 try/finally close 를
+    추가했다가 발견. 싱글톤 conn 을 닫으면 다음 호출자가 closed conn 을 받아
+    깨진다 (psycopg `the connection is closed`). 정리는 db.postgres.close() 가
+    cache_clear 와 함께 일괄 처리.
+
+    허용: db/postgres.py 의 close() 함수 자체 (cache_clear 와 같이 호출).
+    """
+    import ast
+
+    violations = []
+    for root in ('src',):
+        for p in (REPO / root).rglob('*.py'):
+            # db/postgres.py 자체는 close() 정의·구현이라 예외.
+            if p.name == 'postgres.py' and p.parent.name == 'db':
+                continue
+            try:
+                text = p.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if 'get_connection' not in text:
+                continue
+            try:
+                tree = ast.parse(text)
+            except Exception:
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                src = ast.unparse(node)
+                if 'get_connection()' not in src:
+                    continue
+                # `conn = get_connection()` 형태에서 변수명 추출 후 close() 호출 검사.
+                lines = src.split('\n')
+                for i, ln in enumerate(lines):
+                    s = ln.strip()
+                    if not s.endswith('= get_connection()'):
+                        continue
+                    var = s.split('=')[0].strip()
+                    remaining = '\n'.join(lines[i:])
+                    if f'{var}.close()' in remaining:
+                        violations.append(
+                            f"{p.relative_to(REPO)}:{node.name}: "
+                            f"`{var}.close()` 호출 — 싱글톤 conn 닫으면 후속 호출 깨짐"
+                        )
+                        break
+                # `get_connection().close()` 직접 호출도 금지.
+                if 'get_connection().close()' in src:
+                    violations.append(
+                        f"{p.relative_to(REPO)}:{node.name}: "
+                        f"`get_connection().close()` 직접 호출 — db.postgres.close() 사용 권장"
+                    )
+
+    assert not violations, \
+        "싱글톤 get_connection() 에 close() 호출 발견 (다음 호출자 깨짐):\n" + \
+        "\n".join(violations[:10])
+
+
 def test_no_bare_pg_schemas_in_sql_strings():
     """src/scripts 의 SQL 문자열에 bare schema 가 없어야 한다 (anxg_ 프리픽스 강제)."""
     bare_schemas = ('master', 'auto', 'bridge', 'sec', 'wiki', 'ip', 'vec',
