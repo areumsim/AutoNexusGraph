@@ -79,7 +79,7 @@ def main() -> int:
         for year in years:
             try:
                 rows = cli.fetch_groups(year)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 print(f"[FTC] {year} 실패: {e}")
                 continue
             save_raw("ftc", f"{year}/groups.json", rows)

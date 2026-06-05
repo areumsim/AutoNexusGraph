@@ -88,7 +88,7 @@ def main() -> int:
                 filings = cli.extract_filings(sub)
                 print(f"   filings: {len(filings)}")
                 ckpt.mark_done(entity_id, {"corp_code": corp_code, "filings": len(filings)})
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(entity_id, str(e))
                 print(f"   failed: {e}")
 

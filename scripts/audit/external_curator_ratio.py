@@ -106,7 +106,7 @@ def scan() -> dict:
                 slot["n"] += 1
                 if _is_external(row):
                     slot["ext"] += 1
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
             log.warning("[ratio] read %s 실패: %s", fp.name, exc)
             continue
         total_n += n

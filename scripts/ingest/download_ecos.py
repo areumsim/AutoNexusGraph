@@ -81,7 +81,7 @@ def main() -> int:
                     stat_code=meta["stat_code"], start=start, end=end,
                     cycle=cycle, item_code1=meta["item"],
                 )
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 print(f"[WARN] {name} 실패: {e}", file=sys.stderr)
                 continue
             out_path = out_dir / f"{name}.jsonl"

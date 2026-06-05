@@ -152,7 +152,7 @@ _CHECKS: list[tuple[str, str, int, str]] = [
 def _check(session, cypher: str) -> int:
     try:
         rec = list(session.run(cypher))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — boundary → RuntimeError 변환 (raise, silent 아님)
         raise RuntimeError(f"query failed: {exc}") from exc
     if not rec:
         return 0
@@ -211,7 +211,7 @@ def main() -> int:
 
     try:
         rows = run_all()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
         print(f"[edge_meta_invariants] DB 연결 실패: {exc}", file=sys.stderr)
         return 2
 

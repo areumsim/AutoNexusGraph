@@ -1,13 +1,13 @@
-"""broad-except 위생 회귀 가드 — src/ 영역.
+"""broad-except 위생 회귀 가드 — src/ + scripts/.
 
-R1~R9 누적 처리 결과 보존:
+R1~R10 누적 처리 결과 보존:
 - bare `except:` (모든 예외 + KeyboardInterrupt 도 잡음) 절대 금지.
 - `except Exception:` 은 반드시 `# noqa: BLE001 — <사유>` 동반.
 
 목적은 silent swallow 의 신규 유입 차단. 사유가 명시되면 reviewer 가 의도를
 검토 가능하고, `BLE001` 룰이 활성화되어 ruff/flake8 이 자동으로 잡아준다.
 
-검사 범위: `src/` 만. `scripts/` 는 별도 라운드(R10 예정) 후 확장.
+검사 범위: `src/` + `scripts/`. R10 에서 scripts/ 정리 완료 후 확장.
 `tests/` 는 의도된 except (예외 동작 테스트) 가 있어 제외.
 
 예외:
@@ -23,7 +23,15 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
-SRC = REPO / "src"
+SCAN_ROOTS = (REPO / "src", REPO / "scripts")
+
+
+def _iter_python_files():
+    for root in SCAN_ROOTS:
+        if not root.is_dir():
+            continue
+        for p in root.rglob("*.py"):
+            yield p
 
 
 def _code_lines(text: str) -> set[int]:
@@ -64,7 +72,7 @@ def test_no_naked_except_clause():
     """
     pat = re.compile(r'^\s*except\s*:\s*(?:#.*)?$')
     violations: list[str] = []
-    for p in SRC.rglob("*.py"):
+    for p in _iter_python_files():
         text = p.read_text(encoding="utf-8")
         code_lines = _code_lines(text)
         for i, line in enumerate(text.splitlines(), 1):
@@ -91,7 +99,7 @@ def test_except_exception_has_noqa_with_reason():
     noqa_with_reason = re.compile(r'#\s*noqa:\s*BLE001\s+—\s*\S')
 
     violations: list[str] = []
-    for p in SRC.rglob("*.py"):
+    for p in _iter_python_files():
         text = p.read_text(encoding="utf-8")
         code_lines = _code_lines(text)
         for i, line in enumerate(text.splitlines(), 1):
@@ -118,7 +126,7 @@ def test_noqa_ble001_reason_not_empty():
     """
     pat = re.compile(r'#\s*noqa:\s*BLE001\s+—\s*(.+?)\s*$')
     violations: list[str] = []
-    for p in SRC.rglob("*.py"):
+    for p in _iter_python_files():
         text = p.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):
             m = pat.search(line)

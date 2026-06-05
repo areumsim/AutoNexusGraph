@@ -69,7 +69,7 @@ def _make_embed_app(model_name: str, device: str):
                                 convert_to_numpy=True, batch_size=32,
                                 show_progress_bar=False)
             return vecs.tolist()
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — boundary → HTTPException 변환 (raise, silent 아님)
             raise HTTPException(500, str(e)) from e
 
     return app
@@ -104,7 +104,7 @@ def _make_rerank_app(model_name: str, device: str):
                 key=lambda x: x["score"], reverse=True,
             )
             return ranked
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — boundary → HTTPException 변환 (raise, silent 아님)
             raise HTTPException(500, str(e)) from e
 
     return app

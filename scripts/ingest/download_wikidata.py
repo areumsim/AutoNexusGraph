@@ -187,7 +187,7 @@ def step_b(corp_to_qid: dict[str, str] | None = None, limit: int | None = None,
                 if i % 20 == 0:
                     print(f"  [{i}/{len(targets)}] done={ckpt.stats.done} "
                           f"failed={ckpt.stats.failed}")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 ckpt.mark_failed(qid, str(e))
 
     print(f"\n[step-b] done={ckpt.stats.done} failed={ckpt.stats.failed}")

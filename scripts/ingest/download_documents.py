@@ -181,7 +181,7 @@ def main() -> int:
                 tmp.rename(zip_path)
                 summary["ok"] += 1
                 bytes_total += len(content)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 _append_failed(out_dir, corp_code, rcept_no, str(e))
                 summary["fail"] += 1
             call_count += 1

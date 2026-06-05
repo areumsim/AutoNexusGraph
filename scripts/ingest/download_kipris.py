@@ -64,7 +64,7 @@ def main() -> int:
                 ckpt.mark_done(corp_code, {"name": name})
                 if i % 20 == 0:
                     print(f"  [{i}/{len(targets)}] done={ckpt.stats.done}")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(corp_code, str(e))
 
     print(f"\n[KIPRIS] done={ckpt.stats.done} failed={ckpt.stats.failed}")

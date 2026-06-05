@@ -148,7 +148,7 @@ def _load_corp_codes_from_db() -> set[str] | None:
         from autograph.tools._db import query_dicts
         rows = query_dicts("SELECT corp_code FROM anxg_master.companies", ())
         return {str(r["corp_code"]) for r in rows if r.get("corp_code")}
-    except Exception:
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → None 반환
         return None
 
 

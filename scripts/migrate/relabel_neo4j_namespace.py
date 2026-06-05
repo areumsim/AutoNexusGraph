@@ -55,7 +55,7 @@ def _has_apoc(session) -> bool:
     try:
         session.run("RETURN apoc.version() AS v").single()
         return True
-    except Exception:
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → False 반환
         return False
 
 

@@ -111,7 +111,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                          WHERE entity_type='supplier' AND entity_id=%s
                     """, (new_entity_id, entity_id_old))
                 stats["migrated"] += 1
-            except Exception as e:   # noqa: BLE001
+            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 stats["errors"] += 1
                 log.warning("[migrate] %s 실패: %s", entity_id_old, e)
                 conn.rollback()

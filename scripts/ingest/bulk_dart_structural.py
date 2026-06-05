@@ -174,7 +174,7 @@ def main() -> int:
                     method = getattr(client, APIS[api_kind])
                     try:
                         rows = method(corp_code, str(year))
-                    except Exception as e:
+                    except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                         _append_failed(out_dir, corp_code, year, api_kind, str(e))
                         summary["fail"] += 1
                         call_count += 1

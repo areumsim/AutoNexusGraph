@@ -96,7 +96,7 @@ def main() -> int:
                             corp_code=cc, bsns_year=str(y),
                             reprt_code=rc, fs_div=args.fs_div,
                         )
-                    except Exception as e:
+                    except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                         print(f"[WARN] {cc}/{y}/{rc} 실패: {e}", file=sys.stderr)
                         continue
                     if not rows:
