@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from autograph.loaders import load_master_korean_aliases as L
+from autograph.loaders.master import load_master_korean_aliases as L
 
 
 def test_existing_aliases_shape():

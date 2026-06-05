@@ -11,7 +11,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def seed():
-    from autograph.loaders.load_materials_metals import load_seed
+    from autograph.loaders.materials.load_materials_metals import load_seed
     return load_seed()
 
 
@@ -22,7 +22,7 @@ def test_seed_loads_non_empty(seed):
 
 
 def test_material_rows_shape(seed):
-    from autograph.loaders.load_materials_metals import _build_material_rows
+    from autograph.loaders.materials.load_materials_metals import _build_material_rows
     rows = _build_material_rows(seed)
     assert len(rows) == len(seed["materials"])
     for r in rows:
@@ -38,7 +38,7 @@ def test_material_rows_shape(seed):
 
 
 def test_made_of_rows_flatten(seed):
-    from autograph.loaders.load_materials_metals import _build_made_of_rows
+    from autograph.loaders.materials.load_materials_metals import _build_made_of_rows
     rows = _build_made_of_rows(seed)
     # 모든 entry 의 materials 합산과 같아야 함.
     expected = sum(len(e.get("materials") or []) for e in seed["module_to_materials"])
@@ -56,7 +56,7 @@ def test_made_of_rows_use_anxg_module_label():
 
     namespace 격리 commit fb1c925 후속 — bare `:Module` / `:Material` 잔재 차단.
     """
-    from autograph.loaders import load_materials_metals as L
+    from autograph.loaders.materials import load_materials_metals as L
     assert "Anxg_Module" in L._MERGE_MADE_OF
     assert "Anxg_Material" in L._MERGE_MADE_OF
     assert ":Module" not in L._MERGE_MADE_OF  # bare 잔재 없음
@@ -65,7 +65,7 @@ def test_made_of_rows_use_anxg_module_label():
 
 def test_made_of_includes_7key_edge_meta():
     """PRD §6.7 — 7-key meta 모두 SET. namespace 격리 후속 회귀 가드."""
-    from autograph.loaders import load_materials_metals as L
+    from autograph.loaders.materials import load_materials_metals as L
     for k in ("source_type", "source_id", "confidence_score",
               "validated_status", "snapshot_year",
               "extraction_method", "schema_version"):
@@ -73,7 +73,7 @@ def test_made_of_includes_7key_edge_meta():
 
 
 def test_constraint_uses_anxg_label():
-    from autograph.loaders import load_materials_metals as L
+    from autograph.loaders.materials import load_materials_metals as L
     assert "Anxg_Material" in L._CONSTRAINT_MATERIAL
 
 
@@ -82,13 +82,13 @@ def test_made_of_uses_candidate_grade():
 
     docstring 기재된 등급 정합 (OEM IR/MSDS 들어오면 격상) 의 회귀 가드.
     """
-    from autograph.loaders import load_materials_metals as L
+    from autograph.loaders.materials import load_materials_metals as L
     assert L._CONF_EDGE_C == 0.50
 
 
 def test_dry_run_returns_preview():
     """dry_run=True → DB 호출 없이 preview dict 반환."""
-    from autograph.loaders.load_materials_metals import run
+    from autograph.loaders.materials.load_materials_metals import run
     out = run(dry_run=True, snapshot_year=2026)
     assert out["snapshot_year"] == 2026
     assert "preview" in out
@@ -103,7 +103,7 @@ def test_dry_run_returns_preview():
 
 def test_run_returns_stats_dict_shape():
     """LoadStats 직렬화 형태 — JSON 출력용."""
-    from autograph.loaders.load_materials_metals import LoadStats
+    from autograph.loaders.materials.load_materials_metals import LoadStats
     s = LoadStats()
     d = s.__dict__
     for k in ("materials_merged", "module_mappings_seen", "made_of_merged",
@@ -113,6 +113,6 @@ def test_run_returns_stats_dict_shape():
 
 def test_seed_path_missing_returns_none(tmp_path):
     """seed 미존재 시 graceful skip (None 반환)."""
-    from autograph.loaders.load_materials_metals import load_seed
+    from autograph.loaders.materials.load_materials_metals import load_seed
     fake = tmp_path / "no_such.yaml"
     assert load_seed(fake) is None

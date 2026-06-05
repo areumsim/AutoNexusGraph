@@ -37,7 +37,7 @@ def test_fetch_flat_tsbs_returns_cached_path(tmp_path, monkeypatch):
 
 # ── loader 모듈 ────────────────────────────────────────────
 def test_loader_module_importable():
-    from autograph.loaders import load_auto_mfrcomm as L
+    from autograph.loaders.master import load_auto_mfrcomm as L
     assert L._SOURCE_KEY == "nhtsa_tsb"
     assert L._SECTION == "auto.mfrcomm"
     assert len(L._COLUMNS) == 14
@@ -46,7 +46,7 @@ def test_loader_module_importable():
 
 
 def test_parse_year_handles_9999():
-    from autograph.loaders.load_auto_mfrcomm import _parse_year
+    from autograph.loaders.master.load_auto_mfrcomm import _parse_year
     assert _parse_year("2024") == 2024
     assert _parse_year("9999") is None     # sentinel
     assert _parse_year("") is None
@@ -56,7 +56,7 @@ def test_parse_year_handles_9999():
 
 # ── _compose_text ──────────────────────────────────────────
 def test_compose_text_full():
-    from autograph.loaders.load_auto_mfrcomm import _compose_text
+    from autograph.loaders.master.load_auto_mfrcomm import _compose_text
     txt = _compose_text({
         "COMMUNICATION_TYPE":        "Service Bulletin",
         "NHTSA_COMPONENTS":          "AIR BAGS, SEAT BELTS",
@@ -72,13 +72,13 @@ def test_compose_text_full():
 
 
 def test_compose_text_minimal():
-    from autograph.loaders.load_auto_mfrcomm import _compose_text
+    from autograph.loaders.master.load_auto_mfrcomm import _compose_text
     txt = _compose_text({"SUMMARY": "Just summary."})
     assert txt == "요약: Just summary."
 
 
 def test_compose_text_empty():
-    from autograph.loaders.load_auto_mfrcomm import _compose_text
+    from autograph.loaders.master.load_auto_mfrcomm import _compose_text
     assert _compose_text({}) == ""
     assert _compose_text({"COMMUNICATION_TYPE": "  ", "SUMMARY": ""}) == ""
 
@@ -92,7 +92,7 @@ def _make_tsb_zip(zip_path: Path, rows: list[list[str]],
 
 
 def test_iter_rows_basic(tmp_path):
-    from autograph.loaders.load_auto_mfrcomm import _iter_rows
+    from autograph.loaders.master.load_auto_mfrcomm import _iter_rows
     zp = tmp_path / "FLAT_TSBS.zip"
     _make_tsb_zip(zp, [
         # 14 컬럼 row.
@@ -115,7 +115,7 @@ def test_iter_rows_basic(tmp_path):
 
 
 def test_find_zip_priorities(tmp_path, monkeypatch):
-    from autograph.loaders import load_auto_mfrcomm as L
+    from autograph.loaders.master import load_auto_mfrcomm as L
     monkeypatch.setattr(L, "_mfrcomm_root", lambda: tmp_path)
     assert L._find_zip() is None
 
@@ -132,7 +132,7 @@ def test_find_zip_priorities(tmp_path, monkeypatch):
 
 # ── _process_row — 매칭 + UPSERT ──────────────────────────
 def test_process_row_skips_no_summary():
-    from autograph.loaders.load_auto_mfrcomm import LoadStats, _process_row
+    from autograph.loaders.master.load_auto_mfrcomm import LoadStats, _process_row
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None
     cur.fetchone = lambda: None
@@ -148,7 +148,7 @@ def test_process_row_skips_no_summary():
 
 
 def test_process_row_skips_no_id():
-    from autograph.loaders.load_auto_mfrcomm import LoadStats, _process_row
+    from autograph.loaders.master.load_auto_mfrcomm import LoadStats, _process_row
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None
     cur.fetchone = lambda: None
@@ -159,7 +159,7 @@ def test_process_row_skips_no_id():
 
 def test_process_row_variant_matched_inserts(monkeypatch):
     """variant 1개 매칭 → 1청크 insert."""
-    from autograph.loaders import load_auto_mfrcomm as L
+    from autograph.loaders.master import load_auto_mfrcomm as L
 
     inserts: list[tuple] = []
     cur = MagicMock()
@@ -204,7 +204,7 @@ def test_process_row_variant_matched_inserts(monkeypatch):
 
 def test_process_row_unmatched_still_chunks(monkeypatch):
     """make 매칭 0 → unmatched 카운트 + manufacturer/model/variant 모두 NULL 청크."""
-    from autograph.loaders import load_auto_mfrcomm as L
+    from autograph.loaders.master import load_auto_mfrcomm as L
 
     inserts: list[tuple] = []
     cur = MagicMock()
@@ -235,7 +235,7 @@ def test_process_row_unmatched_still_chunks(monkeypatch):
 
 def test_process_row_year_9999_falls_back_to_model_level(monkeypatch):
     """MODEL_YEAR=9999 → variant 매칭 skip → model 단위 1청크만."""
-    from autograph.loaders import load_auto_mfrcomm as L
+    from autograph.loaders.master import load_auto_mfrcomm as L
 
     inserts: list[tuple] = []
     cur = MagicMock()

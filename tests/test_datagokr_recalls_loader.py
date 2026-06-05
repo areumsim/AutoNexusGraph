@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest import mock
 
-from autograph.loaders import load_datagokr_recalls as L
+from autograph.loaders.recall import load_datagokr_recalls as L
 from autonexusgraph.ingestion._common import normalize_corp_name
 
 

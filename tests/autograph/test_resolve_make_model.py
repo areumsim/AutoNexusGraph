@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from autograph.loaders.load_auto_pg import _resolve_make_model_variant
+from autograph.loaders.master.load_auto_pg import _resolve_make_model_variant
 
 
 def _cursor(fetchone_results):

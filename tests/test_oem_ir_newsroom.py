@@ -342,7 +342,7 @@ def test_list_policies_returns_all():
 # ── loader 라이선스 게이트 ──────────────────────────────────────
 def test_loader_skips_when_meta_missing(monkeypatch, tmp_path):
     """raw _meta.jsonl 없으면 graceful skip."""
-    from autograph.loaders import load_oem_ir_news as LD
+    from autograph.loaders.chunks import load_oem_ir_news as LD
 
     class FakeSettings:
         ingest_raw_dir = tmp_path
@@ -354,7 +354,7 @@ def test_loader_skips_when_meta_missing(monkeypatch, tmp_path):
 
 def test_loader_dry_run_reports_tier(monkeypatch, tmp_path):
     """dry_run=True 시 tier 정보 노출."""
-    from autograph.loaders import load_oem_ir_news as LD
+    from autograph.loaders.chunks import load_oem_ir_news as LD
 
     oem_dir = tmp_path / "auto" / "oem_ir" / "hyundai"
     oem_dir.mkdir(parents=True)

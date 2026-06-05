@@ -10,7 +10,7 @@
     1) https://www.nhtsa.gov/nhtsa-datasets-and-apis 또는 file-downloads 에서
        "Manufacturer Communications Flat File" 또는 FLAT_TSBS.zip 을 직접 다운.
     2) ``data/raw/auto/nhtsa_mfrcomm/FLAT_TSBS.zip`` 에 그대로 배치.
-    3) ``python -m autograph.loaders.load_auto_mfrcomm`` 실행.
+    3) ``python -m autograph.loaders.master.load_auto_mfrcomm`` 실행.
 
 스키마 (static.nhtsa.gov/odi/ffdd/tsbs/TSBS.txt 에서 확인됨, TAB-delimited 14 컬럼):
 
@@ -58,7 +58,7 @@ INSTRUCTIONS = """
      클릭 → FLAT_TSBS.zip (또는 FLAT_MFRCOMM.zip) 저장.
   3. 다음 경로에 배치:
         {dest}
-  4. python -m autograph.loaders.load_auto_mfrcomm 실행.
+  4. python -m autograph.loaders.master.load_auto_mfrcomm 실행.
 
 또는 https://data.transportation.gov/Automobiles/.../fmyn-qyh5 페이지에서 직접
 다운로드 (제공 시).

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from autograph.loaders.load_auto_safety import (
+from autograph.loaders.recall.load_auto_safety import (
     _RATING_MAP,
     _parse_pct,
     _parse_star,
@@ -89,7 +89,7 @@ def test_star_fields_have_star_unit():
 def test_safety_modules_importable():
     """ingestion + loader 둘 다 import 가능 (cypher_guard 등 의존 깨지지 않음)."""
     import autograph.ingestion.nhtsa_safety_ratings as ing
-    import autograph.loaders.load_auto_safety as ldr
+    import autograph.loaders.recall.load_auto_safety as ldr
 
     # ingestion module
     assert hasattr(ing, "fetch_safety_ratings")

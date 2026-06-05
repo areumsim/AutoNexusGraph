@@ -10,7 +10,7 @@ import zipfile
 from unittest import mock
 
 from autograph.extractors.dart_production_parser import PlantRow
-from autograph.loaders import load_dart_production as L
+from autograph.loaders.process import load_dart_production as L
 
 
 # ── OEM_CORP_CODES 형태 ───────────────────────────────────────

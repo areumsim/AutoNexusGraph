@@ -7,7 +7,7 @@ P176 행이 0이었다(B7). 본 routine 은 **우리 supplier QID 집합을 VALU
 
 산출: data/raw/auto/wikidata/part_supplies.jsonl (loader 가 기대하는 스키마):
     {"part_qid","partLabel","supplier_qid","supplierLabel"}
-후속: python -m autograph.loaders.load_wikidata_part_supplies  → anxg_auto.staging_relations.
+후속: python -m autograph.loaders.master.load_wikidata_part_supplies  → anxg_auto.staging_relations.
 
 사용:
     python scripts/ingest/ingest_wikidata_part_supplies.py [--limit 3000] [--max-suppliers 60]

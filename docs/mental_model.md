@@ -577,7 +577,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 | NHTSA Complaints | auto | [확정] 활성 | 16,005 (97% 매핑) |
 | NHTSA SafetyRatings | auto | [확정] 활성 | `spec_measurements.safety.ncap.*` |
 | AI Hub (부품 결함 71347, 자율 578) | auto | [확정] 활성 | `:Module` + CONTAINS_COMPONENT |
-| data.go.kr 3048950 (한국 리콜 CSV) | auto | [확정] 941 row 적재 (구 15089863 API 폐기) | `loaders/load_datagokr_recalls.py --csv` |
+| data.go.kr 3048950 (한국 리콜 CSV) | auto | [확정] 941 row 적재 (구 15089863 API 폐기) | `loaders/recall/load_datagokr_recalls.py --csv` |
 | data.go.kr 15155857 (수리검사 CSV) | auto | [잠정] 인터페이스 wired, raw 수동 | `ingestion/datagokr_inspections.py` |
 | car.go.kr | auto | [잠정] CSV 파서만, 공식 API 미정 | `ingestion/car_go_kr_recalls.py` |
 | KATRI (bigdata-tic) | auto | [잠정] OAuth 인터페이스, credentials 필요 | `ingestion/katri_tic.py` |

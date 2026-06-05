@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # ── M-11 factoryon ────────────────────────────────────────────
 def test_factoryon_normalize_row():
-    from autograph.loaders.load_factoryon import _normalize_row
+    from autograph.loaders.process.load_factoryon import _normalize_row
     item = {
         "fctryManageNo": "F123",
         "cmpnyNm":       "현대모비스",
@@ -40,7 +40,7 @@ def test_factoryon_normalize_row():
 
 def test_factoryon_collect_rows_empty_when_no_raw(tmp_path):
     """raw 디렉토리 미존재 → 0 rows."""
-    from autograph.loaders.load_factoryon import collect_rows
+    from autograph.loaders.process.load_factoryon import collect_rows
     empty = tmp_path / "factoryon_missing"
     rows = collect_rows(empty)
     assert rows == []
@@ -48,7 +48,7 @@ def test_factoryon_collect_rows_empty_when_no_raw(tmp_path):
 
 def test_factoryon_dedup_by_factory_no(tmp_path):
     """동일 factory_no 가 두 파일에 있을 때 dedup."""
-    from autograph.loaders.load_factoryon import collect_rows
+    from autograph.loaders.process.load_factoryon import collect_rows
     base = tmp_path / "ft"
     (base / "by_company").mkdir(parents=True)
     (base / "by_factory_no").mkdir(parents=True)
@@ -108,7 +108,7 @@ def test_plant_utilization_table_in_pg_schema():
 
 # ── M-13 KOSIS ────────────────────────────────────────────────
 def test_kosis_loader_coerce_rows():
-    from autograph.loaders.load_kosis_industry import _coerce_rows
+    from autograph.loaders.process.load_kosis_industry import _coerce_rows
     raw = [
         {"TBL_ID": "DT_X", "ITM_ID": "I1", "PRD_DE": "202401",
          "DT": "108.5", "UNIT_NM": "지수",
@@ -127,7 +127,7 @@ def test_kosis_loader_coerce_rows():
 
 def test_kosis_loader_handles_null_dt():
     """DT='-' 또는 빈 값 → value=None."""
-    from autograph.loaders.load_kosis_industry import _coerce_rows
+    from autograph.loaders.process.load_kosis_industry import _coerce_rows
     raw = [{"TBL_ID": "DT_X", "ITM_ID": "I1", "PRD_DE": "2024",
             "DT": "-", "UNIT_NM": "지수"}]
     out = _coerce_rows(raw, stat_code_hint="manufacturing")
@@ -135,7 +135,7 @@ def test_kosis_loader_handles_null_dt():
 
 
 def test_kosis_loader_empty_when_no_raw(tmp_path):
-    from autograph.loaders.load_kosis_industry import collect_rows
+    from autograph.loaders.process.load_kosis_industry import collect_rows
     rows = collect_rows(tmp_path / "kosis_missing")
     assert rows == []
 
@@ -175,7 +175,7 @@ def test_materials_seed_yaml_present():
 
 
 def test_load_usgs_minerals_module_importable():
-    from autograph.loaders import load_usgs_minerals
+    from autograph.loaders.materials import load_usgs_minerals
     # _SCHEMA_VERSION 이 default_schema_version() 의 'v2.2' 인지 (B1 fix).
     assert load_usgs_minerals._SCHEMA_VERSION == "v2.2"
 

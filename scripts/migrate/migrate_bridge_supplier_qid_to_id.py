@@ -34,7 +34,7 @@ from pathlib import Path
 # repo src 를 path 에 추가 (scripts 실행 시).
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from autograph.loaders.load_bridge import _ensure_supplier
+from autograph.loaders.master.load_bridge import _ensure_supplier
 from autonexusgraph.db.postgres import get_connection
 
 log = logging.getLogger(__name__)
