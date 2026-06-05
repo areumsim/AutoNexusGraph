@@ -6,7 +6,7 @@
 >
 > **갱신 주기**: PR 마지막 단계에서 항목 추가·이동·완료. `make audit-dod` 가 자동 반영하는 항목은 (자동) 라벨.
 >
-> **버전**: v1.0 (2026-06-02, README v3.0 통합 시 신설). **83 항목 / 15 카테고리 / P0+/P0/P1/P2/P3 트래픽라이트**.
+> **버전**: v1.1 (2026-06-05, 본 세션 발견 anchor — O-7/O-8/E-8/F-8 추가). **86 항목 / 15 카테고리 / P0+/P0/P1/P2/P3 트래픽라이트** (이전 v1.0 "83 항목" 표기는 카테고리별 카운트 합과 안 맞아 본 PR 에서 정정).
 
 ---
 
@@ -18,10 +18,10 @@
 | 2. 그래프·엣지 적재 | 6 | 1 | 1 | 2 | 2 |
 | 3. 에이전트·도구·HITL | 6 | 0 | 2 | 2 | 2 |
 | 4. 상용 신호 (MCP / Langfuse / SHACL / 매트릭스) | 6 | 0 | 3 | 2 | 1 |
-| 5. 운영·보안·배포 | 6 | 2 | 1 | 2 | 1 |
+| 5. 운영·보안·배포 | 8 | 2 | 1 | 4 | 1 |
 | 6. Bridge·데이터 품질·calibration | 5 | 1 | 1 | 1 | 2 |
-| 7. 평가·신뢰성·gold QA | 7 | 0 | 3 | 3 | 1 |
-| 8. 문서·DX | 7 | 0 | 0 | 4 | 3 |
+| 7. 평가·신뢰성·gold QA | 8 | 0 | 3 | 4 | 1 |
+| 8. 문서·DX | 8 | 0 | 0 | 5 | 3 |
 | 9. ProcessGraph 회사 귀속 + KAMP + 품질 | 3 | 1 | 1 | 1 | 0 |
 | 10. IPGraph 데이터 적재 + bridge join | 7 | 0 | 4 | 1 | 2 |
 | 11. 배터리·소재 L5/L6 | 5 | 0 | 0 | 4 | 1 |
@@ -29,7 +29,7 @@
 | 13. NCAP / Euro NCAP / IIHS | 4 | 0 | 0 | 0 | 4 |
 | 14. 라우팅·정책·미정 결정 | 2 | 0 | 0 | 1 | 1 |
 | 15. 온톨로지·schema | 2 | 0 | 0 | 1 | 1 |
-| **합계** | **89** | **7** | **19** | **26** | **26** |
+| **합계** | **86** | **7** | **19** | **29** | **26** |
 
 ### 우선순위 정의
 
@@ -150,9 +150,10 @@
 | F-2 | **TROUBLESHOOTING.md** | ✅ **구현** — `docs/faq.md`(Q1~Q7) 가 단일 SSOT, 루트 `TROUBLESHOOTING.md` 는 발견성 포인터(중복 회피). 4 named 실패 보강: LLM rate limit(Q2.4) / pgvector·Neo4j auth(Q1.1) / DART·data.go.kr 키 만료(Q3.5) | (완료) | — | README §12.7 |
 | F-3 | **`docs/design/` ADR** | ✅ **작성** — `docs/design/` 신설 + ADR 4건(0001 LangGraph StateGraph / 0002 DomainHandler plug-in / 0003 Bridge 분리 테이블 / 0004 P1~P4 추출) + index. 각 코드 라인·mental_model 위임 | (완료) | diagram(이미지)은 후속 | README §12.7 |
 | F-4 | **GitHub Issue/PR template** | ✅ **작성** — `.github/ISSUE_TEMPLATE/{bug_report,feature_request,data_source}.md` + `config.yml` + `pull_request_template.md` (프로젝트 불변식 체크리스트 내장) | (완료) | — | README §12.7 |
-| F-5 | **`make load-kamp-process-metrics` Makefile 타겟 미정의** — 모듈 `src/autograph/loaders/load_kamp_process_metrics.py` 는 존재, Makefile 타겟 부재 (BACKLOG D-4 트리거 인용 stale) | 모듈 ✓ / 타겟 ✗ | P3 | Makefile 에 5줄 타겟 정의 + BACKLOG D-4 트리거 명령 정합 검증 | Makefile + BACKLOG D-4 |
+| F-5 | **`make load-kamp-process-metrics` Makefile 타겟 미정의** — 모듈 `src/autograph/loaders/load_kamp_process_metrics.py` 는 존재, Makefile 타겟 부재 (BACKLOG D-4 트리거 인용 stale) | ✅ **완료** (2026-06-05) — Makefile 5줄 타겟 추가 + PHONY 등록. dry-run 검증 (raw 미존재 → graceful skip). | (완료) | — | Makefile + BACKLOG D-4 |
 | F-6 | **Mermaid 다이어그램 GitHub 실제 렌더 + Figma 동기화** — 본 세션 신설 2 다이어그램 (README §0 도메인 위계 4축 / autograph §2.5.4 BoM ⟂ BoP 직교) 의 렌더 미실측 | 미검증 (본 세션 발견) | P2 | GitHub PR/main 페이지 접속 후 렌더 캡처 + 옵션 Mermaid live editor 검증 | README §0 / docs/autograph.md §2.5.4 |
 | F-7 | **mental_model / learning_guide 본문 잔여 `PRD §X.Y` 인용** — 두 문서 본문 정책 "점진적 갱신 중" (mental_model.md:45, learning_guide.md:51) 으로 갈음 중 | 잔재 30건 (2026-06-05, 어색한 `(구 PRD §7.5).N` 6건 → agents.md anchor 로 정정 완료) | P2 | grep `PRD §` 으로 잔재 모니터링 + 발견 시 다음 PR 에 같이 정리 | docs/mental_model.md / docs/learning_guide.md |
+| F-8 | **broad-except 자동 분류 휴리스틱 한계 사례** — R9/R10 자동 사유 부여 정확도 | ✅ **사례 기록** (2026-06-05) — R8~R10 누적 ~470건 사유 명시. v2 휴리스틱(다음 5줄 context)이 1건 silent 오분류 (`extract_defect_types_llm.py:187` 실제는 boundary → rollback + raise) — R10 수동 검토 단계에서 catch. 가드 (`test_broad_except_hygiene`) 도 `dedupe_suppliers_by_name_norm` 신규 위반 1건 catch (의도된 silent swallow 차단 실증). 향후 새 코드 작성 시 reviewer 가 사유 정확성 직접 확인 권장 (자동 휴리스틱은 80~90% 정확). | (사례 anchor) | 사유 verbatim 으로는 prefix `[file_stem]` 또는 `[module.name]` 강제 — 자동 추가 가능 | tests/test_broad_except_hygiene.py · 본 세션 commit history |
 
 ---
 
