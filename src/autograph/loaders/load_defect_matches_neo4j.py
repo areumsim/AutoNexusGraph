@@ -189,6 +189,8 @@ def _fetch_matches() -> list[dict]:
                    m.snapshot_year, m.extraction_method, m.schema_version
               FROM anxg_auto.defect_matches m
               JOIN anxg_auto.defect_types d ON d.defect_type_id = m.defect_type_id
+             -- PRD §6.7: reviewed-rejected 매칭은 그래프에 적재 금지 (rejected_loaded invariant).
+             WHERE m.validated_status IS DISTINCT FROM 'rejected'
         """)
         out = []
         for r in cur.fetchall():
