@@ -81,7 +81,7 @@ def vector_search(
                 cur.execute(f"SET LOCAL hnsw.ef_search = {int(ef_search)}")
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+            hits = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
     cap = _cap(top_k)
     # rerank 비활성 / 빈 결과 — vector 유사도 그대로 top_k 잘라 반환.
