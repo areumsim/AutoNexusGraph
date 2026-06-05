@@ -16,8 +16,8 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
+from ..chunking import chunk_text, parse_dart_zip
 from ..config import get_settings
-from ..extraction import chunk_text, parse_dart_zip
 from ._common import LoadStats, chunked
 
 SQL_INSERT_CHUNK = """

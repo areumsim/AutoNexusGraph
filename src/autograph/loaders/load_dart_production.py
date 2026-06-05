@@ -122,7 +122,7 @@ def _read_main_xml(zip_path: Path) -> str | None:
     """zip 안에서 사업보고서 메인 XML 텍스트 추출.
 
     DART 사업보고서 zip 의 첫 번째 비-언더스코어 XML 이 본문 (`{rcept_no}.xml`).
-    이 패턴은 ``autonexusgraph/extraction/dart_parser.py::parse_dart_zip`` 와 동일.
+    이 패턴은 ``autonexusgraph/chunking/dart_parser.py::parse_dart_zip`` 와 동일.
     """
     try:
         with zipfile.ZipFile(zip_path) as zf:

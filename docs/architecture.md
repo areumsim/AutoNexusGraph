@@ -18,9 +18,16 @@ PG/Neo4j/pgvector + cost/cypher guard) 위에 **도메인 plug-in** 을 import-s
 
 | 패키지 | py 파일 | 역할 | 상태 |
 |---|---:|---|---|
-| `src/autonexusgraph/` | 107 | 코어 (finance 도메인 + LangGraph + 공통 인프라) | ✅ 완료 |
-| `src/autograph/` | 97 | auto plug-in (자동차 OEM/부품/리콜 + BoP 공정) | ✅ MVP 안정 |
+| `src/autonexusgraph/` | 110 | 코어 (finance 도메인 + LangGraph + 공통 인프라) | ✅ 완료 |
+| `src/autograph/` | 98 | auto plug-in (자동차 OEM/부품/리콜 + BoP 공정) | ✅ MVP 안정 |
 | `src/ipgraph/` | 21 | ip plug-in (특허·기술혁신, 보조축) | ✅ 코드/온톨로지/스키마 완료, 특허 데이터 (KIPRIS/USPTO ODP) 적재 대기 |
+| `src/common/` | 2 | 순수 공유 헬퍼 (코어·plug-in 양쪽이 import — 결합 방향 회피). 현재 retrieve top-k cap 등 | ✅ |
+
+> **왜 4개 top-level 패키지인가**: 도메인(`autograph`/`ipgraph`)을 코어의 *하위*가 아니라 *형제*
+> 패키지로 두어 "코어는 도메인을 import 하지 않는다"를 **물리적으로 강제**한다(§2 의존 방향).
+> `common/` 은 어느 쪽에도 속하지 않는 순수 헬퍼만 담아 core↔domain 양방향 결합을 피한다.
+> ⚠️ 네이밍 주의: `autonexusgraph`(코어) ↔ `autograph`(auto 도메인) 은 이름이 비슷하나 의미가
+> 다르다(코어 vs 한 도메인).
 
 핵심 정책: **코어는 plug-in 을 직접 import 하지 않는다** (역의존 0건). plug-in 이 import 되는
 순간 부작용으로 `register_handler` / `register_router` 가 호출되어 코어 라우터에 합류.
@@ -80,6 +87,10 @@ flowchart TD
 **의존 방향 (검증)**: `grep -rn '^from autograph\|^import autograph' src/autonexusgraph/` → 0 건.
 `grep -rn '^from ipgraph\|^import ipgraph' src/autonexusgraph/ src/autograph/` → 0 건.
 **코어는 plug-in 을 모른다.** 코어 변경 없이 새 도메인 추가 가능 (README §10.15 baseline reset).
+
+> **코어 서브패키지 명명 주의**: `chunking/`(결정적 문서 파싱·청킹 → `anxg_vec.chunks` 벡터 청크)
+> 와 `extractors/`(LLM 엔티티·관계 추출 엔진, P3) 는 역할이 전혀 다르다. 과거 `extraction/` 이
+> `extractors/` 와 이름이 혼동되어 `chunking/` 로 개명.
 
 ---
 

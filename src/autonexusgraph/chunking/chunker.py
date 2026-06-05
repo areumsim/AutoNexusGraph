@@ -28,7 +28,7 @@ _CHARS_PER_TOKEN = 3
 def estimate_tokens(text: str) -> int:
     """문자 길이 기반 BGE-M3 토큰 추정 (한영 혼합 기준).
 
-    공통 휴리스틱으로 src/autonexusgraph/extraction + src/autonexusgraph/loaders/chunks
+    공통 휴리스틱으로 src/autonexusgraph/chunking + src/autonexusgraph/loaders/chunks
     + src/autograph/loaders/build_chunks_auto 가 동일 값을 산출.
     """
     if not text:
