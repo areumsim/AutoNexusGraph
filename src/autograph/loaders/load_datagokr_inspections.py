@@ -1,4 +1,4 @@
-"""data.go.kr 15155857 — KOTSA 수리검사내역 → auto.events_inspections UPSERT.
+"""data.go.kr 15155857 — KOTSA 수리검사내역 → anxg_auto.events_inspections UPSERT.
 
 raw 파일 위치: ``data/raw/auto/datagokr_inspections/<year>.jsonl``
              (ingestion.datagokr_inspections 가 CSV → JSONL normalize 한 후 생성)
@@ -34,7 +34,7 @@ def _resolve_manufacturer_id(cur, raw_name: str | None) -> int | None:
         return None
     norm = normalize_corp_name(raw_name)
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
          WHERE name_norm = %s OR name = %s
          ORDER BY manufacturer_id LIMIT 1
     """, (norm, raw_name))
@@ -151,7 +151,7 @@ def run() -> dict:
             try:
                 mfr_id = _resolve_manufacturer_id(cur, row.get("make_kr"))
                 cur.execute("""
-                    INSERT INTO auto.events_inspections
+                    INSERT INTO anxg_auto.events_inspections
                       (source, source_inspection_id, vin,
                        manufacturer_id, model_id, variant_id,
                        inspection_type, result, inspected_at, reason,

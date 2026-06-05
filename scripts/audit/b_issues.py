@@ -16,9 +16,9 @@ P2-(10) "이슈 추적" 단순 리스트 → 측정 가능 audit (사용자 cold
 
 판정:
     B6  : aihub_578/aihub_71347 component 매칭률 — 현재 모니터링만
-    B7  : auto.staging_relations (Wikidata P176) row > 0 = 해결
+    B7  : anxg_auto.staging_relations (Wikidata P176) row > 0 = 해결
     B10 : Neo4j :Supplier 중복 count (name_norm group_by, cnt > 1) = 0 = 해결
-    B11 : auto.events_complaints 의 missing component_text 비율 < 0.30 = 해결
+    B11 : anxg_auto.events_complaints 의 missing component_text 비율 < 0.30 = 해결
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ def _neo4j_driver():
 
 # ── B6 — AI-Hub model name mismatch ─────────────────────────
 def check_b6() -> dict[str, Any]:
-    """auto.components AI-Hub source 분포. 모니터링만 — threshold 없음.
+    """anxg_auto.components AI-Hub source 분포. 모니터링만 — threshold 없음.
 
     현재 상태: 양호 (24 CONTAINS_COMPONENT edge OK). model 변경 시 routine 재실행.
     """
@@ -88,7 +88,7 @@ def check_b6() -> dict[str, Any]:
             cur.execute("""
                 SELECT source, count(*) AS n,
                        count(DISTINCT system_code) AS n_systems
-                  FROM auto.components
+                  FROM anxg_auto.components
                  WHERE source IN ('aihub_578', 'aihub_71347')
                  GROUP BY source ORDER BY source
             """)
@@ -108,14 +108,14 @@ def check_b6() -> dict[str, Any]:
 
 # ── B7 — Wikidata P176 rate-limit / staging_relations 0 ────
 def check_b7() -> dict[str, Any]:
-    """auto.staging_relations 의 P176 (HAS_PART) row 수. > 0 = 해결.
+    """anxg_auto.staging_relations 의 P176 (HAS_PART) row 수. > 0 = 해결.
 
     staging_relations 스키마: source 컬럼 없음 — extractor_name 으로 wikidata 식별.
     """
     try:
         with _pg_conn() as c, c.cursor() as cur:
             cur.execute("""
-                SELECT count(*) FROM auto.staging_relations
+                SELECT count(*) FROM anxg_auto.staging_relations
                  WHERE extractor_name ILIKE '%wikidata%'
                     OR (relation_type = 'SUPPLIED_BY' AND extractor_name ILIKE '%p176%')
             """)
@@ -141,9 +141,10 @@ def check_b10() -> dict[str, Any]:
     """Neo4j :Supplier 의 name_norm 중복 패턴. 0 = 해결."""
     try:
         drv = _neo4j_driver()
-        with drv.session() as s:
+        import os
+        with drv.session(database=os.environ.get("NEO4J_DATABASE") or None) as s:
             r = s.run("""
-                MATCH (s:Supplier)
+                MATCH (s:Anxg_Supplier)
                 WITH s.name_norm AS norm, count(*) AS cnt
                 WHERE norm IS NOT NULL AND cnt > 1
                 RETURN count(norm) AS dup_groups,
@@ -152,7 +153,7 @@ def check_b10() -> dict[str, Any]:
             dup_groups = (r or {}).get("dup_groups", 0)
             extra_nodes = (r or {}).get("extra_nodes", 0)
             total = s.run(
-                "MATCH (s:Supplier) RETURN count(s) AS n"
+                "MATCH (s:Anxg_Supplier) RETURN count(s) AS n"
             ).single()["n"]
         drv.close()
     except Exception as exc:   # noqa: BLE001
@@ -189,14 +190,14 @@ def check_b11() -> dict[str, Any]:
             cur.execute("""
                 WITH expanded AS (
                   SELECT complaint_id, unnest(components) AS comp_text
-                    FROM auto.events_complaints
+                    FROM anxg_auto.events_complaints
                    WHERE components IS NOT NULL AND array_length(components, 1) > 0
                 )
                 SELECT
                     count(*) AS total,
                     count(*) FILTER (
                         WHERE comp_text NOT IN
-                              (SELECT canonical_name FROM auto.components)
+                              (SELECT canonical_name FROM anxg_auto.components)
                     ) AS unmatched
                   FROM expanded
             """)

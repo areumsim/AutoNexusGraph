@@ -5,7 +5,7 @@ API: http://open.law.go.kr/LSO/openApi/  (무료 키)
 
 본 시스템 범위:
 - 금융 관련 법령 (자본시장법, 외부감사법, 공정거래법, 상법, 금융지주회사법, ...)
-- 회사·산업과 LLM 으로 키워드 매칭 후 (:Industry)-[:REGULATED_BY]->(:Law) 적재
+- 회사·산업과 LLM 으로 키워드 매칭 후 (:Anxg_Industry)-[:REGULATED_BY]->(:Law) 적재
 """
 from __future__ import annotations
 

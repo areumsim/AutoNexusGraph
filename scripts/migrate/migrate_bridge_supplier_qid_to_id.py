@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""bridge.corp_entity 의 supplier row 마이그레이션 — entity_id Q*→numeric.
+"""anxg_bridge.corp_entity 의 supplier row 마이그레이션 — entity_id Q*→numeric.
 
 배경:
     초기 load_bridge 가 supplier 의 entity_id 에 Wikidata QID 를 그대로
     저장했다 (예 'Q246', 'Q1346' 등). 이후 코드는 stringified supplier_id
-    컨벤션 (`auto.master_suppliers.supplier_id`) 으로 변경됐지만 옛 row
+    컨벤션 (`anxg_auto.master_suppliers.supplier_id`) 으로 변경됐지만 옛 row
     4,000+ 가 잔존. 결과:
     1) `eval/metrics/bridge_quality.py` 의 supplier_id IN (SELECT entity_id::bigint ...)
        cast 가 실패 → query fail
     2) Neo4j 의 :Supplier 노드와 entity_id 매칭 불일치 → SUPPLIED_BY 적재 실패
 
 본 스크립트 동작 (멱등):
-    1) bridge.corp_entity WHERE entity_type='supplier' AND entity_id ~ '^Q...'
+    1) anxg_bridge.corp_entity WHERE entity_type='supplier' AND entity_id ~ '^Q...'
        전체 fetch.
-    2) 각 row 의 wikidata_qid → auto.master_suppliers UPSERT
+    2) 각 row 의 wikidata_qid → anxg_auto.master_suppliers UPSERT
        (load_bridge._ensure_supplier 와 동일 패턴) → 새 supplier_id 발급.
-    3) bridge.corp_entity 업데이트: entity_id ← str(supplier_id),
+    3) anxg_bridge.corp_entity 업데이트: entity_id ← str(supplier_id),
        기존 entity_id_legacy 컬럼은 만들지 않음 (wikidata_qid 컬럼에 이미 보존).
 
 CLI:
@@ -53,7 +53,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
         # 1) QID-only supplier row fetch.
         sql = """
             SELECT entity_id, name, wikidata_qid
-              FROM bridge.corp_entity
+              FROM anxg_bridge.corp_entity
              WHERE entity_type = 'supplier'
                AND entity_id ~ '^Q[0-9]+$'
         """
@@ -71,7 +71,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                 stats["skipped_no_qid"] += 1
                 continue
             try:
-                # auto.master_suppliers UPSERT — supplier_id 발급/조회.
+                # anxg_auto.master_suppliers UPSERT — supplier_id 발급/조회.
                 supplier_id = _ensure_supplier(
                     cur,
                     name=name or effective_qid,
@@ -83,15 +83,15 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                 )
                 new_entity_id = str(supplier_id)
 
-                # bridge.corp_entity 의 entity_id 업데이트.
+                # anxg_bridge.corp_entity 의 entity_id 업데이트.
                 # UNIQUE(corp_code, entity_type, entity_id) 제약 충돌 회피:
                 # 같은 supplier_id 의 numeric entity_id row 가 이미 있으면 옛 row 삭제.
                 cur.execute("""
-                    SELECT 1 FROM bridge.corp_entity
+                    SELECT 1 FROM anxg_bridge.corp_entity
                      WHERE entity_type='supplier'
                        AND entity_id=%s
                        AND COALESCE(corp_code,'')=COALESCE(
-                             (SELECT corp_code FROM bridge.corp_entity
+                             (SELECT corp_code FROM anxg_bridge.corp_entity
                                WHERE entity_type='supplier' AND entity_id=%s LIMIT 1),
                              '')
                      LIMIT 1
@@ -99,13 +99,13 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                 if cur.fetchone():
                     # 새 numeric row 가 이미 있음 → 옛 QID row 만 삭제.
                     cur.execute("""
-                        DELETE FROM bridge.corp_entity
+                        DELETE FROM anxg_bridge.corp_entity
                          WHERE entity_type='supplier' AND entity_id=%s
                     """, (entity_id_old,))
                 else:
                     # entity_id 만 in-place 갱신.
                     cur.execute("""
-                        UPDATE bridge.corp_entity
+                        UPDATE anxg_bridge.corp_entity
                            SET entity_id  = %s,
                                updated_at = now()
                          WHERE entity_type='supplier' AND entity_id=%s

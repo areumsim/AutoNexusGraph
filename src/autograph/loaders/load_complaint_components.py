@@ -1,10 +1,10 @@
 """events_complaints.components → Neo4j :Complaint-[:COMPLAINT_OF]->:Module 매핑.
 
 NHTSA complaint 의 ``components`` 컬럼은 string array (예: ``['ELECTRICAL SYSTEM']``).
-각 component string 을 auto.components.canonical_name (NHTSA taxonomy loader 가
+각 component string 을 anxg_auto.components.canonical_name (NHTSA taxonomy loader 가
 적재한 것) 과 정확/별칭 매칭 후 Neo4j edge 생성:
 
-    (:Complaint {id: N})-[:COMPLAINT_OF {meta...}]->(:Module|:Component {name})
+    (:Anxg_Complaint {id: N})-[:COMPLAINT_OF {meta...}]->(:Anxg_Module|:Component {name})
 
 선행 필요: ``python -m autograph.loaders.load_nhtsa_component_taxonomy``.
 
@@ -21,7 +21,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ._text_utils import norm_text as _norm
@@ -40,9 +40,9 @@ class MatchStats:
 
 _MERGE_COMPLAINT_OF = """
 UNWIND $rows AS row
-MATCH (cp:Complaint {id: row.complaint_id})
+MATCH (cp:Anxg_Complaint {id: row.complaint_id})
 MATCH (m {name_norm: row.comp_norm})
-WHERE (m:Module OR m:Component)
+WHERE (m:Anxg_Module OR m:Component)
 MERGE (cp)-[r:COMPLAINT_OF]->(m)
 ON CREATE SET r.source_type      = 'nhtsa_complaint',
               r.source_id        = row.source_id,
@@ -66,14 +66,14 @@ def load_complaint_components(*, dry_run: bool = False,
     with conn.cursor() as cur:
         # 1) component_name → norm 매핑 (Neo4j 측 노드 매칭용 키).
         cur.execute("""
-            SELECT canonical_name, name_norm FROM auto.components
+            SELECT canonical_name, name_norm FROM anxg_auto.components
         """)
         canonical_norms = {c[1] for c in cur.fetchall()}
 
         # 2) 모든 complaint 의 components 배열 unnest.
         cur.execute("""
             SELECT complaint_id, components, snapshot_year, source_complaint_no
-              FROM auto.events_complaints
+              FROM anxg_auto.events_complaints
              WHERE components IS NOT NULL AND array_length(components, 1) > 0
         """)
         for cid, comps, snap, src_no in cur.fetchall():
@@ -102,8 +102,8 @@ def load_complaint_components(*, dry_run: bool = False,
         return stats
 
     # 3) Neo4j MERGE.
-    driver = get_driver()
-    with driver.session() as s:
+
+    with get_session() as s:
         for i in range(0, len(rows), batch):
             chunk = rows[i: i + batch]
             try:

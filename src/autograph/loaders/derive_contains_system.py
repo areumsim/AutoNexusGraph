@@ -30,7 +30,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 
 log = logging.getLogger(__name__)
@@ -43,13 +43,13 @@ class DeriveStats:
     errors: list[str] = field(default_factory=list)
 
 
-# (m:VehicleModel)-[r1:CONTAINS_COMPONENT]->(c:Module|Part) -> (s:System)
+# (m:Anxg_VehicleModel)-[r1:CONTAINS_COMPONENT]->(c:Anxg_Module|Part) -> (s:Anxg_System)
 # c 가 Part 인 경우 Module 한 단계 더 거침 (CONTAINED_IN*1..2 로 양쪽 수용).
 # 같은 (model, system) 쌍의 중복은 WITH DISTINCT + MERGE 가 처리.
 _DERIVE_CYPHER = """
-MATCH (m:VehicleModel)-[r1:CONTAINS_COMPONENT]->(c)
+MATCH (m:Anxg_VehicleModel)-[r1:CONTAINS_COMPONENT]->(c)
 WHERE c:Module OR c:Part
-MATCH (c)-[:CONTAINED_IN*1..2]->(s:System)
+MATCH (c)-[:CONTAINED_IN*1..2]->(s:Anxg_System)
 WITH m, s,
      max(coalesce(r1.confidence_score, 0.0))      AS max_conf,
      min(coalesce(r1.snapshot_year, date().year)) AS min_year,
@@ -69,17 +69,17 @@ RETURN count(rel) AS n
 
 # Dry-run 미리보기 — MERGE 없이 후보 쌍 카운트만.
 _PREVIEW_CYPHER = """
-MATCH (m:VehicleModel)-[r1:CONTAINS_COMPONENT]->(c)
+MATCH (m:Anxg_VehicleModel)-[r1:CONTAINS_COMPONENT]->(c)
 WHERE c:Module OR c:Part
-MATCH (c)-[:CONTAINED_IN*1..2]->(s:System)
+MATCH (c)-[:CONTAINED_IN*1..2]->(s:Anxg_System)
 RETURN count(DISTINCT [m.id, s.code]) AS pairs
 """
 
 
 def derive_contains_system(*, dry_run: bool = False) -> DeriveStats:
     stats = DeriveStats()
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         # 후보 쌍 미리보기.
         rec = session.run(_PREVIEW_CYPHER).single()
         stats.pairs_seen = int(rec["pairs"]) if rec else 0

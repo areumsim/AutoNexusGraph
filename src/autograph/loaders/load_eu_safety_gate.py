@@ -1,4 +1,4 @@
-"""EU Safety Gate weekly XML → auto.events_recalls UPSERT.
+"""EU Safety Gate weekly XML → anxg_auto.events_recalls UPSERT.
 
 가이드 §1 표 EU Safety Gate (RAPEX) — Layer 2 회사귀속 리콜. EU 시장 커버.
 NHTSA(US) + KOTSA(KR) + EU = 3개 지역 L2.
@@ -58,7 +58,7 @@ DEFAULT_XML_DIR = ROOT / "data" / "raw" / "eu_safety_gate" / "xml"
 _SOURCE = "eu_safety_gate"
 _SCHEMA_VERSION = "eu_safety_gate_v1"
 
-# EU brand → 우리 auto.master_manufacturers.name (영문 정규형) 매핑.
+# EU brand → 우리 anxg_auto.master_manufacturers.name (영문 정규형) 매핑.
 # 기존 한국 OEM alias dict 와 동일 패턴. 미매칭은 raw 에만 보관.
 _EU_BRAND_ALIAS: dict[str, str] = {
     "Hyundai":           "HYUNDAI",
@@ -196,11 +196,11 @@ def _candidate_brands(brand: str) -> list[str]:
 
 
 def _resolve_manufacturer_id(cur, brand: str | None) -> int | None:
-    """EU brand 텍스트 → auto.master_manufacturers.manufacturer_id.
+    """EU brand 텍스트 → anxg_auto.master_manufacturers.manufacturer_id.
 
     1) brand multi-split → 각 후보에 대해:
     2) _EU_BRAND_ALIAS (case-insensitive) → 영문 정규명
-    3) auto.master_manufacturers.name 정확 매치 (case-insensitive)
+    3) anxg_auto.master_manufacturers.name 정확 매치 (case-insensitive)
     첫 매칭 반환. 모두 실패 시 NULL.
     """
     if not brand:
@@ -208,7 +208,7 @@ def _resolve_manufacturer_id(cur, brand: str | None) -> int | None:
     for cand in _candidate_brands(brand):
         norm = _ALIAS_LOWER.get(cand.lower(), cand.upper())
         cur.execute("""
-            SELECT manufacturer_id FROM auto.master_manufacturers
+            SELECT manufacturer_id FROM anxg_auto.master_manufacturers
              WHERE upper(name) = %s LIMIT 1
         """, (norm,))
         r = cur.fetchone()
@@ -233,7 +233,7 @@ def collect_rows(xml_dir: Path | None = None) -> list[dict[str, Any]]:
 
 
 _UPSERT_SQL = """
-INSERT INTO auto.events_recalls (
+INSERT INTO anxg_auto.events_recalls (
     source, source_recall_no, manufacturer_id, model_id, variant_id,
     component_text, defect_summary, consequence, remedy_summary,
     report_date, country, affected_units,
@@ -245,7 +245,7 @@ INSERT INTO auto.events_recalls (
     1.000, 'verified', %s, %s::jsonb
 )
 ON CONFLICT (source, source_recall_no) DO UPDATE SET
-    manufacturer_id = COALESCE(EXCLUDED.manufacturer_id, auto.events_recalls.manufacturer_id),
+    manufacturer_id = COALESCE(EXCLUDED.manufacturer_id, anxg_auto.events_recalls.manufacturer_id),
     component_text  = EXCLUDED.component_text,
     defect_summary  = EXCLUDED.defect_summary,
     consequence     = EXCLUDED.consequence,

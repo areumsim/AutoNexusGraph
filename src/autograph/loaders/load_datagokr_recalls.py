@@ -1,4 +1,4 @@
-"""data.go.kr 15089863 — 한국 KOTSA 리콜 → auto.events_recalls UPSERT.
+"""data.go.kr 15089863 — 한국 KOTSA 리콜 → anxg_auto.events_recalls UPSERT.
 
 raw 파일 위치: ``data/raw/auto/datagokr_recalls/page_*.json``
 적재 키:       ``(source='datagokr_kotsa', source_recall_no=<리콜번호>)``
@@ -31,7 +31,7 @@ _SOURCE_PATH = "auto/datagokr_recalls"
 _SOURCE_TAG = "datagokr_kotsa"
 
 # data.go.kr 응답의 한국어 제조사명 → NHTSA vPIC 의 영문 정규형 (auto.master_*
-# 의 name 필드와 매칭) 폴백 사전. ``auto.master_manufacturers.aliases`` 가
+# 의 name 필드와 매칭) 폴백 사전. ``anxg_auto.master_manufacturers.aliases`` 가
 # 비어있어도 한국 OEM 12 사는 본 매핑으로 매칭.
 #
 # 수집 키 부재로 실측 검증은 못 했지만, 한국 시장 점유율 상위 사를 우선 등록.
@@ -154,7 +154,7 @@ def _resolve_manufacturer_id(cur, raw_name: str | None) -> int | None:
 
     # 1) 직접 매칭
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
          WHERE name_norm = %s OR name = %s
          ORDER BY manufacturer_id LIMIT 1
     """, (norm, raw_name))
@@ -164,7 +164,7 @@ def _resolve_manufacturer_id(cur, raw_name: str | None) -> int | None:
 
     # 2) aliases 배열 매칭 (Wikidata loader 가 채운 별칭 활용)
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
          WHERE %s = ANY(aliases) OR %s = ANY(aliases)
          ORDER BY manufacturer_id LIMIT 1
     """, (raw_name, norm))
@@ -176,7 +176,7 @@ def _resolve_manufacturer_id(cur, raw_name: str | None) -> int | None:
     en_name = _ko_alias_lookup(raw_name, norm)
     if en_name:
         cur.execute("""
-            SELECT manufacturer_id FROM auto.master_manufacturers
+            SELECT manufacturer_id FROM anxg_auto.master_manufacturers
              WHERE name = %s OR name_norm = %s
              ORDER BY manufacturer_id LIMIT 1
         """, (en_name, en_name.lower()))
@@ -223,7 +223,7 @@ def run(csv_path: Path | None = None) -> dict:
             try:
                 mfr_id = _resolve_manufacturer_id(cur, manufacturer_name)
                 cur.execute("""
-                    INSERT INTO auto.events_recalls
+                    INSERT INTO anxg_auto.events_recalls
                       (source, source_recall_no, manufacturer_id, model_id, variant_id,
                        component_text, defect_summary, consequence, remedy_summary,
                        report_date, country, affected_units, raw, snapshot_year)
@@ -237,7 +237,7 @@ def run(csv_path: Path | None = None) -> dict:
                               EXTRACT(YEAR FROM now())::SMALLINT))
                     ON CONFLICT (source, source_recall_no) DO UPDATE SET
                       manufacturer_id = COALESCE(EXCLUDED.manufacturer_id,
-                                                  auto.events_recalls.manufacturer_id),
+                                                  anxg_auto.events_recalls.manufacturer_id),
                       raw             = EXCLUDED.raw,
                       ingested_at     = now()
                     RETURNING (xmax = 0) AS is_new

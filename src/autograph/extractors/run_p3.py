@@ -1,10 +1,10 @@
 """P3 LLM 추출 — 자동차 도메인.
 
 흐름:
-  1) chunk_selector.select_auto_chunks(...) — vec.chunks 필터.
+  1) chunk_selector.select_auto_chunks(...) — anxg_vec.chunks 필터.
   2) (옵션) --dry-run-cost 시 estimate 만 출력하고 종료.
   3) ExtractorEngine([AutoRelationExtractor()]) 로 chunk 별 LLM 호출.
-  4) merged relations → staging_writer.upsert_staging — auto.staging_relations 적재.
+  4) merged relations → staging_writer.upsert_staging — anxg_auto.staging_relations 적재.
   5) (별도) cross_validate.run_p4 로 Neo4j 적재.
 
 CLI:

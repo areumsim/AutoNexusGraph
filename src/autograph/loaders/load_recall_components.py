@@ -1,8 +1,8 @@
-"""(:Recall)-[:RECALL_OF]->(:Module|:Part) 결정적 매칭 + Neo4j 적재.
+"""(:Anxg_Recall)-[:RECALL_OF]->(:Anxg_Module|:Part) 결정적 매칭 + Neo4j 적재.
 
 NHTSA / KOTSA 리콜의 ``component_text`` 자유 텍스트 (예 "AIR BAGS:FRONTAL",
 "POWER TRAIN:AUTOMATIC TRANSMISSION", "ELECTRICAL SYSTEM:WIRING:HOSES")
-를 ``auto.components`` (Module/Part) 의 canonical_name / aliases / name_norm 에
+를 ``anxg_auto.components`` (Module/Part) 의 canonical_name / aliases / name_norm 에
 정규화 매칭. PG 의 events_recalls.component_id 를 채우고, Neo4j 에 RECALL_OF
 엣지를 emit.
 
@@ -25,7 +25,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
@@ -83,7 +83,7 @@ def _load_components(cur) -> list[dict]:
     """level 4/5 (Module + Part) 의 canonical_name + name_norm + aliases."""
     cur.execute("""
         SELECT component_id, canonical_name, name_norm, aliases, level
-          FROM auto.components
+          FROM anxg_auto.components
          WHERE level IN (4, 5)
     """)
     out: list[dict] = []
@@ -133,11 +133,11 @@ def _match_one(text: str, components: list[dict]
 
 
 # Neo4j 엣지 적재 — UNWIND $rows AS r, MATCH 후 MERGE rel + §6.7 메타.
-# (rc:Recall)-[:RECALL_OF]->(c:Module|Part)
+# (rc:Anxg_Recall)-[:RECALL_OF]->(c:Anxg_Module|Part)
 _MERGE_RECALL_OF = """
 UNWIND $rows AS r
-MATCH (rc:Recall {id: r.recall_id})
-OPTIONAL MATCH (c) WHERE c.id = r.component_id AND (c:Module OR c:Part)
+MATCH (rc:Anxg_Recall {id: r.recall_id})
+OPTIONAL MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
 WITH rc, r, c WHERE c IS NOT NULL
 MERGE (rc)-[rel:RECALL_OF]->(c)
 SET   rel.source_type      = r.source_type,
@@ -159,12 +159,12 @@ def load_recall_components(*, dry_run: bool = False, batch: int = 500) -> MatchS
     with conn.cursor() as cur:
         components = _load_components(cur)
         if not components:
-            log.warning("[recall→comp] auto.components 비어있음 — 매칭 불가")
+            log.warning("[recall→comp] anxg_auto.components 비어있음 — 매칭 불가")
             return stats
 
         cur.execute("""
             SELECT recall_id, source, source_recall_no, component_text, snapshot_year
-              FROM auto.events_recalls
+              FROM anxg_auto.events_recalls
              WHERE component_text IS NOT NULL
         """)
         rows = cur.fetchall()
@@ -185,7 +185,7 @@ def load_recall_components(*, dry_run: bool = False, batch: int = 500) -> MatchS
         matched_ids.append((recall_id, int(c["id"]), kind, conf))
         edges.append({
             "recall_id": recall_id, "component_id": int(c["id"]),
-            "source_type": f"pg.auto.events_recalls/{source}",
+            "source_type": f"pg.anxg_auto.events_recalls/{source}",
             "source_id": source_no,
             "extraction_method": "deterministic",
             "confidence_score": conf,
@@ -197,7 +197,7 @@ def load_recall_components(*, dry_run: bool = False, batch: int = 500) -> MatchS
     if matched_ids:
         with conn.cursor() as cur:
             cur.executemany("""
-                UPDATE auto.events_recalls
+                UPDATE anxg_auto.events_recalls
                    SET component_id = %s
                  WHERE recall_id    = %s
                    AND component_id IS DISTINCT FROM %s
@@ -212,8 +212,8 @@ def load_recall_components(*, dry_run: bool = False, batch: int = 500) -> MatchS
 
     # Neo4j 적재.
     if edges:
-        driver = get_driver()
-        with driver.session() as session:
+
+        with get_session() as session:
             # B1 fix — Module 노드가 없으면 MATCH (c {id:...}) 실패 → RECALL_OF 0.
             # 적재 직전 PG components → Neo4j :Module 동기화 한 패스.
             from .load_supplier_edges import sync_modules_to_neo4j

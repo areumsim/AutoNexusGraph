@@ -7,12 +7,12 @@
     🔴 red     — 아무 데이터 없음 (raw 도 없음, ingest 필요)
 
 대상 채널:
-    - 산단공 합성 공정 (15151075) — CSV / auto.processes
-    - DART 사업보고서 production — zip / auto.plant_capacity + plant_production
+    - 산단공 합성 공정 (15151075) — CSV / anxg_auto.processes
+    - DART 사업보고서 production — zip / anxg_auto.plant_capacity + plant_production
       + Neo4j MANUFACTURED_AT
-    - KAMA 매크로 — CSV / auto.macro_production_yearly + macro_industry_monthly
+    - KAMA 매크로 — CSV / anxg_auto.macro_production_yearly + macro_industry_monthly
     - 팩토리온 (15087611) — API / (스키마 미정)
-    - 한국 리콜 (3048950 CSV, 구 15089863 API 폐기) — auto.events_recalls WHERE source='datagokr_kotsa'
+    - 한국 리콜 (3048950 CSV, 구 15089863 API 폐기) — anxg_auto.events_recalls WHERE source='datagokr_kotsa'
 
 출력:
     eval/reports/data_channels_latest.md (기본)
@@ -81,8 +81,8 @@ def _try_pg_count(sql: str) -> int | str:
 
 def _try_neo4j_count(cypher: str) -> int | str:
     try:
-        from autonexusgraph.db.neo4j import get_driver
-        with get_driver().session() as s:
+        from autonexusgraph.db.neo4j import get_session
+        with get_session() as s:
             r = s.run(cypher).single()
             return int(r["n"]) if r else 0
     except Exception as exc:   # noqa: BLE001
@@ -102,13 +102,13 @@ def collect() -> list[ChannelStatus]:
 
     # 산단공 합성 공정 (15151075)
     sandang_csvs = _count_files(raw_root / "datagokr", "한국산업단지공단_자동차*.csv")
-    sandang_pg = _try_pg_count("SELECT count(*) FROM auto.processes")
+    sandang_pg = _try_pg_count("SELECT count(*) FROM anxg_auto.processes")
     out.append(ChannelStatus(
         name="산단공 합성 공정 (15151075)",
         raw_count=sandang_csvs,
         raw_detail="CSV file(s)",
         pg_count=sandang_pg,
-        pg_detail="auto.processes",
+        pg_detail="anxg_auto.processes",
         notes="C 등급 (합성), 공정명 taxonomy 사전",
     ))
 
@@ -118,8 +118,8 @@ def collect() -> list[ChannelStatus]:
     dart_zips = sum(_count_files(raw_root / "dart_bulk" / "corp" / cc / "documents",
                                   "*.zip")
                     for cc in dart_corps)
-    dart_capa = _try_pg_count("SELECT count(*) FROM auto.plant_capacity")
-    dart_prod = _try_pg_count("SELECT count(*) FROM auto.plant_production")
+    dart_capa = _try_pg_count("SELECT count(*) FROM anxg_auto.plant_capacity")
+    dart_prod = _try_pg_count("SELECT count(*) FROM anxg_auto.plant_production")
     dart_pg = (dart_capa if isinstance(dart_capa, int)
                else 0) + (dart_prod if isinstance(dart_prod, int) else 0)
     dart_edges = _try_neo4j_count(
@@ -142,8 +142,8 @@ def collect() -> list[ChannelStatus]:
                                      "산업통상부_국내 및 세계 자동차 생산량*.csv")
     kama_monthly_csvs = _count_files(raw_root / "datagokr",
                                       "산업통상부_전체 자동차 산업 현황*.csv")
-    kama_yearly_pg = _try_pg_count("SELECT count(*) FROM auto.macro_production_yearly")
-    kama_monthly_pg = _try_pg_count("SELECT count(*) FROM auto.macro_industry_monthly")
+    kama_yearly_pg = _try_pg_count("SELECT count(*) FROM anxg_auto.macro_production_yearly")
+    kama_monthly_pg = _try_pg_count("SELECT count(*) FROM anxg_auto.macro_industry_monthly")
     kama_pg = (kama_yearly_pg if isinstance(kama_yearly_pg, int) else 0) + \
               (kama_monthly_pg if isinstance(kama_monthly_pg, int) else 0)
     out.append(ChannelStatus(
@@ -158,13 +158,13 @@ def collect() -> list[ChannelStatus]:
     # 팩토리온 (15087611) — M-11 단계에서 PG 스키마 + loader 완성.
     factoryon_dir = raw_root / "auto" / "factoryon"
     factoryon_files = _count_files(factoryon_dir, "**/*.json")
-    factoryon_pg = _try_pg_count("SELECT count(*) FROM auto.factoryon_registry")
+    factoryon_pg = _try_pg_count("SELECT count(*) FROM anxg_auto.factoryon_registry")
     out.append(ChannelStatus(
         name="팩토리온 공장등록 (15087611)",
         raw_count=factoryon_files,
         raw_detail="JSON pages (key 필요)",
         pg_count=factoryon_pg,
-        pg_detail="auto.factoryon_registry (24_auto_factoryon.sql)",
+        pg_detail="anxg_auto.factoryon_registry (24_auto_factoryon.sql)",
         notes="DATA_GO_KR_API_KEY 필요. wire 완료 (load_factoryon.py)",
     ))
 
@@ -172,14 +172,14 @@ def collect() -> list[ChannelStatus]:
     datagokr_recall_csvs = _count_files(raw_root / "datagokr",
                                          "*자동차결함 리콜현황*.csv")
     datagokr_pg = _try_pg_count(
-        "SELECT count(*) FROM auto.events_recalls WHERE source='datagokr_kotsa'"
+        "SELECT count(*) FROM anxg_auto.events_recalls WHERE source='datagokr_kotsa'"
     )
     out.append(ChannelStatus(
         name="한국 리콜 (3048950, KOTSA)",
         raw_count=datagokr_recall_csvs,
         raw_detail="CSV 파일 다운",
         pg_count=datagokr_pg,
-        pg_detail="auto.events_recalls",
+        pg_detail="anxg_auto.events_recalls",
         notes="키 불필요 (파일 다운로드)",
     ))
 
@@ -187,14 +187,14 @@ def collect() -> list[ChannelStatus]:
     inspections_files = _count_files(raw_root / "datagokr",
                                       "*수리검사*.csv")
     inspections_pg = _try_pg_count(
-        "SELECT count(*) FROM auto.events_inspections"
+        "SELECT count(*) FROM anxg_auto.events_inspections"
     )
     out.append(ChannelStatus(
         name="한국 수리검사 (15155857, KOTSA)",
         raw_count=inspections_files,
         raw_detail="CSV 파일 다운",
         pg_count=inspections_pg,
-        pg_detail="auto.events_inspections",
+        pg_detail="anxg_auto.events_inspections",
         notes="키 불필요 (파일 다운로드)",
     ))
 
@@ -207,41 +207,41 @@ def collect() -> list[ChannelStatus]:
         return sum(1 for line in p.read_text().splitlines() if line.strip())
     n_hyundai_meta = _meta_n("hyundai")
     n_kia_ww_meta  = _meta_n("kia_worldwide")
-    oem_news_pg = _try_pg_count("SELECT count(*) FROM auto.events_oem_news")
+    oem_news_pg = _try_pg_count("SELECT count(*) FROM anxg_auto.events_oem_news")
     out.append(ChannelStatus(
         name="OEM IR/뉴스룸 (Hyundai+Kia ww)",
         raw_count=n_hyundai_meta + n_kia_ww_meta,
         raw_detail=f"hyundai={n_hyundai_meta} + kia_worldwide={n_kia_ww_meta}",
         pg_count=oem_news_pg,
-        pg_detail="auto.events_oem_news",
+        pg_detail="anxg_auto.events_oem_news",
         notes="B 등급. Kia 한국·Mobis 비활성 (robots Disallow / SPA)",
     ))
 
     # DART 가동률 (2026-06-01 신규)
-    util_pg = _try_pg_count("SELECT count(*) FROM auto.plant_utilization")
+    util_pg = _try_pg_count("SELECT count(*) FROM anxg_auto.plant_utilization")
     out.append(ChannelStatus(
         name="DART 가동률 (utilization, Hyundai)",
         raw_count="포함",
         raw_detail="(DART zip 재사용)",
         pg_count=util_pg,
-        pg_detail="auto.plant_utilization",
+        pg_detail="anxg_auto.plant_utilization",
         notes="B 등급. Hyundai 사업보고서 III.(3) — explicit utilization_pct",
     ))
 
-    # vec.chunks OEM IR + Wikipedia plants + DART narrative (LLM P3 가능)
-    chunks_ir = _try_pg_count("SELECT count(*) FROM vec.chunks WHERE source='oem_ir'")
+    # anxg_vec.chunks OEM IR + Wikipedia plants + DART narrative (LLM P3 가능)
+    chunks_ir = _try_pg_count("SELECT count(*) FROM anxg_vec.chunks WHERE source='oem_ir'")
     chunks_plants = _try_pg_count(
-        "SELECT count(*) FROM vec.chunks WHERE source='wikipedia_auto' AND metadata->>'kind'='plants'"
+        "SELECT count(*) FROM anxg_vec.chunks WHERE source='wikipedia_auto' AND metadata->>'kind'='plants'"
     )
     chunks_narrative = _try_pg_count(
-        "SELECT count(*) FROM vec.chunks WHERE source='dart_narrative'"
+        "SELECT count(*) FROM anxg_vec.chunks WHERE source='dart_narrative'"
     )
     total_ir_p3 = sum(
         v if isinstance(v, int) else 0
         for v in (chunks_ir, chunks_plants, chunks_narrative)
     )
     out.append(ChannelStatus(
-        name="vec.chunks — IR + Wiki plants + DART narrative",
+        name="anxg_vec.chunks — IR + Wiki plants + DART narrative",
         raw_count="from PG",
         raw_detail="3 sources",
         pg_count=total_ir_p3,
@@ -255,8 +255,8 @@ def collect() -> list[ChannelStatus]:
     out.append(ChannelStatus(
         name="USGS MCS — 핵심광물 L6 (Li/Ni/Co/Mn/Graphite)",
         raw_count=usgs_raw, raw_detail="MCS PDF 5+ files",
-        pg_count=_try_pg_count("SELECT count(*) FROM auto.master_minerals"),
-        pg_detail="auto.master_minerals",
+        pg_count=_try_pg_count("SELECT count(*) FROM anxg_auto.master_minerals"),
+        pg_detail="anxg_auto.master_minerals",
         neo4j_count=_try_neo4j_count(
             "MATCH ()-[r:DERIVED_FROM]->() RETURN count(r)"),
         neo4j_detail="DERIVED_FROM 엣지 (Material→Mineral, 7-key 100%)",
@@ -268,8 +268,8 @@ def collect() -> list[ChannelStatus]:
         name="GLEIF KR enrich — Bridge 품질 (LEI↔corp_code)",
         raw_count=gleif_pages, raw_detail="raw JSON pages (KR 2,704 LEI)",
         pg_count=_try_pg_count(
-            "SELECT count(*) FROM master.entity_map WHERE id_type='lei'"),
-        pg_detail="master.entity_map(id_type='lei')",
+            "SELECT count(*) FROM anxg_master.entity_map WHERE id_type='lei'"),
+        pg_detail="anxg_master.entity_map(id_type='lei')",
         neo4j_count="N/A", neo4j_detail="PG-only",
         notes="A 등급 (GLEIF API CC BY 4.0, 무인증). registeredAs → business_no/jurir_no 매칭",
     ))
@@ -278,12 +278,12 @@ def collect() -> list[ChannelStatus]:
     out.append(ChannelStatus(
         name="OpenAlex — Work / Institution / AUTHORED_AT",
         raw_count=oa_inst, raw_detail="institution JSON snapshots",
-        pg_count=_try_pg_count("SELECT count(*) FROM ip.works"),
-        pg_detail="ip.works (+ip.institution +ip.work_institution)",
+        pg_count=_try_pg_count("SELECT count(*) FROM anxg_ip.works"),
+        pg_detail="anxg_ip.works (+anxg_ip.institution +anxg_ip.work_institution)",
         neo4j_count=_try_neo4j_count(
             "MATCH ()-[r:AUTHORED_AT]->() RETURN count(r)"),
         neo4j_detail="AUTHORED_AT (7-key 100%) + IS_ENTITY (→Company)",
-        notes="A 등급 (OpenAlex CC0). OPENALEX_API_KEY 사용. abstract→vec.chunks",
+        notes="A 등급 (OpenAlex CC0). OPENALEX_API_KEY 사용. abstract→anxg_vec.chunks",
     ))
     # 4) data.go.kr EV chargers — 본 PR 보류 (사용자 결정).
     out.append(ChannelStatus(
@@ -300,8 +300,8 @@ def collect() -> list[ChannelStatus]:
     out.append(ChannelStatus(
         name="KOSIS 산업 통계 (kosis.kr)",
         raw_count=kosis_files, raw_detail="raw JSON (stat_code/period)",
-        pg_count=_try_pg_count("SELECT count(*) FROM macro.kosis_series"),
-        pg_detail="macro.kosis_series (04_external_data.sql)",
+        pg_count=_try_pg_count("SELECT count(*) FROM anxg_macro.kosis_series"),
+        pg_detail="anxg_macro.kosis_series (04_external_data.sql)",
         neo4j_count="N/A", neo4j_detail="—",
         notes="A 등급 (공공). KOSIS_API_KEY 필요. wire 완료 (load_kosis_industry.py)",
     ))
@@ -313,7 +313,7 @@ def collect() -> list[ChannelStatus]:
         raw_count=cell_chem_files, raw_detail="cathode_chem_YYYY.json",
         pg_count="N/A", pg_detail="materials_seed.yaml manual seed 활용",
         neo4j_count=_try_neo4j_count(
-            "MATCH (m:Material) WHERE m.source='wikidata' RETURN count(m)"),
+            "MATCH (m:Anxg_Material) WHERE m.source='wikidata' RETURN count(m)"),
         neo4j_detail=":Material (Wikidata 보강)",
         notes="B 등급 (Wikidata CC0). 회사단위 셀↔OEM 소싱은 grade C candidate (PRD §2.3)",
     ))

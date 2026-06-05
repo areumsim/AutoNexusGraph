@@ -26,8 +26,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # ── 식별 ──────────────────────────────────────────────────
     "auto_lookup_vehicle": {
         "cypher": """
-        MATCH (mm:Manufacturer)-[:MANUFACTURES]->(m:VehicleModel)
-        OPTIONAL MATCH (m)-[:HAS_VARIANT]->(v:VehicleVariant)
+        MATCH (mm:Anxg_Manufacturer)-[:MANUFACTURES]->(m:Anxg_VehicleModel)
+        OPTIONAL MATCH (m)-[:HAS_VARIANT]->(v:Anxg_VehicleVariant)
         WHERE m.name = $q OR m.name CONTAINS $q
            OR mm.name = $q OR mm.name CONTAINS $q
         RETURN m.id AS model_id,
@@ -49,7 +49,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_lookup_supplier": {
         "cypher": """
-        MATCH (s:Supplier)
+        MATCH (s:Anxg_Supplier)
         WHERE s.name = $q OR s.name CONTAINS $q OR s.name_norm CONTAINS $q
         RETURN s.entity_id    AS entity_id,
                s.name         AS name,
@@ -69,8 +69,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # 키 이름은 tools.graph.list_components() 와 정렬 — 결과 라벨이 Module + Part 둘 다.
     "auto_list_components_by_model": {
         "cypher": """
-        MATCH (m:VehicleModel {id: $model_id})-[rel:CONTAINS_COMPONENT]->(c)
-        WHERE (c:Module OR c:Part)
+        MATCH (m:Anxg_VehicleModel {id: $model_id})-[rel:CONTAINS_COMPONENT]->(c)
+        WHERE (c:Anxg_Module OR c:Part)
           AND ($system_code IS NULL OR c.system_code = $system_code)
         RETURN c.id            AS component_id,
                labels(c)[0]    AS kind,
@@ -93,9 +93,9 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_list_components_by_variant": {
         "cypher": """
-        MATCH (v:VehicleVariant {id: $variant_id})<-[:HAS_VARIANT]-(m:VehicleModel)
+        MATCH (v:Anxg_VehicleVariant {id: $variant_id})<-[:HAS_VARIANT]-(m:Anxg_VehicleModel)
         MATCH (m)-[rel:CONTAINS_COMPONENT]->(c)
-        WHERE (c:Module OR c:Part)
+        WHERE (c:Anxg_Module OR c:Part)
           AND ($system_code IS NULL OR c.system_code = $system_code)
         RETURN c.id            AS component_id,
                labels(c)[0]    AS kind,
@@ -118,7 +118,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # (VehicleModel)-[:CONTAINS_SYSTEM]->(System) — derived by derive_contains_system.
     "auto_systems_of_model": {
         "cypher": """
-        MATCH (m:VehicleModel {id: $model_id})-[rel:CONTAINS_SYSTEM]->(s:System)
+        MATCH (m:Anxg_VehicleModel {id: $model_id})-[rel:CONTAINS_SYSTEM]->(s:Anxg_System)
         RETURN s.code AS system_code,
                s.name AS system_name,
                s.description AS description,
@@ -135,8 +135,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_models_with_system": {
         "cypher": """
-        MATCH (s:System {code: $system_code})<-[rel:CONTAINS_SYSTEM]-(m:VehicleModel)
-        OPTIONAL MATCH (mm:Manufacturer)-[:MANUFACTURES]->(m)
+        MATCH (s:Anxg_System {code: $system_code})<-[rel:CONTAINS_SYSTEM]-(m:Anxg_VehicleModel)
+        OPTIONAL MATCH (mm:Anxg_Manufacturer)-[:MANUFACTURES]->(m)
         RETURN m.id   AS model_id,
                m.name AS model_name,
                mm.id  AS manufacturer_id,
@@ -152,7 +152,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_parts_in_module": {
         "cypher": """
-        MATCH (p:Part)-[:CONTAINED_IN]->(m:Module {id: $module_id})
+        MATCH (p:Anxg_Part)-[:CONTAINED_IN]->(m:Anxg_Module {id: $module_id})
         RETURN p.id AS part_id, p.name AS name, p.system_code AS system_code
         ORDER BY p.name
         LIMIT $limit
@@ -164,7 +164,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # ── 리콜 ──────────────────────────────────────────────────
     "auto_recalls_by_variant": {
         "cypher": """
-        MATCH (v:VehicleVariant {id: $variant_id})-[rel:AFFECTED_BY]->(rc:Recall)
+        MATCH (v:Anxg_VehicleVariant {id: $variant_id})-[rel:AFFECTED_BY]->(rc:Anxg_Recall)
         WHERE ($year_min IS NULL OR rc.snapshot_year >= $year_min)
           AND ($year_max IS NULL OR rc.snapshot_year <= $year_max)
         RETURN rc.id              AS recall_id,
@@ -192,12 +192,12 @@ AUTO_TEMPLATES: dict[str, dict] = {
         "cypher": """
         CALL {
           WITH $model_id AS mid
-          MATCH (m:VehicleModel {id: mid})-[:HAS_VARIANT]->(v:VehicleVariant)
-                -[rel:AFFECTED_BY]->(rc:Recall)
+          MATCH (m:Anxg_VehicleModel {id: mid})-[:HAS_VARIANT]->(v:Anxg_VehicleVariant)
+                -[rel:AFFECTED_BY]->(rc:Anxg_Recall)
           RETURN rc, rel
           UNION
           WITH $model_id AS mid
-          MATCH (m:VehicleModel {id: mid})-[rel:AFFECTED_BY]->(rc:Recall)
+          MATCH (m:Anxg_VehicleModel {id: mid})-[rel:AFFECTED_BY]->(rc:Anxg_Recall)
           RETURN rc, rel
         }
         WITH rc, rel
@@ -224,8 +224,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_recalls_for_component": {        # Module 또는 Part 에 영향을 준 리콜
         "cypher": """
-        MATCH (rc:Recall)-[rel:RECALL_OF]->(c)
-        WHERE c.id = $component_id AND (c:Module OR c:Part)
+        MATCH (rc:Anxg_Recall)-[rel:RECALL_OF]->(c)
+        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Part)
         RETURN rc.id              AS recall_id,
                rc.source          AS source,
                rc.source_recall_no AS source_recall_no,
@@ -244,8 +244,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # ── 공급사 ↔ 부품 ────────────────────────────────────────
     "auto_suppliers_of_component": {
         "cypher": """
-        MATCH (c)-[rel:SUPPLIED_BY]->(s:Supplier)
-        WHERE c.id = $component_id AND (c:Module OR c:Part)
+        MATCH (c)-[rel:SUPPLIED_BY]->(s:Anxg_Supplier)
+        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Part)
         RETURN s.entity_id    AS supplier_id,
                s.name         AS name,
                s.country      AS country,
@@ -263,9 +263,9 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_vehicles_using_component": {
         "cypher": """
-        MATCH (c)<-[rel:CONTAINS_COMPONENT]-(m:VehicleModel)
-        WHERE c.id = $component_id AND (c:Module OR c:Part)
-        MATCH (mm:Manufacturer)-[:MANUFACTURES]->(m)
+        MATCH (c)<-[rel:CONTAINS_COMPONENT]-(m:Anxg_VehicleModel)
+        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Part)
+        MATCH (mm:Anxg_Manufacturer)-[:MANUFACTURES]->(m)
         RETURN m.id  AS model_id,
                m.name AS model_name,
                mm.id  AS manufacturer_id,
@@ -281,10 +281,10 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_vehicles_using_supplier": {       # Cross-Domain 진입점.
         "cypher": """
-        MATCH (s:Supplier {entity_id: $entity_id})<-[:SUPPLIED_BY]-(c)
-              <-[:CONTAINS_COMPONENT]-(m:VehicleModel)
-              <-[:MANUFACTURES]-(mm:Manufacturer)
-        WHERE (c:Module OR c:Part)
+        MATCH (s:Anxg_Supplier {entity_id: $entity_id})<-[:SUPPLIED_BY]-(c)
+              <-[:CONTAINS_COMPONENT]-(m:Anxg_VehicleModel)
+              <-[:MANUFACTURES]-(mm:Anxg_Manufacturer)
+        WHERE (c:Anxg_Module OR c:Part)
         RETURN DISTINCT
                mm.id   AS manufacturer_id,
                mm.name AS mfr_name,
@@ -302,7 +302,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # ── 평가 / 규격 / 공장 ────────────────────────────────────
     "auto_safety_ratings": {
         "cypher": """
-        MATCH (v:VehicleVariant {id: $variant_id})-[rel:SAFETY_RATED_BY]->(s:Standard)
+        MATCH (v:Anxg_VehicleVariant {id: $variant_id})-[rel:SAFETY_RATED_BY]->(s:Anxg_Standard)
         RETURN s.code AS standard_code,
                s.name AS standard_name,
                s.agency AS agency,
@@ -317,7 +317,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_plants_of_model": {
         "cypher": """
-        MATCH (m:VehicleModel {id: $model_id})-[rel:MANUFACTURED_AT]->(p:Plant)
+        MATCH (m:Anxg_VehicleModel {id: $model_id})-[rel:MANUFACTURED_AT]->(p:Anxg_Plant)
         RETURN p.code AS plant_code, p.name AS plant_name,
                p.country AS country, p.city AS city,
                rel.confidence_score AS confidence
@@ -330,7 +330,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_plants_of_manufacturer": {        # OEM 이 운영하는 공장 (OWNS_PLANT).
         "cypher": """
-        MATCH (mm:Manufacturer {id: $manufacturer_id})-[rel:OWNS_PLANT]->(p:Plant)
+        MATCH (mm:Anxg_Manufacturer {id: $manufacturer_id})-[rel:OWNS_PLANT]->(p:Anxg_Plant)
         RETURN p.code AS plant_code, p.name AS plant_name,
                p.country AS country, p.city AS city,
                rel.confidence_score AS confidence,
@@ -347,7 +347,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # → inv 만 distinct 한 뒤 rel 의 메타는 첫 한 건만 추출 (B2 fix).
     "auto_investigations_by_variant": {
         "cypher": """
-        MATCH (v:VehicleVariant {id: $variant_id})-[rel:INVESTIGATED_BY]->(inv:Investigation)
+        MATCH (v:Anxg_VehicleVariant {id: $variant_id})-[rel:INVESTIGATED_BY]->(inv:Anxg_Investigation)
         WHERE ($year_min IS NULL OR inv.snapshot_year >= $year_min)
           AND ($year_max IS NULL OR inv.snapshot_year <= $year_max)
         WITH inv,
@@ -378,12 +378,12 @@ AUTO_TEMPLATES: dict[str, dict] = {
         "cypher": """
         CALL {
           WITH $model_id AS mid
-          MATCH (m:VehicleModel {id: mid})-[:HAS_VARIANT]->(:VehicleVariant)
-                -[r:INVESTIGATED_BY]->(inv:Investigation)
+          MATCH (m:Anxg_VehicleModel {id: mid})-[:HAS_VARIANT]->(:Anxg_VehicleVariant)
+                -[r:INVESTIGATED_BY]->(inv:Anxg_Investigation)
           RETURN inv, r.confidence_score AS conf
           UNION
           WITH $model_id AS mid
-          MATCH (m:VehicleModel {id: mid})-[r:INVESTIGATED_BY]->(inv:Investigation)
+          MATCH (m:Anxg_VehicleModel {id: mid})-[r:INVESTIGATED_BY]->(inv:Anxg_Investigation)
           RETURN inv, r.confidence_score AS conf
         }
         WITH inv, max(conf) AS confidence
@@ -412,8 +412,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # 조사 → 후속 리콜 추적 (campno 가 채워진 종결 조사만).
     "auto_investigation_recall_chain": {
         "cypher": """
-        MATCH (inv:Investigation {id: $investigation_id})
-        OPTIONAL MATCH (inv)-[:LED_TO_RECALL]->(rc:Recall)
+        MATCH (inv:Anxg_Investigation {id: $investigation_id})
+        OPTIONAL MATCH (inv)-[:LED_TO_RECALL]->(rc:Anxg_Recall)
         RETURN inv.action_number      AS action_number,
                inv.investigation_type AS investigation_type,
                inv.opened_date        AS opened_date,
@@ -428,7 +428,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
 
     "auto_complaints_by_variant": {
         "cypher": """
-        MATCH (v:VehicleVariant {id: $variant_id})-[rel:REPORTED_IN]->(cmp:Complaint)
+        MATCH (v:Anxg_VehicleVariant {id: $variant_id})-[rel:REPORTED_IN]->(cmp:Anxg_Complaint)
         WHERE ($year_min IS NULL OR cmp.snapshot_year >= $year_min)
           AND ($year_max IS NULL OR cmp.snapshot_year <= $year_max)
         RETURN cmp.id      AS complaint_id,
@@ -453,9 +453,9 @@ AUTO_TEMPLATES: dict[str, dict] = {
         f"auto_find_paths_{h}hops": {
             "cypher": f"""
             MATCH p = shortestPath(
-              (a:VehicleVariant {{id: $a}})-[*1..{h}]-(b)
+              (a:Anxg_VehicleVariant {{id: $a}})-[*1..{h}]-(b)
             )
-            WHERE (b:Module OR b:Part) AND b.id = $b
+            WHERE (b:Anxg_Module OR b:Part) AND b.id = $b
             RETURN [n IN nodes(p) | coalesce(n.name, toString(n.id))] AS node_path,
                    [r IN relationships(p) | type(r)] AS rel_types,
                    length(p) AS hops
@@ -471,8 +471,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # 시작 ProcessStep 에서 PRECEDES 후속 체인. 회사 비귀속(산단공 합성·C).
     "auto_proc_route": {
         "cypher": """
-        MATCH p = (s:ProcessStep {step_id: $step_id})-[:PRECEDES*0..10]->(e:ProcessStep)
-        OPTIONAL MATCH (e)-[:INSTANTIATES]->(proc:Process)
+        MATCH p = (s:Anxg_ProcessStep {step_id: $step_id})-[:PRECEDES*0..10]->(e:Anxg_ProcessStep)
+        OPTIONAL MATCH (e)-[:INSTANTIATES]->(proc:Anxg_Process)
         WITH p, e, proc
         ORDER BY length(p)
         RETURN [n IN nodes(p) | n.process_name_norm] AS route,
@@ -489,8 +489,8 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # :Process taxonomy 단건 정보 + 인스턴스(ProcessStep) 수.
     "auto_proc_info": {
         "cypher": """
-        MATCH (p:Process {process_name_norm: $process_name_norm})
-        OPTIONAL MATCH (st:ProcessStep)-[:INSTANTIATES]->(p)
+        MATCH (p:Anxg_Process {process_name_norm: $process_name_norm})
+        OPTIONAL MATCH (st:Anxg_ProcessStep)-[:INSTANTIATES]->(p)
         RETURN p.process_name_norm AS process_name_norm,
                p.process_name      AS process_name,
                p.process_map_name  AS process_map_name,
@@ -505,7 +505,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     # 공정유형 → 그 유형을 인스턴스화한 ProcessStep 들 (INSTANTIATES 역방향).
     "auto_proc_steps_of_process": {
         "cypher": """
-        MATCH (st:ProcessStep)-[:INSTANTIATES]->(p:Process {process_name_norm: $process_name_norm})
+        MATCH (st:Anxg_ProcessStep)-[:INSTANTIATES]->(p:Anxg_Process {process_name_norm: $process_name_norm})
         RETURN st.step_id AS step_id, st.seq AS seq,
                st.confidence_score AS confidence
         ORDER BY st.seq

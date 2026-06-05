@@ -7,14 +7,14 @@
 - 데이터가 부족한 관계는 절대 생성하지 않거나 confidence < 1.0 candidate 로만.
 
 노드 (라벨 SSOT 는 ontology/auto/entities.yaml):
-    Manufacturer  : {id}    — auto.master_manufacturers.manufacturer_id
-    VehicleModel  : {id}    — auto.master_vehicle_models.model_id
-    VehicleVariant: {id}    — auto.master_vehicle_variants.variant_id
-    Recall        : {id}    — auto.events_recalls.recall_id
+    Manufacturer  : {id}    — anxg_auto.master_manufacturers.manufacturer_id
+    VehicleModel  : {id}    — anxg_auto.master_vehicle_models.model_id
+    VehicleVariant: {id}    — anxg_auto.master_vehicle_variants.variant_id
+    Recall        : {id}    — anxg_auto.events_recalls.recall_id
     System        : {code}  — canonical SCREAMING_SNAKE (system_taxonomy.yaml)
-    Module        : {id}    — auto.components.component_id (level=4)
-    Part          : {id}    — auto.components.component_id (level=5)
-    Supplier      : {entity_id} — stringified auto.master_suppliers.supplier_id
+    Module        : {id}    — anxg_auto.components.component_id (level=4)
+    Part          : {id}    — anxg_auto.components.component_id (level=5)
+    Supplier      : {entity_id} — stringified anxg_auto.master_suppliers.supplier_id
 
 관계 (관계 타입 SSOT 는 ontology/auto/relations.yaml):
     (Manufacturer)-[:MANUFACTURES]->(VehicleModel)
@@ -41,7 +41,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ..ontology import canonical_system_code, load_system_taxonomy
@@ -55,7 +55,7 @@ log = logging.getLogger(__name__)
 # ── 노드 MERGE ──────────────────────────────────────────────
 MERGE_MFR = """
 UNWIND $rows AS r
-MERGE (m:Manufacturer {id: r.id})
+MERGE (m:Anxg_Manufacturer {id: r.id})
 SET   m.name = r.name,
       m.name_norm = r.name_norm,
       m.country = coalesce(r.country, m.country),
@@ -67,8 +67,8 @@ SET   m.name = r.name,
 
 MERGE_MODEL = """
 UNWIND $rows AS r
-MATCH (m:Manufacturer {id: r.manufacturer_id})
-MERGE (v:VehicleModel {id: r.id})
+MATCH (m:Anxg_Manufacturer {id: r.manufacturer_id})
+MERGE (v:Anxg_VehicleModel {id: r.id})
 SET   v.name = r.name,
       v.name_norm = r.name_norm,
       v.market = r.market,
@@ -78,7 +78,7 @@ SET   v.name = r.name,
       v.updated_at = datetime()
 MERGE (m)-[rel:MANUFACTURES]->(v)
 SET   rel.source_id = r.source,
-      rel.source_type = 'pg.auto.master_vehicle_models',
+      rel.source_type = 'pg.anxg_auto.master_vehicle_models',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
@@ -88,8 +88,8 @@ SET   rel.source_id = r.source,
 
 MERGE_VARIANT = """
 UNWIND $rows AS r
-MATCH (m:VehicleModel {id: r.model_id})
-MERGE (v:VehicleVariant {id: r.id})
+MATCH (m:Anxg_VehicleModel {id: r.model_id})
+MERGE (v:Anxg_VehicleVariant {id: r.id})
 SET   v.model_year = r.model_year,
       v.trim = r.trim,
       v.fuel_type = r.fuel_type,
@@ -99,7 +99,7 @@ SET   v.model_year = r.model_year,
       v.updated_at = datetime()
 MERGE (m)-[rel:HAS_VARIANT]->(v)
 SET   rel.source_id = r.source,
-      rel.source_type = 'pg.auto.master_vehicle_variants',
+      rel.source_type = 'pg.anxg_auto.master_vehicle_variants',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
@@ -109,7 +109,7 @@ SET   rel.source_id = r.source,
 
 MERGE_RECALL = """
 UNWIND $rows AS r
-MERGE (rc:Recall {id: r.id})
+MERGE (rc:Anxg_Recall {id: r.id})
 SET   rc.source = r.source,
       rc.source_recall_no = r.source_recall_no,
       rc.report_date = r.report_date,
@@ -127,13 +127,13 @@ SET   rc.source = r.source,
 # OPTIONAL MATCH 로 실제 variant 노드가 있을 때만 연결 — 미매칭 recall 은 다음 fallback 패스로.
 MERGE_RECALL_EDGE_VARIANT = """
 UNWIND $rows AS r
-MATCH (rc:Recall {id: r.id})
+MATCH (rc:Anxg_Recall {id: r.id})
 WITH rc, r WHERE r.variant_id IS NOT NULL
-OPTIONAL MATCH (v:VehicleVariant {id: r.variant_id})
+OPTIONAL MATCH (v:Anxg_VehicleVariant {id: r.variant_id})
 WITH rc, r, v WHERE v IS NOT NULL
 MERGE (v)-[rel:AFFECTED_BY]->(rc)
 SET   rel.source_id = r.source_recall_no,
-      rel.source_type = 'pg.auto.events_recalls',
+      rel.source_type = 'pg.anxg_auto.events_recalls',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
@@ -144,13 +144,13 @@ SET   rel.source_id = r.source_recall_no,
 # (VehicleModel)-[:AFFECTED_BY]->(Recall) — variant 매핑이 실패했을 때의 fallback.
 MERGE_RECALL_EDGE_MODEL_FALLBACK = """
 UNWIND $rows AS r
-MATCH (rc:Recall {id: r.id})
+MATCH (rc:Anxg_Recall {id: r.id})
 WITH rc, r WHERE r.variant_id IS NULL AND r.model_id IS NOT NULL
-OPTIONAL MATCH (m:VehicleModel {id: r.model_id})
+OPTIONAL MATCH (m:Anxg_VehicleModel {id: r.model_id})
 WITH rc, r, m WHERE m IS NOT NULL
 MERGE (m)-[rel:AFFECTED_BY]->(rc)
 SET   rel.source_id = r.source_recall_no,
-      rel.source_type = 'pg.auto.events_recalls',
+      rel.source_type = 'pg.anxg_auto.events_recalls',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
@@ -161,7 +161,7 @@ SET   rel.source_id = r.source_recall_no,
 # Level 3 (System): 노드 + name + description. system_taxonomy 시드로 보강.
 MERGE_SYSTEM = """
 UNWIND $rows AS r
-MERGE (s:System {code: r.code})
+MERGE (s:Anxg_System {code: r.code})
 SET   s.name = coalesce(r.name, s.name),
       s.description = coalesce(r.description, s.description),
       s.updated_at = datetime()
@@ -170,7 +170,7 @@ SET   s.name = coalesce(r.name, s.name),
 # Level 4 (Module): :Module 라벨 + (Module)-[:CONTAINED_IN]->(System).
 MERGE_MODULE = """
 UNWIND $rows AS r
-MERGE (m:Module {id: r.id})
+MERGE (m:Anxg_Module {id: r.id})
 SET   m.name = r.canonical_name,
       m.name_norm = r.name_norm,
       m.system_code = r.system_code,
@@ -178,11 +178,11 @@ SET   m.name = r.canonical_name,
       m.source = r.source,
       m.updated_at = datetime()
 WITH m, r
-OPTIONAL MATCH (s:System {code: r.system_code})
+OPTIONAL MATCH (s:Anxg_System {code: r.system_code})
 WITH m, r, s WHERE s IS NOT NULL
 MERGE (m)-[rel:CONTAINED_IN]->(s)
-SET   rel.source_id = 'auto.components',
-      rel.source_type = 'pg.auto.components',
+SET   rel.source_id = 'anxg_auto.components',
+      rel.source_type = 'pg.anxg_auto.components',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = 1.0,
       rel.validated_status = 'verified',
@@ -193,7 +193,7 @@ SET   rel.source_id = 'auto.components',
 # Level 5 (Part): :Part 라벨 + parent_component_id 가 있으면 (Part)-[:CONTAINED_IN]->(Module).
 MERGE_PART = """
 UNWIND $rows AS r
-MERGE (p:Part {id: r.id})
+MERGE (p:Anxg_Part {id: r.id})
 SET   p.name = r.canonical_name,
       p.name_norm = r.name_norm,
       p.system_code = r.system_code,
@@ -201,11 +201,11 @@ SET   p.name = r.canonical_name,
       p.source = r.source,
       p.updated_at = datetime()
 WITH p, r
-OPTIONAL MATCH (parent:Module {id: r.parent_component_id})
+OPTIONAL MATCH (parent:Anxg_Module {id: r.parent_component_id})
 WITH p, r, parent WHERE parent IS NOT NULL
 MERGE (p)-[rel:CONTAINED_IN]->(parent)
-SET   rel.source_id = 'auto.components',
-      rel.source_type = 'pg.auto.components',
+SET   rel.source_id = 'anxg_auto.components',
+      rel.source_type = 'pg.anxg_auto.components',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = 1.0,
       rel.validated_status = 'verified',
@@ -213,12 +213,12 @@ SET   rel.source_id = 'auto.components',
       rel.schema_version = coalesce(r.schema_version, 'v2.1')
 """
 
-# auto.master_suppliers + bridge.corp_entity 의 supplier 행 → :Supplier 노드.
+# anxg_auto.master_suppliers + anxg_bridge.corp_entity 의 supplier 행 → :Supplier 노드.
 # entity_id (stringified supplier_id) 가 유일 키 — neo4j_init 제약과 일치.
 # name_norm / country / wikidata_qid / corp_code 메타도 함께 세팅 (cross-domain bridge 진입점).
 MERGE_SUPPLIER = """
 UNWIND $rows AS r
-MERGE (sup:Supplier {entity_id: r.entity_id})
+MERGE (sup:Anxg_Supplier {entity_id: r.entity_id})
 SET   sup.name = r.name,
       sup.name_norm = r.name_norm,
       sup.country = r.country,
@@ -235,7 +235,7 @@ def _fetch_mfr(cur) -> list[dict]:
     cur.execute("""
         SELECT manufacturer_id, name, name_norm, country, wikidata_qid,
                source, confidence, validated_status, snapshot_year
-          FROM auto.master_manufacturers
+          FROM anxg_auto.master_manufacturers
     """)
     return [{
         "id": r[0], "name": r[1], "name_norm": r[2], "country": r[3],
@@ -248,7 +248,7 @@ def _fetch_models(cur) -> list[dict]:
     cur.execute("""
         SELECT model_id, manufacturer_id, name, name_norm, market, wikidata_qid,
                source, confidence, validated_status, snapshot_year
-          FROM auto.master_vehicle_models
+          FROM anxg_auto.master_vehicle_models
     """)
     return [{
         "id": r[0], "manufacturer_id": r[1], "name": r[2], "name_norm": r[3],
@@ -261,7 +261,7 @@ def _fetch_variants(cur) -> list[dict]:
     cur.execute("""
         SELECT variant_id, model_id, model_year, trim, fuel_type, body_class,
                source, confidence, validated_status, snapshot_year
-          FROM auto.master_vehicle_variants
+          FROM anxg_auto.master_vehicle_variants
     """)
     return [{
         "id": r[0], "model_id": r[1], "model_year": r[2], "trim": r[3],
@@ -276,7 +276,7 @@ def _fetch_recalls(cur) -> list[dict]:
                variant_id, component_text, defect_summary, consequence,
                remedy_summary, report_date, country, affected_units,
                confidence, validated_status, snapshot_year
-          FROM auto.events_recalls
+          FROM anxg_auto.events_recalls
     """)
     rows = []
     for r in cur.fetchall():
@@ -302,14 +302,14 @@ def _fetch_systems_from_taxonomy() -> list[dict]:
 
 
 def _fetch_components_by_level(cur, level: int) -> list[dict]:
-    """auto.components WHERE level=? → Module(4) / Part(5) dict 리스트.
+    """anxg_auto.components WHERE level=? → Module(4) / Part(5) dict 리스트.
 
     system_code 는 canonical_system_code() 로 정규화 (AI-Hub 'powertrain' → 'POWERTRAIN').
     """
     cur.execute("""
         SELECT component_id, canonical_name, name_norm, system_code,
                wikidata_qid, source, snapshot_year, parent_component_id
-          FROM auto.components
+          FROM anxg_auto.components
          WHERE level = %s
     """, (level,))
     rows: list[dict] = []
@@ -325,16 +325,16 @@ def _fetch_components_by_level(cur, level: int) -> list[dict]:
 
 
 def _fetch_suppliers(cur) -> list[dict]:
-    """auto.master_suppliers + bridge.corp_entity 조인 → :Supplier 노드용 dict.
+    """anxg_auto.master_suppliers + anxg_bridge.corp_entity 조인 → :Supplier 노드용 dict.
 
-    entity_id = stringified supplier_id (SSOT — bridge.corp_entity 와 일치).
+    entity_id = stringified supplier_id (SSOT — anxg_bridge.corp_entity 와 일치).
     corp_code 매핑이 있는 row 도 함께 (Cross-Domain Bridge 진입점).
     """
     cur.execute("""
         SELECT s.supplier_id, s.name, s.name_norm, s.country, s.wikidata_qid,
                be.corp_code, be.reviewed_status, be.confidence_score, be.match_method
-          FROM auto.master_suppliers s
-          LEFT JOIN bridge.corp_entity be
+          FROM anxg_auto.master_suppliers s
+          LEFT JOIN anxg_bridge.corp_entity be
             ON be.entity_type = 'supplier'
            AND be.entity_id   = s.supplier_id::text
          WHERE COALESCE(be.reviewed_status, 'candidate') <> 'rejected'
@@ -360,13 +360,13 @@ def load_all(batch: int = 500) -> dict:
         modules  = _fetch_components_by_level(cur, 4)
         parts    = _fetch_components_by_level(cur, 5)
         suppliers = _fetch_suppliers(cur)
-        processes = _fetch_processes(cur)          # BoP taxonomy (:Process)
+        processes = _fetch_processes(cur)          # BoP taxonomy (:Anxg_Process)
     pg.commit()
 
     systems = _fetch_systems_from_taxonomy()
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         out["manufacturers"] = run_batched(session, MERGE_MFR, mfr, batch=batch)
         out["models"]        = run_batched(session, MERGE_MODEL, models, batch=batch)
         out["variants"]      = run_batched(session, MERGE_VARIANT, variants, batch=batch)

@@ -1,8 +1,8 @@
-"""LLM 기반 :DefectType taxonomy 추출 — NHTSA + KOTSA defect_summary → auto.defect_types.
+"""LLM 기반 :DefectType taxonomy 추출 — NHTSA + KOTSA defect_summary → anxg_auto.defect_types.
 
 Phase 1 (본 모듈): 1,434 리콜 텍스트 중 N건 샘플 → Claude API 1회 호출 →
-                   ~30~50 결함 메커니즘 카테고리 추출 → auto.defect_types 적재.
-Phase 2 (별도):    1,434건 전체 → 카테고리 분류 → auto.defect_matches (llm_assign).
+                   ~30~50 결함 메커니즘 카테고리 추출 → anxg_auto.defect_types 적재.
+Phase 2 (별도):    1,434건 전체 → 카테고리 분류 → anxg_auto.defect_matches (llm_assign).
 
 grade C (LLM): confidence_score=0.700, validated_status='candidate', extraction_method='llm'.
 
@@ -49,7 +49,7 @@ Texts:
 
 
 def sample_recall_texts(n: int = 200, seed: int = 42) -> list[tuple]:
-    """auto.events_recalls 에서 N건 무작위 샘플. source 균형 위해 stratified."""
+    """anxg_auto.events_recalls 에서 N건 무작위 샘플. source 균형 위해 stratified."""
     conn = get_connection()
     # NHTSA 493 + KOTSA 941 = 1,434 → 비율대로 (NHTSA 34% / KOTSA 66%)
     nhtsa_n = int(n * 0.34)
@@ -60,7 +60,7 @@ def sample_recall_texts(n: int = 200, seed: int = 42) -> list[tuple]:
         for src, cnt in (("nhtsa", nhtsa_n), ("datagokr_kotsa", kotsa_n)):
             cur.execute("""
                 SELECT recall_id, source, source_recall_no, component_text, defect_summary
-                  FROM auto.events_recalls
+                  FROM anxg_auto.events_recalls
                  WHERE source = %s
                    AND defect_summary IS NOT NULL
                    AND length(defect_summary) > 30
@@ -124,7 +124,7 @@ def call_llm(prompt: str, *, model: str, max_tokens: int = 8000) -> tuple[str, d
 def extract_taxonomy(*, n_sample: int = 200, model: str) -> tuple[list[dict], dict]:
     samples = sample_recall_texts(n_sample)
     if not samples:
-        raise RuntimeError("샘플 0건 — auto.events_recalls 비어있음")
+        raise RuntimeError("샘플 0건 — anxg_auto.events_recalls 비어있음")
     corpus = format_corpus(samples)
     prompt = PROMPT_TAXONOMY.format(n=len(samples), texts=corpus)
     log.info("[llm.taxonomy] %d samples, prompt %d chars, model=%s",
@@ -148,7 +148,7 @@ def upsert_defect_types(types: list[dict], *, model_tag: str) -> int:
     conn = get_connection()
     n = 0
     sql = """
-    INSERT INTO auto.defect_types
+    INSERT INTO anxg_auto.defect_types
         (name, name_en, name_ko, description, category, representative_text,
          source, source_type, source_id, confidence_score, validated_status,
          snapshot_year, extraction_method, schema_version, raw)
@@ -161,7 +161,7 @@ def upsert_defect_types(types: list[dict], *, model_tag: str) -> int:
         name_ko             = EXCLUDED.name_ko,
         description         = EXCLUDED.description,
         category            = EXCLUDED.category,
-        representative_text = COALESCE(EXCLUDED.representative_text, auto.defect_types.representative_text),
+        representative_text = COALESCE(EXCLUDED.representative_text, anxg_auto.defect_types.representative_text),
         updated_at          = now()
     """
     try:
@@ -230,7 +230,7 @@ def main() -> int:
         return 0
 
     n = upsert_defect_types(types, model_tag=args.model)
-    print(f"\n[OK] upserted {n} rows into auto.defect_types")
+    print(f"\n[OK] upserted {n} rows into anxg_auto.defect_types")
     return 0
 
 

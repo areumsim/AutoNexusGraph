@@ -10,7 +10,7 @@
 - 그 외 graph 호출            → intent 명의 ``_Nhops`` / ``_dN`` 파싱, 없으면 1
 - 비-graph tool (sql/research/calculator) → 0 hop
 
-tracing.py(Langfuse) + api/main.py(PG chat.messages.agent_trace) 가 turn END 에
+tracing.py(Langfuse) + api/main.py(PG anxg_chat.messages.agent_trace) 가 turn END 에
 ``hop_count`` + ``tool_sequence`` 로 기록한다.
 """
 

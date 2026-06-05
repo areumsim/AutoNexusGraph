@@ -1,6 +1,6 @@
 """DART 정형 지배구조 API 일괄 수집 — 자회사 / 임원 / 최대주주.
 
-P2 그래프 노드/관계의 source-of-truth. PG fin.filings (이미 적재) 의 사업보고서만 대상.
+P2 그래프 노드/관계의 source-of-truth. PG anxg_fin.filings (이미 적재) 의 사업보고서만 대상.
 
 저장:
     data/raw/dart_bulk/corp/<corp_code>/subsidiaries/{year}.jsonl
@@ -89,10 +89,10 @@ def main() -> int:
         cy = date.today().year
         years = list(range(cy - s.ingest_years_back, cy))
 
-    # 대상 회사 — PG master.companies (이미 적재됨)
+    # 대상 회사 — PG anxg_master.companies (이미 적재됨)
     import psycopg
     with psycopg.connect(s.postgres_dsn) as conn, conn.cursor() as cur:
-        cur.execute("SELECT corp_code, corp_name FROM master.companies "
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies "
                     "WHERE is_active = TRUE ORDER BY corp_code")
         companies = cur.fetchall()
     if args.limit:

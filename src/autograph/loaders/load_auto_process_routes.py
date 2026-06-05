@@ -1,11 +1,11 @@
 """산단공 공정사전 → Neo4j BoP routing 적재 — :ProcessStep + INSTANTIATES + PRECEDES.
 
 ProcessGraph (PRD_process_graph 로드맵 3단계 — 공정 경로/BoP routing).
-``auto.processes`` 의 행 1개 = ``:ProcessStep`` 1개 (step_id='sd_<process_id>').
+``anxg_auto.processes`` 의 행 1개 = ``:ProcessStep`` 1개 (step_id='sd_<process_id>').
 
 엣지 (전부 grade C — 산단공 합성, **회사 비귀속**):
-- ``(:ProcessStep)-[:INSTANTIATES]->(:Process)``  단계 → 공정유형(사전, process_name_norm).
-- ``(:ProcessStep)-[:PRECEDES]->(:ProcessStep)``  같은 (factory_manage_no, process_map_name)
+- ``(:Anxg_ProcessStep)-[:INSTANTIATES]->(:Anxg_Process)``  단계 → 공정유형(사전, process_name_norm).
+- ``(:Anxg_ProcessStep)-[:PRECEDES]->(:Anxg_ProcessStep)``  같은 (factory_manage_no, process_map_name)
   그룹 내 process_order 인접 단계. **선형 체인**(분기 없음) → 적재 폭발 없음.
   조회 depth cap 은 ``auto_proc_route`` 템플릿의 ``PRECEDES*0..10`` 으로 질의에서 제한.
 
@@ -23,7 +23,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
@@ -37,7 +37,7 @@ _CONF_C = 0.50
 # :ProcessStep MERGE + INSTANTIATES → :Process (process_name_norm 으로 매칭).
 MERGE_STEP_INSTANTIATES = f"""
 UNWIND $rows AS r
-MERGE (st:ProcessStep {{step_id: r.step_id}})
+MERGE (st:Anxg_ProcessStep {{step_id: r.step_id}})
 SET   st.seq               = r.seq,
       st.process_name_norm  = r.process_name_norm,
       st.source             = '{_SOURCE}',
@@ -46,7 +46,7 @@ SET   st.seq               = r.seq,
       st.snapshot_year      = r.snapshot_year,
       st.updated_at         = datetime()
 WITH st, r
-MATCH (p:Process {{process_name_norm: r.process_name_norm}})
+MATCH (p:Anxg_Process {{process_name_norm: r.process_name_norm}})
 MERGE (st)-[rel:INSTANTIATES]->(p)
 SET {edge_meta_cypher('rel')}
 """
@@ -54,8 +54,8 @@ SET {edge_meta_cypher('rel')}
 # PRECEDES — 두 ProcessStep 모두 존재해야 하므로 별도 패스.
 MERGE_PRECEDES = f"""
 UNWIND $rows AS r
-MATCH (a:ProcessStep {{step_id: r.from_step}})
-MATCH (b:ProcessStep {{step_id: r.to_step}})
+MATCH (a:Anxg_ProcessStep {{step_id: r.from_step}})
+MATCH (b:Anxg_ProcessStep {{step_id: r.to_step}})
 MERGE (a)-[rel:PRECEDES]->(b)
 SET {edge_meta_cypher('rel')}
 """
@@ -75,11 +75,11 @@ def _meta(extra: dict) -> dict:
 
 
 def _fetch_steps(cur) -> list[dict]:
-    """auto.processes → ProcessStep row (factory/map 는 PRECEDES 그룹핑용, 노드 미저장)."""
+    """anxg_auto.processes → ProcessStep row (factory/map 는 PRECEDES 그룹핑용, 노드 미저장)."""
     cur.execute("""
         SELECT process_id, factory_manage_no, process_map_name,
                process_order, process_name_norm, snapshot_year
-          FROM auto.processes
+          FROM anxg_auto.processes
          WHERE process_name_norm IS NOT NULL
            AND btrim(process_name_norm) <> ''
          ORDER BY factory_manage_no, process_map_name, process_order, process_id
@@ -115,12 +115,12 @@ def load_all(batch: int = 500) -> dict:
     pg.commit()
 
     if not steps:
-        log.warning("[neo4j:proc_route] auto.processes 비었음 — graceful skip")
+        log.warning("[neo4j:proc_route] anxg_auto.processes 비었음 — graceful skip")
         return {"steps": 0, "instantiates": 0, "precedes": 0}
 
     precedes = _build_precedes(steps)
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         n_step = run_batched(session, MERGE_STEP_INSTANTIATES, steps, batch=batch)
         n_prec = run_batched(session, MERGE_PRECEDES, precedes, batch=batch)
     out = {"steps": n_step, "instantiates": n_step, "precedes": n_prec}

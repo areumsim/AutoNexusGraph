@@ -1,12 +1,12 @@
 """OpenAlex 승격 — Institution / Work / AUTHORED_AT 적재.
 
 전략 (한국 기업 R&D ↔ 특허 ↔ 재무 3중 cross 진입점):
-    1. ``bridge.corp_entity`` + ``master.entity_map`` 의 wikidata_qid 풀로
+    1. ``anxg_bridge.corp_entity`` + ``anxg_master.entity_map`` 의 wikidata_qid 풀로
        OpenAlex institutions 매칭 (filter=ids.wikidata:<QID>).
     2. 매칭된 institution 마다 상위 N 개 Work fetch
        (sort=cited_by_count:desc, type=article, last 5y).
-    3. PG: ip.works + ip.institution + ip.work_institution 멱등 UPSERT.
-    4. ip.institution.corp_code 는 매칭된 corp_entity 의 corp_code.
+    3. PG: anxg_ip.works + anxg_ip.institution + anxg_ip.work_institution 멱등 UPSERT.
+    4. anxg_ip.institution.corp_code 는 매칭된 corp_entity 의 corp_code.
 
 OpenAlex API 인증:
     ``OPENALEX_API_KEY`` (premium/authenticated plus tier) 또는 ``mailto`` 폴리트 풀.
@@ -69,7 +69,7 @@ def _http_get(url: str, *, params: dict | None = None, retries: int = 3) -> dict
 # ── 2. QID 풀 ─────────────────────────────────────────────────
 
 def _gather_qid_pool(cur, *, limit: int | None = None) -> list[dict]:
-    """`bridge.corp_entity` + `master.entity_map(wikidata_qid)` 에서 unique QID 풀.
+    """`anxg_bridge.corp_entity` + `anxg_master.entity_map(wikidata_qid)` 에서 unique QID 풀.
 
     return: [{qid, corp_code|None, name, source}, ...]
     """
@@ -77,16 +77,16 @@ def _gather_qid_pool(cur, *, limit: int | None = None) -> list[dict]:
         WITH brides AS (
           -- bridge 는 corp_code 매칭됐거나 reviewed/manufacturer 인 것만 (정합 신뢰).
           SELECT wikidata_qid AS qid, corp_code, name, 'bridge' AS source
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
           WHERE wikidata_qid IS NOT NULL AND wikidata_qid <> ''
             AND (corp_code IS NOT NULL OR entity_type = 'manufacturer'
                  OR reviewed_status IN ('reviewed','validated'))
         ),
         em AS (
-          -- master.entity_map(qid) 는 모든 295 상장사 매핑 — 신뢰 100%.
+          -- anxg_master.entity_map(qid) 는 모든 295 상장사 매핑 — 신뢰 100%.
           SELECT em.id_value AS qid, em.corp_code, c.corp_name AS name, 'entity_map' AS source
-          FROM master.entity_map em
-          LEFT JOIN master.companies c USING (corp_code)
+          FROM anxg_master.entity_map em
+          LEFT JOIN anxg_master.companies c USING (corp_code)
           WHERE em.id_type = 'wikidata_qid' AND em.id_value IS NOT NULL AND em.id_value <> ''
         ),
         all_rows AS (
@@ -157,7 +157,7 @@ def _wikidata_qid_to_ror(qid: str) -> str | None:
 
 
 def _normalize_institution(rec: dict) -> dict:
-    """OpenAlex institution rec → ip.institution row dict."""
+    """OpenAlex institution rec → anxg_ip.institution row dict."""
     ids = rec.get("ids") or {}
     ror = (rec.get("ror") or ids.get("ror") or "").rsplit("/", 1)[-1] or None
     qid = (ids.get("wikidata") or "").rsplit("/", 1)[-1] or None
@@ -202,7 +202,7 @@ def fetch_works_for_institution(oa_inst_id: str, *,
 
 
 def _normalize_work(rec: dict) -> dict:
-    """OpenAlex work rec → ip.works row dict."""
+    """OpenAlex work rec → anxg_ip.works row dict."""
     oa_id = (rec.get("id") or "").rsplit("/", 1)[-1] or None
     doi   = (rec.get("doi") or "").replace("https://doi.org/", "") or None
     abstract = _reconstruct_abstract(rec.get("abstract_inverted_index"))
@@ -262,15 +262,15 @@ def _first_author_pos(work: dict, inst_id: str) -> str | None:
 
 def _upsert_institution(cur, inst: dict, corp_code: str | None) -> bool:
     cur.execute("""
-        INSERT INTO ip.institution
+        INSERT INTO anxg_ip.institution
           (ror_id, openalex_id, name, country, type, corp_code)
         VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (ror_id) DO UPDATE SET
-          openalex_id = COALESCE(EXCLUDED.openalex_id, ip.institution.openalex_id),
-          name        = COALESCE(EXCLUDED.name, ip.institution.name),
-          country     = COALESCE(EXCLUDED.country, ip.institution.country),
-          type        = COALESCE(EXCLUDED.type, ip.institution.type),
-          corp_code   = COALESCE(EXCLUDED.corp_code, ip.institution.corp_code),
+          openalex_id = COALESCE(EXCLUDED.openalex_id, anxg_ip.institution.openalex_id),
+          name        = COALESCE(EXCLUDED.name, anxg_ip.institution.name),
+          country     = COALESCE(EXCLUDED.country, anxg_ip.institution.country),
+          type        = COALESCE(EXCLUDED.type, anxg_ip.institution.type),
+          corp_code   = COALESCE(EXCLUDED.corp_code, anxg_ip.institution.corp_code),
           updated_at  = now()
         RETURNING (xmax = 0) AS is_new
     """, (inst.get("ror_id"), inst.get("openalex_id"), inst.get("name"),
@@ -280,16 +280,16 @@ def _upsert_institution(cur, inst: dict, corp_code: str | None) -> bool:
 
 def _upsert_work(cur, w: dict) -> bool:
     cur.execute("""
-        INSERT INTO ip.works
+        INSERT INTO anxg_ip.works
           (openalex_id, title, publication_year, cited_by_count, doi, type, abstract)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (openalex_id) DO UPDATE SET
-          title             = COALESCE(EXCLUDED.title, ip.works.title),
-          publication_year  = COALESCE(EXCLUDED.publication_year, ip.works.publication_year),
-          cited_by_count    = GREATEST(COALESCE(ip.works.cited_by_count, 0), COALESCE(EXCLUDED.cited_by_count, 0)),
-          doi               = COALESCE(EXCLUDED.doi, ip.works.doi),
-          type              = COALESCE(EXCLUDED.type, ip.works.type),
-          abstract          = COALESCE(EXCLUDED.abstract, ip.works.abstract),
+          title             = COALESCE(EXCLUDED.title, anxg_ip.works.title),
+          publication_year  = COALESCE(EXCLUDED.publication_year, anxg_ip.works.publication_year),
+          cited_by_count    = GREATEST(COALESCE(anxg_ip.works.cited_by_count, 0), COALESCE(EXCLUDED.cited_by_count, 0)),
+          doi               = COALESCE(EXCLUDED.doi, anxg_ip.works.doi),
+          type              = COALESCE(EXCLUDED.type, anxg_ip.works.type),
+          abstract          = COALESCE(EXCLUDED.abstract, anxg_ip.works.abstract),
           updated_at        = now()
         RETURNING (xmax = 0) AS is_new
     """, (w.get("openalex_id"), w.get("title"), w.get("publication_year"),
@@ -301,12 +301,12 @@ def _upsert_work_institution(cur, openalex_work_id: str, ror_id: str,
                               author_position: str | None,
                               snapshot_year: int | None) -> None:
     cur.execute("""
-        INSERT INTO ip.work_institution
+        INSERT INTO anxg_ip.work_institution
           (openalex_id, ror_id, author_position, snapshot_year)
         VALUES (%s, %s, %s, %s)
         ON CONFLICT (openalex_id, ror_id) DO UPDATE SET
-          author_position = COALESCE(EXCLUDED.author_position, ip.work_institution.author_position),
-          snapshot_year   = COALESCE(EXCLUDED.snapshot_year,   ip.work_institution.snapshot_year)
+          author_position = COALESCE(EXCLUDED.author_position, anxg_ip.work_institution.author_position),
+          snapshot_year   = COALESCE(EXCLUDED.snapshot_year,   anxg_ip.work_institution.snapshot_year)
     """, (openalex_work_id, ror_id, author_position, snapshot_year))
 
 

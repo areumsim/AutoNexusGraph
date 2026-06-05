@@ -5,7 +5,7 @@
   multi-turn 동시 실행 시 turn boundary 가 깨지지 않는다.
 - 기존 process singleton (_singleton + _singleton_lock) 제거.
 - get_tracker / get_session_tracker 이원화 → get_session_tracker 단일 진입점.
-- ops.llm_usage 의 ``meta JSONB`` 컬럼에 turn 식별자 (thread_id, turn_id, n_replans,
+- anxg_ops.llm_usage 의 ``meta JSONB`` 컬럼에 turn 식별자 (thread_id, turn_id, n_replans,
   domain) 적재 — 별도 ALTER 불필요.
 
 수명 주기 (turn 단위):
@@ -79,7 +79,7 @@ class TrackerState:
     cost_usd: float = 0.0
     aborted: bool = False
     finalized: bool = False
-    # turn 식별자 — ops.llm_usage.meta JSONB 에 적재
+    # turn 식별자 — anxg_ops.llm_usage.meta JSONB 에 적재
     thread_id: str | None = None
     turn_id: str | None = None
     domain: str | None = None
@@ -184,7 +184,7 @@ class CostTracker:
     def finalize(self, status: str = "ok", *,
                  n_replans: int | None = None,
                  extra_meta: dict | None = None) -> None:
-        """run 종료 — ops.llm_usage 의 ended_at/총합/status + meta JSONB 갱신.
+        """run 종료 — anxg_ops.llm_usage 의 ended_at/총합/status + meta JSONB 갱신.
 
         n_replans: turn 단위 lifecycle 에서 final state.n_replans 전달.
         extra_meta: 추가 메타 (예: ``{"question_kind": "factual"}``) — meta JSONB 머지.
@@ -206,7 +206,7 @@ class CostTracker:
 
     # ── meta JSONB 직렬화 (PG 적재 공통) ─────────────────────────
     def _build_meta(self) -> dict:
-        """ops.llm_usage.meta 에 적재할 dict — turn 식별자 + extra_meta 통합."""
+        """anxg_ops.llm_usage.meta 에 적재할 dict — turn 식별자 + extra_meta 통합."""
         meta: dict = {}
         if self.state.thread_id is not None:
             meta["thread_id"] = self.state.thread_id
@@ -227,7 +227,7 @@ class CostTracker:
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO ops.llm_usage (run_id, caller, model, status, meta)
+                    INSERT INTO anxg_ops.llm_usage (run_id, caller, model, status, meta)
                     VALUES (%s, %s, %s, 'running', %s::jsonb)
                     """,
                     (self.state.run_id, self.state.caller, self.state.model,
@@ -243,7 +243,7 @@ class CostTracker:
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE ops.llm_usage
+                    UPDATE anxg_ops.llm_usage
                        SET ended_at      = now(),
                            n_calls       = %s,
                            input_tokens  = %s,
@@ -269,7 +269,7 @@ class CostTracker:
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO ops.llm_calls
+                    INSERT INTO anxg_ops.llm_calls
                       (run_id, model, purpose, input_tokens, output_tokens,
                        cost_usd, latency_ms)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)

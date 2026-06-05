@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Wikidata 적재:
-  - master.entity_map (wikidata_qid / isin / lei / cik / homepage / sec_ticker)
-  - wiki.wikidata_facts (모든 statement raw 보관)
+  - anxg_master.entity_map (wikidata_qid / isin / lei / cik / homepage / sec_ticker)
+  - anxg_wiki.wikidata_facts (모든 statement raw 보관)
   - Neo4j Company 노드 속성 보강 (wikidata_qid / inception / hq / industry)
 
 선행: data/raw/wikidata/matched.jsonl, data/raw/wikidata/entities/<qid>.json
@@ -26,17 +26,17 @@ from autonexusgraph.ingestion.wikidata_client import (
 
 
 UPSERT_EM = """
-INSERT INTO master.entity_map
+INSERT INTO anxg_master.entity_map
   (corp_code, id_type, id_value, source, confidence, resolved_by, notes)
 VALUES (%s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (corp_code, id_type, id_value) DO UPDATE
-   SET confidence  = GREATEST(master.entity_map.confidence, EXCLUDED.confidence),
+   SET confidence  = GREATEST(anxg_master.entity_map.confidence, EXCLUDED.confidence),
        resolved_at = now(),
        resolved_by = EXCLUDED.resolved_by
 """
 
 UPSERT_FACT = """
-INSERT INTO wiki.wikidata_facts
+INSERT INTO anxg_wiki.wikidata_facts
   (corp_code, qid, property, value, value_type, value_qid, raw)
 VALUES (%s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (corp_code, qid, property, value) DO UPDATE
@@ -59,7 +59,7 @@ PROPERTY_MAP = {
 # Neo4j Company 속성 보강 Cypher (멱등 — MERGE 가 아닌 SET only)
 NEO4J_UPSERT = """
 UNWIND $rows AS r
-MATCH (c:Company {corp_code: r.corp_code})
+MATCH (c:Anxg_Company {corp_code: r.corp_code})
 SET c.wikidata_qid = r.qid,
     c.label_en     = coalesce(r.label_en, c.label_en),
     c.inception    = coalesce(r.inception, c.inception),
@@ -174,22 +174,22 @@ def main() -> int:
 
     # Neo4j 보강
     if not args.no_neo4j:
-        from autonexusgraph.db.neo4j import get_driver
-        with get_driver().session() as session:
+        from autonexusgraph.db.neo4j import get_session
+        with get_session() as session:
             for i in range(0, len(neo4j_rows), 200):
                 session.run(NEO4J_UPSERT, rows=neo4j_rows[i:i + 200])
 
     # 검증
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
-            SELECT id_type, count(*) FROM master.entity_map
+            SELECT id_type, count(*) FROM anxg_master.entity_map
              WHERE source = 'wikidata'
              GROUP BY id_type ORDER BY 2 DESC
         """)
         print("\n[entity_map by id_type (wikidata source)]:")
         for r in cur.fetchall():
             print(f"  {r[0]:20s} {r[1]:>5}")
-        cur.execute("SELECT count(*) FROM wiki.wikidata_facts")
+        cur.execute("SELECT count(*) FROM anxg_wiki.wikidata_facts")
         print(f"[wikidata_facts] total: {cur.fetchone()[0]:,}")
     return 0
 

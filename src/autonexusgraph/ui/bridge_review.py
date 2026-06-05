@@ -19,7 +19,7 @@ from autonexusgraph.bridge_review import (
 
 st.set_page_config(page_title="Bridge 검토 — AutoNexusGraph", layout="wide")
 st.title("Bridge candidate 검토 (Q-1)")
-st.caption("`bridge.corp_entity` 자동 매칭 후보를 사람이 ✓ 승급 / ✗ 거부. "
+st.caption("`anxg_bridge.corp_entity` 자동 매칭 후보를 사람이 ✓ 승급 / ✗ 거부. "
            "검토자 id 와 시각이 기록됩니다.")
 
 reviewer = st.sidebar.text_input("검토자 id", value="reviewer")

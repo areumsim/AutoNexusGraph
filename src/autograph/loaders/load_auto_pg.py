@@ -8,12 +8,12 @@
     data/raw/auto/wikidata/{manufacturers|models|suppliers}.jsonl
 
 적재 대상:
-    auto.master_manufacturers
-    auto.master_vehicle_models
-    auto.master_vehicle_variants
-    auto.events_recalls
-    auto.events_complaints
-    (auto.spec_measurements 은 본 모듈이 만들지 않는다 — Canadian specs 의 dim/weight
+    anxg_auto.master_manufacturers
+    anxg_auto.master_vehicle_models
+    anxg_auto.master_vehicle_variants
+    anxg_auto.events_recalls
+    anxg_auto.events_complaints
+    (anxg_auto.spec_measurements 은 본 모듈이 만들지 않는다 — Canadian specs 의 dim/weight
      키 매핑은 `load_auto_specs.py` 가 담당. 본 모듈은 마스터·이벤트만.)
 
 UPSERT 규칙:
@@ -131,9 +131,9 @@ def _resolve_make_model_variant(
     if model_norm:
         cur.execute("""
             SELECT mm.manufacturer_id, m.model_id, v.variant_id
-              FROM auto.master_vehicle_models m
-              JOIN auto.master_manufacturers mm USING (manufacturer_id)
-              LEFT JOIN auto.master_vehicle_variants v
+              FROM anxg_auto.master_vehicle_models m
+              JOIN anxg_auto.master_manufacturers mm USING (manufacturer_id)
+              LEFT JOIN anxg_auto.master_vehicle_variants v
                 ON v.model_id = m.model_id
                AND v.model_year = %s::int
              WHERE mm.name_norm = %s AND m.name_norm = %s
@@ -146,7 +146,7 @@ def _resolve_make_model_variant(
 
     # 2) brand 만 매칭 — 어떤 mfr 이든 첫 매칭 (model_id, variant_id NULL).
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
          WHERE name_norm = %s
          ORDER BY manufacturer_id ASC LIMIT 1
     """, (make_norm,))
@@ -182,15 +182,15 @@ def _ensure_manufacturer(cur, *, name: str, source: str, source_ref: str | None,
     name_norm = normalize_corp_name(name)
     if manufacturer_id is not None:
         cur.execute("""
-            INSERT INTO auto.master_manufacturers
+            INSERT INTO anxg_auto.master_manufacturers
               (manufacturer_id, name, name_norm, country, wikidata_qid,
                source, source_ref, raw)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
             ON CONFLICT (manufacturer_id) DO UPDATE SET
               name = EXCLUDED.name,
               name_norm = EXCLUDED.name_norm,
-              country = COALESCE(EXCLUDED.country, auto.master_manufacturers.country),
-              wikidata_qid = COALESCE(EXCLUDED.wikidata_qid, auto.master_manufacturers.wikidata_qid),
+              country = COALESCE(EXCLUDED.country, anxg_auto.master_manufacturers.country),
+              wikidata_qid = COALESCE(EXCLUDED.wikidata_qid, anxg_auto.master_manufacturers.wikidata_qid),
               updated_at = now()
             RETURNING manufacturer_id
         """, (manufacturer_id, name, name_norm, country, wikidata_qid,
@@ -199,7 +199,7 @@ def _ensure_manufacturer(cur, *, name: str, source: str, source_ref: str | None,
 
     # manufacturer_id 미제공 — name_norm 으로 조회 후 자체 seq.
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
         WHERE name_norm = %s LIMIT 1
     """, (name_norm,))
     r = cur.fetchone()
@@ -208,12 +208,12 @@ def _ensure_manufacturer(cur, *, name: str, source: str, source_ref: str | None,
     # 자체 seq 영역 (>=10^9) — vPIC 와 겹치지 않게.
     cur.execute("""
         SELECT COALESCE(MAX(manufacturer_id), 999999999) + 1
-          FROM auto.master_manufacturers
+          FROM anxg_auto.master_manufacturers
          WHERE manufacturer_id >= 1000000000
     """)
     new_id = cur.fetchone()[0]
     cur.execute("""
-        INSERT INTO auto.master_manufacturers
+        INSERT INTO anxg_auto.master_manufacturers
           (manufacturer_id, name, name_norm, country, wikidata_qid,
            source, source_ref, raw)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
@@ -228,14 +228,14 @@ def _ensure_model(cur, *, manufacturer_id: int, name: str, market: str | None,
                   wikidata_qid: str | None = None) -> int:
     name_norm = normalize_corp_name(name)
     cur.execute("""
-        INSERT INTO auto.master_vehicle_models
+        INSERT INTO anxg_auto.master_vehicle_models
           (manufacturer_id, name, name_norm, market, wikidata_qid,
            source, source_ref, raw)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
         ON CONFLICT (manufacturer_id, name_norm, market) DO UPDATE SET
           name = EXCLUDED.name,
           wikidata_qid = COALESCE(EXCLUDED.wikidata_qid,
-                                  auto.master_vehicle_models.wikidata_qid),
+                                  anxg_auto.master_vehicle_models.wikidata_qid),
           updated_at = now()
         RETURNING model_id
     """, (manufacturer_id, name, name_norm, market, wikidata_qid,
@@ -258,7 +258,7 @@ def _ensure_variant(cur, *, model_id: int, model_year: int,
     """
     cur.execute("""
         SELECT variant_id, body_class, drive_type, transmission, fuel_type
-          FROM auto.master_vehicle_variants
+          FROM anxg_auto.master_vehicle_variants
         WHERE model_id = %s AND model_year = %s
           AND COALESCE(trim, '') = COALESCE(%s, '')
           AND COALESCE(fuel_type, '') = COALESCE(%s, '')
@@ -269,7 +269,7 @@ def _ensure_variant(cur, *, model_id: int, model_year: int,
         vid = r[0]
         # NULL 컬럼만 보강 (이미 값이 있으면 유지).
         cur.execute("""
-            UPDATE auto.master_vehicle_variants
+            UPDATE anxg_auto.master_vehicle_variants
                SET body_class  = COALESCE(body_class,  %s),
                    drive_type  = COALESCE(drive_type,  %s),
                    transmission= COALESCE(transmission,%s),
@@ -280,7 +280,7 @@ def _ensure_variant(cur, *, model_id: int, model_year: int,
         """, (body_class, drive_type, transmission, fuel_type, vid))
         return vid
     cur.execute("""
-        INSERT INTO auto.master_vehicle_variants
+        INSERT INTO anxg_auto.master_vehicle_variants
           (model_id, model_year, trim, fuel_type, body_class,
            drive_type, transmission, source, source_ref, raw)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
@@ -406,7 +406,7 @@ def load_recalls(*, dry_run: bool = False) -> LoadStats:
                     # report_date 가 없으면 적재 연도 fallback. 차량 model_year 와는 별개.
                     report_date_iso = _to_iso_date(r.get("ReportReceivedDate"))
                     cur.execute("""
-                        INSERT INTO auto.events_recalls
+                        INSERT INTO anxg_auto.events_recalls
                           (source, source_recall_no, manufacturer_id, model_id, variant_id,
                            component_text, defect_summary, consequence, remedy_summary,
                            report_date, country, affected_units, raw, snapshot_year)
@@ -419,11 +419,11 @@ def load_recalls(*, dry_run: bool = False) -> LoadStats:
                                   EXTRACT(YEAR FROM now())::SMALLINT))
                         ON CONFLICT (source, source_recall_no) DO UPDATE SET
                           manufacturer_id = COALESCE(EXCLUDED.manufacturer_id,
-                                                      auto.events_recalls.manufacturer_id),
+                                                      anxg_auto.events_recalls.manufacturer_id),
                           model_id        = COALESCE(EXCLUDED.model_id,
-                                                      auto.events_recalls.model_id),
+                                                      anxg_auto.events_recalls.model_id),
                           variant_id      = COALESCE(EXCLUDED.variant_id,
-                                                      auto.events_recalls.variant_id),
+                                                      anxg_auto.events_recalls.variant_id),
                           raw             = EXCLUDED.raw,
                           ingested_at     = now()
                     """, (
@@ -498,7 +498,7 @@ def load_complaints(*, dry_run: bool = False) -> LoadStats:
                     filed_iso = _to_iso_date(r.get("dateComplaintFiled"))
                     incident_iso = _to_iso_date(r.get("dateOfIncident"))
                     cur.execute("""
-                        INSERT INTO auto.events_complaints
+                        INSERT INTO anxg_auto.events_complaints
                           (source, source_complaint_no, manufacturer_id, model_id, variant_id,
                            components, summary, filed_date, incident_date, country,
                            raw, snapshot_year)
@@ -512,11 +512,11 @@ def load_complaints(*, dry_run: bool = False) -> LoadStats:
                                   EXTRACT(YEAR FROM now())::SMALLINT))
                         ON CONFLICT (source, source_complaint_no) DO UPDATE SET
                           manufacturer_id = COALESCE(EXCLUDED.manufacturer_id,
-                                                     auto.events_complaints.manufacturer_id),
+                                                     anxg_auto.events_complaints.manufacturer_id),
                           model_id        = COALESCE(EXCLUDED.model_id,
-                                                     auto.events_complaints.model_id),
+                                                     anxg_auto.events_complaints.model_id),
                           variant_id      = COALESCE(EXCLUDED.variant_id,
-                                                     auto.events_complaints.variant_id),
+                                                     anxg_auto.events_complaints.variant_id),
                           raw             = EXCLUDED.raw,
                           ingested_at     = now()
                     """, (
@@ -568,13 +568,13 @@ def load_wikidata(*, dry_run: bool = False) -> LoadStats:
                     continue
                 country = row.get("countryLabel")
                 cur.execute("""
-                    SELECT manufacturer_id FROM auto.master_manufacturers
+                    SELECT manufacturer_id FROM anxg_auto.master_manufacturers
                     WHERE name_norm = %s LIMIT 1
                 """, (normalize_corp_name(name),))
                 r = cur.fetchone()
                 if r:
                     cur.execute("""
-                        UPDATE auto.master_manufacturers
+                        UPDATE anxg_auto.master_manufacturers
                            SET wikidata_qid = COALESCE(wikidata_qid, %s),
                                country = COALESCE(country, %s),
                                updated_at = now()
@@ -603,7 +603,7 @@ def load_wikidata(*, dry_run: bool = False) -> LoadStats:
                     cur.execute("RELEASE SAVEPOINT sp_wd_model")
                     continue
                 cur.execute("""
-                    SELECT manufacturer_id FROM auto.master_manufacturers
+                    SELECT manufacturer_id FROM anxg_auto.master_manufacturers
                     WHERE name_norm = %s LIMIT 1
                 """, (normalize_corp_name(mfr_name),))
                 mfr_row = cur.fetchone()
@@ -623,7 +623,7 @@ def load_wikidata(*, dry_run: bool = False) -> LoadStats:
                 cur.execute("ROLLBACK TO SAVEPOINT sp_wd_model")
                 stats.errors.append(f"wikidata model {row.get('model_qid')}: {e}")
 
-        # suppliers — auto.* 에는 supplier 테이블이 없으므로 bridge.corp_entity 에 candidate 로 적재.
+        # suppliers — auto.* 에는 supplier 테이블이 없으므로 anxg_bridge.corp_entity 에 candidate 로 적재.
         # 본 모듈은 master 적재만 담당 → suppliers 는 load_bridge 에서 처리.
 
     if dry_run:

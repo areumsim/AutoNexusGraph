@@ -1,4 +1,4 @@
-"""data/raw/auto/wikidata/part_supplies.jsonl → auto.staging_relations.
+"""data/raw/auto/wikidata/part_supplies.jsonl → anxg_auto.staging_relations.
 
 Wikidata P176 (manufactured by) 매핑이 만든 (part, supplier) 쌍을 staging 에
 SUPPLIED_BY 후보로 적재. PRD §3.5: Wikidata = B 등급 = 기본 confidence 0.80
@@ -8,7 +8,7 @@ SUPPLIED_BY 후보로 적재. PRD §3.5: Wikidata = B 등급 = 기본 confidence
 (staging_writer.upsert_staging 의 ON CONFLICT 와 동일 정책).
 
 이후 ``python -m autograph.extractors.cross_validate`` 가 staging 을 P4 로 처리해
-Neo4j 의 (:Module|:Part)-[:SUPPLIED_BY]->(:Supplier) 엣지로 promote.
+Neo4j 의 (:Anxg_Module|:Part)-[:SUPPLIED_BY]->(:Anxg_Supplier) 엣지로 promote.
 
 CLI:
     python -m autograph.loaders.load_wikidata_part_supplies
@@ -110,7 +110,7 @@ def load_part_supplies(*, dry_run: bool = False) -> LoadStats:
             try:
                 # ON CONFLICT (merge key) → 더 높은 confidence 로만 update.
                 cur.execute("""
-                    INSERT INTO auto.staging_relations
+                    INSERT INTO anxg_auto.staging_relations
                       (relation_type, head_kind, head_text_norm, tail_kind, tail_text_norm,
                        snapshot_year, head_pg_id, tail_pg_id,
                        head_text, tail_text,
@@ -126,18 +126,18 @@ def load_part_supplies(*, dry_run: bool = False) -> LoadStats:
                                  COALESCE(snapshot_year, 0))
                     DO UPDATE SET
                       confidence_score = GREATEST(
-                          auto.staging_relations.confidence_score,
+                          anxg_auto.staging_relations.confidence_score,
                           EXCLUDED.confidence_score),
                       evidence_text = CASE
                           WHEN EXCLUDED.confidence_score
-                               > auto.staging_relations.confidence_score
+                               > anxg_auto.staging_relations.confidence_score
                           THEN EXCLUDED.evidence_text
-                          ELSE auto.staging_relations.evidence_text END,
+                          ELSE anxg_auto.staging_relations.evidence_text END,
                       gate_status = CASE
                           WHEN EXCLUDED.confidence_score
-                               > auto.staging_relations.confidence_score
+                               > anxg_auto.staging_relations.confidence_score
                           THEN EXCLUDED.gate_status
-                          ELSE auto.staging_relations.gate_status END
+                          ELSE anxg_auto.staging_relations.gate_status END
                     RETURNING (xmax = 0) AS inserted
                 """, (
                     "SUPPLIED_BY", "Module", head_norm, "Supplier", tail_norm,

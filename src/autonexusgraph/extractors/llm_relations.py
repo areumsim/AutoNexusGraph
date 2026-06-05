@@ -1,7 +1,7 @@
 """P3 — 사업보고서 본문 청크 → LLM 관계 추출.
 
 처리 흐름:
-1. vec.chunks 에서 high-value section + 대상 회사 필터로 청크 가져오기
+1. anxg_vec.chunks 에서 high-value section + 대상 회사 필터로 청크 가져오기
 2. 청크별 컨텍스트 (회사명/연도/섹션) + LLMClient.chat_json 호출
 3. 출력 JSON 검증 (relations.yaml 의 P3 관계만 허용) + confidence gate
 4. 결과 → data/processed/extracted/<corp_code>/<rcept_no>.jsonl 저장
@@ -35,7 +35,7 @@ from ..llm.budget_aware import budget_aware_client
 log = logging.getLogger(__name__)
 
 
-# vec.chunks 에서 P3 추출에 의미 있는 section keyword. 너무 길면 노이즈, 너무 짧으면 의미 없음.
+# anxg_vec.chunks 에서 P3 추출에 의미 있는 section keyword. 너무 길면 노이즈, 너무 짧으면 의미 없음.
 HIGH_VALUE_SECTIONS = (
     "사업의 개요",
     "사업의개요",
@@ -103,7 +103,7 @@ def filter_target_chunks(
       SELECT id, corp_code, rcept_no, fiscal_year, section, text, token_count,
              row_number() OVER (PARTITION BY corp_code, fiscal_year, section
                                 ORDER BY token_count DESC) AS rk
-        FROM vec.chunks
+        FROM anxg_vec.chunks
        WHERE {where}
     )
     SELECT id, corp_code, rcept_no, fiscal_year, section, text, token_count
@@ -156,7 +156,7 @@ def extract_one(
 ) -> P3Result | None:
     """단일 청크 → P3Result. LLM 호출 실패 시 None.
 
-    company_name_resolver: corp_code → 회사명 매핑 (PG master.companies 에서 prefetch).
+    company_name_resolver: corp_code → 회사명 매핑 (PG anxg_master.companies 에서 prefetch).
     client: BudgetAwareLLMClient — 미지정 시 새로 만들지 않음 (호출자가 manage).
     """
     if client is None:

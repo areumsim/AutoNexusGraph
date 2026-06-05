@@ -1,6 +1,6 @@
 """data.go.kr 15151075 — 한국산업단지공단 자동차 부품 제조업 공정 합성데이터.
 
-CSV → ``auto.processes`` UPSERT. 550 row 자동차 부품 제조 공정 (전처리/도장/조립/
+CSV → ``anxg_auto.processes`` UPSERT. 550 row 자동차 부품 제조 공정 (전처리/도장/조립/
 검사 등) 의 정규화된 taxonomy 사전. **합성 데이터 (PRD §3.5 C 등급)** — 단독
 근거 금지, 공정명 정규형 사전으로만 사용.
 
@@ -89,7 +89,7 @@ def _coerce_int(s: str | None) -> int | None:
 
 
 def run(*, csv_path: str | None = None, dry_run: bool = False) -> dict:
-    """CSV → auto.processes UPSERT (또는 dry_run 통계만)."""
+    """CSV → anxg_auto.processes UPSERT (또는 dry_run 통계만)."""
     src = _find_csv(csv_path)
     if src is None:
         log.warning("[load:sandang] CSV 없음 (찾는 위치: data/raw/datagokr/%s) — "
@@ -130,7 +130,7 @@ def run(*, csv_path: str | None = None, dry_run: bool = False) -> dict:
             cur.execute("SAVEPOINT sp_sandang")
             try:
                 cur.execute("""
-                    INSERT INTO auto.processes
+                    INSERT INTO anxg_auto.processes
                       (factory_manage_no, industry_code, industry_level,
                        process_map_name, process_map_desc,
                        process_order, process_name, process_name_norm,

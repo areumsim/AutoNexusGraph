@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""뉴스 RSS raw → PG news.articles + 회사 멘션 + Neo4j NewsEvent.
+"""뉴스 RSS raw → PG anxg_news.articles + 회사 멘션 + Neo4j NewsEvent.
 
 룰 기반 멘션 추출:
 - 회사명·alias 정규화 후 기사 제목/요약에서 substring 매칭
 - 너무 짧은 이름(2자 이하) 은 제외 (오탐 多)
 
 Neo4j:
-- (:NewsEvent {article_hash})-[:MENTIONS {confidence}]->(:Company)
-- 공동 언급 → (:Company)-[:CO_MENTIONED_WITH {count}]-(:Company)  (집계는 별도 step)
+- (:Anxg_NewsEvent {article_hash})-[:MENTIONS {confidence}]->(:Anxg_Company)
+- 공동 언급 → (:Anxg_Company)-[:CO_MENTIONED_WITH {count}]-(:Anxg_Company)  (집계는 별도 step)
 
 사용:
     python scripts/load/load_news.py [--dry-run] [--no-neo4j]
@@ -31,7 +31,7 @@ from autonexusgraph.loaders._edge_meta import edge_meta_set_clause
 
 
 UPSERT_ARTICLE = """
-INSERT INTO news.articles
+INSERT INTO anxg_news.articles
   (article_hash, source, guid, title, summary, body_text, link,
    published_at, categories, license_tier, raw)
 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
@@ -44,23 +44,23 @@ ON CONFLICT (article_hash) DO UPDATE
 """
 
 UPSERT_MENTION = """
-INSERT INTO news.article_mentions
+INSERT INTO anxg_news.article_mentions
   (article_hash, corp_code, extracted_by, confidence)
 VALUES (%s, %s, %s, %s)
 ON CONFLICT (article_hash, corp_code) DO UPDATE
-   SET confidence = GREATEST(news.article_mentions.confidence, EXCLUDED.confidence)
+   SET confidence = GREATEST(anxg_news.article_mentions.confidence, EXCLUDED.confidence)
 """
 
 NEO4J_UPSERT_NEWS = f"""
 UNWIND $rows AS r
-MERGE (n:NewsEvent {{article_hash: r.article_hash}})
+MERGE (n:Anxg_NewsEvent {{article_hash: r.article_hash}})
 SET n.title        = r.title,
     n.source       = r.source,
     n.published_at = r.published_at,
     n.url          = r.link
 WITH n, r
 UNWIND r.corp_codes AS cc
-MATCH (c:Company {{corp_code: cc}})
+MATCH (c:Anxg_Company {{corp_code: cc}})
 MERGE (n)-[m:MENTIONS]->(c)
 SET m.extracted_by = 'rule',
     m.confidence   = 0.8,
@@ -99,14 +99,14 @@ def _load_aliases() -> dict[str, set[str]]:
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT alias, alias_norm, corp_code
-              FROM master.company_aliases
+              FROM anxg_master.company_aliases
         """)
         for alias, alias_norm, corp_code in cur.fetchall():
             for k in (alias, alias_norm):
                 if k and len(k) >= 3:
                     out[k].add(corp_code)
         # 회사명 자체도 추가
-        cur.execute("SELECT corp_code, corp_name FROM master.companies WHERE is_active=TRUE")
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies WHERE is_active=TRUE")
         from autonexusgraph.ingestion._common import normalize_corp_name
         for corp_code, corp_name in cur.fetchall():
             if corp_name and len(corp_name) >= 3:
@@ -211,21 +211,21 @@ def main() -> int:
             cur.executemany(UPSERT_MENTION, mention_rows[i:i + BATCH])
 
     if not args.no_neo4j and neo4j_rows:
-        from autonexusgraph.db.neo4j import get_driver
-        with get_driver().session() as session:
+        from autonexusgraph.db.neo4j import get_session
+        with get_session() as session:
             for i in range(0, len(neo4j_rows), 100):
                 session.run(NEO4J_UPSERT_NEWS, rows=neo4j_rows[i:i + 100])
 
     # 검증
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT source, count(*) FROM news.articles GROUP BY source ORDER BY 2 DESC")
-        print("\n[news.articles by source]")
+        cur.execute("SELECT source, count(*) FROM anxg_news.articles GROUP BY source ORDER BY 2 DESC")
+        print("\n[anxg_news.articles by source]")
         for r in cur.fetchall():
             print(f"  {r[0]:25s} {r[1]:>6}")
-        cur.execute("SELECT count(*) FROM news.article_mentions")
+        cur.execute("SELECT count(*) FROM anxg_news.article_mentions")
         print(f"[mentions] total: {cur.fetchone()[0]:,}")
         cur.execute("""
-            SELECT corp_code, count(*) FROM news.article_mentions
+            SELECT corp_code, count(*) FROM anxg_news.article_mentions
             GROUP BY corp_code ORDER BY 2 DESC LIMIT 10
         """)
         print("[mentions] top corps:")

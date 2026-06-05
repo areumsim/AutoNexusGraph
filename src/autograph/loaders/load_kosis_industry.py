@@ -1,4 +1,4 @@
-"""KOSIS 산업 통계 raw → macro.kosis_series PG 적재.
+"""KOSIS 산업 통계 raw → anxg_macro.kosis_series PG 적재.
 
 PRD §10 — 자동차 산업 거시 통계 (광업제조업 동향조사 등) 시계열 통합.
 scripts/ingest/download_kosis.py 가 raw json 만 저장 — 본 loader 가 PG 정규화.
@@ -50,7 +50,7 @@ def _coerce_rows(payload, stat_code_hint: str) -> list[dict]:
     normalized = cli.normalize(raw_rows, stat_code_hint=stat_code_hint)
     out: list[dict] = []
     for r in normalized:
-        # macro.kosis_series PK = (stat_code, item_code, time). cycle = period_type.
+        # anxg_macro.kosis_series PK = (stat_code, item_code, time). cycle = period_type.
         # time 의 길이로 cycle 추론: 4→A, 6→M, 5(YYYY+Q)→Q.
         cycle = "A"
         if len(r.time) == 6:
@@ -93,7 +93,7 @@ def upsert_pg(rows: list[dict]) -> int:
         log.warning("[kosis.load_pg] postgres 모듈 미가용: %s", e)
         return 0
     sql = """
-    INSERT INTO macro.kosis_series (
+    INSERT INTO anxg_macro.kosis_series (
         stat_code, item_code, time, cycle, value,
         unit, stat_name, item_name, raw
     ) VALUES (
@@ -102,9 +102,9 @@ def upsert_pg(rows: list[dict]) -> int:
     )
     ON CONFLICT (stat_code, item_code, time) DO UPDATE SET
         value      = EXCLUDED.value,
-        unit       = COALESCE(EXCLUDED.unit, macro.kosis_series.unit),
-        stat_name  = COALESCE(EXCLUDED.stat_name, macro.kosis_series.stat_name),
-        item_name  = COALESCE(EXCLUDED.item_name, macro.kosis_series.item_name),
+        unit       = COALESCE(EXCLUDED.unit, anxg_macro.kosis_series.unit),
+        stat_name  = COALESCE(EXCLUDED.stat_name, anxg_macro.kosis_series.stat_name),
+        item_name  = COALESCE(EXCLUDED.item_name, anxg_macro.kosis_series.item_name),
         raw        = EXCLUDED.raw
     """
     try:

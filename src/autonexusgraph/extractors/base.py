@@ -7,7 +7,7 @@
 
 우리 도메인 단순화:
 - entity 는 P2 정형(DART)에서 SSOT — extractor 는 relation 만 추출.
-- chunk 입력 = vec.chunks row dict (id, corp_code, text, fiscal_year, section, ...)
+- chunk 입력 = anxg_vec.chunks row dict (id, corp_code, text, fiscal_year, section, ...)
 - RunContext = LLM client / 비용 가드 / company name resolver 묶음.
 """
 

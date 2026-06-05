@@ -4,9 +4,9 @@
 ``dart_production_parser.parse_business_report()`` 를 호출, 결과 PlantRow 를
 다음 세 곳에 적재한다:
 
-- ``auto.plant_capacity``   (생산능력)
-- ``auto.plant_production`` (생산실적)
-- (선택) Neo4j ``(:Manufacturer)-[:MANUFACTURED_AT {capa, actual, util}]->(:Plant)``
+- ``anxg_auto.plant_capacity``   (생산능력)
+- ``anxg_auto.plant_production`` (생산실적)
+- (선택) Neo4j ``(:Anxg_Manufacturer)-[:MANUFACTURED_AT {capa, actual, util}]->(:Anxg_Plant)``
 
 선행 조건:
     1. ``make migrate-auto-production`` — 15_autograph_production.sql 적용.
@@ -54,7 +54,7 @@ log = logging.getLogger(__name__)
 
 # ── 6 OEM 화이트리스트 — Phase A 확정 범위 ───────────────────────
 # corp_code 출처: data/raw/ingest_targets.jsonl 의 KRX 매핑.
-# alias_for_mfr 은 auto.master_manufacturers.name 의 영문 정규형 (NHTSA vPIC).
+# alias_for_mfr 은 anxg_auto.master_manufacturers.name 의 영문 정규형 (NHTSA vPIC).
 OEM_CORP_CODES: dict[str, dict] = {
     "00164742": {"name": "현대자동차",   "alias_for_mfr": "HYUNDAI"},
     "00106641": {"name": "기아",         "alias_for_mfr": "KIA"},
@@ -169,7 +169,7 @@ def _upsert_capacity(cur, *, corp_code: str, rcept_no: str,
                      row: PlantRow) -> bool:
     """1 행 UPSERT. RETURN is_new (True=insert, False=update)."""
     cur.execute("""
-        INSERT INTO auto.plant_capacity
+        INSERT INTO anxg_auto.plant_capacity
           (corp_code, business_division, plant_code, plant_region,
            snapshot_year, capacity_units, source_rcept_no, raw)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
@@ -196,7 +196,7 @@ def _upsert_utilization(cur, *, corp_code: str, rcept_no: str,
     """Hyundai 가동률 표 — value=utilization_pct, extra 에 capa/actual."""
     extra = row.extra or {}
     cur.execute("""
-        INSERT INTO auto.plant_utilization
+        INSERT INTO anxg_auto.plant_utilization
           (corp_code, business_division, plant_code, snapshot_year,
            utilization_pct, actual_hours, available_hours,
            source_rcept_no, raw)
@@ -223,7 +223,7 @@ def _upsert_utilization(cur, *, corp_code: str, rcept_no: str,
 def _upsert_production(cur, *, corp_code: str, rcept_no: str,
                        row: PlantRow) -> bool:
     cur.execute("""
-        INSERT INTO auto.plant_production
+        INSERT INTO anxg_auto.plant_production
           (corp_code, business_division, plant_code, plant_region,
            snapshot_year, actual_units, source_rcept_no, raw)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
@@ -250,8 +250,8 @@ def _resolve_manufacturer_id(corp_code: str) -> int | None:
     """corp_code → manufacturer_id.
 
     우선순위:
-      1. bridge.corp_entity 의 (corp_code, entity_type='manufacturer') 매칭
-      2. OEM_CORP_CODES[cc]['alias_for_mfr'] 로 auto.master_manufacturers.name exact
+      1. anxg_bridge.corp_entity 의 (corp_code, entity_type='manufacturer') 매칭
+      2. OEM_CORP_CODES[cc]['alias_for_mfr'] 로 anxg_auto.master_manufacturers.name exact
       3. 모두 실패 → None (Neo4j 엣지 skip + log)
     """
     from autonexusgraph.db.postgres import get_connection
@@ -259,7 +259,7 @@ def _resolve_manufacturer_id(corp_code: str) -> int | None:
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT entity_id::int FROM bridge.corp_entity
+                SELECT entity_id::int FROM anxg_bridge.corp_entity
                  WHERE corp_code = %s
                    AND entity_type = 'manufacturer'
                    AND reviewed_status <> 'rejected'
@@ -272,7 +272,7 @@ def _resolve_manufacturer_id(corp_code: str) -> int | None:
             alias = OEM_CORP_CODES.get(corp_code, {}).get("alias_for_mfr")
             if alias:
                 cur.execute("""
-                    SELECT manufacturer_id FROM auto.master_manufacturers
+                    SELECT manufacturer_id FROM anxg_auto.master_manufacturers
                      WHERE name = %s
                      ORDER BY manufacturer_id LIMIT 1
                 """, (alias,))
@@ -371,8 +371,8 @@ def _merge_capa_and_actual(capacity_rows: list[PlantRow],
 
 _MANUFACTURED_AT_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (mm:Manufacturer {{id: r.manufacturer_id}})
-MATCH (p:Plant {{code: r.plant_code}})
+MATCH (mm:Anxg_Manufacturer {{id: r.manufacturer_id}})
+MATCH (p:Anxg_Plant {{code: r.plant_code}})
 MERGE (mm)-[edge:MANUFACTURED_AT {{snapshot_year: r.snapshot_year}}]->(p)
 SET {edge_meta_cypher('edge')},
     edge.capa_units      = r.capa_units,
@@ -433,9 +433,9 @@ def _sync_manufactured_at_to_neo4j(*, capacity_rows: list[PlantRow],
     if not rows:
         return {"edges_created": 0, "plants_skipped": plants_skipped}
 
-    from autonexusgraph.db.neo4j import get_driver
-    driver = get_driver()
-    with driver.session() as session:
+    from autonexusgraph.db.neo4j import get_session
+
+    with get_session() as session:
         run_batched(session, _MANUFACTURED_AT_CYPHER, rows)
     return {"edges_created": len(rows), "plants_skipped": plants_skipped}
 

@@ -1,4 +1,4 @@
-"""data/raw/auto/epa_fueleconomy/vehicles.csv(.zip) → auto.spec_measurements.
+"""data/raw/auto/epa_fueleconomy/vehicles.csv(.zip) → anxg_auto.spec_measurements.
 
 PRD §3.5: EPA 인증 = A 등급 (0.95). 정량 수치 → number_guard 통과 후 cite 가능.
 "제원 수치 EM 95%+" (PRD §10.9) 직접 기여.
@@ -195,9 +195,9 @@ def _resolve_variants(cur, *, make: str, model: str, year: int) -> list[int]:
         return []
     cur.execute("""
         SELECT v.variant_id
-          FROM auto.master_vehicle_variants v
-          JOIN auto.master_vehicle_models m  USING (model_id)
-          JOIN auto.master_manufacturers mm USING (manufacturer_id)
+          FROM anxg_auto.master_vehicle_variants v
+          JOIN anxg_auto.master_vehicle_models m  USING (model_id)
+          JOIN anxg_auto.master_manufacturers mm USING (manufacturer_id)
          WHERE mm.name_norm = %s
            AND (m.name_norm = %s OR m.name_norm LIKE %s)
            AND v.model_year = %s
@@ -260,7 +260,7 @@ def _process_row(cur, row: dict, stats: LoadStats,
         try:
             # 같은 source 기존 row 모두 삭제 (멱등).
             cur.execute("""
-                DELETE FROM auto.spec_measurements
+                DELETE FROM anxg_auto.spec_measurements
                  WHERE variant_id = %s AND source = %s
             """, (vid, _SOURCE_KEY))
             deleted = cur.rowcount
@@ -268,7 +268,7 @@ def _process_row(cur, row: dict, stats: LoadStats,
             inserted = 0
             for measure_key, v_num, v_text, unit in measurements:
                 cur.execute("""
-                    INSERT INTO auto.spec_measurements
+                    INSERT INTO anxg_auto.spec_measurements
                       (variant_id, measure_key, value_num, value_text, unit,
                        source, source_ref, confidence, validated_status,
                        snapshot_year, raw)

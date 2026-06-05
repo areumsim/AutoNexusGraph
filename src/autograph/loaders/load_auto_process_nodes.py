@@ -1,7 +1,7 @@
-"""산단공 합성 공정사전(`auto.processes`) → Neo4j ``:Process`` 노드 적재 (BoP taxonomy).
+"""산단공 합성 공정사전(`anxg_auto.processes`) → Neo4j ``:Process`` 노드 적재 (BoP taxonomy).
 
 ProcessGraph (PRD_process_graph §1 / 로드맵 1단계) — BoP 축의 뼈대.
-`auto.processes` 는 PG SSOT (loader: ``load_sandang_processes.py``). 본 모듈은 그
+`anxg_auto.processes` 는 PG SSOT (loader: ``load_sandang_processes.py``). 본 모듈은 그
 **정규화 공정명(process_name_norm) 별 1 노드**로 ``:Process`` 를 MERGE 한다.
 
 설계 메모:
@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import run_batched
@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 # grade C governance 속성은 노드에 그대로 — 답변 시 "패턴(합성)" 근거.
 MERGE_PROCESS = """
 UNWIND $rows AS r
-MERGE (p:Process {process_name_norm: r.process_name_norm})
+MERGE (p:Anxg_Process {process_name_norm: r.process_name_norm})
 SET   p.process_name      = r.process_name,
       p.process_map_name   = r.process_map_name,
       p.industry_code      = r.industry_code,
@@ -46,7 +46,7 @@ SET   p.process_name      = r.process_name,
 
 
 def _fetch_processes(cur) -> list[dict]:
-    """auto.processes → process_name_norm 별 1 dict (대표값 집계).
+    """anxg_auto.processes → process_name_norm 별 1 dict (대표값 집계).
 
     process_name_norm 이 NULL/빈 문자열인 행은 제외 (노드 키 무결성).
     """
@@ -56,7 +56,7 @@ def _fetch_processes(cur) -> list[dict]:
                min(process_map_name)  AS process_map_name,
                min(industry_code)     AS industry_code,
                max(snapshot_year)     AS snapshot_year
-          FROM auto.processes
+          FROM anxg_auto.processes
          WHERE process_name_norm IS NOT NULL
            AND btrim(process_name_norm) <> ''
          GROUP BY process_name_norm
@@ -83,11 +83,11 @@ def load_all(batch: int = 500) -> dict:
     pg.commit()
 
     if not rows:
-        log.warning("[neo4j:process] auto.processes 비었음 — graceful skip (0 nodes)")
+        log.warning("[neo4j:process] anxg_auto.processes 비었음 — graceful skip (0 nodes)")
         return {"processes": 0}
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         n = merge_processes(session, rows, batch=batch)
     out = {"processes": n}
     log.info("[neo4j:process] loaded %s (distinct process_name_norm)", out)

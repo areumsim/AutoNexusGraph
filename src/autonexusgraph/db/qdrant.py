@@ -21,6 +21,19 @@ def get_client():
     return QdrantClient(url=s.qdrant_url)
 
 
+def collection_name(base: str = "chunks") -> str:
+    """namespace 격리 Qdrant 컬렉션 명. **컬렉션 생성/조회는 이 헬퍼로** (하드코딩 금지).
+
+    공유 Qdrant 서버에서 프로젝트별 컬렉션을 분리한다. config `qdrant_collection`
+    (env `QDRANT_COLLECTION`, 기본 `anxg_chunks`) 가 기본 청크 컬렉션. 다른 base 는
+    `<app_namespace>_<base>` 로 파생.
+    """
+    s = get_settings()
+    if base == "chunks":
+        return s.qdrant_collection
+    return f"{s.app_namespace}_{base}"
+
+
 def ping() -> bool:
     """연결 헬스체크 — 컬렉션 리스트 호출."""
     try:

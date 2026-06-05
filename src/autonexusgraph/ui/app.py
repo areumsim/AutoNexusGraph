@@ -2,7 +2,7 @@
 
 설계 메모 (이전 web/app.py 패턴 단순화):
 - 채팅형 multi-turn (st.chat_message, st.chat_input)
-- session_state thread_id (PG chat.conversations 와 1:1)
+- session_state thread_id (PG anxg_chat.conversations 와 1:1)
 - 답변에 citation expander + grounding 경고
 - 사이드바: 최근 대화 목록 + LLM 비용 누적 + provider 정보
 

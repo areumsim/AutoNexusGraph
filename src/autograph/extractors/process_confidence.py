@@ -7,7 +7,7 @@ PR-P3-B 에서 채워진다. 다른 모듈(`scripts/upgrade_processes_confidence
 
 PRD §3.5.1 인용 — 8 시그널 → ``conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)``.
 정적 등급표 ``_confidence.py::SOURCE_TO_GRADE`` 와 ``validator.py::LOW_CONFIDENCE_THRESHOLD``
-는 무변경. 본 helper 의 결과는 ``auto.processes.confidence_score`` 컬럼에 row 단위 UPDATE.
+는 무변경. 본 helper 의 결과는 ``anxg_auto.processes.confidence_score`` 컬럼에 row 단위 UPDATE.
 """
 
 from __future__ import annotations

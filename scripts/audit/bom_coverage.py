@@ -30,37 +30,37 @@ sys.path.insert(0, str(ROOT / "src"))
 
 _QUERIES: list[tuple[str, str]] = [
     ("manufacturer_count",
-     "MATCH (m:Manufacturer) RETURN count(m) AS n"),
+     "MATCH (m:Anxg_Manufacturer) RETURN count(m) AS n"),
     ("model_count",
-     "MATCH (m:VehicleModel) RETURN count(m) AS n"),
+     "MATCH (m:Anxg_VehicleModel) RETURN count(m) AS n"),
     ("model_with_manufactures",
-     "MATCH (:Manufacturer)-[:MANUFACTURES]->(m:VehicleModel) RETURN count(DISTINCT m) AS n"),
+     "MATCH (:Anxg_Manufacturer)-[:MANUFACTURES]->(m:Anxg_VehicleModel) RETURN count(DISTINCT m) AS n"),
     ("variant_count",
-     "MATCH (v:VehicleVariant) RETURN count(v) AS n"),
+     "MATCH (v:Anxg_VehicleVariant) RETURN count(v) AS n"),
     ("variant_with_has_variant",
-     "MATCH (:VehicleModel)-[:HAS_VARIANT]->(v:VehicleVariant) RETURN count(DISTINCT v) AS n"),
+     "MATCH (:Anxg_VehicleModel)-[:HAS_VARIANT]->(v:Anxg_VehicleVariant) RETURN count(DISTINCT v) AS n"),
     ("system_count",
-     "MATCH (s:System) RETURN count(s) AS n"),
+     "MATCH (s:Anxg_System) RETURN count(s) AS n"),
     ("model_with_contains_system",
-     "MATCH (m:VehicleModel)-[:CONTAINS_SYSTEM]->(:System) RETURN count(DISTINCT m) AS n"),
+     "MATCH (m:Anxg_VehicleModel)-[:CONTAINS_SYSTEM]->(:Anxg_System) RETURN count(DISTINCT m) AS n"),
     ("module_count",
-     "MATCH (m:Module) RETURN count(m) AS n"),
+     "MATCH (m:Anxg_Module) RETURN count(m) AS n"),
     # Level 4 coverage 정의: 자신이 직접 Module 을 가진 또는 model 의 module 를 통해
     # 간접 연결된 variant 비율.
     ("variant_with_module_l4",
      """
-     MATCH (v:VehicleVariant)
-     OPTIONAL MATCH (v)<-[:HAS_VARIANT]-(m:VehicleModel)-[:CONTAINS_COMPONENT]->(mod:Module)
-     OPTIONAL MATCH (v)-[:CONTAINS_COMPONENT]->(mod2:Module)
+     MATCH (v:Anxg_VehicleVariant)
+     OPTIONAL MATCH (v)<-[:HAS_VARIANT]-(m:Anxg_VehicleModel)-[:CONTAINS_COMPONENT]->(mod:Anxg_Module)
+     OPTIONAL MATCH (v)-[:CONTAINS_COMPONENT]->(mod2:Anxg_Module)
      WITH v, count(DISTINCT mod) + count(DISTINCT mod2) AS modules
      RETURN count(CASE WHEN modules > 0 THEN 1 END) AS n_with, count(v) AS n_total
      """),
     ("part_count",
-     "MATCH (p:Part) RETURN count(p) AS n"),
+     "MATCH (p:Anxg_Part) RETURN count(p) AS n"),
     ("supplier_count",
-     "MATCH (s:Supplier) RETURN count(s) AS n"),
+     "MATCH (s:Anxg_Supplier) RETURN count(s) AS n"),
     ("supplied_by_count",
-     "MATCH ()-[r:SUPPLIED_BY]->(:Supplier) RETURN count(r) AS n"),
+     "MATCH ()-[r:SUPPLIED_BY]->(:Anxg_Supplier) RETURN count(r) AS n"),
     ("supplied_by_by_provenance",
      """
      MATCH ()-[r:SUPPLIED_BY]->()
@@ -68,17 +68,17 @@ _QUERIES: list[tuple[str, str]] = [
      ORDER BY n DESC
      """),
     ("manufactured_at_count",
-     "MATCH (:VehicleModel)-[r:MANUFACTURED_AT]->(:Plant) RETURN count(r) AS n"),
+     "MATCH (:Anxg_VehicleModel)-[r:MANUFACTURED_AT]->(:Anxg_Plant) RETURN count(r) AS n"),
     ("owns_plant_count",
-     "MATCH (:Manufacturer)-[r:OWNS_PLANT]->(:Plant) RETURN count(r) AS n"),
+     "MATCH (:Anxg_Manufacturer)-[r:OWNS_PLANT]->(:Anxg_Plant) RETURN count(r) AS n"),
     ("complies_with_count",
-     "MATCH (:VehicleVariant)-[r:COMPLIES_WITH]->(:Standard) RETURN count(r) AS n"),
+     "MATCH (:Anxg_VehicleVariant)-[r:COMPLIES_WITH]->(:Anxg_Standard) RETURN count(r) AS n"),
     ("safety_rated_by_count",
-     "MATCH (:VehicleVariant)-[r:SAFETY_RATED_BY]->(:Standard) RETURN count(r) AS n"),
+     "MATCH (:Anxg_VehicleVariant)-[r:SAFETY_RATED_BY]->(:Anxg_Standard) RETURN count(r) AS n"),
     ("affected_by_count",
-     "MATCH (:VehicleVariant)-[r:AFFECTED_BY]->(:Recall) RETURN count(r) AS n"),
+     "MATCH (:Anxg_VehicleVariant)-[r:AFFECTED_BY]->(:Anxg_Recall) RETURN count(r) AS n"),
     ("recall_of_count",
-     "MATCH (:Recall)-[r:RECALL_OF]->() RETURN count(r) AS n"),
+     "MATCH (:Anxg_Recall)-[r:RECALL_OF]->() RETURN count(r) AS n"),
 ]
 
 
@@ -96,10 +96,10 @@ def _run_query(session, key: str, cypher: str) -> dict:
 
 
 def collect() -> dict:
-    from autonexusgraph.db.neo4j import get_driver
+    from autonexusgraph.db.neo4j import get_session
     out: dict = {}
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         for key, cypher in _QUERIES:
             out[key] = _run_query(session, key, cypher)
     return out

@@ -122,7 +122,7 @@ def search_documents(
     SELECT id, corp_code, rcept_no, source, section, report_type,
            fiscal_year, chunk_idx, text, token_count,
            1 - (embedding <=> %(q)s::vector) AS score
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY embedding <=> %(q)s::vector
      LIMIT %(k)s
@@ -187,7 +187,7 @@ def search_by_metadata(
     sql = f"""
     SELECT id, corp_code, rcept_no, source, section, report_type,
            fiscal_year, chunk_idx, text, token_count
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY corp_code, fiscal_year DESC, chunk_idx
      LIMIT %(limit)s
@@ -204,7 +204,7 @@ def get_chunk(chunk_id: int) -> dict | None:
     sql = """
     SELECT id, corp_code, rcept_no, source, section, report_type,
            fiscal_year, chunk_idx, text, token_count, metadata
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE id = %s
     """
     pool = get_pool()

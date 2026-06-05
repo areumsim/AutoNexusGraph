@@ -1,4 +1,4 @@
-"""한국교통안전공단 자동차검사관리_수리검사내역 → vec.chunks 통계 청크.
+"""한국교통안전공단 자동차검사관리_수리검사내역 → anxg_vec.chunks 통계 청크.
 
 data.go.kr 15155857. CSV 2개 (EUC-KR):
 - 수리검사내역(UVTOTLOSSRS_T).csv — 49,290 row, [검사소코드, 접수일자, 접수일련번호, 접수횟수, 특이사항코드]
@@ -10,7 +10,7 @@ data.go.kr 15155857. CSV 2개 (EUC-KR):
 - 연도 × 특이사항 분포 (예: 2020 사고 12,345건 / 침수 234건 / 도난 3건)
 - 검사소 상위 N개 × 특이사항 분포 (지역별 분포 파악)
 
-vec.chunks 에 manufacturer_id/model_id 없이 (NULL) 적재되므로 `search_documents_auto`
+anxg_vec.chunks 에 manufacturer_id/model_id 없이 (NULL) 적재되므로 `search_documents_auto`
 는 의미 검색 (한국어 RAG) 에만 사용 — 차량 메타 필터 무관.
 
 CLI:
@@ -118,7 +118,7 @@ def _format_chunk_overall(agg: dict, station_names: dict) -> str:
 
 def _upsert_chunk(cur, *, uniq: str, source: str, text: str, metadata: dict) -> str:
     cur.execute("""
-        SELECT id, text FROM vec.chunks
+        SELECT id, text FROM anxg_vec.chunks
          WHERE source = %s AND metadata->>'uniq' = %s
          LIMIT 1
     """, (source, uniq))
@@ -127,7 +127,7 @@ def _upsert_chunk(cur, *, uniq: str, source: str, text: str, metadata: dict) -> 
         cid, ex_text = r
         if ex_text != text:
             cur.execute("""
-                UPDATE vec.chunks SET text=%s, token_count=%s,
+                UPDATE anxg_vec.chunks SET text=%s, token_count=%s,
                        metadata = metadata || %s::jsonb,
                        embedding = NULL
                  WHERE id = %s
@@ -136,7 +136,7 @@ def _upsert_chunk(cur, *, uniq: str, source: str, text: str, metadata: dict) -> 
             return "updated"
         return "skipped"
     cur.execute("""
-        INSERT INTO vec.chunks
+        INSERT INTO anxg_vec.chunks
           (corp_code, rcept_no, section, chunk_idx, text, token_count,
            metadata, source, manufacturer_id, model_id, variant_id)
         VALUES (NULL, NULL, %s, 0, %s, %s, %s::jsonb, %s, NULL, NULL, NULL)

@@ -1,4 +1,4 @@
-"""vPIC Canadian Vehicle Specifications → auto.spec_measurements 적재.
+"""vPIC Canadian Vehicle Specifications → anxg_auto.spec_measurements 적재.
 
 raw 위치:
     data/raw/auto/nhtsa_vpic/{MAKE}/{YEAR}/canspec_ALL.json
@@ -19,7 +19,7 @@ NHTSA Canadian Specs 의 단위는 dim=cm, weight=kg.
     A/B/C/D/E/F/G/WD         → 의미 불명 — raw JSON 에 보관, INSERT 안 함
 
 variant 매칭:
-    canspec 의 Make + Model + 20+MYR → auto.master_vehicle_variants 의
+    canspec 의 Make + Model + 20+MYR → anxg_auto.master_vehicle_variants 의
     (manufacturer name_norm, model name_norm prefix, model_year) 매칭. 미매칭 시 skip.
 
 UPSERT 규칙:
@@ -135,9 +135,9 @@ def _resolve_variant(cur, *, make: str, model_raw: str, model_year: int
             continue
         cur.execute("""
             SELECT v.variant_id
-              FROM auto.master_vehicle_variants v
-              JOIN auto.master_vehicle_models m  USING (model_id)
-              JOIN auto.master_manufacturers mm USING (manufacturer_id)
+              FROM anxg_auto.master_vehicle_variants v
+              JOIN anxg_auto.master_vehicle_models m  USING (model_id)
+              JOIN anxg_auto.master_manufacturers mm USING (manufacturer_id)
              WHERE mm.name_norm = %s
                AND (m.name_norm = %s OR m.name_norm LIKE %s)
                AND v.model_year = %s
@@ -212,7 +212,7 @@ def load_specs(*, make_filter: str | None = None,
                     body_class, drive_type = parse_canspec_model_str(model_raw)
                     if body_class or drive_type:
                         cur.execute("""
-                            UPDATE auto.master_vehicle_variants
+                            UPDATE anxg_auto.master_vehicle_variants
                                SET body_class = COALESCE(body_class, %s),
                                    drive_type = COALESCE(drive_type, %s)
                              WHERE variant_id = %s
@@ -221,7 +221,7 @@ def load_specs(*, make_filter: str | None = None,
 
                     # 기존 동일 source 측정값 모두 삭제 후 재삽입 (멱등).
                     cur.execute("""
-                        DELETE FROM auto.spec_measurements
+                        DELETE FROM anxg_auto.spec_measurements
                          WHERE variant_id = %s AND source = 'nhtsa_canspec'
                     """, (variant_id,))
                     deleted = cur.rowcount
@@ -237,7 +237,7 @@ def load_specs(*, make_filter: str | None = None,
                         except (TypeError, ValueError):
                             continue
                         cur.execute("""
-                            INSERT INTO auto.spec_measurements
+                            INSERT INTO anxg_auto.spec_measurements
                               (variant_id, measure_key, value_num, value_text, unit,
                                source, source_ref, confidence, validated_status,
                                snapshot_year, raw)

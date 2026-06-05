@@ -1,6 +1,6 @@
-"""vec.chunks 임베딩 backfill 진행률 (Q-4) — read-only 가시화.
+"""anxg_vec.chunks 임베딩 backfill 진행률 (Q-4) — read-only 가시화.
 
-배경: `vec.chunks.embedding` (BGE-M3 1024d) 은 `embed_chunks.py` 로 backfill 된다.
+배경: `anxg_vec.chunks.embedding` (BGE-M3 1024d) 은 `embed_chunks.py` 로 backfill 된다.
 finance 청크는 대량(~748K) 이라 부분 적재, auto 청크(~16K)는 100%. 어디까지
 채워졌는지 한눈에 보기 위한 진행률 도구 (BACKLOG Q-4 / README §12.4).
 
@@ -66,15 +66,15 @@ def _summarize(overall: dict, by_source: list[dict]) -> dict[str, Any]:
 
 
 def embed_status() -> dict[str, Any]:
-    """vec.chunks 임베딩 backfill 진행률 — 전체 + source 별."""
+    """anxg_vec.chunks 임베딩 backfill 진행률 — 전체 + source 별."""
     overall = _run(
-        "SELECT count(*) AS total, count(embedding) AS embedded FROM vec.chunks",
+        "SELECT count(*) AS total, count(embedding) AS embedded FROM anxg_vec.chunks",
         fetch="rows",
     )[0]
     by_source = _run(
         """
         SELECT source, count(*) AS total, count(embedding) AS embedded
-          FROM vec.chunks
+          FROM anxg_vec.chunks
          GROUP BY source
          ORDER BY (count(*) - count(embedding)) DESC, count(*) DESC
         """,
@@ -85,7 +85,7 @@ def embed_status() -> dict[str, Any]:
 
 def _format_table(st: dict[str, Any]) -> str:
     lines = [
-        f"vec.chunks 임베딩 backfill — {st['embedded']:,}/{st['total']:,} "
+        f"anxg_vec.chunks 임베딩 backfill — {st['embedded']:,}/{st['total']:,} "
         f"({st['pct']}%) · pending {st['pending']:,}",
         "",
         f"  {'source':<18} {'embedded':>12} {'total':>12} {'pct':>7}  pending",
@@ -103,7 +103,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
     p = argparse.ArgumentParser(prog="autonexusgraph.embed_status",
-                                description="vec.chunks 임베딩 backfill 진행률 (Q-4)")
+                                description="anxg_vec.chunks 임베딩 backfill 진행률 (Q-4)")
     p.add_argument("--json", action="store_true", help="JSON 출력 (기본은 표)")
     args = p.parse_args(argv)
     st = embed_status()

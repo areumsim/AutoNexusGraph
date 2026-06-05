@@ -1,12 +1,12 @@
-"""PG (auto.defect_types, auto.defect_matches, auto.events_recalls) → Neo4j 미러링.
+"""PG (anxg_auto.defect_types, anxg_auto.defect_matches, anxg_auto.events_recalls) → Neo4j 미러링.
 
-Bridge: (:Recall)-[:DEFECT_MATCHES {cos_sim, conf, match_method}]->(:DefectType)
+Bridge: (:Anxg_Recall)-[:DEFECT_MATCHES {cos_sim, conf, match_method}]->(:Anxg_DefectType)
 
 본 모듈이 한 번에 처리하는 것:
-  1. :Recall 보충 — auto.events_recalls 의 KOTSA 941건 + NHTSA 누락분이 Neo4j 에
+  1. :Recall 보충 — anxg_auto.events_recalls 의 KOTSA 941건 + NHTSA 누락분이 Neo4j 에
      없으면 MERGE (id 키 기준).  기존 load_auto_neo4j.py 의 Recall MERGE 와 호환.
-  2. :DefectType 노드 (50건) — auto.defect_types → MERGE (name 키).
-  3. DEFECT_MATCHES 엣지 — auto.defect_matches → MERGE (recall_id, defect_type_id,
+  2. :DefectType 노드 (50건) — anxg_auto.defect_types → MERGE (name 키).
+  3. DEFECT_MATCHES 엣지 — anxg_auto.defect_matches → MERGE (recall_id, defect_type_id,
      match_method 복합 키).
   4. 모든 신규/기존 노드에 `domain` 속성 (ontology.domain SSOT).
 
@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ontology.domain import domain_for
 
@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 # :Recall MERGE — 기존 load_auto_neo4j.MERGE_RECALL 호환 + domain 속성 추가.
 MERGE_RECALL = """
 UNWIND $rows AS r
-MERGE (rc:Recall {id: r.id})
+MERGE (rc:Anxg_Recall {id: r.id})
 SET   rc.source = r.source,
       rc.source_recall_no = r.source_recall_no,
       rc.report_date = r.report_date,
@@ -56,13 +56,13 @@ SET   rc.source = r.source,
 # (VehicleModel)-[:AFFECTED_BY]->(Recall) — variant 매핑 실패 fallback (KOTSA는 variant 매핑 거의 없음)
 MERGE_RECALL_EDGE_MODEL = """
 UNWIND $rows AS r
-MATCH (rc:Recall {id: r.id})
+MATCH (rc:Anxg_Recall {id: r.id})
 WITH rc, r WHERE r.model_id IS NOT NULL
-OPTIONAL MATCH (m:VehicleModel {id: r.model_id})
+OPTIONAL MATCH (m:Anxg_VehicleModel {id: r.model_id})
 WITH rc, r, m WHERE m IS NOT NULL
 MERGE (m)-[rel:AFFECTED_BY]->(rc)
 SET   rel.source_id = r.source_recall_no,
-      rel.source_type = 'pg.auto.events_recalls',
+      rel.source_type = 'pg.anxg_auto.events_recalls',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = r.validated_status,
@@ -73,7 +73,7 @@ SET   rel.source_id = r.source_recall_no,
 # :DefectType MERGE (name 키, domain='auto')
 MERGE_DEFECT_TYPE = """
 UNWIND $rows AS r
-MERGE (d:DefectType {name: r.name})
+MERGE (d:Anxg_DefectType {name: r.name})
 SET   d.name_en          = r.name_en,
       d.name_ko          = r.name_ko,
       d.description      = r.description,
@@ -92,8 +92,8 @@ SET   d.name_en          = r.name_en,
 # DEFECT_MATCHES 엣지 — (recall_id, defect_name, match_method) 복합 키
 MERGE_DEFECT_MATCH = """
 UNWIND $rows AS r
-MATCH (rc:Recall {id: r.recall_id})
-MATCH (d:DefectType {name: r.defect_name})
+MATCH (rc:Anxg_Recall {id: r.recall_id})
+MATCH (d:Anxg_DefectType {name: r.defect_name})
 MERGE (rc)-[rel:DEFECT_MATCHES {match_method: r.match_method}]->(d)
 SET   rel.cos_sim          = r.cos_sim,
       rel.rank             = r.rank,
@@ -112,7 +112,7 @@ SET   rel.cos_sim          = r.cos_sim,
 # ──────────────────────────────────────────────────────────────────────
 
 def _fetch_recalls() -> list[dict]:
-    """auto.events_recalls 전체 → row dict (domain='auto')."""
+    """anxg_auto.events_recalls 전체 → row dict (domain='auto')."""
     domain_val = domain_for("Recall") or ["auto"]
     conn = get_connection()
     with conn.cursor() as cur:
@@ -121,7 +121,7 @@ def _fetch_recalls() -> list[dict]:
                    variant_id, component_text, defect_summary, consequence,
                    remedy_summary, report_date, country, affected_units,
                    confidence, validated_status, snapshot_year
-              FROM auto.events_recalls
+              FROM anxg_auto.events_recalls
         """)
         out = []
         for r in cur.fetchall():
@@ -155,7 +155,7 @@ def _fetch_defect_types() -> list[dict]:
             SELECT defect_type_id, name, name_en, name_ko, description, category,
                    source, source_type, confidence_score, validated_status,
                    snapshot_year, extraction_method, schema_version
-              FROM auto.defect_types
+              FROM anxg_auto.defect_types
         """)
         out = []
         for r in cur.fetchall():
@@ -179,7 +179,7 @@ def _fetch_defect_types() -> list[dict]:
 
 
 def _fetch_matches() -> list[dict]:
-    """auto.defect_matches → 엣지 row. defect_type_id → defect_name 조인."""
+    """anxg_auto.defect_matches → 엣지 row. defect_type_id → defect_name 조인."""
     conn = get_connection()
     with conn.cursor() as cur:
         cur.execute("""
@@ -187,8 +187,8 @@ def _fetch_matches() -> list[dict]:
                    m.cos_sim, m.match_method, m.rank,
                    m.source_id, m.source_type, m.confidence_score, m.validated_status,
                    m.snapshot_year, m.extraction_method, m.schema_version
-              FROM auto.defect_matches m
-              JOIN auto.defect_types d ON d.defect_type_id = m.defect_type_id
+              FROM anxg_auto.defect_matches m
+              JOIN anxg_auto.defect_types d ON d.defect_type_id = m.defect_type_id
         """)
         out = []
         for r in cur.fetchall():
@@ -215,26 +215,26 @@ def _fetch_matches() -> list[dict]:
 
 def load(*, skip_recall_backfill: bool = False, batch: int = 500) -> dict[str, int]:
     stats = {"recall": 0, "recall_edge_model": 0, "defect_type": 0, "defect_match": 0}
-    drv = get_driver()
+
 
     # 1) Recall 보충
     if not skip_recall_backfill:
         recalls = _fetch_recalls()
         log.info("[neo4j.recall_backfill] %d rows (전체 events_recalls)", len(recalls))
-        with drv.session() as sess:
+        with get_session() as sess:
             stats["recall"] = run_batched(sess, MERGE_RECALL, recalls, batch=batch)
             stats["recall_edge_model"] = run_batched(sess, MERGE_RECALL_EDGE_MODEL, recalls, batch=batch)
 
     # 2) DefectType 노드
     defect_types = _fetch_defect_types()
     log.info("[neo4j.defect_types] %d nodes", len(defect_types))
-    with drv.session() as sess:
+    with get_session() as sess:
         stats["defect_type"] = run_batched(sess, MERGE_DEFECT_TYPE, defect_types, batch=batch)
 
     # 3) DEFECT_MATCHES 엣지
     matches = _fetch_matches()
     log.info("[neo4j.defect_matches] %d edges", len(matches))
-    with drv.session() as sess:
+    with get_session() as sess:
         stats["defect_match"] = run_batched(sess, MERGE_DEFECT_MATCH, matches, batch=batch)
 
     return stats

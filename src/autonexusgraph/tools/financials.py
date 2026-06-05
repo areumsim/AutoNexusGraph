@@ -45,7 +45,7 @@ def lookup_company(query: str, limit: int = 5) -> list[dict]:
                         WHEN corp_name ILIKE %(q)s || '%%' THEN 60
                         WHEN corp_name ILIKE '%%' || %(q)s || '%%' THEN 40
                         ELSE 0 END AS score
-            FROM master.companies
+            FROM anxg_master.companies
             WHERE corp_code = %(q)s
                OR stock_code = %(q)s
                OR corp_name ILIKE '%%' || %(q)s || '%%'
@@ -67,7 +67,7 @@ def get_company_info(corp_code: str) -> dict | None:
         cur.execute("""
             SELECT corp_code, corp_name, stock_code, market, sector, industry,
                    listed_at, is_active, extra
-            FROM master.companies WHERE corp_code = %s
+            FROM anxg_master.companies WHERE corp_code = %s
         """, (corp_code,))
         r = cur.fetchone()
     conn.commit()
@@ -107,7 +107,7 @@ def _query_amount(
     with conn.cursor() as cur:
         cur.execute("""
             SELECT account_nm, thstrm_amount, frmtrm_amount, fs_div, sj_div, reprt_code
-            FROM fin.financials
+            FROM anxg_fin.financials
             WHERE corp_code = %s AND bsns_year = %s AND fs_div = %s AND sj_div = %s
               AND account_nm = ANY(%s)
               AND thstrm_amount IS NOT NULL
@@ -180,7 +180,7 @@ def compare_companies(
     with conn.cursor() as cur:
         # 1) 회사명 일괄 조회.
         cur.execute("""
-            SELECT corp_code, corp_name FROM master.companies
+            SELECT corp_code, corp_name FROM anxg_master.companies
              WHERE corp_code = ANY(%s)
         """, (list(corp_codes),))
         name_by_cc = {r[0]: r[1] for r in cur.fetchall()}
@@ -189,13 +189,13 @@ def compare_companies(
         cur.execute("""
             SELECT cc, account_nm, value FROM (
                 SELECT cc,
-                       (SELECT account_nm FROM fin.financials f
+                       (SELECT account_nm FROM anxg_fin.financials f
                          WHERE f.corp_code = cc AND f.bsns_year = %s
                            AND f.fs_div = %s AND f.sj_div = 'IS'
                            AND f.account_nm = ANY(%s)
                            AND f.thstrm_amount IS NOT NULL
                          ORDER BY ord NULLS LAST LIMIT 1) AS account_nm,
-                       (SELECT thstrm_amount FROM fin.financials f
+                       (SELECT thstrm_amount FROM anxg_fin.financials f
                          WHERE f.corp_code = cc AND f.bsns_year = %s
                            AND f.fs_div = %s AND f.sj_div = 'IS'
                            AND f.account_nm = ANY(%s)
@@ -231,7 +231,7 @@ def list_companies_by_market(market: str, limit: int = 50) -> list[dict]:
         cur.execute("""
             SELECT corp_code, corp_name, stock_code,
                    (extra->>'market_cap_krw')::numeric AS cap
-            FROM master.companies
+            FROM anxg_master.companies
             WHERE market = %s AND is_active = TRUE
             ORDER BY cap DESC NULLS LAST
             LIMIT %s

@@ -11,7 +11,7 @@ C(0.50, 합성/패턴) 이므로 답변 시 "패턴(합성)" 표시 필요.
 - **(scaffold)** 빈결과 반환 — 함수 정의 + ``return []`` (출처 적재 + 매크로 등록 후 자연 활성):
   ``list_plants_of_process`` (PERFORMED_AT, 팩토리온 DATA_GO_KR_API_KEY 부재 → PR-P3-A),
   ``list_materials_of_process`` (CONSUMES_MATERIAL, materials_seed 매핑 부재 → P2-B),
-  ``get_process_metrics`` (KAMP 미수집, PG 조회만 — ``auto.process_metrics`` 빈 시 빈 list).
+  ``get_process_metrics`` (KAMP 미수집, PG 조회만 — ``anxg_auto.process_metrics`` 빈 시 빈 list).
 - **(비전)** — 본 모듈에 함수 정의 없음, ``__all__`` 미포함:
   ``list_equipment_of_process`` (USES_EQUIPMENT, :Equipment 0 + 매핑 부재),
   ``get_processes_of_part`` (PRODUCED_BY, 산단공에 part_id 부재).
@@ -40,18 +40,18 @@ def _cap(limit: int | None, default: int = DEFAULT_LIMIT) -> int:
 
 def _exec(template_name: str, **params: Any) -> list[dict]:
     """화이트리스트 템플릿 렌더 + READ-only Cypher 실행 (graph.py 패턴 동일)."""
-    from autonexusgraph.db.neo4j import get_driver
+    from autonexusgraph.db.neo4j import get_session
     from autonexusgraph.safety.cypher_guard import assert_read_only
     cypher, bind = render_template(template_name, params)
     assert_read_only(cypher)
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         return [dict(r) for r in session.run(cypher, **bind)]
 
 
 # ── 식별·조회 (실데이터) ─────────────────────────────────────
 def lookup_process(query: str, limit: int = DEFAULT_LIMIT) -> list[dict]:
-    """공정명 검색 → 공정유형(:Process taxonomy) 단위 **distinct** 결과 (GROUP BY).
+    """공정명 검색 → 공정유형(:Anxg_Process taxonomy) 단위 **distinct** 결과 (GROUP BY).
 
     cf. ``autograph.tools.spec.search_processes`` 는 row 단위 (동일 공정명이 여러
     factory_manage_no 에 반복되면 row 모두 반환). 본 함수는 distinct ``process_name_norm``
@@ -69,7 +69,7 @@ def lookup_process(query: str, limit: int = DEFAULT_LIMIT) -> list[dict]:
                MIN(industry_code)    AS industry_code,
                0.50::numeric         AS confidence,
                'pattern_synthetic'   AS grade_note
-          FROM auto.processes
+          FROM anxg_auto.processes
          WHERE process_name_norm ILIKE '%%' || %(q)s || '%%'
             OR process_map_name  ILIKE '%%' || %(q)s || '%%'
          GROUP BY process_name_norm
@@ -119,7 +119,7 @@ def get_process_metrics(process_name_norm: str | None = None,
                         limit: int = DEFAULT_LIMIT) -> list[dict]:
     """공정 파라미터 분포(cycle_time/yield/defect, **익명·회사 비귀속** grade B).
 
-    auto.process_metrics 조회. KAMP 미수집 시 빈결과(DATA_GO_KR_API_KEY 필요).
+    anxg_auto.process_metrics 조회. KAMP 미수집 시 빈결과(DATA_GO_KR_API_KEY 필요).
     """
     where, params = [], {"lim": _cap(limit)}
     if (process_name_norm or "").strip():
@@ -131,7 +131,7 @@ def get_process_metrics(process_name_norm: str | None = None,
         SELECT process_name_norm, process_category, metric_type, unit,
                value_mean, value_p50, value_p95, sample_count,
                confidence_score, 'pattern_anonymous' AS grade_note
-          FROM auto.process_metrics{clause}
+          FROM anxg_auto.process_metrics{clause}
          ORDER BY process_category, metric_type
          LIMIT %(lim)s
     """, params)

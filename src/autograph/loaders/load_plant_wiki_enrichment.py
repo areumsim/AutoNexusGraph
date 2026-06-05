@@ -6,7 +6,7 @@ city/wikidata_qid 만 채움. Wikipedia 본문 (extract + infobox) 에서 추가
     description (extract 첫 200 chars), wikipedia_url, wikipedia_title,
     extract_len (본문 길이 — RAG 검색 가치 지표)
 
-vec.chunks (source='wikipedia_auto', kind='plants') 에서 metadata 추출 후
+anxg_vec.chunks (source='wikipedia_auto', kind='plants') 에서 metadata 추출 후
 :Plant.code 매칭하여 MERGE.
 
 2026-06-01 신규.
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 _MERGE_CYPHER = """
 UNWIND $rows AS r
-MATCH (p:Plant {code: r.code})
+MATCH (p:Anxg_Plant {code: r.code})
 SET p.description    = coalesce(p.description, r.description),
     p.wikipedia_url  = coalesce(p.wikipedia_url, r.wikipedia_url),
     p.wikipedia_title = coalesce(p.wikipedia_title, r.wikipedia_title),
@@ -36,7 +36,7 @@ RETURN count(p) AS n
 
 
 def _build_rows() -> list[dict]:
-    """vec.chunks 의 wiki plant 청크 → (code, description, url, title, lang) row.
+    """anxg_vec.chunks 의 wiki plant 청크 → (code, description, url, title, lang) row.
 
     한 plant 가 ko + en 양쪽 청크 가지면 ko 우선 (한국어 사용자 친화).
     """
@@ -48,7 +48,7 @@ def _build_rows() -> list[dict]:
             SELECT metadata->>'lang', metadata->>'title', metadata->>'fullurl',
                    metadata->>'qid', metadata->>'extract_len',
                    text, metadata
-              FROM vec.chunks
+              FROM anxg_vec.chunks
              WHERE source='wikipedia_auto' AND metadata->>'kind'='plants'
         """)
         for lang, title, fullurl, qid, ext_len, text, meta in cur.fetchall():
@@ -93,7 +93,7 @@ def _build_rows() -> list[dict]:
 def run(*, dry_run: bool = False) -> dict:
     rows = _build_rows()
     if not rows:
-        log.warning("[plant_wiki] vec.chunks 에 wikipedia plant 청크 없음 — "
+        log.warning("[plant_wiki] anxg_vec.chunks 에 wikipedia plant 청크 없음 — "
                     "build_chunks_auto --source wikipedia 실행 선행 필요")
         return {"plants_with_wiki": 0, "merged": 0}
 
@@ -107,10 +107,10 @@ def run(*, dry_run: bool = False) -> dict:
             "merged": 0,
         }
 
-    from autonexusgraph.db.neo4j import get_driver
-    driver = get_driver()
+    from autonexusgraph.db.neo4j import get_session
+
     merged = 0
-    with driver.session() as session:
+    with get_session() as session:
         r = session.run(_MERGE_CYPHER, rows=rows).single()
         merged = r["n"] if r else 0
     log.info("[plant_wiki] wiki chunks=%d, plants merged=%d", len(rows), merged)

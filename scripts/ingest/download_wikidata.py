@@ -33,8 +33,8 @@ from autonexusgraph.ingestion.wikidata_client import WikidataClient
 
 SELECT_TICKERS = """
 SELECT em.id_value as ticker, em.corp_code, c.corp_name
-  FROM master.entity_map em
-  JOIN master.companies c ON c.corp_code = em.corp_code
+  FROM anxg_master.entity_map em
+  JOIN anxg_master.companies c ON c.corp_code = em.corp_code
  WHERE em.id_type = 'ticker'
    AND c.is_active = TRUE
 """
@@ -82,7 +82,7 @@ def step_a(force: bool = False) -> dict[str, str]:
 
     name_to_corp = {}
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT corp_code, corp_name FROM master.companies WHERE is_active=TRUE")
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies WHERE is_active=TRUE")
         for cc, nm in cur.fetchall():
             name_to_corp[normalize_corp_name(nm)] = (cc, nm)
 

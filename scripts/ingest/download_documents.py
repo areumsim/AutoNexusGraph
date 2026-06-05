@@ -1,6 +1,6 @@
 """DART 사업보고서 본문 zip 다운로드.
 
-PG fin.filings 를 source-of-truth 로 사용 (이미 적재된 메타 기반).
+PG anxg_fin.filings 를 source-of-truth 로 사용 (이미 적재된 메타 기반).
 사업보고서만 필터 (`report_nm LIKE '%사업보고서%'`).
 
 저장:
@@ -94,7 +94,7 @@ def main() -> int:
     with psycopg.connect(s.postgres_dsn) as conn, conn.cursor() as cur:
         sql = """
             SELECT corp_code, rcept_no, report_nm
-            FROM fin.filings
+            FROM anxg_fin.filings
             WHERE report_nm LIKE %s
               AND EXTRACT(YEAR FROM rcept_dt) BETWEEN %s AND %s
             ORDER BY rcept_dt DESC, corp_code

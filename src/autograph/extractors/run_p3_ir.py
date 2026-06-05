@@ -1,10 +1,10 @@
 """P3 IR LLM 추출 — OEM IR/뉴스룸 본문 → MANUFACTURED_AT / CAPACITY_REPORTED.
 
 흐름 (run_p3.py 와 동일 패턴):
-  1) chunk_selector.select_ir_chunks(oems=[...]) — vec.chunks (source='oem_ir') 필터.
+  1) chunk_selector.select_ir_chunks(oems=[...]) — anxg_vec.chunks (source='oem_ir') 필터.
   2) (옵션) --dry-run-cost 시 추정만 출력.
   3) ExtractorEngine([IRRelationExtractor()]) 로 chunk 별 LLM 호출.
-  4) merged relations → staging_writer.upsert_staging → auto.staging_relations.
+  4) merged relations → staging_writer.upsert_staging → anxg_auto.staging_relations.
   5) cross_validate.run_p4 (별도) 가 DART production 표와 정합 검사 후
      Neo4j MANUFACTURED_AT 보강.
 

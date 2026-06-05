@@ -1,4 +1,4 @@
-"""(:Part)-[:PRODUCED_BY]->(:ProcessStep) — 부품 → 공정 카테고리 추론 적재.
+"""(:Anxg_Part)-[:PRODUCED_BY]->(:Anxg_ProcessStep) — 부품 → 공정 카테고리 추론 적재.
 
 ProcessGraph G-2 / BoP 입력. ontology 가 상정한 deterministic BoP routing
 (DART 공정도설명 + 산단공 part_id 매칭)은 **산단공 part_id 부재**로 불가 →
@@ -9,7 +9,7 @@ ProcessGraph G-2 / BoP 입력. ontology 가 상정한 deterministic BoP routing
   않고 의장(조립)에서 BoP 진입 → 기본값 '의장'. 본체/파워트레인 부품만 제조 공정
   매핑. 진짜 deterministic 매핑(산단공 part_id 또는 DART 공정도)이 들어오면 격상.
 
-구조: (:Part)-[:PRODUCED_BY]->(:ProcessStep {step_id='proc_<공정>'})-[:INSTANTIATES]->(:Process).
+구조: (:Anxg_Part)-[:PRODUCED_BY]->(:Anxg_ProcessStep {step_id='proc_<공정>'})-[:INSTANTIATES]->(:Anxg_Process).
 대표 ProcessStep(proc_*)은 공정유형별 1개 — 부품 BoP 진입점 표현 (plant 비귀속).
 
 CLI:
@@ -22,7 +22,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
@@ -59,15 +59,15 @@ class LoadStats:
 # 대표 ProcessStep(proc_*) MERGE + INSTANTIATES + Part PRODUCED_BY.
 _MERGE_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (pt:Part {{id: r.part_id}})
-MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
+MATCH (pt:Anxg_Part {{id: r.part_id}})
+MERGE (pr:Anxg_Process {{process_name_norm: r.process_name_norm}})
   ON CREATE SET pr.process_name    = r.process_name,
                 pr.source           = 'produced_by_seed',
                 pr.domain           = 'auto',
                 pr.validated_status = 'validated',
                 pr.snapshot_year    = r.snapshot_year,
                 pr.updated_at        = datetime()
-MERGE (st:ProcessStep {{step_id: r.step_id}})
+MERGE (st:Anxg_ProcessStep {{step_id: r.step_id}})
   ON CREATE SET st.process_name_norm = r.process_name_norm,
                 st.process_name      = r.process_name,
                 st.source            = 'produced_by_seed',
@@ -105,9 +105,9 @@ def _build_rows(parts: list[dict]) -> list[dict]:
 
 def load(*, dry_run: bool = False) -> LoadStats:
     stats = LoadStats()
-    driver = get_driver()
-    with driver.session() as session:
-        parts = session.run("MATCH (p:Part) RETURN p.id AS id, p.name AS name").data()
+
+    with get_session() as session:
+        parts = session.run("MATCH (p:Anxg_Part) RETURN p.id AS id, p.name AS name").data()
         stats.parts_seen = len(parts)
         rows = _build_rows(parts)
 
@@ -125,7 +125,7 @@ def load(*, dry_run: bool = False) -> LoadStats:
 
         run_batched(session, _MERGE_CYPHER, rows, batch=200)
         res = session.run(
-            "MATCH (:Part)-[e:PRODUCED_BY]->(:ProcessStep) RETURN count(e) AS n"
+            "MATCH (:Anxg_Part)-[e:PRODUCED_BY]->(:Anxg_ProcessStep) RETURN count(e) AS n"
         ).single()
         stats.edges_created = int(res["n"]) if res else 0
 

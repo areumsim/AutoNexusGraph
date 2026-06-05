@@ -1,4 +1,4 @@
-"""auto.events_complaints → :Complaint + (:VehicleVariant)-[:REPORTED_IN]->(:Complaint).
+"""anxg_auto.events_complaints → :Complaint + (:Anxg_VehicleVariant)-[:REPORTED_IN]->(:Anxg_Complaint).
 
 Recall 적재 패턴과 동일: 1) :Complaint 노드 MERGE, 2) variant 가 PG 에서 매칭된 경우만
 REPORTED_IN 엣지. 매칭 안 된 complaint 는 노드만 남기고 그래프 멀티홉에서는 빠진다.
@@ -14,7 +14,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import run_batched
@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 _MERGE_COMPLAINT = """
 UNWIND $rows AS r
-MERGE (cmp:Complaint {id: r.id})
+MERGE (cmp:Anxg_Complaint {id: r.id})
 SET   cmp.source = r.source,
       cmp.source_complaint_no = r.source_complaint_no,
       cmp.filed_date = r.filed_date,
@@ -40,12 +40,12 @@ SET   cmp.source = r.source,
 
 _MERGE_REPORTED_IN = """
 UNWIND $rows AS r
-MATCH (cmp:Complaint {id: r.id})
+MATCH (cmp:Anxg_Complaint {id: r.id})
 WITH cmp, r WHERE r.variant_id IS NOT NULL
-OPTIONAL MATCH (v:VehicleVariant {id: r.variant_id})
+OPTIONAL MATCH (v:Anxg_VehicleVariant {id: r.variant_id})
 WITH cmp, r, v WHERE v IS NOT NULL
 MERGE (v)-[rel:REPORTED_IN]->(cmp)
-SET   rel.source_type      = 'pg.auto.events_complaints',
+SET   rel.source_type      = 'pg.anxg_auto.events_complaints',
       rel.source_id        = r.source_complaint_no,
       rel.extraction_method= 'deterministic',
       rel.confidence_score = 1.0,
@@ -67,7 +67,7 @@ def _fetch_complaints(cur) -> list[dict]:
         SELECT complaint_id, source, source_complaint_no, variant_id, model_id,
                manufacturer_id, components, summary, filed_date, incident_date,
                country, snapshot_year
-          FROM auto.events_complaints
+          FROM anxg_auto.events_complaints
     """)
     rows: list[dict] = []
     for r in cur.fetchall():
@@ -94,8 +94,8 @@ def load_complaints_neo4j(*, batch: int = 500) -> LoadStats:
         log.info("[complaints→neo4j] PG 비어있음 — skip")
         return stats
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         stats.complaints = run_batched(session, _MERGE_COMPLAINT,  rows, batch=batch)
         run_batched(session, _MERGE_REPORTED_IN, rows, batch=batch)
         # 엣지 카운트 측정 — REPORTED_IN 의 수는 RETURN 없이 SET 만으로 추적 불편.

@@ -12,7 +12,7 @@ helper 가 합리적 기본값으로 보강 (year=현재, schema_version=ontolog
 사용:
     >>> from ._neo4j_helpers import run_batched, edge_meta_cypher
     >>> session.run(
-    ...     f"MATCH (a:Module {{id:$mid}}), (b:Supplier {{entity_id:$sid}}) "
+    ...     f"MATCH (a:Anxg_Module {{id:$mid}}), (b:Anxg_Supplier {{entity_id:$sid}}) "
     ...     f"MERGE (a)-[r:SUPPLIED_BY]->(b) "
     ...     f"SET {edge_meta_cypher('r')}",
     ...     mid=..., sid=..., source_id=..., source_type=..., ...

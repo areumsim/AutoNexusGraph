@@ -1,6 +1,6 @@
 -- AutoGraph — EV 충전 인프라 (data.go.kr B552584/B553530).
 --
--- 사용자 의제: auto 도메인의 EV 확장. Operator(운영기관) → bridge.corp_entity 로
+-- 사용자 의제: auto 도메인의 EV 확장. Operator(운영기관) → anxg_bridge.corp_entity 로
 -- "충전 인프라 운영사 ↔ 재무" cross-domain. 이미 보유한 DATA_GO_KR_API_KEY 재사용.
 --
 -- 원천:
@@ -14,7 +14,7 @@
 -- 그래프 흡수:
 --   (:ChargingStation {station_id, operator, charger_type, capacity_kw, install_year, sido, gungu})
 --   (:Operator)-[:OPERATES {snapshot_year}]->(:ChargingStation)
---   (:Operator)-[:IS_ENTITY]->(bridge.corp_entity)
+--   (:Operator)-[:IS_ENTITY]->(anxg_bridge.corp_entity)
 --
 -- 멱등: PRIMARY KEY (station_id) / (snapshot_year, sido, gungu).
 --
@@ -22,14 +22,14 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
 -- ── 1. 전국 충전소 위치·운영정보 (B552584, 환경공단) ──────
-CREATE TABLE IF NOT EXISTS auto.ev_chargers (
+CREATE TABLE IF NOT EXISTS anxg_auto.ev_chargers (
     station_id           VARCHAR(40)  PRIMARY KEY,    -- 충전소 ID (statId)
     charger_seq          VARCHAR(10),                 -- 충전기 일련번호 (chgerId)
     operator             VARCHAR(120),                -- 운영기관 (busiNm)
-    operator_corp_code   VARCHAR(8),                  -- bridge.corp_entity 매칭 (선택)
+    operator_corp_code   VARCHAR(8),                  -- anxg_bridge.corp_entity 매칭 (선택)
     station_name         VARCHAR(200),                -- 충전소명 (statNm)
     charger_type         VARCHAR(20),                 -- AC완속 | DC차데모 | DC콤보 | AC3상 …
     capacity_kw          NUMERIC(6,2),                -- 충전용량 (kW)
@@ -48,16 +48,16 @@ CREATE TABLE IF NOT EXISTS auto.ev_chargers (
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_evc_operator     ON auto.ev_chargers(operator);
-CREATE INDEX IF NOT EXISTS idx_evc_corp_code    ON auto.ev_chargers(operator_corp_code)
+CREATE INDEX IF NOT EXISTS idx_evc_operator     ON anxg_auto.ev_chargers(operator);
+CREATE INDEX IF NOT EXISTS idx_evc_corp_code    ON anxg_auto.ev_chargers(operator_corp_code)
     WHERE operator_corp_code IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_evc_install_year ON auto.ev_chargers(install_year);
-CREATE INDEX IF NOT EXISTS idx_evc_sido         ON auto.ev_chargers(sido);
-CREATE INDEX IF NOT EXISTS idx_evc_type         ON auto.ev_chargers(charger_type);
+CREATE INDEX IF NOT EXISTS idx_evc_install_year ON anxg_auto.ev_chargers(install_year);
+CREATE INDEX IF NOT EXISTS idx_evc_sido         ON anxg_auto.ev_chargers(sido);
+CREATE INDEX IF NOT EXISTS idx_evc_type         ON anxg_auto.ev_chargers(charger_type);
 
 
 -- ── 2. 지역별 급속충전기 설치현황·실제 이용량 (B553530, 에너지공단) ──────
-CREATE TABLE IF NOT EXISTS auto.ev_charger_usage (
+CREATE TABLE IF NOT EXISTS anxg_auto.ev_charger_usage (
     snapshot_year        SMALLINT     NOT NULL,
     snapshot_month       SMALLINT     NOT NULL DEFAULT 0,   -- 0 = 연 단위, 1~12 = 월 단위
     sido                 VARCHAR(20)  NOT NULL,
@@ -76,8 +76,8 @@ CREATE TABLE IF NOT EXISTS auto.ev_charger_usage (
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
     PRIMARY KEY (snapshot_year, snapshot_month, sido, gungu)
 );
-CREATE INDEX IF NOT EXISTS idx_evu_year ON auto.ev_charger_usage(snapshot_year);
-CREATE INDEX IF NOT EXISTS idx_evu_sido ON auto.ev_charger_usage(sido);
+CREATE INDEX IF NOT EXISTS idx_evu_year ON anxg_auto.ev_charger_usage(snapshot_year);
+CREATE INDEX IF NOT EXISTS idx_evu_sido ON anxg_auto.ev_charger_usage(sido);
 
 
 -- 권한

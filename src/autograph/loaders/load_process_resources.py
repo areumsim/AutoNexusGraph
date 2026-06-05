@@ -1,4 +1,4 @@
-"""(:ProcessStep)-[:USES_EQUIPMENT]->(:Equipment) + [:CONSUMES_MATERIAL]->(:Material).
+"""(:Anxg_ProcessStep)-[:USES_EQUIPMENT]->(:Anxg_Equipment) + [:CONSUMES_MATERIAL]->(:Anxg_Material).
 
 ProcessGraph G-3. 자동차 공정의 표준 설비·투입소재를 공정유형별로 적재.
 
@@ -21,7 +21,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
@@ -71,16 +71,16 @@ def _meta(conf: float) -> dict:
 # proc_* ProcessStep + INSTANTIATES + USES_EQUIPMENT (+ Equipment 노드 MERGE).
 _EQ_CYPHER = f"""
 UNWIND $rows AS r
-MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
+MERGE (pr:Anxg_Process {{process_name_norm: r.process_name_norm}})
   ON CREATE SET pr.process_name = r.process_name, pr.source='process_resources_seed',
                 pr.domain='auto', pr.validated_status='validated',
                 pr.snapshot_year=r.snapshot_year, pr.updated_at=datetime()
-MERGE (st:ProcessStep {{step_id: r.step_id}})
+MERGE (st:Anxg_ProcessStep {{step_id: r.step_id}})
   ON CREATE SET st.process_name_norm=r.process_name_norm, st.process_name=r.process_name,
                 st.source='process_resources_seed', st.domain='auto', st.updated_at=datetime()
 MERGE (st)-[inst:INSTANTIATES]->(pr)
 SET {edge_meta_cypher('inst')}
-MERGE (eq:Equipment {{name: r.equipment}})
+MERGE (eq:Anxg_Equipment {{name: r.equipment}})
   ON CREATE SET eq.domain='auto', eq.source='process_resources_seed', eq.updated_at=datetime()
 MERGE (st)-[edge:USES_EQUIPMENT]->(eq)
 SET {edge_meta_cypher('edge')}
@@ -89,8 +89,8 @@ SET {edge_meta_cypher('edge')}
 # 파워트레인 proc step → 기존 :Material (배터리소재) CONSUMES_MATERIAL.
 _MAT_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (st:ProcessStep {{step_id: r.step_id}})
-MATCH (m:Material {{code: r.material_code}})
+MATCH (st:Anxg_ProcessStep {{step_id: r.step_id}})
+MATCH (m:Anxg_Material {{code: r.material_code}})
 MERGE (st)-[edge:CONSUMES_MATERIAL]->(m)
 SET {edge_meta_cypher('edge')}
 """
@@ -112,9 +112,9 @@ def _build_equipment_rows() -> list[dict]:
 def load(*, dry_run: bool = False) -> LoadStats:
     stats = LoadStats()
     eq_rows = _build_equipment_rows()
-    driver = get_driver()
-    with driver.session() as session:
-        mats = session.run("MATCH (m:Material) RETURN m.code AS code").value()
+
+    with get_session() as session:
+        mats = session.run("MATCH (m:Anxg_Material) RETURN m.code AS code").value()
         norm = _MATERIAL_PROC.lower()
         mat_rows = [{
             "step_id": f"proc_{norm}", "material_code": code, **_meta(_MAT_CONF)
@@ -130,11 +130,11 @@ def load(*, dry_run: bool = False) -> LoadStats:
             run_batched(session, _MAT_CYPHER, mat_rows, batch=200)
 
         stats.equipment_nodes = session.run(
-            "MATCH (e:Equipment {source:'process_resources_seed'}) RETURN count(e) AS n").single()["n"]
+            "MATCH (e:Anxg_Equipment {source:'process_resources_seed'}) RETURN count(e) AS n").single()["n"]
         stats.uses_equipment = session.run(
-            "MATCH (:ProcessStep)-[r:USES_EQUIPMENT]->(:Equipment) RETURN count(r) AS n").single()["n"]
+            "MATCH (:Anxg_ProcessStep)-[r:USES_EQUIPMENT]->(:Anxg_Equipment) RETURN count(r) AS n").single()["n"]
         stats.consumes_material = session.run(
-            "MATCH (:ProcessStep)-[r:CONSUMES_MATERIAL]->(:Material) RETURN count(r) AS n").single()["n"]
+            "MATCH (:Anxg_ProcessStep)-[r:CONSUMES_MATERIAL]->(:Anxg_Material) RETURN count(r) AS n").single()["n"]
 
     log.info("[process_resources] Equipment=%d USES_EQUIPMENT=%d CONSUMES_MATERIAL=%d",
              stats.equipment_nodes, stats.uses_equipment, stats.consumes_material)

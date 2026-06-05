@@ -2,7 +2,7 @@
 
 명세 = docs/ipgraph.md §4. autograph 의 retrieve 패턴과 동일 (rerank flag 1급).
 
-vec.chunks 에서 ``source IN ('uspto_odp', 'kipris', 'openalex')`` 필터.
+anxg_vec.chunks 에서 ``source IN ('uspto_odp', 'kipris', 'openalex')`` 필터.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
 log = logging.getLogger(__name__)
 
 
-# 본 도메인의 vec.chunks source 화이트리스트.
+# 본 도메인의 anxg_vec.chunks source 화이트리스트.
 _IP_SOURCES = ("uspto_odp", "kipris", "openalex", "patent_abstract", "patent_claims")
 
 
@@ -85,7 +85,7 @@ def search_patents(query: str, *,
     sql = f"""
     SELECT id, source, section, chunk_idx, text, token_count, metadata,
            1 - (embedding <=> %(q)s::vector) AS score
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY embedding <=> %(q)s::vector
      LIMIT %(k)s
@@ -144,7 +144,7 @@ def search_by_metadata_ip(*,
     params["limit"] = max(1, min(int(limit), 500))
     sql = f"""
     SELECT id, source, section, chunk_idx, text, token_count, metadata
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY chunk_idx
      LIMIT %(limit)s
@@ -163,7 +163,7 @@ def get_chunk_ip(chunk_id: int) -> dict | None:
     """단일 청크 — 원문 + metadata."""
     sql = """
     SELECT id, source, section, chunk_idx, text, token_count, metadata
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE id = %s
        AND source = ANY(%s)
     """

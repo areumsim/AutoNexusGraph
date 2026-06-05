@@ -2,7 +2,7 @@
 
 엔드포인트:
 - POST /chat                : 단일 turn 실행 → 답변 + 인용 + 비용
-- GET  /threads/{id}        : 대화 히스토리 조회 (PG chat.messages)
+- GET  /threads/{id}        : 대화 히스토리 조회 (PG anxg_chat.messages)
 - POST /threads/{id}/message: 멀티턴 — history 자동 주입
 
 응답 메타에 cost_usd / tokens 포함 (사용자 명시 — 모든 호출 비용 가시화).
@@ -87,7 +87,7 @@ def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse
         log.exception("[chat] agent failed")
         raise HTTPException(500, f"agent failed: {e}")
 
-    # PG chat.messages 에 user + assistant 두 turn 적재
+    # PG anxg_chat.messages 에 user + assistant 두 turn 적재
     _persist_turn(req.thread_id, "user", req.message, citations=None, trace=None,
                    user_id=user_id)
     _persist_turn(req.thread_id, "assistant", state.get("answer", ""),
@@ -269,8 +269,8 @@ def health() -> dict:
     except Exception as e:
         out["postgres"] = f"error: {e}"
     try:
-        from ..db.neo4j import get_driver
-        with get_driver().session() as s:
+        from ..db.neo4j import get_session
+        with get_session() as s:
             s.run("RETURN 1").consume()
         out["neo4j"] = "ok"
     except Exception as e:
@@ -282,7 +282,7 @@ def health() -> dict:
 def _fetch_conv_owner(thread_id: str) -> tuple[bool, str | None]:
     """(존재여부, user_id). 분리된 함수 — 테스트에서 monkeypatch 용이."""
     with get_pool().connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT user_id FROM chat.conversations WHERE thread_id = %s",
+        cur.execute("SELECT user_id FROM anxg_chat.conversations WHERE thread_id = %s",
                     (thread_id,))
         row = cur.fetchone()
     if row is None:
@@ -309,10 +309,10 @@ def _load_history(thread_id: str, limit: int = 20) -> list[dict]:
     """이전 메시지 N 개. user/assistant 만 (system 제외)."""
     sql = """
     WITH conv AS (
-      SELECT id FROM chat.conversations WHERE thread_id = %s
+      SELECT id FROM anxg_chat.conversations WHERE thread_id = %s
     )
     SELECT role, content, citations, agent_trace, created_at
-      FROM chat.messages m
+      FROM anxg_chat.messages m
       JOIN conv c ON m.conversation_id = c.id
      WHERE m.role IN ('user', 'assistant')
      ORDER BY turn_idx DESC
@@ -338,16 +338,16 @@ def _persist_turn(thread_id: str, role: str, content: str,
     legacy NULL 소유자만 claim (COALESCE).
     """
     sql_conv = """
-    INSERT INTO chat.conversations (thread_id, user_id)
+    INSERT INTO anxg_chat.conversations (thread_id, user_id)
     VALUES (%s, %s)
     ON CONFLICT (thread_id) DO UPDATE
       SET updated_at = now(),
-          user_id = COALESCE(chat.conversations.user_id, EXCLUDED.user_id)
+          user_id = COALESCE(anxg_chat.conversations.user_id, EXCLUDED.user_id)
     RETURNING id
     """
-    sql_max_turn = "SELECT coalesce(max(turn_idx), -1) + 1 FROM chat.messages WHERE conversation_id = %s"
+    sql_max_turn = "SELECT coalesce(max(turn_idx), -1) + 1 FROM anxg_chat.messages WHERE conversation_id = %s"
     sql_insert = """
-    INSERT INTO chat.messages
+    INSERT INTO anxg_chat.messages
       (conversation_id, turn_idx, role, content, citations, agent_trace)
     VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
     ON CONFLICT (conversation_id, turn_idx, role) DO NOTHING

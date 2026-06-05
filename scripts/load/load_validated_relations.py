@@ -6,7 +6,7 @@
 2. extractors.validator.validate_relations 로 accept / review / discard 분류
 3. accept 만 Neo4j 에 적재 (PARTNER_OF / COMPETES_WITH / INVESTED_IN / PRODUCES)
 4. review 는 별도 jsonl 큐 (data/reports/review_queue_<date>.jsonl) — 사람 검토용
-5. discard 는 ops.quality_checks 에 사유 기록
+5. discard 는 anxg_ops.quality_checks 에 사유 기록
 
 LLM 호출 없음 — 비용 가드 불필요.
 멱등: Cypher MERGE.
@@ -26,8 +26,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 CYPHER_RELATIONS = """
 UNWIND $rows AS r
-MATCH (head:Company {corp_code: r.head_corp})
-MATCH (tail:Company {corp_code: r.tail_corp})
+MATCH (head:Anxg_Company {corp_code: r.head_corp})
+MATCH (tail:Anxg_Company {corp_code: r.tail_corp})
 CALL apoc.merge.relationship(head, r.relation, {}, {
   source: 'p3_llm',
   extracted_at: datetime(),
@@ -44,8 +44,8 @@ RETURN count(rel) AS n
 CYPHER_BY_TYPE = {
     "PARTNER_OF": """
         UNWIND $rows AS r
-        MATCH (a:Company {corp_code: r.head_corp})
-        MATCH (b:Company {corp_code: r.tail_corp})
+        MATCH (a:Anxg_Company {corp_code: r.head_corp})
+        MATCH (b:Anxg_Company {corp_code: r.tail_corp})
         MERGE (a)-[rel:PARTNER_OF]-(b)
         SET rel.source        = 'p3_llm',
             rel.extracted_at  = datetime(),
@@ -57,8 +57,8 @@ CYPHER_BY_TYPE = {
     """,
     "COMPETES_WITH": """
         UNWIND $rows AS r
-        MATCH (a:Company {corp_code: r.head_corp})
-        MATCH (b:Company {corp_code: r.tail_corp})
+        MATCH (a:Anxg_Company {corp_code: r.head_corp})
+        MATCH (b:Anxg_Company {corp_code: r.tail_corp})
         MERGE (a)-[rel:COMPETES_WITH]-(b)
         SET rel.source       = 'p3_llm',
             rel.extracted_at = datetime(),
@@ -69,8 +69,8 @@ CYPHER_BY_TYPE = {
     """,
     "INVESTED_IN": """
         UNWIND $rows AS r
-        MATCH (a:Company {corp_code: r.head_corp})
-        MATCH (b:Company {corp_code: r.tail_corp})
+        MATCH (a:Anxg_Company {corp_code: r.head_corp})
+        MATCH (b:Anxg_Company {corp_code: r.tail_corp})
         MERGE (a)-[rel:INVESTED_IN]->(b)
         SET rel.source        = 'p3_llm',
             rel.extracted_at  = datetime(),
@@ -83,7 +83,7 @@ CYPHER_BY_TYPE = {
     """,
     "PRODUCES": """
         UNWIND $rows AS r
-        MATCH (a:Company {corp_code: r.head_corp})
+        MATCH (a:Anxg_Company {corp_code: r.head_corp})
         MERGE (p:Product {name: r.tail, company_corp_code: r.head_corp})
         ON CREATE SET p.source = 'p3_llm', p.created_at = datetime()
         MERGE (a)-[rel:PRODUCES]->(p)
@@ -156,13 +156,13 @@ def main() -> int:
                 }, ensure_ascii=False) + "\n")
         print(f"[P4] review queue: {rev_path}")
 
-    # 2) discard → ops.quality_checks
+    # 2) discard → anxg_ops.quality_checks
     if n_discard:
         from autonexusgraph.db.postgres import get_pool
         with get_pool().connection() as conn, conn.cursor() as cur:
             for v in classified["discard"]:
                 cur.execute("""
-                    INSERT INTO ops.quality_checks
+                    INSERT INTO anxg_ops.quality_checks
                       (check_name, target_id, severity, message, details)
                     VALUES ('p3_discarded', %s, 'warn', %s, %s)
                 """, (
@@ -180,7 +180,7 @@ def main() -> int:
         return 0
 
     # 3) accept → Neo4j 적재 (relation type 별 batch)
-    from autonexusgraph.db.neo4j import get_driver
+    from autonexusgraph.db.neo4j import get_session
 
     by_type: dict[str, list[dict]] = {}
     for v in classified["accept"]:
@@ -208,7 +208,7 @@ def main() -> int:
             "fiscal_year": rel.get("_fiscal_year"),
         })
 
-    with get_driver().session() as session:
+    with get_session() as session:
         for rtype, rows in by_type.items():
             cypher = CYPHER_BY_TYPE.get(rtype)
             if not cypher:

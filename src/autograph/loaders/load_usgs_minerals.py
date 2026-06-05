@@ -1,9 +1,9 @@
-"""USGS MCS → ``auto.master_minerals`` PG 적재 + Neo4j ``:Mineral`` / ``:Material``
+"""USGS MCS → ``anxg_auto.master_minerals`` PG 적재 + Neo4j ``:Mineral`` / ``:Material``
 + ``:DERIVED_FROM`` 엣지 적재.
 
 흐름:
     1. ``autograph.ingestion.usgs_mcs.fetch_and_parse_all()`` 로 PDF → row.
-    2. PG ``auto.master_minerals`` UPSERT (commodity, snapshot_year PK).
+    2. PG ``anxg_auto.master_minerals`` UPSERT (commodity, snapshot_year PK).
     3. ``ontology/auto/materials_seed.yaml`` 로 ``:Material`` / ``:Mineral`` 노드 +
        ``:DERIVED_FROM`` 엣지 (7키 메타) MERGE.
     4. (있으면) 'name' 기반 ``:Module`` ↔ ``:Material`` ``MADE_OF`` 엣지 MERGE.
@@ -43,10 +43,10 @@ _CONF_A = 0.95         # USGS MCS A grade
 _CONF_B = 0.80         # manual seed (materials_seed)
 
 
-# ── 1. PG: auto.master_minerals UPSERT ────────────────────────────
+# ── 1. PG: anxg_auto.master_minerals UPSERT ────────────────────────────
 
 def _upsert_minerals(cur, rows: list[dict]) -> tuple[int, int, int]:
-    """rows → auto.master_minerals UPSERT. (inserted, updated, skipped)."""
+    """rows → anxg_auto.master_minerals UPSERT. (inserted, updated, skipped)."""
     ins = upd = skip = 0
     for r in rows:
         if not r.get("commodity") or r.get("snapshot_year") is None:
@@ -55,7 +55,7 @@ def _upsert_minerals(cur, rows: list[dict]) -> tuple[int, int, int]:
         cur.execute("SAVEPOINT sp_min")
         try:
             cur.execute("""
-                INSERT INTO auto.master_minerals
+                INSERT INTO anxg_auto.master_minerals
                   (commodity, snapshot_year,
                    world_production, us_production, us_import_reliance,
                    us_imports, us_exports, us_reserves, world_reserves,
@@ -129,9 +129,9 @@ def _load_seed() -> dict | None:
 
 
 _CONSTRAINTS_CYPHER = [
-    "CREATE CONSTRAINT material_code IF NOT EXISTS FOR (m:Material) REQUIRE m.code IS UNIQUE",
-    "CREATE CONSTRAINT mineral_code  IF NOT EXISTS FOR (m:Mineral)  REQUIRE m.code IS UNIQUE",
-    "CREATE INDEX     material_family IF NOT EXISTS FOR (m:Material) ON (m.chem_family)",
+    "CREATE CONSTRAINT material_code IF NOT EXISTS FOR (m:Anxg_Material) REQUIRE m.code IS UNIQUE",
+    "CREATE CONSTRAINT mineral_code  IF NOT EXISTS FOR (m:Anxg_Mineral)  REQUIRE m.code IS UNIQUE",
+    "CREATE INDEX     material_family IF NOT EXISTS FOR (m:Anxg_Material) ON (m.chem_family)",
 ]
 
 # 7-key edge meta — PRD §6.7.
@@ -163,7 +163,7 @@ def _neo4j_load(seed: dict, snapshot_year: int,
         "made_of_merged":   0,
     }
     try:
-        with drv.session() as s:
+        with drv.session(database=os.environ.get("NEO4J_DATABASE") or None) as s:
             for q in _CONSTRAINTS_CYPHER:
                 s.run(q)
 
@@ -172,7 +172,7 @@ def _neo4j_load(seed: dict, snapshot_year: int,
                 if code not in pg_commodities:
                     continue
                 s.run("""
-                    MERGE (n:Mineral {code: $code})
+                    MERGE (n:Anxg_Mineral {code: $code})
                     SET n.name = $name,
                         n.element_symbol = $sym,
                         n.aliases = $aliases,
@@ -186,7 +186,7 @@ def _neo4j_load(seed: dict, snapshot_year: int,
             edge_meta = dict(_EDGE_META, snapshot_year=snapshot_year)
             for mat_code, info in (seed.get("materials") or {}).items():
                 s.run("""
-                    MERGE (m:Material {code: $code})
+                    MERGE (m:Anxg_Material {code: $code})
                     SET m.name = $name,
                         m.chem_family = $fam,
                         m.cathode_ratio = $ratio,
@@ -204,7 +204,7 @@ def _neo4j_load(seed: dict, snapshot_year: int,
                     # 'source_id' 는 row 별로 (mat→mineral) 결정 — 결정적.
                     eid = f"usgs_mcs_{snapshot_year}:{mat_code}->{min_code}"
                     s.run("""
-                        MATCH (mat:Material {code: $mat}), (min:Mineral {code: $min})
+                        MATCH (mat:Anxg_Material {code: $mat}), (min:Anxg_Mineral {code: $min})
                         MERGE (mat)-[r:DERIVED_FROM]->(min)
                         SET r.source_type       = $source_type,
                             r.source_id         = $source_id,
@@ -231,7 +231,7 @@ def _neo4j_load(seed: dict, snapshot_year: int,
                     continue
                 for mat_code in entry.get("materials", []) or []:
                     res = s.run("""
-                        MATCH (mod:Module), (mat:Material {code: $mat})
+                        MATCH (mod:Anxg_Module), (mat:Anxg_Material {code: $mat})
                         WHERE mod.name = $mname
                         MERGE (mod)-[r:MADE_OF]->(mat)
                         SET r.source_type       = $source_type,

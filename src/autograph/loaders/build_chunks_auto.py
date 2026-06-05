@@ -1,4 +1,4 @@
-"""자동차 텍스트 청크 → vec.chunks 적재.
+"""자동차 텍스트 청크 → anxg_vec.chunks 적재.
 
 대상:
 - nhtsa_recalls 의 Summary / Consequence / Remedy 본문
@@ -34,7 +34,7 @@ from autonexusgraph.db.postgres import get_connection
 log = logging.getLogger(__name__)
 
 
-# vec.chunks 의 rcept_no/section/chunk_idx UNIQUE(rcept_no, chunk_idx) 가 있어
+# anxg_vec.chunks 의 rcept_no/section/chunk_idx UNIQUE(rcept_no, chunk_idx) 가 있어
 # 자동차 청크는 rcept_no=NULL → unique 충돌 회피 위해 metadata.uniq 키 활용.
 # section='auto.recall'|'auto.complaint' 로 구분.
 def _upsert_chunk(cur, *, source: str, section: str, text: str,
@@ -48,7 +48,7 @@ def _upsert_chunk(cur, *, source: str, section: str, text: str,
         raise ValueError("metadata['uniq'] 필요")
 
     cur.execute("""
-        SELECT id, manufacturer_id, model_id, variant_id FROM vec.chunks
+        SELECT id, manufacturer_id, model_id, variant_id FROM anxg_vec.chunks
         WHERE source = %s AND metadata->>'uniq' = %s
         LIMIT 1
     """, (source, uniq))
@@ -58,7 +58,7 @@ def _upsert_chunk(cur, *, source: str, section: str, text: str,
         cid, ex_mfr, ex_model, ex_variant = existing
         if (manufacturer_id and not ex_mfr) or (model_id and not ex_model) or (variant_id and not ex_variant):
             cur.execute("""
-                UPDATE vec.chunks
+                UPDATE anxg_vec.chunks
                    SET manufacturer_id = COALESCE(manufacturer_id, %s),
                        model_id        = COALESCE(model_id, %s),
                        variant_id      = COALESCE(variant_id, %s)
@@ -71,7 +71,7 @@ def _upsert_chunk(cur, *, source: str, section: str, text: str,
     from autonexusgraph.extraction.chunker import estimate_tokens
     token_est = estimate_tokens(text)
     cur.execute("""
-        INSERT INTO vec.chunks
+        INSERT INTO anxg_vec.chunks
           (corp_code, rcept_no, section, chunk_idx, text, token_count,
            metadata, source, manufacturer_id, model_id, variant_id)
         VALUES (NULL, NULL, %s, 0, %s, %s,
@@ -89,7 +89,7 @@ _RECALL_SRC_MAP: dict[str, str] = {
 
 
 def build_from_recalls() -> int:
-    """auto.events_recalls 모든 행 → vec.chunks.
+    """anxg_auto.events_recalls 모든 행 → anxg_vec.chunks.
 
     source 별 chunk 라벨 (DEFECT_MATCHES 빌더가 이 라벨로 매칭):
         nhtsa            → 'nhtsa_recall'   (영문)
@@ -103,7 +103,7 @@ def build_from_recalls() -> int:
             SELECT recall_id, source, source_recall_no, manufacturer_id, model_id, variant_id,
                    component_text, defect_summary, consequence, remedy_summary,
                    report_date
-              FROM auto.events_recalls
+              FROM anxg_auto.events_recalls
         """)
         rows = cur.fetchall()
     with conn.cursor() as cur:
@@ -149,7 +149,7 @@ def build_from_complaints() -> int:
         cur.execute("""
             SELECT complaint_id, source_complaint_no, manufacturer_id, model_id, variant_id,
                    summary, filed_date
-              FROM auto.events_complaints
+              FROM anxg_auto.events_complaints
         """)
         rows = cur.fetchall()
     with conn.cursor() as cur:
@@ -214,7 +214,7 @@ def _strip_html(html: str) -> str:
 
 
 def build_from_wikipedia(*, max_html_chars: int = 4000) -> int:
-    """data/raw/auto/wikipedia/**/*.json → vec.chunks (source='wikipedia_auto').
+    """data/raw/auto/wikipedia/**/*.json → anxg_vec.chunks (source='wikipedia_auto').
 
     페이지 1건당 1 청크. 본문은:
         title + '\\n' + summary(extract) + '\\n[Infobox]\\n' + key:value... + '\\n' + html_text(앞부분)
@@ -294,7 +294,7 @@ def build_from_wikipedia(*, max_html_chars: int = 4000) -> int:
 
 def build_from_dart_narrative(*, context_chars: int = 600) -> int:
     """4 supplier OEM (현대모비스/한온/HL만도/현대위아) 의 DART 사업보고서
-    III. 생산 및 설비 narrative → vec.chunks (source='dart_narrative').
+    III. 생산 및 설비 narrative → anxg_vec.chunks (source='dart_narrative').
 
     Hyundai/Kia 는 표 기반이라 dart_production_parser 가 자동 추출. 그 외 4 사 는
     narrative 본문에 capacity 가 적혀있어 LLM P3 추출이 필요.
@@ -304,7 +304,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
         2. 정규식으로 '생산능력' / '가동률' / '생산실적' 키워드 주변
            ``context_chars`` (default 600) 만큼 컨텍스트 발췌
         3. XML 태그 strip, 공백 정규화
-        4. (corp_code, rcept_no, match_idx) 단위로 vec.chunks 적재
+        4. (corp_code, rcept_no, match_idx) 단위로 anxg_vec.chunks 적재
 
     metadata:
         oem (mobis/hanon/mando/wia), corp_code, rcept_no, sequence_in_zip
@@ -401,7 +401,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
 
 
 def build_from_oem_ir() -> int:
-    """auto.events_oem_news.body_text → vec.chunks (source='oem_ir').
+    """anxg_auto.events_oem_news.body_text → anxg_vec.chunks (source='oem_ir').
 
     OEM 별 corp_code 를 메타데이터에 동봉 — finance 측 검색과도 cross 가능.
     Body 가 비어있거나 SPA 한계로 너무 짧으면 skip (< 300 chars).
@@ -415,12 +415,12 @@ def build_from_oem_ir() -> int:
         cur.execute("""
             SELECT news_id, oem, oem_corp_code, url, title, section,
                    body_text, published_date, source
-              FROM auto.events_oem_news
+              FROM anxg_auto.events_oem_news
              WHERE body_text IS NOT NULL AND length(body_text) >= 300
         """)
         rows = cur.fetchall()
         cur.execute("""
-            SELECT count(*) FROM auto.events_oem_news
+            SELECT count(*) FROM anxg_auto.events_oem_news
              WHERE body_text IS NULL OR length(coalesce(body_text,'')) < 300
         """)
         skipped_short = cur.fetchone()[0]

@@ -1,9 +1,9 @@
-"""fin.filings 적재 — DART 공시 보고서 메타.
+"""anxg_fin.filings 적재 — DART 공시 보고서 메타.
 
 원본:
 - data/raw/dart_bulk/corp/<corp_code>/filings.jsonl
 
-PK: fin.filings.rcept_no (DART 접수번호)
+PK: anxg_fin.filings.rcept_no (DART 접수번호)
 upsert: 메타 정보 변경 가능
 """
 
@@ -17,7 +17,7 @@ from ._common import LoadStats, chunked, iter_jsonl, parse_date
 
 
 SQL_UPSERT = """
-INSERT INTO fin.filings
+INSERT INTO anxg_fin.filings
   (rcept_no, corp_code, report_nm, rcept_dt, flr_nm, pblntf_ty, raw, ingested_at)
 VALUES
   (%(rcept_no)s, %(corp_code)s, %(report_nm)s, %(rcept_dt)s,

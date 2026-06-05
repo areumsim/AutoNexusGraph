@@ -1,6 +1,6 @@
 """AutoGraph 의미 검색 — pgvector + 자동차 메타 필터.
 
-finance 의 ``autonexusgraph.tools.retrieve.search_documents`` 와 동일 인덱스(vec.chunks)를 사용하되,
+finance 의 ``autonexusgraph.tools.retrieve.search_documents`` 와 동일 인덱스(anxg_vec.chunks)를 사용하되,
 필터 키가 자동차 도메인용 (manufacturer_id / model_id / variant_id) 으로 확장.
 """
 
@@ -110,7 +110,7 @@ def search_documents_auto(query: str, *,
     SELECT id, manufacturer_id, model_id, variant_id, source, section,
            chunk_idx, text, token_count, metadata,
            1 - (embedding <=> %(q)s::vector) AS score
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY embedding <=> %(q)s::vector
      LIMIT %(k)s
@@ -168,7 +168,7 @@ def search_by_metadata_auto(*,
     sql = f"""
     SELECT id, manufacturer_id, model_id, variant_id, source, section,
            chunk_idx, text, token_count, metadata
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY id
      LIMIT %(limit)s
@@ -185,7 +185,7 @@ def get_chunk_auto(chunk_id: int) -> dict | None:
     sql = """
     SELECT id, manufacturer_id, model_id, variant_id, source, section,
            chunk_idx, text, token_count, metadata
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE id = %s AND manufacturer_id IS NOT NULL
     """
     pool = get_pool()

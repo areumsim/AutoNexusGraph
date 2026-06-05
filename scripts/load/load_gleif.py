@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""GLEIF KR LEI → sec.lei + master.entity_map (legal_name 매칭).
+"""GLEIF KR LEI → anxg_sec.lei + anxg_master.entity_map (legal_name 매칭).
 
 매칭 전략:
-- legal_name 정규화 후 master.companies / company_aliases 와 매칭
+- legal_name 정규화 후 anxg_master.companies / company_aliases 와 매칭
 - 매치되면 corp_code 채움. 못 찾으면 corp_code NULL (외부 법인)
-- LEI 자체는 모두 sec.lei 에 저장 (검색용)
+- LEI 자체는 모두 anxg_sec.lei 에 저장 (검색용)
 """
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 
 UPSERT_LEI = """
-INSERT INTO sec.lei
+INSERT INTO anxg_sec.lei
   (lei, corp_code, legal_name, legal_jurisdiction, entity_status,
    registration_status, issued_at, next_renewal_at, raw)
 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
 ON CONFLICT (lei) DO UPDATE
-   SET corp_code           = COALESCE(EXCLUDED.corp_code, sec.lei.corp_code),
+   SET corp_code           = COALESCE(EXCLUDED.corp_code, anxg_sec.lei.corp_code),
        legal_name          = EXCLUDED.legal_name,
        entity_status       = EXCLUDED.entity_status,
        registration_status = EXCLUDED.registration_status,
@@ -36,11 +36,11 @@ ON CONFLICT (lei) DO UPDATE
 """
 
 UPSERT_EM = """
-INSERT INTO master.entity_map
+INSERT INTO anxg_master.entity_map
   (corp_code, id_type, id_value, source, confidence, resolved_by)
 VALUES (%s, 'lei', %s, 'gleif', 0.95, 'rule')
 ON CONFLICT (corp_code, id_type, id_value) DO UPDATE
-   SET confidence  = GREATEST(master.entity_map.confidence, EXCLUDED.confidence),
+   SET confidence  = GREATEST(anxg_master.entity_map.confidence, EXCLUDED.confidence),
        resolved_at = now()
 """
 
@@ -58,10 +58,10 @@ def _load_name_index(pool) -> dict[str, str]:
     """alias_norm → corp_code."""
     idx: dict[str, str] = {}
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT alias_norm, corp_code FROM master.company_aliases")
+        cur.execute("SELECT alias_norm, corp_code FROM anxg_master.company_aliases")
         for k, cc in cur.fetchall():
             idx.setdefault(k, cc)
-        cur.execute("SELECT corp_code, corp_name FROM master.companies WHERE is_active=TRUE")
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies WHERE is_active=TRUE")
         for cc, nm in cur.fetchall():
             idx.setdefault(normalize_corp_name(nm), cc)
     return idx
@@ -120,11 +120,11 @@ def main() -> int:
             cur.executemany(UPSERT_EM, em_rows[i:i + BATCH])
 
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT count(*) FROM sec.lei")
-        print(f"[sec.lei] total: {cur.fetchone()[0]:,}")
-        cur.execute("SELECT count(*) FROM sec.lei WHERE corp_code IS NOT NULL")
-        print(f"[sec.lei] matched to corp: {cur.fetchone()[0]:,}")
-        cur.execute("SELECT count(*) FROM master.entity_map WHERE id_type='lei'")
+        cur.execute("SELECT count(*) FROM anxg_sec.lei")
+        print(f"[anxg_sec.lei] total: {cur.fetchone()[0]:,}")
+        cur.execute("SELECT count(*) FROM anxg_sec.lei WHERE corp_code IS NOT NULL")
+        print(f"[anxg_sec.lei] matched to corp: {cur.fetchone()[0]:,}")
+        cur.execute("SELECT count(*) FROM anxg_master.entity_map WHERE id_type='lei'")
         print(f"[entity_map] lei rows: {cur.fetchone()[0]:,}")
     return 0
 

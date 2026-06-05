@@ -1,4 +1,4 @@
-"""auto.master_manufacturers 의 한국어 alias 보강 — 한국 OEM/공급사 매칭율 ↑.
+"""anxg_auto.master_manufacturers 의 한국어 alias 보강 — 한국 OEM/공급사 매칭율 ↑.
 
 backfill 대상:
 - 기존 NHTSA-derived 영문 entries (HYUNDAI/KIA/GENESIS/CHEVROLET) 의 aliases
@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 
 # 기존 entry 의 aliases 보강 — (canonical_name, ko_aliases[]).
-# canonical_name 은 auto.master_manufacturers.name (NHTSA vPIC 표준형).
+# canonical_name 은 anxg_auto.master_manufacturers.name (NHTSA vPIC 표준형).
 EXISTING_ALIASES: dict[str, list[str]] = {
     "HYUNDAI": [
         "현대자동차", "현대차", "현대자동차주식회사", "(주)현대자동차",
@@ -130,7 +130,7 @@ def _backfill_existing(conn) -> int:
         for name, aliases in EXISTING_ALIASES.items():
             # 비어있는 aliases 만 — 이미 채워진 건 건드리지 않음 (수동 보강 보호)
             cur.execute("""
-                UPDATE auto.master_manufacturers
+                UPDATE anxg_auto.master_manufacturers
                    SET aliases = %s::text[],
                        updated_at = now()
                  WHERE name = %s
@@ -151,7 +151,7 @@ def _insert_new_oems(conn) -> int:
     with conn.cursor() as cur:
         for oem in NEW_OEMS:
             cur.execute("""
-                INSERT INTO auto.master_manufacturers
+                INSERT INTO anxg_auto.master_manufacturers
                   (manufacturer_id, name, name_norm, country, wikidata_qid,
                    aliases, source, source_ref, confidence, validated_status)
                 VALUES (%s, %s, %s, %s, %s,

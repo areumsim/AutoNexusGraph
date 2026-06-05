@@ -1,4 +1,4 @@
-"""팩토리온 (data.go.kr 15087611) raw json → auto.factoryon_registry PG 적재.
+"""팩토리온 (data.go.kr 15087611) raw json → anxg_auto.factoryon_registry PG 적재.
 
 PRD v2.2 §2.3 — 공정·라인·설비 부분 진입 (LLM 0%).
 factoryon_registry.py 가 raw 저장만 — 본 loader 가 PG 정규화 적재.
@@ -52,7 +52,7 @@ def _extract_items(payload: Any) -> list[dict]:
 def _normalize_row(item: dict, endpoint: str, *,
                     snapshot_year: int,
                     schema_version: str = "v2.2") -> dict[str, Any]:
-    """raw item → auto.factoryon_registry row."""
+    """raw item → anxg_auto.factoryon_registry row."""
     def _i(*keys) -> Any:
         for k in keys:
             v = item.get(k)
@@ -133,7 +133,7 @@ def collect_rows(raw_dir: Path | None = None) -> list[dict]:
 
 
 def upsert_pg(rows: list[dict]) -> int:
-    """auto.factoryon_registry UPSERT. DB 미가용 시 0 + warning."""
+    """anxg_auto.factoryon_registry UPSERT. DB 미가용 시 0 + warning."""
     if not rows:
         return 0
     try:
@@ -142,7 +142,7 @@ def upsert_pg(rows: list[dict]) -> int:
         log.warning("[factoryon.load_pg] postgres 모듈 미가용: %s", e)
         return 0
     sql = """
-    INSERT INTO auto.factoryon_registry (
+    INSERT INTO anxg_auto.factoryon_registry (
         factory_no, company_name, business_no, representative, address,
         industrial_complex, industry_code, industry_codes, industry_name, products, capacity,
         employees, land_area_m2, building_area_m2, registered_at,
@@ -157,23 +157,23 @@ def upsert_pg(rows: list[dict]) -> int:
     )
     ON CONFLICT (factory_no) DO UPDATE SET
         company_name       = EXCLUDED.company_name,
-        business_no        = COALESCE(EXCLUDED.business_no, auto.factoryon_registry.business_no),
-        representative     = COALESCE(EXCLUDED.representative, auto.factoryon_registry.representative),
-        address            = COALESCE(EXCLUDED.address, auto.factoryon_registry.address),
-        industrial_complex = COALESCE(EXCLUDED.industrial_complex, auto.factoryon_registry.industrial_complex),
-        industry_code      = COALESCE(EXCLUDED.industry_code, auto.factoryon_registry.industry_code),
-        industry_codes     = COALESCE(EXCLUDED.industry_codes, auto.factoryon_registry.industry_codes),
-        industry_name      = COALESCE(EXCLUDED.industry_name, auto.factoryon_registry.industry_name),
-        products           = COALESCE(EXCLUDED.products, auto.factoryon_registry.products),
-        capacity           = COALESCE(EXCLUDED.capacity, auto.factoryon_registry.capacity),
-        employees          = COALESCE(EXCLUDED.employees, auto.factoryon_registry.employees),
-        land_area_m2       = COALESCE(EXCLUDED.land_area_m2, auto.factoryon_registry.land_area_m2),
-        building_area_m2   = COALESCE(EXCLUDED.building_area_m2, auto.factoryon_registry.building_area_m2),
-        registered_at      = COALESCE(EXCLUDED.registered_at, auto.factoryon_registry.registered_at),
-        charge_org         = COALESCE(EXCLUDED.charge_org, auto.factoryon_registry.charge_org),
-        tel                = COALESCE(EXCLUDED.tel, auto.factoryon_registry.tel),
-        fax                = COALESCE(EXCLUDED.fax, auto.factoryon_registry.fax),
-        homepage           = COALESCE(EXCLUDED.homepage, auto.factoryon_registry.homepage),
+        business_no        = COALESCE(EXCLUDED.business_no, anxg_auto.factoryon_registry.business_no),
+        representative     = COALESCE(EXCLUDED.representative, anxg_auto.factoryon_registry.representative),
+        address            = COALESCE(EXCLUDED.address, anxg_auto.factoryon_registry.address),
+        industrial_complex = COALESCE(EXCLUDED.industrial_complex, anxg_auto.factoryon_registry.industrial_complex),
+        industry_code      = COALESCE(EXCLUDED.industry_code, anxg_auto.factoryon_registry.industry_code),
+        industry_codes     = COALESCE(EXCLUDED.industry_codes, anxg_auto.factoryon_registry.industry_codes),
+        industry_name      = COALESCE(EXCLUDED.industry_name, anxg_auto.factoryon_registry.industry_name),
+        products           = COALESCE(EXCLUDED.products, anxg_auto.factoryon_registry.products),
+        capacity           = COALESCE(EXCLUDED.capacity, anxg_auto.factoryon_registry.capacity),
+        employees          = COALESCE(EXCLUDED.employees, anxg_auto.factoryon_registry.employees),
+        land_area_m2       = COALESCE(EXCLUDED.land_area_m2, anxg_auto.factoryon_registry.land_area_m2),
+        building_area_m2   = COALESCE(EXCLUDED.building_area_m2, anxg_auto.factoryon_registry.building_area_m2),
+        registered_at      = COALESCE(EXCLUDED.registered_at, anxg_auto.factoryon_registry.registered_at),
+        charge_org         = COALESCE(EXCLUDED.charge_org, anxg_auto.factoryon_registry.charge_org),
+        tel                = COALESCE(EXCLUDED.tel, anxg_auto.factoryon_registry.tel),
+        fax                = COALESCE(EXCLUDED.fax, anxg_auto.factoryon_registry.fax),
+        homepage           = COALESCE(EXCLUDED.homepage, anxg_auto.factoryon_registry.homepage),
         snapshot_year      = EXCLUDED.snapshot_year,
         schema_version     = EXCLUDED.schema_version,
         raw_payload        = EXCLUDED.raw_payload,

@@ -1,7 +1,7 @@
-"""KAMP 제조AI 데이터셋 카탈로그(data.go.kr 15089213) → auto.kamp_catalog UPSERT.
+"""KAMP 제조AI 데이터셋 카탈로그(data.go.kr 15089213) → anxg_auto.kamp_catalog UPSERT.
 
 Layer A — 카탈로그(인덱스). 50종 데이터셋의 메타·링크만 적재.
-실제 공정 센서 통계는 별도 ``load_kamp_process_metrics`` (Layer B, auto.process_metrics).
+실제 공정 센서 통계는 별도 ``load_kamp_process_metrics`` (Layer B, anxg_auto.process_metrics).
 
 원본 CSV 인코딩은 EUC-KR/CP949 — 자동 감지 후 UTF-8 처리.
 
@@ -38,7 +38,7 @@ _CONFIDENCE = 0.800   # B 등급 (익명)
 _SCHEMA_VERSION = "kamp_catalog_v1"
 
 # 산단공 :Process 사전 정규화 매핑. KAMP 37 unique "적용공정" → (norm, category).
-# category 는 auto.process_metrics.process_category 와 동일 분류 체계 사용:
+# category 는 anxg_auto.process_metrics.process_category 와 동일 분류 체계 사용:
 #   casting | forging | stamping | welding | coating | machining | assembly | inspection
 #   + 확장: melting | injection_molding | heat_treatment | plating | logistics | mixing | safety
 #
@@ -204,7 +204,7 @@ def collect_rows(csv_path: Path | None = None) -> list[dict[str, Any]]:
 # ──────────────────────────────────────────────────────────────────────
 
 _UPSERT_SQL = """
-INSERT INTO auto.kamp_catalog (
+INSERT INTO anxg_auto.kamp_catalog (
     seq, base_year, industry, purpose,
     process_name_raw, process_name_norm, process_category,
     dataset_name, dataset_desc, data_type, usage_terms, download_url,
@@ -250,9 +250,9 @@ def upsert_pg(rows: list[dict[str, Any]]) -> int:
     n = 0
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT to_regclass('auto.kamp_catalog')")
+            cur.execute("SELECT to_regclass('anxg_auto.kamp_catalog')")
             if cur.fetchone()[0] is None:
-                log.error("[kamp.catalog] auto.kamp_catalog 미생성 — "
+                log.error("[kamp.catalog] anxg_auto.kamp_catalog 미생성 — "
                           "make migrate-schema-pg MIGRATE_FILE=27_auto_kamp_catalog.sql 먼저")
                 return 0
             for r in rows:

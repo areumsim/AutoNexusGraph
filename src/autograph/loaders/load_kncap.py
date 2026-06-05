@@ -1,4 +1,4 @@
-"""KNCAP raw → auto.spec_measurements (safety.kncap.*) + Neo4j SAFETY_RATED_BY.
+"""KNCAP raw → anxg_auto.spec_measurements (safety.kncap.*) + Neo4j SAFETY_RATED_BY.
 
 raw 위치: ``data/raw/auto/kncap/*.jsonl`` (ingestion.kncap 가 normalize 후 생성)
 
@@ -16,7 +16,7 @@ import logging
 import sys
 
 from autonexusgraph.config import get_settings
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
@@ -34,8 +34,8 @@ _EXTRACTOR_VERSION = "v1"
 
 _MERGE_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (v:VehicleVariant {{variant_id: r.variant_id}})
-MATCH (s:Standard {{code: 'KNCAP'}})
+MATCH (v:Anxg_VehicleVariant {{variant_id: r.variant_id}})
+MATCH (s:Anxg_Standard {{code: 'KNCAP'}})
 MERGE (v)-[edge:SAFETY_RATED_BY]->(s)
 SET {edge_meta_cypher('edge')},
     edge.overall_rating = r.overall_rating,
@@ -51,9 +51,9 @@ def _resolve_variant_id(cur, manufacturer: str | None, model: str | None,
     mod = normalize_corp_name(model)
     cur.execute("""
         SELECT v.variant_id
-          FROM auto.master_vehicle_variants v
-          JOIN auto.master_vehicle_models m ON m.model_id = v.model_id
-          JOIN auto.master_manufacturers mf ON mf.manufacturer_id = m.manufacturer_id
+          FROM anxg_auto.master_vehicle_variants v
+          JOIN anxg_auto.master_vehicle_models m ON m.model_id = v.model_id
+          JOIN anxg_auto.master_manufacturers mf ON mf.manufacturer_id = m.manufacturer_id
          WHERE mf.name_norm = %s
            AND m.name_norm = %s
            AND v.model_year = %s
@@ -107,7 +107,7 @@ def run(*, dry_run: bool = False) -> dict:
                         if val is None or val == "":
                             continue
                         cur.execute("""
-                            INSERT INTO auto.spec_measurements
+                            INSERT INTO anxg_auto.spec_measurements
                               (variant_id, measure_key, value_text, source, snapshot_year)
                             VALUES (%s, %s, %s, 'kncap', %s)
                             ON CONFLICT (variant_id, measure_key)
@@ -133,8 +133,8 @@ def run(*, dry_run: bool = False) -> dict:
     if dry_run:
         return {"variants": len(pg_rows), "edges": 0}
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         edges = run_batched(session, _MERGE_CYPHER, pg_rows, batch=200)
     log.info("[load:kncap] Neo4j SAFETY_RATED_BY edges=%d", edges)
     return {"variants": len(pg_rows), "edges": edges}

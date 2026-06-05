@@ -1,6 +1,6 @@
-"""master.persons 동명·동년생 충돌 측정 (Q-3) — read-only audit.
+"""anxg_master.persons 동명·동년생 충돌 측정 (Q-3) — read-only audit.
 
-배경: `master.persons` 의 dedup 키는 `UNIQUE(canonical_name, birth_year)`
+배경: `anxg_master.persons` 의 dedup 키는 `UNIQUE(canonical_name, birth_year)`
 (02_entity_resolution.sql). 이 키는 두 가지 충돌 위험을 갖는다 (README §12.4):
 1. **birth_year NULL** — 디스앰비규에이터 부재 → 동명이인 false-merge 또는 분절 위험.
 2. **동일 (name, birth_year)** — 진짜 다른 두 사람이 한 row 로 병합될 수 있음
@@ -67,24 +67,24 @@ def _summarize(overall: dict, reused: dict, ambiguous: int,
 
 
 def collision_report(*, min_corp: int = DEFAULT_MIN_CORP) -> dict[str, Any]:
-    """master.persons 충돌 빈도 측정."""
+    """anxg_master.persons 충돌 빈도 측정."""
     overall = _run(
         """
         SELECT count(*) AS total,
                count(birth_year) AS with_year,
                count(*) FILTER (WHERE wikidata_qid IS NOT NULL) AS with_qid
-          FROM master.persons
+          FROM anxg_master.persons
         """, fetch="rows")[0]
     reused = _run(
         """
         SELECT count(*) AS dup_names, coalesce(sum(c), 0) AS dup_rows
           FROM (SELECT canonical_name, count(*) AS c
-                  FROM master.persons GROUP BY canonical_name HAVING count(*) > 1) t
+                  FROM anxg_master.persons GROUP BY canonical_name HAVING count(*) > 1) t
         """, fetch="rows")[0]
     ambiguous = _run(
         """
         SELECT count(*) FROM (
-          SELECT canonical_name FROM master.persons
+          SELECT canonical_name FROM anxg_master.persons
            GROUP BY canonical_name
           HAVING bool_or(birth_year IS NULL) AND bool_or(birth_year IS NOT NULL)
         ) t
@@ -93,8 +93,8 @@ def collision_report(*, min_corp: int = DEFAULT_MIN_CORP) -> dict[str, Any]:
         """
         SELECT p.canonical_name, p.birth_year,
                count(DISTINCT h.corp_code) AS n_corp
-          FROM master.persons p
-          JOIN master.person_executive_history h ON h.internal_id = p.internal_id
+          FROM anxg_master.persons p
+          JOIN anxg_master.person_executive_history h ON h.internal_id = p.internal_id
          GROUP BY p.internal_id, p.canonical_name, p.birth_year
         HAVING count(DISTINCT h.corp_code) >= %s
          ORDER BY n_corp DESC
@@ -105,7 +105,7 @@ def collision_report(*, min_corp: int = DEFAULT_MIN_CORP) -> dict[str, Any]:
 
 def _format_table(r: dict[str, Any]) -> str:
     lines = [
-        f"master.persons 충돌 측정 — total {r['total']:,}",
+        f"anxg_master.persons 충돌 측정 — total {r['total']:,}",
         f"  birth_year NULL : {r['null_birth_year']:,} ({r['null_birth_year_pct']}%)  ← 디스앰비규에이터 부재 위험",
         f"  wikidata_qid    : {r['with_wikidata_qid']:,} ({r['qid_pct']}%)",
         f"  동명 다중 row   : {r['reused_names']:,} 이름 / {r['reused_name_rows']:,} row",
@@ -125,7 +125,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
     p = argparse.ArgumentParser(prog="autonexusgraph.persons_collision",
-                                description="master.persons 동명·동년생 충돌 측정 (Q-3)")
+                                description="anxg_master.persons 동명·동년생 충돌 측정 (Q-3)")
     p.add_argument("--json", action="store_true")
     p.add_argument("--min-corp", type=int, default=DEFAULT_MIN_CORP,
                    help="병합 의심 검토 후보 distinct corp 임계 (기본 5)")

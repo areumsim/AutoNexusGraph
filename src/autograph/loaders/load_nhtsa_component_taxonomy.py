@@ -1,9 +1,9 @@
-"""auto.events_recalls.component_text → auto.components 직접 등록.
+"""anxg_auto.events_recalls.component_text → anxg_auto.components 직접 등록.
 
 NHTSA 표준 component_text 는 ``SYSTEM:SUBSYSTEM:PART`` 형식 (예:
 ``ELECTRICAL SYSTEM:INSTRUMENT CLUSTER/PANEL``). 본 loader 는 이를:
 
-    - auto.components 에 level=4 module 로 등록 (source='nhtsa_recall_taxonomy')
+    - anxg_auto.components 에 level=4 module 로 등록 (source='nhtsa_recall_taxonomy')
     - 첫 ``:`` 앞을 system_code 로 정규화 (예: ``electrical_system``)
     - events_recalls.component_id 를 새로 매핑된 component_id 로 backfill
 
@@ -51,7 +51,7 @@ class LoadStats:
 
 def _iter_categories(cur) -> Iterable[tuple[str, int]]:
     cur.execute("""
-        SELECT component_text, COUNT(*) AS n FROM auto.events_recalls
+        SELECT component_text, COUNT(*) AS n FROM anxg_auto.events_recalls
          WHERE component_text IS NOT NULL AND component_text != ''
          GROUP BY component_text
          ORDER BY n DESC
@@ -64,18 +64,18 @@ def _ensure_component(cur, name: str, *, snapshot_year: int) -> tuple[int, bool]
     """등록 또는 기존 조회. (component_id, inserted) 반환."""
     norm = _norm(name)
     cur.execute("""
-        SELECT component_id FROM auto.components
+        SELECT component_id FROM anxg_auto.components
          WHERE name_norm = %s LIMIT 1
     """, (norm,))
     r = cur.fetchone()
     if r:
         return int(r[0]), False
 
-    cur.execute("SELECT GREATEST(COALESCE(MAX(component_id), 0), 1000) + 1 FROM auto.components")
+    cur.execute("SELECT GREATEST(COALESCE(MAX(component_id), 0), 1000) + 1 FROM anxg_auto.components")
     new_id = int(cur.fetchone()[0])
     sys_code = _system_code(name)
     cur.execute("""
-        INSERT INTO auto.components
+        INSERT INTO anxg_auto.components
             (component_id, canonical_name, name_norm, system_code,
              aliases, wikidata_qid, source, confidence,
              validated_status, notes, level, parent_component_id,
@@ -95,7 +95,7 @@ def load_component_taxonomy(*, dry_run: bool = False) -> LoadStats:
     cur_year = _dt.datetime.now(tz=_dt.timezone.utc).year
 
     with conn.cursor() as cur:
-        # 1) NHTSA 표준 카테고리 → auto.components.
+        # 1) NHTSA 표준 카테고리 → anxg_auto.components.
         cat_to_id: dict[str, int] = {}
         for name, _n in _iter_categories(cur):
             stats.distinct_categories += 1
@@ -125,7 +125,7 @@ def load_component_taxonomy(*, dry_run: bool = False) -> LoadStats:
                 rows,
             )
             cur.execute("""
-                UPDATE auto.events_recalls r
+                UPDATE anxg_auto.events_recalls r
                    SET component_id = t.component_id
                   FROM _tmp_comp_map t
                  WHERE r.component_text = t.component_text

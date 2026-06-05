@@ -1,4 +1,4 @@
-"""(:Module)-[:USES_PROCESS]->(:Process) — 모듈 → 제조 공정유형 추론 적재.
+"""(:Anxg_Module)-[:USES_PROCESS]->(:Anxg_Process) — 모듈 → 제조 공정유형 추론 적재.
 
 ProcessGraph G-6. :Module(BoM L4) 의 system_code 를 캐논 공정 카테고리로 매핑.
 PRODUCED_BY(Part→ProcessStep)의 모듈 수준 대응 — "이 모듈이 어떤 공정으로
@@ -17,7 +17,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
@@ -51,8 +51,8 @@ class LoadStats:
 
 _MERGE_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (m:Module {{id: r.module_id}})
-MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
+MATCH (m:Anxg_Module {{id: r.module_id}})
+MERGE (pr:Anxg_Process {{process_name_norm: r.process_name_norm}})
   ON CREATE SET pr.process_name = r.process_name, pr.source='uses_process_seed',
                 pr.domain='auto', pr.validated_status='validated',
                 pr.snapshot_year=r.snapshot_year, pr.updated_at=datetime()
@@ -84,10 +84,10 @@ def _build_rows(modules: list[dict]) -> list[dict]:
 
 def load(*, dry_run: bool = False) -> LoadStats:
     stats = LoadStats()
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         modules = session.run(
-            "MATCH (m:Module) RETURN m.id AS id, m.system_code AS system_code").data()
+            "MATCH (m:Anxg_Module) RETURN m.id AS id, m.system_code AS system_code").data()
         stats.modules_seen = len(modules)
         rows = _build_rows(modules)
 
@@ -105,7 +105,7 @@ def load(*, dry_run: bool = False) -> LoadStats:
 
         run_batched(session, _MERGE_CYPHER, rows, batch=200)
         res = session.run(
-            "MATCH (:Module)-[e:USES_PROCESS]->(:Process) RETURN count(e) AS n").single()
+            "MATCH (:Anxg_Module)-[e:USES_PROCESS]->(:Anxg_Process) RETURN count(e) AS n").single()
         stats.edges_created = int(res["n"]) if res else 0
 
     log.info("[uses_process] modules=%d USES_PROCESS=%d (candidate)",

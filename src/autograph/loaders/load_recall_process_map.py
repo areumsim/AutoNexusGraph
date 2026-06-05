@@ -1,6 +1,6 @@
-"""(:Recall)-[:CAUSED_BY_PROCESS]->(:Process) — 한글 리콜 결함 → 공정 추론 적재.
+"""(:Anxg_Recall)-[:CAUSED_BY_PROCESS]->(:Anxg_Process) — 한글 리콜 결함 → 공정 추론 적재.
 
-ProcessGraph G-4 / DoD §10.20 cross. KOTSA 한글 리콜(auto.events_recalls,
+ProcessGraph G-4 / DoD §10.20 cross. KOTSA 한글 리콜(anxg_auto.events_recalls,
 source='datagokr_kotsa', 941행) 의 결함 요약에서 **공정 키워드 + 결함 지시어**
 동시출현을 deterministic 매칭 → CAUSED_BY_PROCESS 후보 엣지.
 
@@ -26,7 +26,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
@@ -34,7 +34,7 @@ from ._neo4j_helpers import edge_meta_cypher, run_batched
 
 log = logging.getLogger(__name__)
 
-_SOURCE_ID = "auto.events_recalls(datagokr_kotsa)"
+_SOURCE_ID = "anxg_auto.events_recalls(datagokr_kotsa)"
 _CONF = 0.50            # ontology C default — 후보
 _SNAPSHOT_YEAR = 2026
 
@@ -59,8 +59,8 @@ class LoadStats:
 
 _MERGE_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (rc:Recall {{id: r.recall_id}})
-MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
+MATCH (rc:Anxg_Recall {{id: r.recall_id}})
+MERGE (pr:Anxg_Process {{process_name_norm: r.process_name_norm}})
   ON CREATE SET pr.process_name    = r.process_name,
                 pr.source           = 'recall_process_map',
                 pr.domain           = 'auto',
@@ -104,7 +104,7 @@ def _fetch() -> list[tuple]:
     with conn.cursor() as cur:
         cur.execute("""
             SELECT recall_id, defect_summary
-              FROM auto.events_recalls
+              FROM anxg_auto.events_recalls
              WHERE source = 'datagokr_kotsa' AND defect_summary IS NOT NULL
         """)
         return cur.fetchall()
@@ -130,11 +130,11 @@ def load(*, dry_run: bool = False) -> LoadStats:
         log.warning("[recall_process_map] 매칭 0 — datagokr_kotsa 리콜 적재 확인")
         return stats
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         run_batched(session, _MERGE_CYPHER, rows, batch=300)
         res = session.run(
-            "MATCH (:Recall)-[e:CAUSED_BY_PROCESS]->(:Process) "
+            "MATCH (:Anxg_Recall)-[e:CAUSED_BY_PROCESS]->(:Anxg_Process) "
             "WHERE e.source_type = 'datagokr_recall' RETURN count(e) AS n"
         ).single()
         stats.edges_created = int(res["n"]) if res else 0

@@ -42,9 +42,9 @@ def lookup_vehicle(query: str, *,
                     WHEN m.name ILIKE '%%' || %(q)s || '%%' THEN 60
                     WHEN mm.name ILIKE '%%' || %(q)s || '%%' THEN 40
                     ELSE 0 END AS score
-          FROM auto.master_vehicle_variants v
-          JOIN auto.master_vehicle_models m ON v.model_id = m.model_id
-          JOIN auto.master_manufacturers mm ON m.manufacturer_id = mm.manufacturer_id
+          FROM anxg_auto.master_vehicle_variants v
+          JOIN anxg_auto.master_vehicle_models m ON v.model_id = m.model_id
+          JOIN anxg_auto.master_manufacturers mm ON m.manufacturer_id = mm.manufacturer_id
          WHERE (m.name ILIKE '%%' || %(q)s || '%%'
                 OR mm.name ILIKE '%%' || %(q)s || '%%')
            AND (%(year)s::int IS NULL OR v.model_year = %(year)s::int)
@@ -60,9 +60,9 @@ def get_vehicle_info(variant_id: int) -> dict | None:
                m.model_id, m.name AS model_name, m.market, m.wikidata_qid,
                mm.manufacturer_id, mm.name AS mfr_name,
                mm.country, mm.wikidata_qid AS mfr_wikidata_qid
-          FROM auto.master_vehicle_variants v
-          JOIN auto.master_vehicle_models m ON v.model_id = m.model_id
-          JOIN auto.master_manufacturers mm ON m.manufacturer_id = mm.manufacturer_id
+          FROM anxg_auto.master_vehicle_variants v
+          JOIN anxg_auto.master_vehicle_models m ON v.model_id = m.model_id
+          JOIN anxg_auto.master_manufacturers mm ON m.manufacturer_id = mm.manufacturer_id
          WHERE v.variant_id = %s
     """, (variant_id,))
 
@@ -78,14 +78,14 @@ def get_spec(variant_id: int, measure_key: str | None = None) -> list[dict]:
         return query_dicts("""
             SELECT measure_key, value_num, value_text, unit, source,
                    confidence, validated_status, snapshot_year
-              FROM auto.spec_measurements
+              FROM anxg_auto.spec_measurements
              WHERE variant_id = %s AND measure_key = %s
              ORDER BY confidence DESC, snapshot_year DESC NULLS LAST
         """, (variant_id, measure_key))
     return query_dicts("""
         SELECT measure_key, value_num, value_text, unit, source,
                confidence, validated_status, snapshot_year
-          FROM auto.spec_measurements
+          FROM anxg_auto.spec_measurements
          WHERE variant_id = %s
          ORDER BY measure_key, confidence DESC
     """, (variant_id,))
@@ -102,7 +102,7 @@ def compare_vehicles(variant_ids: list[int],
         SELECT DISTINCT ON (variant_id, measure_key)
                variant_id, measure_key, value_num, value_text, unit,
                source, confidence
-          FROM auto.spec_measurements
+          FROM anxg_auto.spec_measurements
          WHERE variant_id = ANY(%s) AND measure_key = ANY(%s)
          ORDER BY variant_id, measure_key, confidence DESC, snapshot_year DESC NULLS LAST
     """, (variant_ids, measure_keys))
@@ -112,13 +112,13 @@ def compare_vehicles(variant_ids: list[int],
 def get_safety_rating(variant_id: int) -> dict | None:
     """NCAP / IIHS 안전 등급.
 
-    ``auto.spec_measurements`` 의 'safety.*' 키를 모두 반환. NHTSA NCAP 은
+    ``anxg_auto.spec_measurements`` 의 'safety.*' 키를 모두 반환. NHTSA NCAP 은
     `load_auto_safety` 가 'safety.ncap.*' / 'safety.feature.*' 로 채운다.
     KNCAP / Euro NCAP / IIHS 는 별도 ingest 모듈이 추가되면 같은 prefix 로 합류.
     """
     rows = query_dicts("""
         SELECT measure_key, value_num, value_text, unit, source, confidence
-          FROM auto.spec_measurements
+          FROM anxg_auto.spec_measurements
          WHERE variant_id = %s AND measure_key LIKE 'safety.%%'
          ORDER BY measure_key
     """, (variant_id,))
@@ -131,7 +131,7 @@ def get_safety_rating(variant_id: int) -> dict | None:
 def get_plant_capacity(corp_code: str,
                        plant_code: str | None = None,
                        year: int | None = None) -> list[dict]:
-    """auto.plant_capacity 조회 — 모든 인자 optional 결합.
+    """anxg_auto.plant_capacity 조회 — 모든 인자 optional 결합.
 
     원천: DART 사업보고서 "III. 생산 및 설비 — (1) 생산능력" 표.
     confidence 0.80 (B 등급 — DART 공식 공시).
@@ -148,7 +148,7 @@ def get_plant_capacity(corp_code: str,
         SELECT capacity_id, corp_code, business_division, plant_code, plant_region,
                snapshot_year, capacity_units, unit, source_rcept_no,
                confidence_score, validated_status
-          FROM auto.plant_capacity
+          FROM anxg_auto.plant_capacity
          WHERE corp_code = %(cc)s
            AND (%(plant)s::text IS NULL OR plant_code = %(plant)s)
            AND (%(year)s::int  IS NULL OR snapshot_year = %(year)s::int)
@@ -159,7 +159,7 @@ def get_plant_capacity(corp_code: str,
 
 def get_oem_production(corp_code: str,
                        year: int | None = None) -> list[dict]:
-    """auto.plant_production — OEM 의 모든 공장 실적, optional year.
+    """anxg_auto.plant_production — OEM 의 모든 공장 실적, optional year.
 
     원천: DART 사업보고서 "III. 생산 및 설비 — (2) 생산실적" 표.
     """
@@ -170,7 +170,7 @@ def get_oem_production(corp_code: str,
         SELECT production_id, corp_code, business_division, plant_code, plant_region,
                snapshot_year, actual_units, unit, source_rcept_no,
                confidence_score, validated_status
-          FROM auto.plant_production
+          FROM anxg_auto.plant_production
          WHERE corp_code = %(cc)s
            AND (%(year)s::int IS NULL OR snapshot_year = %(year)s::int)
          ORDER BY snapshot_year DESC NULLS LAST, plant_code
@@ -191,7 +191,7 @@ def list_plants_by_oem(corp_code: str) -> list[dict]:
             SELECT plant_code, plant_region,
                    MAX(snapshot_year)  AS latest_year,
                    MAX(capacity_units) AS peak_capacity
-              FROM auto.plant_capacity
+              FROM anxg_auto.plant_capacity
              WHERE corp_code = %(cc)s AND plant_code <> ''
              GROUP BY plant_code, plant_region
         ),
@@ -199,7 +199,7 @@ def list_plants_by_oem(corp_code: str) -> list[dict]:
             SELECT plant_code, plant_region,
                    MAX(snapshot_year) AS latest_year,
                    MAX(actual_units)  AS peak_actual
-              FROM auto.plant_production
+              FROM anxg_auto.plant_production
              WHERE corp_code = %(cc)s AND plant_code <> ''
              GROUP BY plant_code, plant_region
         )
@@ -220,7 +220,7 @@ def list_plants_by_oem(corp_code: str) -> list[dict]:
 
 
 def search_processes(query: str, limit: int = 20) -> list[dict]:
-    """auto.processes 의 process_name_norm ILIKE 검색 (산단공 합성) — **row 단위**.
+    """anxg_auto.processes 의 process_name_norm ILIKE 검색 (산단공 합성) — **row 단위**.
 
     동일 공정명이 여러 factory_manage_no / process_order 조합에 반복되면 row 모두 반환
     (≈550 행 상한). cf. ``autograph.tools.process.lookup_process`` 는 distinct
@@ -237,7 +237,7 @@ def search_processes(query: str, limit: int = 20) -> list[dict]:
                process_map_name, process_order, process_name,
                LEFT(process_desc, 200) AS process_desc_preview,
                confidence_score, validated_status
-          FROM auto.processes
+          FROM anxg_auto.processes
          WHERE process_name_norm ILIKE '%%' || %(q)s || '%%'
             OR process_map_name  ILIKE '%%' || %(q)s || '%%'
          ORDER BY process_order, process_name
@@ -247,7 +247,7 @@ def search_processes(query: str, limit: int = 20) -> list[dict]:
 
 def get_macro_industry(year: int | None = None,
                        month: int | None = None) -> list[dict]:
-    """auto.macro_industry_monthly — 월 단위 내수·수출 매크로 (KAMA 15051118).
+    """anxg_auto.macro_industry_monthly — 월 단위 내수·수출 매크로 (KAMA 15051118).
 
     인자 모두 optional. 둘 다 미지정 시 최근 24 개월. confidence 0.95 (A 등급).
     """
@@ -256,7 +256,7 @@ def get_macro_industry(year: int | None = None,
             SELECT snapshot_year, snapshot_month,
                    domestic_sales, export_units, export_value_usd_k,
                    source, confidence_score
-              FROM auto.macro_industry_monthly
+              FROM anxg_auto.macro_industry_monthly
              ORDER BY snapshot_year DESC, snapshot_month DESC
              LIMIT 24
         """)
@@ -264,7 +264,7 @@ def get_macro_industry(year: int | None = None,
         SELECT snapshot_year, snapshot_month,
                domestic_sales, export_units, export_value_usd_k,
                source, confidence_score
-          FROM auto.macro_industry_monthly
+          FROM anxg_auto.macro_industry_monthly
          WHERE (%(year)s::int  IS NULL OR snapshot_year  = %(year)s::int)
            AND (%(month)s::int IS NULL OR snapshot_month = %(month)s::int)
          ORDER BY snapshot_year DESC, snapshot_month DESC
@@ -273,7 +273,7 @@ def get_macro_industry(year: int | None = None,
 
 
 def get_macro_production(year: int | None = None) -> list[dict]:
-    """auto.macro_production_yearly — 연 단위 한국·세계 생산량 (KAMA 15051116).
+    """anxg_auto.macro_production_yearly — 연 단위 한국·세계 생산량 (KAMA 15051116).
 
     year 미지정 시 전체 (21 행). confidence 0.95 (A 등급).
     """
@@ -281,13 +281,13 @@ def get_macro_production(year: int | None = None) -> list[dict]:
         return query_dicts("""
             SELECT snapshot_year, domestic_units_k, global_units_k,
                    domestic_share_pct, source, confidence_score
-              FROM auto.macro_production_yearly
+              FROM anxg_auto.macro_production_yearly
              ORDER BY snapshot_year DESC
         """)
     return query_dicts("""
         SELECT snapshot_year, domestic_units_k, global_units_k,
                domestic_share_pct, source, confidence_score
-          FROM auto.macro_production_yearly
+          FROM anxg_auto.macro_production_yearly
          WHERE snapshot_year = %(year)s::int
     """, {"year": year})
 

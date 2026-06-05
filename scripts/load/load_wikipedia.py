@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Wikipedia 적재:
-  - wiki.wikipedia_pages : title / page_id / extract / infobox
-  - master.company_aliases : Wikipedia title 자체를 alias 로
+  - anxg_wiki.wikipedia_pages : title / page_id / extract / infobox
+  - anxg_master.company_aliases : Wikipedia title 자체를 alias 로
   - Neo4j Company 속성 : wikipedia_title_ko, wikipedia_url
 
-본문 HTML 은 별도 청킹 단계 (Step 10) 에서 vec.chunks 로 적재.
+본문 HTML 은 별도 청킹 단계 (Step 10) 에서 anxg_vec.chunks 로 적재.
 이 loader 는 메타데이터만 처리 — 작고 빠름.
 
 사용:
@@ -27,7 +27,7 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 
 UPSERT_PAGE = """
-INSERT INTO wiki.wikipedia_pages
+INSERT INTO anxg_wiki.wikipedia_pages
   (corp_code, lang, title, page_id, revision_id, extract, infobox, last_modified)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (corp_code, lang) DO UPDATE
@@ -41,14 +41,14 @@ ON CONFLICT (corp_code, lang) DO UPDATE
 """
 
 UPSERT_ALIAS = """
-INSERT INTO master.company_aliases (alias, alias_norm, corp_code, source, confidence)
+INSERT INTO anxg_master.company_aliases (alias, alias_norm, corp_code, source, confidence)
 VALUES (%s, %s, %s, %s, %s)
 ON CONFLICT (alias_norm, corp_code, source) DO UPDATE
    SET confidence = EXCLUDED.confidence
 """
 
 UPSERT_EM = """
-INSERT INTO master.entity_map (corp_code, id_type, id_value, source, confidence, resolved_by)
+INSERT INTO anxg_master.entity_map (corp_code, id_type, id_value, source, confidence, resolved_by)
 VALUES (%s, %s, %s, 'wikipedia', 0.95, 'rule')
 ON CONFLICT (corp_code, id_type, id_value) DO UPDATE
    SET resolved_at = now()
@@ -56,7 +56,7 @@ ON CONFLICT (corp_code, id_type, id_value) DO UPDATE
 
 NEO4J_UPSERT = """
 UNWIND $rows AS r
-MATCH (c:Company {corp_code: r.corp_code})
+MATCH (c:Anxg_Company {corp_code: r.corp_code})
 SET c.wikipedia_title_ko = r.title,
     c.wikipedia_url_ko   = r.url
 """
@@ -140,18 +140,18 @@ def main() -> int:
             cur.executemany(UPSERT_EM, em_rows[i:i + BATCH])
 
     if not args.no_neo4j and neo4j_rows:
-        from autonexusgraph.db.neo4j import get_driver
-        with get_driver().session() as session:
+        from autonexusgraph.db.neo4j import get_session
+        with get_session() as session:
             for i in range(0, len(neo4j_rows), 200):
                 session.run(NEO4J_UPSERT, rows=neo4j_rows[i:i + 200])
 
     # 검증
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT lang, count(*) FROM wiki.wikipedia_pages GROUP BY lang")
+        cur.execute("SELECT lang, count(*) FROM anxg_wiki.wikipedia_pages GROUP BY lang")
         for r in cur.fetchall():
             print(f"[wikipedia_pages] {r[0]}: {r[1]:,}")
         cur.execute("""
-            SELECT count(*) FROM master.entity_map WHERE id_type='wikipedia_title'
+            SELECT count(*) FROM anxg_master.entity_map WHERE id_type='wikipedia_title'
         """)
         print(f"[entity_map] wikipedia_title: {cur.fetchone()[0]:,}")
     return 0

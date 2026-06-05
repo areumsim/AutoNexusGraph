@@ -5,9 +5,9 @@
 
 원천 (사용자 직접 다운, 키 불필요):
     data/raw/datagokr/산업통상부_국내 및 세계 자동차 생산량(한국자동차산업협회)_*.csv
-        → auto.macro_production_yearly (snapshot_year PK)
+        → anxg_auto.macro_production_yearly (snapshot_year PK)
     data/raw/datagokr/산업통상부_전체 자동차 산업 현황_*.csv
-        → auto.macro_industry_monthly  (snapshot_year, snapshot_month PK)
+        → anxg_auto.macro_industry_monthly  (snapshot_year, snapshot_month PK)
 
 PRD §3.5: KAMA / 산업통상자원부 공식 = A 등급, confidence 0.950.
 
@@ -121,7 +121,7 @@ def _parse_monthly_row(row: dict
 def _upsert_yearly(cur, *, year: int, domestic_k: int | None,
                    global_k: int | None, raw_row: dict) -> bool:
     cur.execute("""
-        INSERT INTO auto.macro_production_yearly
+        INSERT INTO anxg_auto.macro_production_yearly
           (snapshot_year, domestic_units_k, global_units_k, raw)
         VALUES (%s, %s, %s, %s::jsonb)
         ON CONFLICT (snapshot_year) DO UPDATE SET
@@ -139,7 +139,7 @@ def _upsert_monthly(cur, *, year: int, month: int,
                     domestic: int | None, export_u: int | None,
                     export_v: int | None, raw_row: dict) -> bool:
     cur.execute("""
-        INSERT INTO auto.macro_industry_monthly
+        INSERT INTO anxg_auto.macro_industry_monthly
           (snapshot_year, snapshot_month,
            domestic_sales, export_units, export_value_usd_k, raw)
         VALUES (%s, %s, %s, %s, %s, %s::jsonb)

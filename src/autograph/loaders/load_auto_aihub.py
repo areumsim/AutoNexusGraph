@@ -1,4 +1,4 @@
-"""AI Hub 라벨 → auto.components(level=4) + vec.chunks + Neo4j CONTAINS_COMPONENT.
+"""AI Hub 라벨 → anxg_auto.components(level=4) + anxg_vec.chunks + Neo4j CONTAINS_COMPONENT.
 
 대상 데이터셋:
 - 71347 자율주행 고장진단 — 모터-감속기 + 배터리 결함 분류 (IONIQ/KONA/NIRO)
@@ -8,12 +8,12 @@
 (차량_모델, 컴포넌트, 결함_클래스, 라벨_수) 통계로 변환. 통계는 **이벤트 (recalls/
 complaints) 가 아니므로** `auto.events_*` 에 적재하지 않고 다음 3 곳에 분산:
 
-1. `auto.components` (level=4 Module) — Motor-Reducer / Battery / 도어 / 범퍼 / ... (UPSERT)
-2. `vec.chunks` — `(model × module)` 1 chunk 의 검색 가능 텍스트 요약
-3. Neo4j — `(:VehicleModel)-[:CONTAINS_COMPONENT {source,confidence,validated_status,snapshot_year}]->(:Module)`
+1. `anxg_auto.components` (level=4 Module) — Motor-Reducer / Battery / 도어 / 범퍼 / ... (UPSERT)
+2. `anxg_vec.chunks` — `(model × module)` 1 chunk 의 검색 가능 텍스트 요약
+3. Neo4j — `(:Anxg_VehicleModel)-[:CONTAINS_COMPONENT {source,confidence,validated_status,snapshot_year}]->(:Anxg_Module)`
 
 적재 규약:
-- :Module 노드 MERGE key 는 ``{id: ...}`` (auto.components.component_id) — neo4j_init 제약과 일치.
+- :Module 노드 MERGE key 는 ``{id: ...}`` (anxg_auto.components.component_id) — neo4j_init 제약과 일치.
 - 공용 ``get_driver()`` + UNWIND $rows 배치 적재.
 
 CLI:
@@ -197,7 +197,7 @@ def aggregate_578(root: Path) -> dict[str, dict[str, int]]:
 def _upsert_component(cur, *, canonical_name: str, system_code: str,
                       aliases: list[str], source: str,
                       level: int = 4) -> int:
-    """auto.components UPSERT (default level=4 Module).
+    """anxg_auto.components UPSERT (default level=4 Module).
 
     system_code 는 canonical_system_code() 로 SCREAMING_SNAKE_CASE 정규화 후 저장 —
     AI-Hub raw 'powertrain' 같은 표기를 'POWERTRAIN' 로 통일해 :System 노드와 매칭.
@@ -205,15 +205,15 @@ def _upsert_component(cur, *, canonical_name: str, system_code: str,
     name_norm = normalize_corp_name(canonical_name)
     sys_code  = canonical_system_code(system_code)
     cur.execute("""
-        INSERT INTO auto.components
+        INSERT INTO anxg_auto.components
           (canonical_name, name_norm, system_code, aliases, source,
            confidence, validated_status, level, snapshot_year)
         VALUES (%s, %s, %s, %s, %s, 1.000, 'verified', %s,
                 EXTRACT(YEAR FROM now())::SMALLINT)
         ON CONFLICT (canonical_name, system_code) DO UPDATE SET
           aliases = (SELECT array_agg(DISTINCT a) FROM unnest(
-                       auto.components.aliases || EXCLUDED.aliases) a),
-          level = COALESCE(auto.components.level, EXCLUDED.level)
+                       anxg_auto.components.aliases || EXCLUDED.aliases) a),
+          level = COALESCE(anxg_auto.components.level, EXCLUDED.level)
         RETURNING component_id
     """, (canonical_name, name_norm, sys_code, aliases, source, level))
     return cur.fetchone()[0]
@@ -249,9 +249,9 @@ def _summary_text_578(part_name: str, class_counts: dict[str, int]) -> str:
 def _upsert_chunk(cur, *, uniq: str, source: str, text: str,
                   manufacturer_id: int | None, model_id: int | None,
                   variant_id: int | None, metadata: dict) -> str:
-    """vec.chunks UPSERT — source + metadata.uniq 로 dedup. 'inserted' / 'updated'."""
+    """anxg_vec.chunks UPSERT — source + metadata.uniq 로 dedup. 'inserted' / 'updated'."""
     cur.execute("""
-        SELECT id, text FROM vec.chunks
+        SELECT id, text FROM anxg_vec.chunks
          WHERE source = %s AND metadata->>'uniq' = %s
          LIMIT 1
     """, (source, uniq))
@@ -260,7 +260,7 @@ def _upsert_chunk(cur, *, uniq: str, source: str, text: str,
         cid, ex_text = r
         if ex_text != text:
             cur.execute("""
-                UPDATE vec.chunks SET text=%s, token_count=%s,
+                UPDATE anxg_vec.chunks SET text=%s, token_count=%s,
                        manufacturer_id=COALESCE(manufacturer_id, %s),
                        model_id=COALESCE(model_id, %s),
                        variant_id=COALESCE(variant_id, %s),
@@ -273,7 +273,7 @@ def _upsert_chunk(cur, *, uniq: str, source: str, text: str,
             return "updated"
         return "skipped"
     cur.execute("""
-        INSERT INTO vec.chunks
+        INSERT INTO anxg_vec.chunks
           (corp_code, rcept_no, section, chunk_idx, text, token_count,
            metadata, source, manufacturer_id, model_id, variant_id)
         VALUES (NULL, NULL, %s, 0, %s, %s, %s::jsonb, %s, %s, %s, %s)
@@ -293,8 +293,8 @@ def _resolve_model(cur, model_name: str) -> tuple[int | None, int | None, str | 
     norm = normalize_corp_name(model_name)
     cur.execute("""
         SELECT mm.manufacturer_id, m.model_id, m.name
-          FROM auto.master_vehicle_models m
-          JOIN auto.master_manufacturers mm USING (manufacturer_id)
+          FROM anxg_auto.master_vehicle_models m
+          JOIN anxg_auto.master_manufacturers mm USING (manufacturer_id)
          WHERE m.name_norm = %s OR m.name_norm LIKE %s
          ORDER BY m.name_norm = %s DESC, length(m.name_norm) ASC
          LIMIT 1
@@ -309,13 +309,13 @@ def _resolve_model(cur, model_name: str) -> tuple[int | None, int | None, str | 
 # 여러 모델일 수 있다 (그래서 MERGE rel 가 모델당 1 엣지를 생성).
 _MERGE_AIHUB_EDGES = """
 UNWIND $rows AS r
-MERGE (c:Module {id: r.component_id})
+MERGE (c:Anxg_Module {id: r.component_id})
   ON CREATE SET c.name = r.name, c.system_code = r.system_code,
                 c.source = r.source
   ON MATCH  SET c.name = coalesce(c.name, r.name),
                 c.system_code = coalesce(c.system_code, r.system_code)
 WITH c, r
-OPTIONAL MATCH (m:VehicleModel)
+OPTIONAL MATCH (m:Anxg_VehicleModel)
  WHERE toLower(m.name) = toLower(r.model_name)
     OR toLower(m.name) STARTS WITH toLower(r.model_name)
 WITH c, r, m WHERE m IS NOT NULL
@@ -343,7 +343,7 @@ def _neo4j_merge_component_edges(rows: list[dict], *, batch: int = 200) -> int:
         return 0
     driver = get_driver()
     n = 0
-    with driver.session() as s:
+    with driver.session(database=get_settings().neo4j_database or None) as s:
         for i in range(0, len(rows), batch):
             chunk = rows[i:i + batch]
             result = s.run(_MERGE_AIHUB_EDGES, rows=chunk)
@@ -397,7 +397,7 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
                 stats.errors.append(f"71347 component {canonical}: {e}")
                 continue
 
-            # 2) (model, component) 별 vec.chunks 1건
+            # 2) (model, component) 별 anxg_vec.chunks 1건
             mfr_id, model_id, resolved_name = _resolve_model(cur, model)
             text = _summary_text_71347(model, system_code, korean, classes)
             uniq = f"aihub_71347::{model}::{canonical}"

@@ -1,4 +1,4 @@
-"""(:ProcessStep)-[:PERFORMED_AT]->(:Plant) 회사 귀속 공정 시드 적재.
+"""(:Anxg_ProcessStep)-[:PERFORMED_AT]->(:Anxg_Plant) 회사 귀속 공정 시드 적재.
 
 source: ``ontology/auto/performed_at_seed.yaml`` — 한국 OEM 완성차/파워트레인
 공장의 4 대 핵심공정(프레스/차체/도장/의장) + 파워트레인 매핑. 공개 자료 기반
@@ -10,10 +10,10 @@ ProcessGraph DoD #19 (회사 귀속 인스턴스 ≥ 30) 의 **source allowlist 
 오염시키지 않는다.
 
 생성:
-    (:Process {process_name_norm})              캐논 공정유형 (synthetic 사전과 분리)
-    (:ProcessStep {step_id='seed_<plant>_<proc>'})  회사 귀속 인스턴스
-    (:ProcessStep)-[:INSTANTIATES]->(:Process)
-    (:ProcessStep)-[:PERFORMED_AT]->(:Plant {code})  ★ 회사 귀속 (7키 메타)
+    (:Anxg_Process {process_name_norm})              캐논 공정유형 (synthetic 사전과 분리)
+    (:Anxg_ProcessStep {step_id='seed_<plant>_<proc>'})  회사 귀속 인스턴스
+    (:Anxg_ProcessStep)-[:INSTANTIATES]->(:Anxg_Process)
+    (:Anxg_ProcessStep)-[:PERFORMED_AT]->(:Anxg_Plant {code})  ★ 회사 귀속 (7키 메타)
 
 선행 조건:
     ``make load-auto-seed-standards-plants`` — :Plant 노드(code) 적재.
@@ -32,7 +32,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 from ..ontology import load_performed_at_seed
 from ._neo4j_helpers import edge_meta_cypher, run_batched
@@ -62,8 +62,8 @@ class LoadStats:
 # Plant 부재 시 MATCH 실패 → 해당 row 전체 skip (orphan step 미생성).
 _MERGE_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (pl:Plant {{code: r.plant_code}})
-MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
+MATCH (pl:Anxg_Plant {{code: r.plant_code}})
+MERGE (pr:Anxg_Process {{process_name_norm: r.process_name_norm}})
   ON CREATE SET pr.process_name     = r.process_name,
                 pr.process_desc      = r.process_desc,
                 pr.source            = 'performed_at_seed',
@@ -72,7 +72,7 @@ MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
                 pr.confidence_score  = r.confidence_score,
                 pr.snapshot_year     = r.snapshot_year,
                 pr.updated_at        = datetime()
-MERGE (st:ProcessStep {{step_id: r.step_id}})
+MERGE (st:Anxg_ProcessStep {{step_id: r.step_id}})
   SET st.process_name_norm = r.process_name_norm,
       st.process_name      = r.process_name,
       st.source            = 'performed_at_seed',
@@ -139,13 +139,13 @@ def load(*, dry_run: bool = False) -> LoadStats:
             log.info("  • %s @ %s (%s)", r["process_name"], r["plant_code"], r["manufacturer"])
         return stats
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         # Plant 부재 진단 (code 매칭).
         missing = set()
         for r in rows:
             chk = session.run(
-                "MATCH (p:Plant {code:$c}) RETURN count(p) AS n", c=r["plant_code"]
+                "MATCH (p:Anxg_Plant {code:$c}) RETURN count(p) AS n", c=r["plant_code"]
             ).single()
             if not chk or int(chk["n"]) == 0:
                 missing.add(r["plant_code"])
@@ -154,7 +154,7 @@ def load(*, dry_run: bool = False) -> LoadStats:
         run_batched(session, _MERGE_CYPHER, rows, batch=200)
         # 실제 적재된 PERFORMED_AT 엣지 수 (멱등 재실행 정합).
         res = session.run(
-            "MATCH (:ProcessStep)-[e:PERFORMED_AT]->(:Plant) "
+            "MATCH (:Anxg_ProcessStep)-[e:PERFORMED_AT]->(:Anxg_Plant) "
             "WHERE e.source_id = $sid RETURN count(e) AS n", sid=_SOURCE_ID
         ).single()
         stats.edges_created = int(res["n"]) if res else 0

@@ -1,9 +1,9 @@
-"""auto.components Part(L5) 적재 — NHTSA depth≥3 재분류 + manual seed (PR-P2-A 옵션 AC).
+"""anxg_auto.components Part(L5) 적재 — NHTSA depth≥3 재분류 + manual seed (PR-P2-A 옵션 AC).
 
 ProcessGraph 격상 #2 — BoM L5 격상. 현재 :Part 0 → ~46 (NHTSA 31 자동 + manual seed 15).
 
 옵션 AC (사용자 결정 2026-06-02):
-1. **NHTSA depth≥3 자동 재분류** (31 row): auto.components.canonical_name 의 콜론 깊이
+1. **NHTSA depth≥3 자동 재분류** (31 row): anxg_auto.components.canonical_name 의 콜론 깊이
    ≥3 인 level=4 row 를 level=5 로 UPDATE + parent_component_id = parent prefix 매핑.
    예 ``AIR BAGS:FRONTAL:DRIVER SIDE:INFLATOR MODULE`` (depth=3) → level=5,
    parent_component_id = ``AIR BAGS:FRONTAL:DRIVER SIDE`` (depth=2) 의 component_id.
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import yaml
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
@@ -50,18 +50,18 @@ _SQL_PROMOTE_DEPTH3 = """
 WITH candidates AS (
   SELECT component_id, canonical_name, system_code,
          regexp_replace(canonical_name, ':[^:]+$', '') AS parent_name
-    FROM auto.components
+    FROM anxg_auto.components
    WHERE level = 4
      AND (length(canonical_name) - length(replace(canonical_name, ':', ''))) >= 3
 ),
 matched AS (
   SELECT c.component_id, p.component_id AS parent_id
     FROM candidates c
-    LEFT JOIN auto.components p
+    LEFT JOIN anxg_auto.components p
       ON p.canonical_name = c.parent_name
      AND p.system_code   = c.system_code
 )
-UPDATE auto.components ac
+UPDATE anxg_auto.components ac
    SET level = 5,
        parent_component_id = m.parent_id
   FROM matched m
@@ -73,7 +73,7 @@ RETURNING ac.component_id, ac.canonical_name, ac.parent_component_id
 
 _SQL_FIND_PARENT = """
 SELECT component_id
-  FROM auto.components
+  FROM anxg_auto.components
  WHERE canonical_name = %s
    AND level = 4
  LIMIT 1
@@ -81,7 +81,7 @@ SELECT component_id
 
 
 _SQL_INSERT_SEED = """
-INSERT INTO auto.components (
+INSERT INTO anxg_auto.components (
   canonical_name, name_norm, system_code, aliases, wikidata_qid,
   source, confidence, validated_status, level, parent_component_id, snapshot_year
 ) VALUES (
@@ -148,15 +148,15 @@ def _insert_seed(cur, seed: list[dict], dry_run: bool
 
 _CY_SWAP_LABEL = """
 UNWIND $ids AS id
-MATCH (n:Module {id: id})
-REMOVE n:Module
-SET   n:Part,
+MATCH (n:Anxg_Module {id: id})
+REMOVE n:Anxg_Module
+SET   n:Anxg_Part,
       n.level = 5
 """
 
 _CY_MERGE_PART = """
 UNWIND $rows AS r
-MERGE (n:Part {id: r.id})
+MERGE (n:Anxg_Part {id: r.id})
 SET   n.name           = r.name,
       n.name_norm      = r.name_norm,
       n.system_code    = r.system_code,
@@ -172,8 +172,8 @@ SET   n.name           = r.name,
 
 _CY_CONTAINED_IN = f"""
 UNWIND $rows AS r
-MATCH (p:Part   {{id: r.part_id}})
-MATCH (m:Module {{id: r.module_id}})
+MATCH (p:Anxg_Part   {{id: r.part_id}})
+MATCH (m:Anxg_Module {{id: r.module_id}})
 MERGE (p)-[rel:CONTAINED_IN]->(m)
 SET {edge_meta_cypher('rel')}
 """
@@ -253,8 +253,8 @@ def run(*, dry_run: bool = False, batch: int = 200) -> dict:
                 "swapped": 0, "seed_merged": 0, "contained_in": 0, "dry_run": True}
     pg.commit()
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         neo = _neo4j_apply(session, promoted, seed_rows, seed_yaml, batch=batch)
 
     result = {

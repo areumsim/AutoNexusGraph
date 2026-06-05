@@ -33,7 +33,7 @@ def load_auto_prompt() -> dict[str, Any]:
 
 
 class AutoRelationExtractor(BaseExtractor):
-    """vec.chunks (자동차) → SUPPLIED_BY / RECALL_OF 관계 후보."""
+    """anxg_vec.chunks (자동차) → SUPPLIED_BY / RECALL_OF 관계 후보."""
 
     name = "auto_relation_extractor"
     version = "p3-auto-v1"

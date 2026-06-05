@@ -1,4 +1,4 @@
-"""OEM IR/뉴스룸 raw → ``auto.events_oem_news`` UPSERT.
+"""OEM IR/뉴스룸 raw → ``anxg_auto.events_oem_news`` UPSERT.
 
 원본 위치:
     data/raw/auto/oem_ir/<oem>/_meta.jsonl              — 메타 (URL, title, ...)
@@ -105,7 +105,7 @@ def _coerce_snapshot_year(published_date: str | None) -> int | None:
 def _upsert_row(cur, *, oem: str, meta: dict, body_text: str | None) -> bool:
     """RETURN is_new."""
     cur.execute("""
-        INSERT INTO auto.events_oem_news
+        INSERT INTO anxg_auto.events_oem_news
           (oem, oem_corp_code, url, title, published_date, section,
            body_text, body_html_path, source, snapshot_year,
            license_tier, raw)
@@ -115,12 +115,12 @@ def _upsert_row(cur, *, oem: str, meta: dict, body_text: str | None) -> bool:
         ON CONFLICT (oem, url) DO UPDATE SET
           title          = EXCLUDED.title,
           published_date = COALESCE(EXCLUDED.published_date,
-                                     auto.events_oem_news.published_date),
+                                     anxg_auto.events_oem_news.published_date),
           section        = EXCLUDED.section,
           body_text      = EXCLUDED.body_text,
           body_html_path = EXCLUDED.body_html_path,
           snapshot_year  = COALESCE(EXCLUDED.snapshot_year,
-                                     auto.events_oem_news.snapshot_year),
+                                     anxg_auto.events_oem_news.snapshot_year),
           license_tier   = EXCLUDED.license_tier,
           raw            = EXCLUDED.raw,
           updated_at     = now()

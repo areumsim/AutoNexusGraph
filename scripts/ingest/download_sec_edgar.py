@@ -2,7 +2,7 @@
 """SEC EDGAR — 한국 ADR/외국법인의 SEC 공시.
 
 대상 선정:
-- master.entity_map 에 id_type='cik' 이 있는 회사 (Wikidata 수집 시 P5531 매핑됨)
+- anxg_master.entity_map 에 id_type='cik' 이 있는 회사 (Wikidata 수집 시 P5531 매핑됨)
 - 없으면 manual CIK 리스트도 인자로 전달 가능
 
 저장:
@@ -33,8 +33,8 @@ from autonexusgraph.ingestion.sec_client import SecEdgarClient
 
 SELECT_CIK = """
 SELECT em.corp_code, em.id_value AS cik, c.corp_name
-  FROM master.entity_map em
-  JOIN master.companies c ON c.corp_code = em.corp_code
+  FROM anxg_master.entity_map em
+  JOIN anxg_master.companies c ON c.corp_code = em.corp_code
  WHERE em.id_type = 'cik' AND c.is_active = TRUE
 """
 

@@ -1,4 +1,4 @@
-"""(:Standard) + (:Plant) 시드 적재.
+"""(:Anxg_Standard) + (:Anxg_Plant) 시드 적재.
 
 본 PR 의 1차 source 는 ontology/auto/standards.yaml + plants.yaml. 즉시 사용 가능한
 ~22 표준 + ~18 공장 노드를 그래프에 노출. 차량↔표준 (COMPLIES_WITH / SAFETY_RATED_BY)
@@ -7,7 +7,7 @@
 본 모듈이 만드는 것:
   • :Standard {code, name, region, agency, url}
   • :Plant {code, name, country, city, wikidata_qid}
-  • (:Manufacturer)-[:OWNS_PLANT]->(:Plant) — manufacturer_name 으로 OEM 매칭 시.
+  • (:Anxg_Manufacturer)-[:OWNS_PLANT]->(:Anxg_Plant) — manufacturer_name 으로 OEM 매칭 시.
     (OWNS_PLANT 는 plants.yaml seed 의 자연스러운 산출 — MANUFACTURED_AT 보다 보수적.)
 """
 
@@ -17,7 +17,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ..ontology import load_plants, load_standards, load_system_taxonomy
@@ -39,7 +39,7 @@ class LoadStats:
 # ── System (taxonomy seed) — load_auto_neo4j 도 적재하지만 본 시드 단독 실행 가능. ──
 _MERGE_SYSTEM = """
 UNWIND $rows AS r
-MERGE (s:System {code: r.code})
+MERGE (s:Anxg_System {code: r.code})
 SET   s.name = r.name,
       s.description = r.description,
       s.updated_at = datetime()
@@ -49,7 +49,7 @@ SET   s.name = r.name,
 # ── Standard ────────────────────────────────────────────────────
 _MERGE_STANDARD = """
 UNWIND $rows AS r
-MERGE (s:Standard {code: r.code})
+MERGE (s:Anxg_Standard {code: r.code})
 SET   s.name = r.name,
       s.region = r.region,
       s.agency = r.agency,
@@ -61,14 +61,14 @@ SET   s.name = r.name,
 # ── Plant + OWNS_PLANT 엣지 ─────────────────────────────────────
 _MERGE_PLANT = """
 UNWIND $rows AS r
-MERGE (p:Plant {code: r.code})
+MERGE (p:Anxg_Plant {code: r.code})
 SET   p.name = r.name,
       p.country = r.country,
       p.city = r.city,
       p.wikidata_qid = r.wikidata_qid,
       p.updated_at = datetime()
 WITH p, r
-OPTIONAL MATCH (mm:Manufacturer)
+OPTIONAL MATCH (mm:Anxg_Manufacturer)
   WHERE r.mfr_name_norm IS NOT NULL AND mm.name_norm = r.mfr_name_norm
 WITH p, r, mm WHERE mm IS NOT NULL
 MERGE (mm)-[rel:OWNS_PLANT]->(p)
@@ -108,8 +108,8 @@ def load_seed_standards_plants(*, batch: int = 200) -> LoadStats:
         for r in load_plants()
     ]
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         stats.systems   = run_batched(session, _MERGE_SYSTEM,   systems,   batch=batch)
         stats.standards = run_batched(session, _MERGE_STANDARD, standards, batch=batch)
         stats.plants    = run_batched(session, _MERGE_PLANT,    plants,    batch=batch)

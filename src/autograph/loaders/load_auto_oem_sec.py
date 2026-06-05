@@ -1,4 +1,4 @@
-"""data/raw/auto/sec_oem/CIK*.json → auto.oem_financials_sec + bridge.corp_entity.
+"""data/raw/auto/sec_oem/CIK*.json → anxg_auto.oem_financials_sec + anxg_bridge.corp_entity.
 
 SEC EDGAR Company Facts JSON 구조:
     {
@@ -40,9 +40,9 @@ SEC EDGAR Company Facts JSON 구조:
 이외 vehicle deliveries / production 같은 OEM-specific custom concept 은 taxonomy='tsla-...'
 등으로 등장 — 별도 화이트리스트로 처리 (선택, 본 PR 스코프 아님).
 
-bridge.corp_entity 매핑:
-    - 시드 OEM_SEED 의 (CIK, company_name) → auto.master_manufacturers 의 name 매칭 시도.
-    - 매칭 성공 → bridge.corp_entity row (entity_type='manufacturer', entity_id=mfr_id,
+anxg_bridge.corp_entity 매핑:
+    - 시드 OEM_SEED 의 (CIK, company_name) → anxg_auto.master_manufacturers 의 name 매칭 시도.
+    - 매칭 성공 → anxg_bridge.corp_entity row (entity_type='manufacturer', entity_id=mfr_id,
       sec_cik=CIK, match_method='sec_cik', confidence=1.0, reviewed_status='reviewed').
     - 매칭 실패 → manufacturer 가 PG 에 없으니 bridge row 생성 보류. 사용자가 vpic 적재 후 재실행.
 
@@ -88,7 +88,7 @@ _SEC_MANUAL_MFR_SEED: dict[str, tuple[str, str]] = {
 
 # Tier1 부품사 — manufacturer 가 아니라 supplier 로 bridge.
 # 본 loader 는 OEM facts 도 받고 supplier bridge 도 보강. supplier facts 는
-# auto.oem_financials_sec 에 manufacturer_id=NULL 로 그대로 적재됨 (분석 측에서
+# anxg_auto.oem_financials_sec 에 manufacturer_id=NULL 로 그대로 적재됨 (분석 측에서
 # bridge 통해 supplier 와 join).
 # {sec_cik: supplier_name}.
 _SEC_TIER1_SUPPLIER_SEED: dict[str, str] = {
@@ -148,14 +148,14 @@ def _iter_cik_files() -> Iterable[tuple[str, Path]]:
 
 
 def _ensure_tier1_supplier(cur, *, name: str, cik10: str) -> int:
-    """Tier1 supplier 발급 — auto.master_suppliers 에 없으면 신규.
+    """Tier1 supplier 발급 — anxg_auto.master_suppliers 에 없으면 신규.
 
     supplier_id 시퀀스 충돌 회피를 위해 MAX+1 패턴 사용.
     """
     from autonexusgraph.ingestion._common import normalize_corp_name as _ncn
     norm = _ncn(name)
     cur.execute("""
-        SELECT supplier_id FROM auto.master_suppliers
+        SELECT supplier_id FROM anxg_auto.master_suppliers
          WHERE name_norm = %s LIMIT 1
     """, (norm,))
     r = cur.fetchone()
@@ -164,11 +164,11 @@ def _ensure_tier1_supplier(cur, *, name: str, cik10: str) -> int:
 
     cur.execute("""
         SELECT GREATEST(COALESCE(MAX(supplier_id), 0), 9000000) + 1
-          FROM auto.master_suppliers
+          FROM anxg_auto.master_suppliers
     """)
     new_id = int(cur.fetchone()[0])
     cur.execute("""
-        INSERT INTO auto.master_suppliers
+        INSERT INTO anxg_auto.master_suppliers
             (supplier_id, name, name_norm, country, source, source_ref,
              confidence, validated_status)
         VALUES (%s, %s, %s, NULL, 'manual_sec_cik', %s, 0.95, 'reviewed')
@@ -182,15 +182,15 @@ def _upsert_bridge_supplier(cur, *, supplier_id: int, sec_cik: str,
                               entity_name: str | None) -> bool:
     """Tier1 supplier 의 bridge upsert — entity_type='supplier'."""
     cur.execute("""
-        INSERT INTO bridge.corp_entity
+        INSERT INTO anxg_bridge.corp_entity
           (corp_code, entity_id, entity_type, name, sec_cik,
            match_method, confidence_score, reviewed_status)
         VALUES (NULL, %s, 'supplier', %s, %s,
                 'sec_cik', 1.000, 'reviewed')
         ON CONFLICT (COALESCE(corp_code, ''), entity_type, entity_id) DO UPDATE SET
-          sec_cik           = COALESCE(EXCLUDED.sec_cik, bridge.corp_entity.sec_cik),
-          name              = COALESCE(EXCLUDED.name, bridge.corp_entity.name),
-          confidence_score  = GREATEST(bridge.corp_entity.confidence_score,
+          sec_cik           = COALESCE(EXCLUDED.sec_cik, anxg_bridge.corp_entity.sec_cik),
+          name              = COALESCE(EXCLUDED.name, anxg_bridge.corp_entity.name),
+          confidence_score  = GREATEST(anxg_bridge.corp_entity.confidence_score,
                                        EXCLUDED.confidence_score),
           updated_at        = now()
     """, (str(supplier_id), entity_name, sec_cik))
@@ -207,7 +207,7 @@ def _ensure_manual_manufacturer(cur, *, name: str, country: str | None,
     """
     norm = normalize_corp_name(name)
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
          WHERE name_norm = %s AND source = 'manual_sec_cik' LIMIT 1
     """, (norm,))
     r = cur.fetchone()
@@ -216,11 +216,11 @@ def _ensure_manual_manufacturer(cur, *, name: str, country: str | None,
 
     cur.execute("""
         SELECT GREATEST(COALESCE(MAX(manufacturer_id), 0), 2000000000) + 1
-          FROM auto.master_manufacturers
+          FROM anxg_auto.master_manufacturers
     """)
     new_id = int(cur.fetchone()[0])
     cur.execute("""
-        INSERT INTO auto.master_manufacturers
+        INSERT INTO anxg_auto.master_manufacturers
             (manufacturer_id, name, name_norm, country, source, source_ref,
              confidence, validated_status)
         VALUES (%s, %s, %s, %s, 'manual_sec_cik', %s, 0.95, 'reviewed')
@@ -232,7 +232,7 @@ def _ensure_manual_manufacturer(cur, *, name: str, country: str | None,
 
 def _resolve_manufacturer_id(cur, *, entity_name: str,
                               cik10: str) -> int | None:
-    """SEC entity_name → auto.master_manufacturers.manufacturer_id 매칭.
+    """SEC entity_name → anxg_auto.master_manufacturers.manufacturer_id 매칭.
 
     0) bridge 에 이미 매핑 있으면 사용.
     1) _SEC_CIK_TO_VPIC_MFR_ID alias 매핑.
@@ -244,7 +244,7 @@ def _resolve_manufacturer_id(cur, *, entity_name: str,
     # 0) bridge 에 이미 매핑 있나?
     cur.execute("""
         SELECT entity_id::bigint
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          WHERE sec_cik = %s AND entity_type = 'manufacturer'
          LIMIT 1
     """, (cik10,))
@@ -262,7 +262,7 @@ def _resolve_manufacturer_id(cur, *, entity_name: str,
     # 1) 직접 name_norm 매칭.
     norm = normalize_corp_name(entity_name)
     cur.execute("""
-        SELECT manufacturer_id FROM auto.master_manufacturers
+        SELECT manufacturer_id FROM anxg_auto.master_manufacturers
          WHERE name_norm = %s LIMIT 1
     """, (norm,))
     r = cur.fetchone()
@@ -288,7 +288,7 @@ def _resolve_manufacturer_id(cur, *, entity_name: str,
         if not nc:
             continue
         cur.execute("""
-            SELECT manufacturer_id FROM auto.master_manufacturers
+            SELECT manufacturer_id FROM anxg_auto.master_manufacturers
              WHERE name_norm = %s OR name_norm = %s
              LIMIT 1
         """, (nc, nc.upper()))
@@ -308,21 +308,21 @@ def _resolve_manufacturer_id(cur, *, entity_name: str,
 
 def _upsert_bridge(cur, *, manufacturer_id: int, sec_cik: str,
                    entity_name: str | None) -> bool:
-    """bridge.corp_entity row UPSERT — SEC CIK ↔ manufacturer_id 매핑.
+    """anxg_bridge.corp_entity row UPSERT — SEC CIK ↔ manufacturer_id 매핑.
 
     같은 (corp_code='', entity_type='manufacturer', entity_id) 가 이미 있으면
     sec_cik 컬럼만 보강. 없으면 신규.
     """
     cur.execute("""
-        INSERT INTO bridge.corp_entity
+        INSERT INTO anxg_bridge.corp_entity
           (corp_code, entity_id, entity_type, name, sec_cik,
            match_method, confidence_score, reviewed_status)
         VALUES (NULL, %s, 'manufacturer', %s, %s,
                 'sec_cik', 1.000, 'reviewed')
         ON CONFLICT (COALESCE(corp_code, ''), entity_type, entity_id) DO UPDATE SET
-          sec_cik           = COALESCE(EXCLUDED.sec_cik, bridge.corp_entity.sec_cik),
-          name              = COALESCE(EXCLUDED.name, bridge.corp_entity.name),
-          confidence_score  = GREATEST(bridge.corp_entity.confidence_score,
+          sec_cik           = COALESCE(EXCLUDED.sec_cik, anxg_bridge.corp_entity.sec_cik),
+          name              = COALESCE(EXCLUDED.name, anxg_bridge.corp_entity.name),
+          confidence_score  = GREATEST(anxg_bridge.corp_entity.confidence_score,
                                        EXCLUDED.confidence_score),
           updated_at        = now()
     """, (str(manufacturer_id), entity_name, sec_cik))
@@ -417,7 +417,7 @@ def _process_cik_file(cur, path: Path, stats: LoadStats) -> None:
         cur.execute("SAVEPOINT sp_sec_fact")
         try:
             cur.execute("""
-                INSERT INTO auto.oem_financials_sec
+                INSERT INTO anxg_auto.oem_financials_sec
                   (manufacturer_id, sec_cik, taxonomy, concept, unit,
                    fiscal_year, fiscal_period, period_end, period_start,
                    value, form_type, accession_no, filed_at, raw)
@@ -427,15 +427,15 @@ def _process_cik_file(cur, path: Path, stats: LoadStats) -> None:
                 ON CONFLICT (sec_cik, concept, fiscal_year, fiscal_period, unit, form_type)
                 DO UPDATE SET
                   manufacturer_id = COALESCE(EXCLUDED.manufacturer_id,
-                                              auto.oem_financials_sec.manufacturer_id),
+                                              anxg_auto.oem_financials_sec.manufacturer_id),
                   value           = EXCLUDED.value,
                   period_end      = COALESCE(EXCLUDED.period_end,
-                                              auto.oem_financials_sec.period_end),
+                                              anxg_auto.oem_financials_sec.period_end),
                   period_start    = COALESCE(EXCLUDED.period_start,
-                                              auto.oem_financials_sec.period_start),
+                                              anxg_auto.oem_financials_sec.period_start),
                   accession_no    = EXCLUDED.accession_no,
                   filed_at        = COALESCE(EXCLUDED.filed_at,
-                                              auto.oem_financials_sec.filed_at),
+                                              anxg_auto.oem_financials_sec.filed_at),
                   raw             = EXCLUDED.raw,
                   ingested_at     = now()
                 RETURNING (xmax = 0) AS inserted

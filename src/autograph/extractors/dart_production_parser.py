@@ -1,8 +1,8 @@
 """DART 사업보고서 "III. 사업의 내용 → 생산 및 설비" 섹션 파서.
 
 목적: 한국 상장 자동차 OEM 의 공장(법인)별 **생산능력 / 생산실적 / 가동률** 데이터를
-사업보고서 XML 에서 추출 → ``auto.plant_capacity`` / ``auto.plant_production`` /
-``auto.plant_utilization`` 으로 정형화.
+사업보고서 XML 에서 추출 → ``anxg_auto.plant_capacity`` / ``anxg_auto.plant_production`` /
+``anxg_auto.plant_utilization`` 으로 정형화.
 
 원천: ``data/raw/dart_bulk/corp/<corp_code>/documents/<rcept_no>.zip`` 에 들어있는
 DART XML (``dart4.xsd``). 본 파서는 zip 자체는 다루지 않고 추출된 XML 문자열을

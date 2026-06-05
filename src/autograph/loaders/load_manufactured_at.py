@@ -1,4 +1,4 @@
-"""(:VehicleModel)-[:MANUFACTURED_AT]->(:Plant) seed 적재.
+"""(:Anxg_VehicleModel)-[:MANUFACTURED_AT]->(:Anxg_Plant) seed 적재.
 
 source: ``ontology/auto/manufactured_at_seed.yaml`` — 한국 OEM 모델 + 글로벌 대표
 모델 ~50건의 model↔plant 매핑. 모두 공개 IR / Wikipedia / 회사 홈페이지 기반,
@@ -24,7 +24,7 @@ import datetime as _dt
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ..ontology import load_manufactured_at_seed
@@ -50,9 +50,9 @@ class LoadStats:
 
 _MERGE_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (m:VehicleModel)
+MATCH (m:Anxg_VehicleModel)
 WHERE toLower(replace(coalesce(m.name, ''), ' ', '')) = r.model_norm
-MATCH (p:Plant {{code: r.plant_code}})
+MATCH (p:Anxg_Plant {{code: r.plant_code}})
 MERGE (m)-[edge:MANUFACTURED_AT]->(p)
 SET {edge_meta_cypher('edge')},
     edge.valid_from = date(r.valid_from)
@@ -110,19 +110,19 @@ def load(*, dry_run: bool = False) -> LoadStats:
             log.info("  • %s -> %s (%s)", r["model_name"], r["plant_code"], r["valid_from"])
         return stats
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         # 누락 진단 — model 노드가 그래프에 있는지 (NHTSA vPIC 의 model name 표기 매칭).
         for r in rows:
             check = session.run(
-                "MATCH (m:VehicleModel) "
+                "MATCH (m:Anxg_VehicleModel) "
                 "WHERE toLower(replace(coalesce(m.name,''),' ','')) = $n "
                 "RETURN count(m) AS n", n=r["model_norm"]
             ).single()
             if not check or int(check["n"]) == 0:
                 stats.models_missing += 1
             chk = session.run(
-                "MATCH (p:Plant {code:$c}) RETURN count(p) AS n", c=r["plant_code"]
+                "MATCH (p:Anxg_Plant {code:$c}) RETURN count(p) AS n", c=r["plant_code"]
             ).single()
             if not chk or int(chk["n"]) == 0:
                 stats.plants_missing += 1

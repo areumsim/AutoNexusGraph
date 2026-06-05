@@ -1,17 +1,17 @@
-"""data/raw/auto/nhtsa_investigations/FLAT_INV.zip → auto.events_investigations + Neo4j.
+"""data/raw/auto/nhtsa_investigations/FLAT_INV.zip → anxg_auto.events_investigations + Neo4j.
 
 PRD §3.5: NHTSA ODI = A 등급 (0.95). 리콜 전단계 — 잠재적 결함 시계열.
 
 PG 적재:
-    FLAT_INV TAB-delimited (11 컬럼, no header) → auto.events_investigations.
+    FLAT_INV TAB-delimited (11 컬럼, no header) → anxg_auto.events_investigations.
     멱등: UNIQUE(source, action_number) ON CONFLICT DO UPDATE.
 
 Neo4j 적재:
-    1) (:Investigation {id}) 노드 MERGE
-    2) variant 매칭이 있으면 (:VehicleVariant)-[:INVESTIGATED_BY]->(:Investigation)
-       없고 model 매칭이 있으면 (:VehicleModel)-[:INVESTIGATED_BY]->(:Investigation)
+    1) (:Anxg_Investigation {id}) 노드 MERGE
+    2) variant 매칭이 있으면 (:Anxg_VehicleVariant)-[:INVESTIGATED_BY]->(:Anxg_Investigation)
+       없고 model 매칭이 있으면 (:Anxg_VehicleModel)-[:INVESTIGATED_BY]->(:Anxg_Investigation)
     3) campno 가 채워졌고 해당 리콜이 그래프에 있으면
-       (:Investigation)-[:LED_TO_RECALL]->(:Recall) 부가 엣지 (조사→리콜 종결).
+       (:Anxg_Investigation)-[:LED_TO_RECALL]->(:Anxg_Recall) 부가 엣지 (조사→리콜 종결).
 
 NHTSA_ACTION_NUMBER 의 첫 2글자가 investigation_type:
     PE  Preliminary Evaluation
@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Iterator
 
 from autonexusgraph.config import get_settings
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
@@ -155,11 +155,11 @@ def _resolve_targets(cur, *, make: str, model: str, year: int | None
         return _RESOLVE_CACHE[key]
     cur.execute("""
         SELECT mm.manufacturer_id, m.model_id, v.variant_id
-          FROM auto.master_manufacturers mm
-          LEFT JOIN auto.master_vehicle_models m
+          FROM anxg_auto.master_manufacturers mm
+          LEFT JOIN anxg_auto.master_vehicle_models m
             ON m.manufacturer_id = mm.manufacturer_id
            AND m.name_norm = %s
-          LEFT JOIN auto.master_vehicle_variants v
+          LEFT JOIN anxg_auto.master_vehicle_variants v
             ON v.model_id = m.model_id
            AND v.model_year = %s::int
          WHERE mm.name_norm = %s
@@ -179,7 +179,7 @@ def clear_resolve_cache() -> None:
 # ── Neo4j MERGE Cypher ─────────────────────────────────────
 _MERGE_INVESTIGATION = """
 UNWIND $rows AS r
-MERGE (inv:Investigation {id: r.id})
+MERGE (inv:Anxg_Investigation {id: r.id})
 SET   inv.source              = r.source,
       inv.action_number       = r.action_number,
       inv.investigation_type  = r.investigation_type,
@@ -196,13 +196,13 @@ SET   inv.source              = r.source,
 
 _MERGE_VARIANT_EDGE = """
 UNWIND $rows AS r
-MATCH (inv:Investigation {id: r.id})
+MATCH (inv:Anxg_Investigation {id: r.id})
 WITH inv, r WHERE r.variant_id IS NOT NULL
-OPTIONAL MATCH (v:VehicleVariant {id: r.variant_id})
+OPTIONAL MATCH (v:Anxg_VehicleVariant {id: r.variant_id})
 WITH inv, r, v WHERE v IS NOT NULL
 MERGE (v)-[rel:INVESTIGATED_BY]->(inv)
 SET   rel.source_id        = r.action_number,
-      rel.source_type      = 'pg.auto.events_investigations',
+      rel.source_type      = 'pg.anxg_auto.events_investigations',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = 'verified',
@@ -211,13 +211,13 @@ SET   rel.source_id        = r.action_number,
 
 _MERGE_MODEL_EDGE = """
 UNWIND $rows AS r
-MATCH (inv:Investigation {id: r.id})
+MATCH (inv:Anxg_Investigation {id: r.id})
 WITH inv, r WHERE r.variant_id IS NULL AND r.model_id IS NOT NULL
-OPTIONAL MATCH (m:VehicleModel {id: r.model_id})
+OPTIONAL MATCH (m:Anxg_VehicleModel {id: r.model_id})
 WITH inv, r, m WHERE m IS NOT NULL
 MERGE (m)-[rel:INVESTIGATED_BY]->(inv)
 SET   rel.source_id        = r.action_number,
-      rel.source_type      = 'pg.auto.events_investigations',
+      rel.source_type      = 'pg.anxg_auto.events_investigations',
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
       rel.validated_status = 'verified',
@@ -227,13 +227,13 @@ SET   rel.source_id        = r.action_number,
 # 조사가 리콜로 종결됐다는 신호 — campno 가 채워진 row 만.
 _MERGE_LED_TO_RECALL = """
 UNWIND $rows AS r
-MATCH (inv:Investigation {id: r.id})
+MATCH (inv:Anxg_Investigation {id: r.id})
 WITH inv, r WHERE r.campno IS NOT NULL
-OPTIONAL MATCH (rc:Recall)
+OPTIONAL MATCH (rc:Anxg_Recall)
   WHERE rc.source_recall_no = r.campno
 WITH inv, r, rc WHERE rc IS NOT NULL
 MERGE (inv)-[rel:LED_TO_RECALL]->(rc)
-SET   rel.source_type      = 'pg.auto.events_investigations',
+SET   rel.source_type      = 'pg.anxg_auto.events_investigations',
       rel.source_id        = r.action_number,
       rel.extraction_method = 'deterministic',
       rel.confidence_score = r.confidence,
@@ -243,7 +243,7 @@ SET   rel.source_type      = 'pg.auto.events_investigations',
 
 
 def _upsert_pg(cur, row: dict[str, str], stats: LoadStats) -> tuple[bool, dict] | None:
-    """단일 row 를 auto.events_investigations 에 UPSERT.
+    """단일 row 를 anxg_auto.events_investigations 에 UPSERT.
 
     Returns:
         (inserted_bool, neo4j_payload) — neo4j_payload 는 Neo4j 적재용 dict.
@@ -279,7 +279,7 @@ def _upsert_pg(cur, row: dict[str, str], stats: LoadStats) -> tuple[bool, dict] 
             snap_year = None
 
     cur.execute("""
-        INSERT INTO auto.events_investigations
+        INSERT INTO anxg_auto.events_investigations
           (source, action_number, investigation_type,
            manufacturer_id, model_id, variant_id,
            mfr_name, component_text,
@@ -294,13 +294,13 @@ def _upsert_pg(cur, row: dict[str, str], stats: LoadStats) -> tuple[bool, dict] 
                 COALESCE(%s, EXTRACT(YEAR FROM now())::SMALLINT), %s::jsonb)
         ON CONFLICT (source, action_number) DO UPDATE SET
           investigation_type = COALESCE(EXCLUDED.investigation_type,
-                                         auto.events_investigations.investigation_type),
+                                         anxg_auto.events_investigations.investigation_type),
           manufacturer_id    = COALESCE(EXCLUDED.manufacturer_id,
-                                         auto.events_investigations.manufacturer_id),
+                                         anxg_auto.events_investigations.manufacturer_id),
           model_id           = COALESCE(EXCLUDED.model_id,
-                                         auto.events_investigations.model_id),
+                                         anxg_auto.events_investigations.model_id),
           variant_id         = COALESCE(EXCLUDED.variant_id,
-                                         auto.events_investigations.variant_id),
+                                         anxg_auto.events_investigations.variant_id),
           subject            = EXCLUDED.subject,
           summary            = EXCLUDED.summary,
           closed_date        = EXCLUDED.closed_date,
@@ -416,8 +416,8 @@ def load_investigations(*, dry_run: bool = False, batch: int = 500,
     conn.commit()
 
     if payloads:
-        driver = get_driver()
-        with driver.session() as session:
+
+        with get_session() as session:
             stats.nodes_merged = run_batched(
                 session, _MERGE_INVESTIGATION, payloads, batch=batch,
             )

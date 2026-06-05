@@ -38,7 +38,7 @@ def main() -> int:
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT corp_code, corp_name
-              FROM master.companies
+              FROM anxg_master.companies
              WHERE is_active = TRUE
              ORDER BY corp_code
         """)

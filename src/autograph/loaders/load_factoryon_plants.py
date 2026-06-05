@@ -1,7 +1,7 @@
-"""factoryon 공장등록(auto.factoryon_registry) → Neo4j :Plant 승격 + PERFORMED_AT 확대.
+"""factoryon 공장등록(anxg_auto.factoryon_registry) → Neo4j :Plant 승격 + PERFORMED_AT 확대.
 
 PG 의 90 행(현대차/기아/한국지엠/쌍용/르노 + tier-1)을 :Plant 노드(A 등급, 공식
-registry)로 승격하고, 회사명 매칭 시 (:Manufacturer)-[:OWNS_PLANT]->(:Plant) 를
+registry)로 승격하고, 회사명 매칭 시 (:Anxg_Manufacturer)-[:OWNS_PLANT]->(:Anxg_Plant) 를
 만든다. 추가로 업종명(KSIC)이 공정을 deterministic 하게 시사하는 공장에 대해
 회사 귀속 PERFORMED_AT 을 확대한다.
 
@@ -25,7 +25,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
@@ -34,7 +34,7 @@ from ._neo4j_helpers import edge_meta_cypher, run_batched
 
 log = logging.getLogger(__name__)
 
-_SOURCE_ID = "auto.factoryon_registry"
+_SOURCE_ID = "anxg_auto.factoryon_registry"
 _PLANT_CONF = 0.90          # 공식 registry — 공장·소유 사실
 _PROC_CONF = 0.60           # 업종→공정 추론 — candidate
 _SNAPSHOT_YEAR = 2026
@@ -77,7 +77,7 @@ class LoadStats:
 # :Plant 승격 + OWNS_PLANT (회사 매칭 시).
 _PLANT_CYPHER = f"""
 UNWIND $rows AS r
-MERGE (pl:Plant {{code: r.code}})
+MERGE (pl:Anxg_Plant {{code: r.code}})
 SET   pl.name          = r.name,
       pl.country       = 'KR',
       pl.city          = r.city,
@@ -89,7 +89,7 @@ SET   pl.name          = r.name,
       pl.grade         = 'A',
       pl.updated_at    = datetime()
 WITH pl, r
-OPTIONAL MATCH (mm:Manufacturer) WHERE mm.name_norm = r.company_norm
+OPTIONAL MATCH (mm:Anxg_Manufacturer) WHERE mm.name_norm = r.company_norm
 FOREACH (_ IN CASE WHEN mm IS NULL THEN [] ELSE [1] END |
   MERGE (mm)-[own:OWNS_PLANT]->(pl)
   SET {edge_meta_cypher('own')}
@@ -99,15 +99,15 @@ FOREACH (_ IN CASE WHEN mm IS NULL THEN [] ELSE [1] END |
 # 회사 귀속 :ProcessStep + INSTANTIATES + PERFORMED_AT (candidate, 업종→공정 추론).
 _PERFORMED_CYPHER = f"""
 UNWIND $rows AS r
-MATCH (pl:Plant {{code: r.code}})
-MERGE (pr:Process {{process_name_norm: r.process_name_norm}})
+MATCH (pl:Anxg_Plant {{code: r.code}})
+MERGE (pr:Anxg_Process {{process_name_norm: r.process_name_norm}})
   ON CREATE SET pr.process_name    = r.process_name,
                 pr.source           = 'performed_at_seed',
                 pr.domain           = 'auto',
                 pr.validated_status = 'validated',
                 pr.snapshot_year    = r.snapshot_year,
                 pr.updated_at        = datetime()
-MERGE (st:ProcessStep {{step_id: r.step_id}})
+MERGE (st:Anxg_ProcessStep {{step_id: r.step_id}})
   SET st.process_name_norm = r.process_name_norm,
       st.process_name      = r.process_name,
       st.source            = 'factoryon',
@@ -131,7 +131,7 @@ def _fetch_registry() -> list[dict]:
         cur.execute("""
             SELECT factory_no, company_name, business_no, address,
                    industry_name, products
-              FROM auto.factoryon_registry
+              FROM anxg_auto.factoryon_registry
         """)
         cols = [c[0] for c in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
@@ -206,18 +206,18 @@ def load(*, dry_run: bool = False) -> LoadStats:
         log.warning("[factoryon_plants] registry 비어있음 — make load-factoryon 먼저")
         return stats
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         run_batched(session, _PLANT_CYPHER, plant_rows, batch=200)
         stats.plants_promoted = session.run(
-            "MATCH (p:Plant {source:'factoryon'}) RETURN count(p) AS n").single()["n"]
+            "MATCH (p:Anxg_Plant {source:'factoryon'}) RETURN count(p) AS n").single()["n"]
         stats.owns_plant = session.run(
-            "MATCH (:Manufacturer)-[r:OWNS_PLANT]->(:Plant {source:'factoryon'}) "
+            "MATCH (:Anxg_Manufacturer)-[r:OWNS_PLANT]->(:Anxg_Plant {source:'factoryon'}) "
             "RETURN count(r) AS n").single()["n"]
         if perf_rows:
             run_batched(session, _PERFORMED_CYPHER, perf_rows, batch=200)
         stats.performed_at = session.run(
-            "MATCH (:ProcessStep {source:'factoryon'})-[e:PERFORMED_AT]->(:Plant) "
+            "MATCH (:Anxg_ProcessStep {source:'factoryon'})-[e:PERFORMED_AT]->(:Anxg_Plant) "
             "RETURN count(e) AS n").single()["n"]
 
     log.info("[factoryon_plants] :Plant=%d OWNS_PLANT=%d PERFORMED_AT(factoryon)=%d skip=%d",

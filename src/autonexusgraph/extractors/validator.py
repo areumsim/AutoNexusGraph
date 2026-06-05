@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
-from ..db.neo4j import get_driver
+from ..db.neo4j import get_session
 
 
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class ValidationResult:
 
 
 def _resolve_corp_codes(names: Iterable[str]) -> dict[str, str | None]:
-    """회사명 → corp_code 매핑 (master.company_aliases 통해).
+    """회사명 → corp_code 매핑 (anxg_master.company_aliases 통해).
 
     1차: alias_norm 정확 매칭. 2차: 부분 매칭은 신뢰도 낮으므로 skip.
     """
@@ -56,7 +56,7 @@ def _resolve_corp_codes(names: Iterable[str]) -> dict[str, str | None]:
 
     sql = """
     SELECT alias_norm, corp_code
-      FROM master.company_aliases
+      FROM anxg_master.company_aliases
      WHERE alias_norm = ANY(%s)
     """
     params = [list(names_norm.values())]
@@ -76,13 +76,13 @@ def _check_conflict(head_corp: str | None, tail_corp: str | None,
     if not head_corp or not tail_corp:
         return None
     cypher = """
-    MATCH (a:Company {corp_code: $a})
-    MATCH (b:Company {corp_code: $b})
+    MATCH (a:Anxg_Company {corp_code: $a})
+    MATCH (b:Anxg_Company {corp_code: $b})
     OPTIONAL MATCH (a)-[r1:SUBSIDIARY_OF|RELATED_TO]->(b)
     OPTIONAL MATCH (b)-[r2:SUBSIDIARY_OF|RELATED_TO]->(a)
     RETURN type(r1) AS r1, type(r2) AS r2
     """
-    with get_driver().session() as session:
+    with get_session() as session:
         rec = session.run(cypher, a=head_corp, b=tail_corp).single()
     if not rec:
         return None

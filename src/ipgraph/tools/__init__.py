@@ -4,7 +4,7 @@
 - patents  : PG 정형 (특허 식별, 출원인, CPC 집계)
 - graph    : Neo4j 관계 탐색 (인용, CPC 계층, co-assignee) — cypher 템플릿 경유
 - retrieve : pgvector 의미 검색 (abstract+claims 청크 메타 필터)
-- bridge   : Cross-Domain (assignee_id ↔ corp_code via ip.assignee_corp_map)
+- bridge   : Cross-Domain (assignee_id ↔ corp_code via anxg_ip.assignee_corp_map)
 
 본 패키지 import 시점에 ``IP_TEMPLATES`` 가 finance 의 ``TEMPLATES`` 에 병합된다 →
 같은 render_template / _run / cypher_guard 파이프라인을 그대로 통과.

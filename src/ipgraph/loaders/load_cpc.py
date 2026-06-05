@@ -1,4 +1,4 @@
-"""CPC scheme bulk → ip.cpc_scheme PG + Neo4j :CPCCode + :SUBCLASS_OF.
+"""CPC scheme bulk → anxg_ip.cpc_scheme PG + Neo4j :CPCCode + :SUBCLASS_OF.
 
 CPC = Cooperative Patent Classification (USPTO+EPO 공동). 본 PR 은 section/class/
 subclass/main_group/subgroup 전 레벨 적재. 입력: CPCTitleList20YYMM.zip 의 섹션별
@@ -173,14 +173,14 @@ def upsert_pg(rows: list[dict]) -> tuple[int, int, int]:
                 cur.execute("SAVEPOINT sp_cpc")
                 try:
                     cur.execute("""
-                        INSERT INTO ip.cpc_scheme
+                        INSERT INTO anxg_ip.cpc_scheme
                           (code, parent_code, level, depth, title, raw)
                         VALUES (%s, %s, %s, %s, %s, %s::jsonb)
                         ON CONFLICT (code) DO UPDATE SET
-                          parent_code = COALESCE(EXCLUDED.parent_code, ip.cpc_scheme.parent_code),
+                          parent_code = COALESCE(EXCLUDED.parent_code, anxg_ip.cpc_scheme.parent_code),
                           level       = EXCLUDED.level,
                           depth       = EXCLUDED.depth,
-                          title       = COALESCE(EXCLUDED.title, ip.cpc_scheme.title),
+                          title       = COALESCE(EXCLUDED.title, anxg_ip.cpc_scheme.title),
                           updated_at  = now()
                         RETURNING (xmax = 0) AS is_new
                     """, (r["code"], r.get("parent_code"), r["level"],
@@ -216,11 +216,11 @@ def load_neo4j(rows: list[dict]) -> dict:
     )
     stats = {"nodes_merged": 0, "subclass_of_merged": 0}
     try:
-        with drv.session() as s:
+        with drv.session(database=os.environ.get("NEO4J_DATABASE") or None) as s:
             s.run("CREATE CONSTRAINT cpc_code IF NOT EXISTS "
-                  "FOR (c:CPCCode) REQUIRE c.code IS UNIQUE")
+                  "FOR (c:Anxg_CPCCode) REQUIRE c.code IS UNIQUE")
             s.run("CREATE INDEX cpc_level IF NOT EXISTS "
-                  "FOR (c:CPCCode) ON (c.level)")
+                  "FOR (c:Anxg_CPCCode) ON (c.level)")
 
             # 노드 — 일괄 UNWIND.
             batch = 1000
@@ -228,7 +228,7 @@ def load_neo4j(rows: list[dict]) -> dict:
                 chunk = rows[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MERGE (c:CPCCode {code: r.code})
+                    MERGE (c:Anxg_CPCCode {code: r.code})
                     SET c.level = r.level,
                         c.depth = r.depth,
                         c.title = r.title,
@@ -243,9 +243,9 @@ def load_neo4j(rows: list[dict]) -> dict:
                     continue
                 s.run("""
                     UNWIND $rows AS r
-                    MATCH (child:CPCCode {code: r.code})
+                    MATCH (child:Anxg_CPCCode {code: r.code})
                     WITH child, r
-                    MATCH (parent:CPCCode {code: r.parent_code})
+                    MATCH (parent:Anxg_CPCCode {code: r.parent_code})
                     MERGE (child)-[e:SUBCLASS_OF]->(parent)
                     SET e.source_type       = $source_type,
                         e.source_id         = 'cpc_scheme_2026',

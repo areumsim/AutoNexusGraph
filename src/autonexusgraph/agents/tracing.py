@@ -15,7 +15,7 @@ v2 — 근본 재정비:
         result = app.invoke(init_state, config=...)
         turn.state = result        # final state 동기화 — n_replans/answer push 용
     # __exit__ 시:
-    #   1. CostTracker.finalize(n_replans=result["n_replans"]) → PG ops.llm_usage 갱신
+    #   1. CostTracker.finalize(n_replans=result["n_replans"]) → PG anxg_ops.llm_usage 갱신
     #   2. Langfuse span.update(metadata={cost,tokens,n_replans,status}) + flush
 """
 
@@ -194,7 +194,7 @@ def start_turn_context(thread_id: str, state: dict, *,
          trace tags/metadata 부착
     exit:
       1. tracker.finalize(status, n_replans=turn.state["n_replans"]) →
-         ops.llm_usage row 의 meta JSONB 갱신
+         anxg_ops.llm_usage row 의 meta JSONB 갱신
       2. Langfuse span.update(metadata={cost,tokens,n_replans,status}) + flush
 
     BudgetExceeded 는 'aborted_budget', 그 외 예외는 'error', 정상은 'ok' 로 finalize.
@@ -261,7 +261,7 @@ def start_turn_context(thread_id: str, state: dict, *,
         status = "error"
         raise
     finally:
-        # 1. tracker finalize — PG ops.llm_usage 의 meta JSONB 에 thread_id/turn_id/
+        # 1. tracker finalize — PG anxg_ops.llm_usage 의 meta JSONB 에 thread_id/turn_id/
         #    n_replans/domain + 총합 영구 적재.
         try:
             n_replans = int(turn.state.get("n_replans") or 0)

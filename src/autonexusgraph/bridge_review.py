@@ -1,4 +1,4 @@
-"""Bridge candidate 검토 운영 (Q-1) — `bridge.corp_entity` SOP 데이터 계층.
+"""Bridge candidate 검토 운영 (Q-1) — `anxg_bridge.corp_entity` SOP 데이터 계층.
 
 배경: 자동 매칭 (Wikidata QID / LEI / 사업자번호 / 이름) 결과는
 ``reviewed_status='candidate'`` 로 적재된다 (08_bridge.sql). 검토 없이 누적되면
@@ -84,7 +84,7 @@ def list_candidates(*, status: str = "candidate",
                match_method, confidence_score, reviewed_status, notes,
                created_at, reviewed_at, reviewed_by,
                EXTRACT(DAY FROM now() - created_at)::int AS age_days
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          WHERE reviewed_status = %s
            AND (%s::text IS NULL OR entity_type = %s)
            AND (%s::text IS NULL OR match_method = %s)
@@ -112,7 +112,7 @@ def set_review_status(row_id: int, status: str, *,
     reviewed_at_expr = "NULL" if status == "candidate" else "now()"
     return _run(
         f"""
-        UPDATE bridge.corp_entity
+        UPDATE anxg_bridge.corp_entity
            SET reviewed_status = %s,
                reviewed_at = {reviewed_at_expr},
                reviewed_by = %s,
@@ -136,7 +136,7 @@ def bulk_set_status(row_ids: Sequence[int], status: str, *,
     reviewed_at_expr = "NULL" if status == "candidate" else "now()"
     return _run(
         f"""
-        UPDATE bridge.corp_entity
+        UPDATE anxg_bridge.corp_entity
            SET reviewed_status = %s,
                reviewed_at = {reviewed_at_expr},
                reviewed_by = %s,
@@ -162,7 +162,7 @@ def auto_expire_stale(*, days: int = DEFAULT_STALE_DAYS,
     if not apply:
         n = _run(
             """
-            SELECT count(*) FROM bridge.corp_entity
+            SELECT count(*) FROM anxg_bridge.corp_entity
              WHERE reviewed_status = 'candidate'
                AND created_at < now() - make_interval(days => %s)
             """,
@@ -173,7 +173,7 @@ def auto_expire_stale(*, days: int = DEFAULT_STALE_DAYS,
     note = f"[auto-rejected: 미검토 {int(days)}일 경과 — Q-1]"
     n = _run(
         """
-        UPDATE bridge.corp_entity
+        UPDATE anxg_bridge.corp_entity
            SET reviewed_status = 'rejected',
                reviewed_at = now(),
                reviewed_by = 'auto-expire',
@@ -214,14 +214,14 @@ def _kpi_summarize(status_counts: dict[str, int],
 def review_progress_kpi() -> dict[str, Any]:
     """검토 진행률 + 분포. UI 헤더·CLI·대시보드 공용."""
     rows = _run(
-        "SELECT reviewed_status, count(*) AS n FROM bridge.corp_entity GROUP BY reviewed_status",
+        "SELECT reviewed_status, count(*) AS n FROM anxg_bridge.corp_entity GROUP BY reviewed_status",
         fetch="rows",
     )
     counts = {r["reviewed_status"]: int(r["n"]) for r in rows}
     oldest = _run(
         """
         SELECT EXTRACT(DAY FROM now() - min(created_at))::int
-          FROM bridge.corp_entity WHERE reviewed_status = 'candidate'
+          FROM anxg_bridge.corp_entity WHERE reviewed_status = 'candidate'
         """,
         fetch="scalar",
     )
@@ -230,7 +230,7 @@ def review_progress_kpi() -> dict[str, Any]:
         SELECT entity_type,
                count(*) FILTER (WHERE reviewed_status = 'candidate') AS pending,
                count(*) AS total
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          GROUP BY entity_type
          ORDER BY pending DESC
         """,

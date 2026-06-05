@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""master.companies + master.entity_map → master.entities 멱등 마이그.
+"""anxg_master.companies + anxg_master.entity_map → anxg_master.entities 멱등 마이그.
 
-PRD §4.5 v2.1 — 다형 ER 마스터 (master.entities) 신설에 따라, 기존 v2.0 분리
-구조 (master.companies + master.entity_map) 의 데이터를 entities 로 흡수한다.
+PRD §4.5 v2.1 — 다형 ER 마스터 (anxg_master.entities) 신설에 따라, 기존 v2.0 분리
+구조 (anxg_master.companies + anxg_master.entity_map) 의 데이터를 entities 로 흡수한다.
 
 전략:
-    1. master.companies 한 행 = entities 한 행 (entity_type='manufacturer').
+    1. anxg_master.companies 한 행 = entities 한 행 (entity_type='manufacturer').
        - entity_id = 'mfr_' + corp_code (자연키 기반, prefix+seq 미사용).
        - canonical_name = corp_name.
-    2. master.entity_map 의 외부 식별자 (id_type ∈ {wikidata_qid, lei,
+    2. anxg_master.entity_map 의 외부 식별자 (id_type ∈ {wikidata_qid, lei,
        business_no, cik}) 를 entities 의 해당 컬럼에 enrich.
        - 같은 corp_code 에 여러 외부 ID 있어도 우선순위로 1개 선택
          (confidence 내림차순 → resolved_at 내림차순).
-    3. master.entity_map 자체는 **삭제하지 않는다** — 기존 도메인 로더가
+    3. anxg_master.entity_map 자체는 **삭제하지 않는다** — 기존 도메인 로더가
        의존. entities 는 폴리모픽 레이어로 공존.
-    4. master.persons / company_aliases 는 손대지 않음 (PRD 384 행 '도메인 선택').
+    4. anxg_master.persons / company_aliases 는 손대지 않음 (PRD 384 행 '도메인 선택').
 
 멱등성:
     - 모든 INSERT 가 ON CONFLICT (entity_id) DO UPDATE.
@@ -50,7 +50,7 @@ ID_TYPE_TO_COLUMN: dict[str, str] = {
 
 
 def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
-    """master.companies → master.entities + entity_map enrich.
+    """anxg_master.companies → anxg_master.entities + entity_map enrich.
 
     Returns stats dict — {seen, inserted, updated, enriched, errors}.
     """
@@ -60,21 +60,21 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
         # 1) companies → entities upsert.
         sql_companies = """
             SELECT corp_code, corp_name, is_active
-              FROM master.companies
+              FROM anxg_master.companies
              ORDER BY corp_code
         """
         if limit:
             sql_companies += f" LIMIT {int(limit)}"
         cur.execute(sql_companies)
         companies = cur.fetchall()
-        log.info("[migrate] master.companies %d 행 처리", len(companies))
+        log.info("[migrate] anxg_master.companies %d 행 처리", len(companies))
 
         for corp_code, corp_name, is_active in companies:
             stats["seen"] += 1
             entity_id = f"mfr_{corp_code}"
             try:
                 cur.execute("""
-                    INSERT INTO master.entities
+                    INSERT INTO anxg_master.entities
                       (entity_id, entity_type, canonical_name, corp_code,
                        source_priority, confidence_score, valid_to, schema_version)
                     VALUES (%s, 'manufacturer', %s, %s, 1, 1.000,
@@ -105,7 +105,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                                PARTITION BY corp_code
                                ORDER BY confidence DESC, resolved_at DESC
                            ) AS rn
-                      FROM master.entity_map
+                      FROM anxg_master.entity_map
                      WHERE id_type = %s
                 )
                 SELECT corp_code, id_value
@@ -121,7 +121,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                 try:
                     # 해당 컬럼이 NULL 일 때만 채움 (덮어쓰지 않음).
                     cur.execute(f"""
-                        UPDATE master.entities
+                        UPDATE anxg_master.entities
                            SET {col} = %s
                          WHERE entity_id = %s
                            AND {col} IS NULL

@@ -1,4 +1,4 @@
-"""data/raw/auto/nhtsa_mfrcomm/FLAT_TSBS.zip → vec.chunks (source='nhtsa_tsb').
+"""data/raw/auto/nhtsa_mfrcomm/FLAT_TSBS.zip → anxg_vec.chunks (source='nhtsa_tsb').
 
 NHTSA Manufacturer Communications (TSB / Campaign / Warranty / OTA / Emissions / Other)
 의 SUMMARY 본문을 narrative 청크로 변환. Investigations/Recalls/Complaints 와는 다른
@@ -136,8 +136,8 @@ def _resolve_targets(cur, *, make: str, model: str, year: int | None
         return None, None, []
     cur.execute("""
         SELECT mm.manufacturer_id, m.model_id
-          FROM auto.master_manufacturers mm
-          LEFT JOIN auto.master_vehicle_models m
+          FROM anxg_auto.master_manufacturers mm
+          LEFT JOIN anxg_auto.master_vehicle_models m
             ON m.manufacturer_id = mm.manufacturer_id
            AND m.name_norm = %s
          WHERE mm.name_norm = %s
@@ -155,7 +155,7 @@ def _resolve_targets(cur, *, make: str, model: str, year: int | None
     if model_id and year:
         cur.execute("""
             SELECT variant_id
-              FROM auto.master_vehicle_variants
+              FROM anxg_auto.master_vehicle_variants
              WHERE model_id = %s AND model_year = %s
         """, (model_id, year))
         variants = [row[0] for row in cur.fetchall()]
@@ -185,12 +185,12 @@ def _upsert_chunk(cur, *, uniq: str, text: str, metadata: dict,
                   manufacturer_id: int | None,
                   model_id: int | None,
                   variant_id: int | None) -> str:
-    """vec.chunks UPSERT — source='nhtsa_tsb' + metadata.uniq dedup.
+    """anxg_vec.chunks UPSERT — source='nhtsa_tsb' + metadata.uniq dedup.
 
     Returns: 'inserted' | 'updated' | 'skipped'.
     """
     cur.execute("""
-        SELECT id, text FROM vec.chunks
+        SELECT id, text FROM anxg_vec.chunks
          WHERE source = %s AND metadata->>'uniq' = %s
          LIMIT 1
     """, (_SOURCE_KEY, uniq))
@@ -200,7 +200,7 @@ def _upsert_chunk(cur, *, uniq: str, text: str, metadata: dict,
         if ex_text == text:
             return "skipped"
         cur.execute("""
-            UPDATE vec.chunks
+            UPDATE anxg_vec.chunks
                SET text = %s, token_count = %s,
                    manufacturer_id = COALESCE(manufacturer_id, %s),
                    model_id        = COALESCE(model_id, %s),
@@ -213,7 +213,7 @@ def _upsert_chunk(cur, *, uniq: str, text: str, metadata: dict,
               json.dumps(metadata, ensure_ascii=False, default=str), cid))
         return "updated"
     cur.execute("""
-        INSERT INTO vec.chunks
+        INSERT INTO anxg_vec.chunks
           (corp_code, rcept_no, section, chunk_idx, text, token_count,
            metadata, source, manufacturer_id, model_id, variant_id)
         VALUES (NULL, NULL, %s, 0, %s, %s, %s::jsonb, %s, %s, %s, %s)

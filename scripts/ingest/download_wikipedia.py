@@ -70,10 +70,10 @@ def _select_targets(lang: str) -> list[dict]:
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT c.corp_code, c.corp_name,
-                   (SELECT id_value FROM master.entity_map em
+                   (SELECT id_value FROM anxg_master.entity_map em
                      WHERE em.corp_code = c.corp_code AND em.id_type='wikidata_qid'
                      LIMIT 1) as qid
-              FROM master.companies c
+              FROM anxg_master.companies c
              WHERE c.is_active = TRUE
              ORDER BY c.corp_code
         """)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DART 임원 + 최대주주(자연인) → master.persons + person_executive_history.
+"""DART 임원 + 최대주주(자연인) → anxg_master.persons + person_executive_history.
 
 선행: data/raw/dart_bulk/corp/<corp_code>/executives/<year>.jsonl 존재
 목적: PG 에 인물 SSOT 확보 — Neo4j 와 비교/검증·시계열 JOIN 분석 가능.
@@ -29,16 +29,16 @@ from autonexusgraph.db.postgres import get_pool
 
 
 UPSERT_PERSON = """
-INSERT INTO master.persons (canonical_name, birth_year, aliases)
+INSERT INTO anxg_master.persons (canonical_name, birth_year, aliases)
 VALUES (%s, %s, %s)
 ON CONFLICT (canonical_name, birth_year) DO UPDATE
-   SET aliases    = master.persons.aliases || EXCLUDED.aliases,
+   SET aliases    = anxg_master.persons.aliases || EXCLUDED.aliases,
        updated_at = now()
 RETURNING internal_id
 """
 
 UPSERT_HISTORY = """
-INSERT INTO master.person_executive_history
+INSERT INTO anxg_master.person_executive_history
   (internal_id, corp_code, role, registered, since_date, until_date, rcept_no, raw)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (internal_id, corp_code, role, since_date, rcept_no) DO UPDATE
@@ -164,17 +164,17 @@ def main() -> int:
 
     # 검증
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT count(*) FROM master.persons")
+        cur.execute("SELECT count(*) FROM anxg_master.persons")
         n_p = cur.fetchone()[0]
-        cur.execute("SELECT count(*) FROM master.person_executive_history")
+        cur.execute("SELECT count(*) FROM anxg_master.person_executive_history")
         n_h = cur.fetchone()[0]
         cur.execute("""
-            SELECT role, count(*) FROM master.person_executive_history
+            SELECT role, count(*) FROM anxg_master.person_executive_history
             GROUP BY role ORDER BY 2 DESC LIMIT 8
         """)
         roles = cur.fetchall()
 
-    print(f"\n[persons] master.persons rows: {n_p:,}")
+    print(f"\n[persons] anxg_master.persons rows: {n_p:,}")
     print(f"[persons] person_executive_history rows: {n_h:,}")
     print(f"[persons] top roles:")
     for r, c in roles:

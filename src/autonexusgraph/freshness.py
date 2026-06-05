@@ -24,14 +24,14 @@ DEFAULT_STALE_DAYS = 90
 
 # (label, schema.table, ingest 타임스탬프 컬럼, content 일자 컬럼)
 FRESHNESS_SOURCES: list[dict[str, str]] = [
-    {"label": "DART filings",      "table": "fin.filings",            "ingest": "ingested_at", "content": "rcept_dt"},
-    {"label": "vec.chunks",        "table": "vec.chunks",             "ingest": "created_at",  "content": "created_at"},
-    {"label": "NHTSA recalls",     "table": "auto.events_recalls",    "ingest": "ingested_at", "content": "report_date"},
-    {"label": "NHTSA complaints",  "table": "auto.events_complaints", "ingest": "ingested_at", "content": "filed_date"},
-    {"label": "OEM SEC financials","table": "auto.oem_financials_sec","ingest": "ingested_at", "content": "filed_at"},
-    {"label": "IP patents",        "table": "ip.patents",             "ingest": "ingested_at", "content": "filing_date"},
-    {"label": "bridge.corp_entity","table": "bridge.corp_entity",     "ingest": "created_at",  "content": "updated_at"},
-    {"label": "master.persons",    "table": "master.persons",         "ingest": "updated_at",  "content": "updated_at"},
+    {"label": "DART filings",      "table": "anxg_fin.filings",            "ingest": "ingested_at", "content": "rcept_dt"},
+    {"label": "anxg_vec.chunks",        "table": "anxg_vec.chunks",             "ingest": "created_at",  "content": "created_at"},
+    {"label": "NHTSA recalls",     "table": "anxg_auto.events_recalls",    "ingest": "ingested_at", "content": "report_date"},
+    {"label": "NHTSA complaints",  "table": "anxg_auto.events_complaints", "ingest": "ingested_at", "content": "filed_date"},
+    {"label": "OEM SEC financials","table": "anxg_auto.oem_financials_sec","ingest": "ingested_at", "content": "filed_at"},
+    {"label": "IP patents",        "table": "anxg_ip.patents",             "ingest": "ingested_at", "content": "filing_date"},
+    {"label": "anxg_bridge.corp_entity","table": "anxg_bridge.corp_entity",     "ingest": "created_at",  "content": "updated_at"},
+    {"label": "anxg_master.persons",    "table": "anxg_master.persons",         "ingest": "updated_at",  "content": "updated_at"},
 ]
 
 

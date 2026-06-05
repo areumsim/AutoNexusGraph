@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 
 MIGRATIONS = [
@@ -32,7 +32,7 @@ MIGRATIONS = [
         """
         MATCH (s:Sector)
         WHERE NOT s:Industry
-        SET s:Industry
+        SET s:Anxg_Industry
         REMOVE s:Sector
         RETURN count(s) AS n
         """,
@@ -41,7 +41,7 @@ MIGRATIONS = [
     (
         "rel IN_SECTOR → IN_INDUSTRY",
         """
-        MATCH (c:Company)-[r:IN_SECTOR]->(s)
+        MATCH (c:Anxg_Company)-[r:IN_SECTOR]->(s)
         MERGE (c)-[r2:IN_INDUSTRY]->(s)
         ON CREATE SET r2.source = coalesce(r.source, 'dart')
         DELETE r
@@ -52,7 +52,7 @@ MIGRATIONS = [
     (
         "Person.birth_year NULL → -1",
         """
-        MATCH (p:Person)
+        MATCH (p:Anxg_Person)
         WHERE p.birth_year IS NULL
         SET p.birth_year = -1
         RETURN count(p) AS n
@@ -98,19 +98,19 @@ MIGRATIONS = [
     # 5. 인덱스 idempotent — (name, birth_year) 복합
     (
         "index person_name_birth",
-        "CREATE INDEX person_name_birth IF NOT EXISTS FOR (p:Person) ON (p.name, p.birth_year)",
+        "CREATE INDEX person_name_birth IF NOT EXISTS FOR (p:Anxg_Person) ON (p.name, p.birth_year)",
     ),
     (
         "index industry_code",
-        "CREATE INDEX industry_code IF NOT EXISTS FOR (i:Industry) ON (i.code)",
+        "CREATE INDEX industry_code IF NOT EXISTS FOR (i:Anxg_Industry) ON (i.code)",
     ),
     (
         "index newsevent_hash",
-        "CREATE INDEX newsevent_hash IF NOT EXISTS FOR (n:NewsEvent) ON (n.article_hash)",
+        "CREATE INDEX newsevent_hash IF NOT EXISTS FOR (n:Anxg_NewsEvent) ON (n.article_hash)",
     ),
     (
         "index group_name",
-        "CREATE INDEX group_name IF NOT EXISTS FOR (g:Group) ON (g.name)",
+        "CREATE INDEX group_name IF NOT EXISTS FOR (g:Anxg_Group) ON (g.name)",
     ),
 ]
 
@@ -126,8 +126,8 @@ def main() -> int:
             print(f"  - {name}")
         return 0
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         for name, cypher in MIGRATIONS:
             try:
                 result = session.run(cypher)

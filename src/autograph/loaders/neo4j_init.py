@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 from ..ontology import entity_key_property, entity_labels
 
@@ -80,8 +80,8 @@ def init_neo4j() -> None:
         if label in label_set
     ]
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         for stmt in constraints + indexes:
             try:
                 session.run(stmt)

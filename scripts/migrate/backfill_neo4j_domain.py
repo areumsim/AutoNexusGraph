@@ -18,7 +18,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "src"))
 
-from autonexusgraph.db.neo4j import get_driver       # noqa: E402
+from autonexusgraph.db.neo4j import get_session  # noqa: E402
 from autonexusgraph.ontology.domain import (         # noqa: E402
     all_labels, domain_for, KNOWN_DOMAINS,
 )
@@ -53,9 +53,9 @@ def main() -> int:
     targets = args.only or all_labels()
     print(f"[backfill] {len(targets)} labels: {targets}\n")
 
-    drv = get_driver()
+
     total = 0
-    with drv.session() as sess:
+    with get_session() as sess:
         # 사전 NULL 상태 점검
         r = list(sess.run(COUNT_NULL_DOMAIN))
         if r:

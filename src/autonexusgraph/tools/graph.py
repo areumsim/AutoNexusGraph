@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..db.neo4j import get_driver
+from ..db.neo4j import get_session
 from .cypher_templates import TemplateError, render_template
 
 log = logging.getLogger(__name__)
@@ -35,8 +35,8 @@ def _run(cypher: str, **params: Any) -> list[dict]:
     """READ 단일 쿼리 실행 → list[dict] (record.data())."""
     from ..safety.cypher_guard import assert_read_only
     assert_read_only(cypher)
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         result = session.run(cypher, **params)
         return [dict(r) for r in result]
 
@@ -62,7 +62,7 @@ def lookup_company_node(query: str, limit: int = 5) -> list[dict]:
     """이름·종목코드·corp_code 로 Neo4j :Company 노드 찾기.
 
     SQL 동명 함수 (``tools/financials.py:lookup_company``) 와 명명 충돌 방지를
-    위해 ``_node`` 접미사. SQL 측은 master.companies 테이블 직접 조회.
+    위해 ``_node`` 접미사. SQL 측은 anxg_master.companies 테이블 직접 조회.
     """
     return _exec("lookup_company", q=query.strip(), limit=_cap(limit))
 

@@ -1,7 +1,7 @@
-"""data/raw/auto/nhtsa_safety/**/*.json → auto.spec_measurements + Neo4j SAFETY_RATED_BY.
+"""data/raw/auto/nhtsa_safety/**/*.json → anxg_auto.spec_measurements + Neo4j SAFETY_RATED_BY.
 
 PRD §3.5: NCAP 출처는 A 등급 (confidence 0.95).
-- `auto.spec_measurements` 의 ``safety.ncap.*`` measure_key 채움 → ``get_safety_rating()`` 가
+- `anxg_auto.spec_measurements` 의 ``safety.ncap.*`` measure_key 채움 → ``get_safety_rating()`` 가
   더 이상 None 만 반환 안 함.
 - Neo4j ``(VehicleVariant)-[:SAFETY_RATED_BY {confidence_score:0.95, ...}]->(Standard {code:'NCAP_US'})``
   엣지 적재 → ``auto_safety_ratings`` cypher 가 빈 결과만 주던 문제 해소.
@@ -22,7 +22,7 @@ PRD §3.5: NCAP 출처는 A 등급 (confidence 0.95).
     NHTSALaneDepartureWarning           → safety.feature.ldw
 
 Bug 회피: NHTSA SafetyRatings 의 trim 표기 ("AWD ELECTRIC", "STANDARD RANGE", ...) 는
-`auto.master_vehicle_variants.trim` 과 정확 매칭이 어렵다. 본 loader 는 (make, model, year)
+`anxg_auto.master_vehicle_variants.trim` 과 정확 매칭이 어렵다. 본 loader 는 (make, model, year)
 까지만 매칭하고 매칭된 모든 variant 에 동일 점수를 박는다 — NCAP 점수는 보통 trim
 범위에 걸쳐 동일이라 안전. 단, 동일 model_year × trim 다수가 있으면 적당히 보수적.
 
@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from autonexusgraph.config import get_settings
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
@@ -129,9 +129,9 @@ def _resolve_variants(cur, *, make: str, model: str, year: int) -> list[int]:
         return []
     cur.execute("""
         SELECT v.variant_id
-          FROM auto.master_vehicle_variants v
-          JOIN auto.master_vehicle_models m  USING (model_id)
-          JOIN auto.master_manufacturers mm USING (manufacturer_id)
+          FROM anxg_auto.master_vehicle_variants v
+          JOIN anxg_auto.master_vehicle_models m  USING (model_id)
+          JOIN anxg_auto.master_manufacturers mm USING (manufacturer_id)
          WHERE mm.name_norm = %s
            AND (m.name_norm = %s OR m.name_norm LIKE %s)
            AND v.model_year = %s
@@ -149,10 +149,10 @@ def _resolve_variants(cur, *, make: str, model: str, year: int) -> list[int]:
 # Neo4j (VehicleVariant)-[:SAFETY_RATED_BY]->(Standard {code:'NCAP_US'})
 _MERGE_SAFETY_RATED_BY = """
 UNWIND $rows AS r
-MATCH (v:VehicleVariant {id: r.variant_id})
-MATCH (s:Standard {code: r.standard_code})
+MATCH (v:Anxg_VehicleVariant {id: r.variant_id})
+MATCH (s:Anxg_Standard {code: r.standard_code})
 MERGE (v)-[rel:SAFETY_RATED_BY]->(s)
-SET   rel.source_type      = 'pg.auto.spec_measurements/nhtsa',
+SET   rel.source_type      = 'pg.anxg_auto.spec_measurements/nhtsa',
       rel.source_id        = r.source_id,
       rel.extraction_method= 'deterministic',
       rel.confidence_score = r.confidence,
@@ -216,7 +216,7 @@ def load_safety(*, dry_run: bool = False, batch: int = 200) -> LoadStats:
                 try:
                     # 동일 source 기존 측정값 모두 삭제 후 재삽입 (멱등).
                     cur.execute("""
-                        DELETE FROM auto.spec_measurements
+                        DELETE FROM anxg_auto.spec_measurements
                          WHERE variant_id = %s AND source = %s
                     """, (vid, _SOURCE_KEY))
                     deleted = cur.rowcount
@@ -242,7 +242,7 @@ def load_safety(*, dry_run: bool = False, batch: int = 200) -> LoadStats:
                             v_text = str(raw_val)[:400]
 
                         cur.execute("""
-                            INSERT INTO auto.spec_measurements
+                            INSERT INTO anxg_auto.spec_measurements
                               (variant_id, measure_key, value_num, value_text, unit,
                                source, source_ref, confidence, validated_status,
                                snapshot_year, raw)
@@ -292,8 +292,8 @@ def load_safety(*, dry_run: bool = False, batch: int = 200) -> LoadStats:
 
     # Neo4j 적재. Standard 노드는 load_seed_standards_plants 가 먼저 만들어둠.
     if edges:
-        driver = get_driver()
-        with driver.session() as session:
+
+        with get_session() as session:
             stats.edges_written = run_batched(
                 session, _MERGE_SAFETY_RATED_BY, edges, batch=batch,
             )

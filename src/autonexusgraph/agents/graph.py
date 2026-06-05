@@ -241,7 +241,7 @@ def run_agent(question: str, *,
     """단일 turn 실행 (blocking). PRD §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
 
     ``start_turn_context`` 가 ContextVar 격리된 CostTracker + Langfuse span 을
-    enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG ops.llm_usage 의
+    enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG anxg_ops.llm_usage 의
     meta JSONB 에 thread_id/turn_id/n_replans/domain 영구 적재.
 
     ``rerank`` (PRD §10 DoD #17 (d) 평가 매트릭스 ablation): None=기본(retrieve 도구
@@ -350,7 +350,7 @@ def run_agent_resume(thread_id: str, response: Any) -> AgentState:
     """interrupt 후 graph 재개 (blocking). PRD §7.5.6.
 
     동일 thread_id 의 checkpoint 에서 이어감 + Command(resume=response).
-    resume 는 새 turn 으로 간주 — 별도의 ops.llm_usage row + Langfuse span.
+    resume 는 새 turn 으로 간주 — 별도의 anxg_ops.llm_usage row + Langfuse span.
     langgraph 미설치 환경 → InterruptUnavailable 우회: 호출자가 새 turn 으로
     response 를 question 에 합쳐 재호출하는 패턴 권장.
     """

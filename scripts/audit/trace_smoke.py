@@ -8,7 +8,7 @@
   2. ``start_turn_context`` enter — 새 CostTracker (+ 키 있으면 Langfuse span).
   3. ``tracker.record(...)`` 로 가짜 토큰 적재 (input=100/output=50, mock 모델).
   4. ``turn.state`` 에 n_replans=2 + answer 박기.
-  5. exit → tracker.finalize → PG ops.llm_usage 의 meta JSONB 영구 적재 +
+  5. exit → tracker.finalize → PG anxg_ops.llm_usage 의 meta JSONB 영구 적재 +
      Langfuse span.update + flush.
   6. PG 검증: 최신 row 의 meta JSONB 에 thread_id/turn_id/n_replans 존재.
      n_calls/input_tokens/output_tokens/cost_usd > 0.
@@ -122,7 +122,7 @@ def _run_real_agent(thread_id: str) -> dict:
 
 
 def _verify_pg(thread_id: str) -> dict:
-    """ops.llm_usage 의 thread_id 일치 최신 row 검증."""
+    """anxg_ops.llm_usage 의 thread_id 일치 최신 row 검증."""
     try:
         from autonexusgraph.db.postgres import get_pool
     except Exception as e:   # noqa: BLE001
@@ -134,7 +134,7 @@ def _verify_pg(thread_id: str) -> dict:
                 """
                 SELECT run_id::text, caller, n_calls, input_tokens, output_tokens,
                        cost_usd, status, meta
-                FROM ops.llm_usage
+                FROM anxg_ops.llm_usage
                 WHERE meta ->> 'thread_id' = %s
                 ORDER BY started_at DESC
                 LIMIT 1

@@ -1,4 +1,4 @@
-"""P4 cross-validate — auto.staging_relations → Neo4j 적재 결정.
+"""P4 cross-validate — anxg_auto.staging_relations → Neo4j 적재 결정.
 
 규칙 (PRD §3.5, §6.7):
   - 정형 P2 와 일치 → validated (confidence boost = max(c_llm, 0.95))
@@ -22,7 +22,7 @@ import argparse
 import logging
 from dataclasses import dataclass, field
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.db.postgres import get_connection
 
 from ..loaders._neo4j_helpers import run_batched
@@ -49,7 +49,7 @@ def _resolve_component_id(cur, name_norm: str) -> tuple[int, int] | None:
     """
     cur.execute("""
         SELECT component_id, level
-          FROM auto.components
+          FROM anxg_auto.components
          WHERE name_norm = %s
          ORDER BY length(canonical_name) ASC
          LIMIT 1
@@ -60,7 +60,7 @@ def _resolve_component_id(cur, name_norm: str) -> tuple[int, int] | None:
 
 def _resolve_supplier_id(cur, name_norm: str) -> int | None:
     cur.execute("""
-        SELECT supplier_id FROM auto.master_suppliers
+        SELECT supplier_id FROM anxg_auto.master_suppliers
          WHERE name_norm = %s LIMIT 1
     """, (name_norm,))
     r = cur.fetchone()
@@ -70,7 +70,7 @@ def _resolve_supplier_id(cur, name_norm: str) -> int | None:
 def _resolve_recall_id(cur, head_text_norm: str) -> int | None:
     """LLM 이 추출한 head 가 recall 의 source_recall_no 또는 component_text 였을 수 있다."""
     cur.execute("""
-        SELECT recall_id FROM auto.events_recalls
+        SELECT recall_id FROM anxg_auto.events_recalls
          WHERE source_recall_no = %s
             OR LOWER(component_text) = %s
          LIMIT 1
@@ -79,11 +79,11 @@ def _resolve_recall_id(cur, head_text_norm: str) -> int | None:
     return r[0] if r else None
 
 
-# (:Module|:Part)-[:SUPPLIED_BY]->(:Supplier) — staging 에서 발생.
+# (:Anxg_Module|:Part)-[:SUPPLIED_BY]->(:Anxg_Supplier) — staging 에서 발생.
 _MERGE_SUPPLIED_BY = """
 UNWIND $rows AS r
-MATCH (c) WHERE c.id = r.component_id AND (c:Module OR c:Part)
-MATCH (s:Supplier {entity_id: r.supplier_entity_id})
+MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
+MATCH (s:Anxg_Supplier {entity_id: r.supplier_entity_id})
 MERGE (c)-[rel:SUPPLIED_BY]->(s)
 SET   rel.source_type      = 'llm_p3',
       rel.source_id        = r.source_id,
@@ -98,8 +98,8 @@ SET   rel.source_type      = 'llm_p3',
 
 _MERGE_RECALL_OF = """
 UNWIND $rows AS r
-MATCH (rc:Recall {id: r.recall_id})
-MATCH (c) WHERE c.id = r.component_id AND (c:Module OR c:Part)
+MATCH (rc:Anxg_Recall {id: r.recall_id})
+MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
 MERGE (rc)-[rel:RECALL_OF]->(c)
 SET   rel.source_type      = 'llm_p3',
       rel.source_id        = r.source_id,
@@ -148,11 +148,11 @@ def _validate_supplied_by(cur, row: dict) -> tuple[str, dict | None]:
 
     # 기존 deterministic (manual_supplier_seed) 와의 일치 검사 — Neo4j 에서 직접 확인.
     # 일치하면 confidence 부스팅 + validated.
-    with get_driver().session() as session:
+    with get_session() as session:
         rec = session.run(
             """
-            MATCH (c)-[r:SUPPLIED_BY]->(s:Supplier {entity_id: $sid})
-             WHERE c.id = $cid AND (c:Module OR c:Part)
+            MATCH (c)-[r:SUPPLIED_BY]->(s:Anxg_Supplier {entity_id: $sid})
+             WHERE c.id = $cid AND (c:Anxg_Module OR c:Part)
             RETURN r.source_type AS source_type, r.confidence_score AS conf
             """, cid=component_id, sid=str(sup_id),
         ).single()
@@ -199,7 +199,7 @@ def _validate_recall_of(cur, row: dict) -> tuple[str, dict | None]:
     }
     # P2 deterministic 매칭 존재 시 boost — load_recall_components 가 같은 pair 를 썼는지 확인.
     cur.execute("""
-        SELECT 1 FROM auto.events_recalls
+        SELECT 1 FROM anxg_auto.events_recalls
          WHERE recall_id = %s AND component_id = %s
     """, (recall_id, component_id))
     if cur.fetchone():
@@ -230,7 +230,7 @@ def _fetch_staging(cur, *, only_pending: bool = True) -> list[dict]:
                tail_kind, tail_text_norm, snapshot_year,
                head_text, tail_text, confidence_score, evidence_text,
                evidence_chunk_ids, gate_status, p4_decision
-          FROM auto.staging_relations
+          FROM anxg_auto.staging_relations
     """
     if only_pending:
         sql += " WHERE p4_decision IS NULL AND gate_status <> 'rejected'"
@@ -283,7 +283,7 @@ def run_p4(*, dry_run: bool = False, batch: int = 200) -> P4Stats:
     # PG 업데이트 — p4_decision 기록.
     with conn.cursor() as cur:
         cur.executemany("""
-            UPDATE auto.staging_relations
+            UPDATE anxg_auto.staging_relations
                SET p4_decision = %s,
                    p4_reason   = %s,
                    p4_at       = now()
@@ -300,8 +300,8 @@ def run_p4(*, dry_run: bool = False, batch: int = 200) -> P4Stats:
 
     # Neo4j 적재 — 관계 타입별 cypher.
     if payloads_by_rel:
-        driver = get_driver()
-        with driver.session() as session:
+
+        with get_session() as session:
             for rt, payloads in payloads_by_rel.items():
                 cypher = _CYPHER_BY_REL.get(rt)
                 if not cypher:
@@ -311,10 +311,10 @@ def run_p4(*, dry_run: bool = False, batch: int = 200) -> P4Stats:
                 conn = get_connection()
                 with conn.cursor() as cur:
                     cur.execute("""
-                        UPDATE auto.staging_relations
+                        UPDATE anxg_auto.staging_relations
                            SET neo4j_loaded_at = now()
                          WHERE staging_id IN (
-                           SELECT staging_id FROM auto.staging_relations
+                           SELECT staging_id FROM anxg_auto.staging_relations
                             WHERE relation_type = %s
                               AND p4_decision IN ('validated','candidate','needs_review')
                               AND neo4j_loaded_at IS NULL

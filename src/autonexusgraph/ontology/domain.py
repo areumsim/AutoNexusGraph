@@ -9,7 +9,7 @@ Neo4j Community Edition은 multi-database 미지원 → 단일 DB `neo4j` 안에
 - 매핑 없으면 None — 사용자 검토 대상
 
 쿼리 예시 (도메인 필터):
-    MATCH (n:Manufacturer) WHERE 'auto' IN coalesce(n.domain, []) OR n.domain = 'auto' RETURN n
+    MATCH (n:Anxg_Manufacturer) WHERE 'auto' IN coalesce(n.domain, []) OR n.domain = 'auto' RETURN n
     또는 한 번 normalize 후:
     MATCH (n) WHERE 'auto' IN n.domains RETURN n  ← Backfill 시 항상 list 로 통일하면 더 깔끔
 

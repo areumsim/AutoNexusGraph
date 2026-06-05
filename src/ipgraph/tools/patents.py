@@ -29,7 +29,7 @@ def lookup_patent(query: str, *, limit: int = 10) -> list[dict[str, Any]]:
     sql = """
     SELECT pub_no, app_no, title, filing_date, grant_date, kind,
            jurisdiction, source
-      FROM ip.patents
+      FROM anxg_ip.patents
      WHERE pub_no = %s OR title ILIKE %s
      ORDER BY filing_date DESC NULLS LAST
      LIMIT %s
@@ -54,12 +54,12 @@ def get_patent_info(pub_no: str) -> dict[str, Any] | None:
            array_agg(DISTINCT a.name) FILTER (WHERE a.name IS NOT NULL) AS assignees,
            array_agg(DISTINCT c.cpc_code) FILTER (WHERE c.cpc_code IS NOT NULL) AS cpc_codes,
            array_agg(DISTINCT i.name) FILTER (WHERE i.name IS NOT NULL) AS inventors
-      FROM ip.patents p
-      LEFT JOIN ip.patent_assignees pa ON pa.pub_no = p.pub_no
-      LEFT JOIN ip.assignees a         ON a.assignee_id = pa.assignee_id
-      LEFT JOIN ip.patent_cpc c        ON c.pub_no = p.pub_no
-      LEFT JOIN ip.patent_inventors pi ON pi.pub_no = p.pub_no
-      LEFT JOIN ip.inventors i         ON i.inventor_id = pi.inventor_id
+      FROM anxg_ip.patents p
+      LEFT JOIN anxg_ip.patent_assignees pa ON pa.pub_no = p.pub_no
+      LEFT JOIN anxg_ip.assignees a         ON a.assignee_id = pa.assignee_id
+      LEFT JOIN anxg_ip.patent_cpc c        ON c.pub_no = p.pub_no
+      LEFT JOIN anxg_ip.patent_inventors pi ON pi.pub_no = p.pub_no
+      LEFT JOIN anxg_ip.inventors i         ON i.inventor_id = pi.inventor_id
      WHERE p.pub_no = %s
      GROUP BY p.pub_no
     """
@@ -85,7 +85,7 @@ def list_patents_by_assignee(assignee_id: str,
     """assignee 의 특허 목록 — 연도 / CPC 필터.
 
     Args:
-        assignee_id: ip.assignees.assignee_id (USPTO assignee_id 또는 KIPRIS applicantNo)
+        assignee_id: anxg_ip.assignees.assignee_id (USPTO assignee_id 또는 KIPRIS applicantNo)
         year_range: (from, to) inclusive — filing_date 기준
         cpc: CPC 코드 (prefix 매칭)
         limit: 결과 행 수 (1~500)
@@ -100,15 +100,15 @@ def list_patents_by_assignee(assignee_id: str,
         clauses.append("EXTRACT(YEAR FROM p.filing_date) BETWEEN %s AND %s")
         params.extend([year_range[0], year_range[1]])
     if cpc:
-        joins.append("JOIN ip.patent_cpc pc ON pc.pub_no = p.pub_no")
+        joins.append("JOIN anxg_ip.patent_cpc pc ON pc.pub_no = p.pub_no")
         clauses.append("pc.cpc_code LIKE %s")
         params.append(f"{cpc}%")
     where = " AND ".join(clauses)
     join_sql = "\n".join(joins)
     sql = f"""
     SELECT p.pub_no, p.title, p.filing_date, p.jurisdiction
-      FROM ip.patents p
-      JOIN ip.patent_assignees pa ON pa.pub_no = p.pub_no
+      FROM anxg_ip.patents p
+      JOIN anxg_ip.patent_assignees pa ON pa.pub_no = p.pub_no
       {join_sql}
      WHERE {where}
      ORDER BY p.filing_date DESC NULLS LAST
@@ -139,9 +139,9 @@ def count_patents_by_field(assignee_id: str, cpc_section: str,
         params.extend([year_range[0], year_range[1]])
     sql = f"""
     SELECT pc.cpc_code, COUNT(p.pub_no) AS n_patents
-      FROM ip.patents p
-      JOIN ip.patent_assignees pa ON pa.pub_no = p.pub_no
-      JOIN ip.patent_cpc pc       ON pc.pub_no = p.pub_no
+      FROM anxg_ip.patents p
+      JOIN anxg_ip.patent_assignees pa ON pa.pub_no = p.pub_no
+      JOIN anxg_ip.patent_cpc pc       ON pc.pub_no = p.pub_no
      WHERE pa.assignee_id = %s
        AND pc.cpc_code LIKE %s
        {extra}
@@ -170,14 +170,14 @@ def compare_assignees_patent_volume(assignee_ids: list[str], year: int,
     cpc_join = ""
     cpc_where = ""
     if cpc:
-        cpc_join = "JOIN ip.patent_cpc pc ON pc.pub_no = p.pub_no"
+        cpc_join = "JOIN anxg_ip.patent_cpc pc ON pc.pub_no = p.pub_no"
         cpc_where = "AND pc.cpc_code LIKE %s"
         params.append(f"{cpc}%")
     sql = f"""
     SELECT pa.assignee_id, a.name, COUNT(DISTINCT p.pub_no) AS n_patents
-      FROM ip.patents p
-      JOIN ip.patent_assignees pa ON pa.pub_no = p.pub_no
-      JOIN ip.assignees a         ON a.assignee_id = pa.assignee_id
+      FROM anxg_ip.patents p
+      JOIN anxg_ip.patent_assignees pa ON pa.pub_no = p.pub_no
+      JOIN anxg_ip.assignees a         ON a.assignee_id = pa.assignee_id
       {cpc_join}
      WHERE pa.assignee_id = ANY(%s)
        AND EXTRACT(YEAR FROM p.filing_date) = %s
