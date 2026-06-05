@@ -6,7 +6,7 @@
 >
 > **갱신 주기**: PR 마지막 단계에서 항목 추가·이동·완료. `make audit-dod` 가 자동 반영하는 항목은 (자동) 라벨.
 >
-> **버전**: v1.1 (2026-06-05, 본 세션 발견 anchor — O-7/O-8/E-8/F-8 추가). **86 항목 / 15 카테고리 / P0+/P0/P1/P2/P3 트래픽라이트** (이전 v1.0 "83 항목" 표기는 카테고리별 카운트 합과 안 맞아 본 PR 에서 정정).
+> **버전**: v1.2 (2026-06-05, eval matrix 실측 + 신규 런타임 버그 anchor — S-4/PG-2/E-1/E-3 결과 반영 + A-7/A-8/A-9 추가). **89 항목 / 15 카테고리 / P0+/P0/P1/P2/P3 트래픽라이트** (v1.1 86 항목 → +3 신규 / S-4 측정 완료 — thesis 반증 신호).
 
 ---
 
@@ -16,7 +16,7 @@
 |---|---:|---:|---:|---:|---:|
 | 1. 데이터 인입 (키 / bulk download) | 10 | 2 | 2 | 1 | 5 |
 | 2. 그래프·엣지 적재 | 6 | 1 | 1 | 2 | 2 |
-| 3. 에이전트·도구·HITL | 6 | 0 | 2 | 2 | 2 |
+| 3. 에이전트·도구·HITL | 9 | 0 | 3 | 4 | 2 |
 | 4. 상용 신호 (MCP / Langfuse / SHACL / 매트릭스) | 6 | 0 | 3 | 2 | 1 |
 | 5. 운영·보안·배포 | 8 | 2 | 1 | 4 | 1 |
 | 6. Bridge·데이터 품질·calibration | 5 | 1 | 1 | 1 | 2 |
@@ -29,7 +29,7 @@
 | 13. NCAP / Euro NCAP / IIHS | 4 | 0 | 0 | 0 | 4 |
 | 14. 라우팅·정책·미정 결정 | 2 | 0 | 0 | 1 | 1 |
 | 15. 온톨로지·schema | 2 | 0 | 0 | 1 | 1 |
-| **합계** | **86** | **7** | **19** | **29** | **26** |
+| **합계** | **89** | **7** | **20** | **31** | **26** |
 
 ### 우선순위 정의
 
@@ -81,9 +81,12 @@
 | A-1 | **`sensitive_decision` HITL trigger 정책** | wired (interrupts.py) + 휴리스틱 활성 (SENSITIVE_KEYWORDS 10종) | P1 | 운영 데이터에서 false-positive 측정 → 키워드 정정. nodes.py:668~688 게이트 활성 | README §7 (HITL sensitive_decision 행) |
 | A-2 | **P3 LLM 4종 활성화** — COMPETES_WITH / MANUFACTURED_AT(LLM) / CONTAINS_MODULE / CONTAINS_PART | `enabled:false` | P1 | 비용·환각 위험 검증 후 selectively 활성. validation gate 강화 | README §12.5, ontology/auto/relations.yaml:226-235 |
 | A-3 | **HITL `clarification`/`cost_approval` 무한 루프 가드** | wired | P2 | (P2) Streamlit dialog 의 resume 재진입 횟수 cap. 의도적이지만 미구현 | docs/operations/agents.md |
-| A-4 | **새 Cypher 템플릿** — recall 전파 · 공급 집중도 · 시점 정합 cross | finance 22 + auto 24 + ip 25 = 71 | P2 | use case 별 신규 템플릿. 자유 Cypher 금지 원칙 유지 | README §12.5 |
+| A-4 | **새 Cypher 템플릿** — recall 전파 · 공급 집중도 · 시점 정합 cross | finance 22 + auto 27 + ip 25 = 74 | P2 | use case 별 신규 템플릿. 자유 Cypher 금지 원칙 유지 | README §12.5 |
 | A-5 | **N-domain bridge 일반화** — `bridge.drug_entity` 등 다형 | `bridge.corp_entity` 만 (2-domain 가정) | P3 | 4번째 도메인 추가 시. 또는 `bridge.cross` 다형 1 테이블 | README §12.5 |
 | A-6 | **DomainHandler intent allowlist 확장** | finance / auto / ip 각각 정의 | P3 | 새 도메인 추가 시 자동 확장. 신규 intent 추가 시 화이트리스트 갱신 | src/autonexusgraph/agents/_domain_handler.py |
+| A-7 | **LangGraph checkpointer Date msgpack 직렬화 실패** | 본 세션 발견 (2026-06-05) — `[run_agent] LangGraph 실행 실패 — 함수 체인 폴백: Type is not msgpack serializable: Date` (eval matrix 30 cells 중 다수). Cypher 결과의 `neo4j.time.Date` 객체가 checkpointer 직렬화 단계에서 실패 → 함수 체인 fallback 으로 우회 (silent degrade) | P1 | tools/graph.py 또는 cypher 결과 변환 단계에서 `Date` → ISO `str` 변환. fallback 통계 (몇 % turn 이 함수체인으로 떨어지는지) 측정. 회귀 가드 추가 | src/autonexusgraph/agents/graph.py · src/autograph/tools/graph.py |
+| A-8 | **calculator tool expr 누락 호출 패턴** | 본 세션 발견 (2026-06-05) — `[calculator] failed: expr 필요` (eval log 다수). LLM planner 가 calculator task 생성 시 args 에 expr 누락 → tool 즉시 fail. | P2 | calculator tool args 검증 보강 (expr 부재 시 명확한 에러 + planner 가 retry 유도). 또는 LLM planner prompt 에 calculator 호출 시 expr 필수 명시 + 예시 추가 | src/autonexusgraph/tools/calculator.py · src/autonexusgraph/agents/llm_planner.py |
+| A-9 | **planner 화이트리스트 밖 sql:매출 조회 drop** | 본 세션 발견 (2026-06-05) — `[llm_planner] 화이트리스트 밖 N task drop: ['sql:현대모비스 매출 조회', 'research:매출 추이 검색', 'graph:이재용 임원 회사 검색']` 다수. LLM planner 가 자연어 task description 생성 → DomainHandler allowlist (좁은 intent 집합) 와 매칭 안 됨 → 전 task drop → 결과 없음 → grounding fail | P2 | (a) DomainHandler allowlist 를 LLM planner prompt 에 명시 노출 (b) intent 정규화 layer 추가 (LLM 자연어 → intent enum 매핑) (c) drop 률 측정 + 임계 초과 시 alert | src/autonexusgraph/agents/_domain_handler.py · src/autonexusgraph/agents/llm_planner.py |
 
 ---
 
@@ -94,7 +97,7 @@
 | S-1 | **MCP 래퍼** — typed tool pool 59 tools (finance 21 + auto 38) | (wired) — `make audit-mcp` SDK 설치 시 **PASS** (build_mcp_server boot + 59 tools, 2026-06-04), 미설치 시 SKIPPED(fail-soft) | **P0+** | `pip install -e ".[mcp]"` 또는 `[all]` extras → `python -m autonexusgraph.mcp` stdio server | README §10.17 (a) |
 | S-2 | **Langfuse 실측 ON (turn별 token/cost/replan)** | (wired) — Langfuse 4.x OTEL native. **2026-06-04**: `audit-trace` 가 PG 적재 경로와 Langfuse export 를 분리 — LANGFUSE 키 없이도 PG token/cost/replan 실측 PASS (이전엔 키 부재 시 no-op SKIP). cloud export 만 키 대기 | **P0+** | (PG 경로 ✅) `LANGFUSE_*` 키 → `make audit-trace --full` 로 cloud export 까지 · [runbook Step 3](./docs/operations/api_keys_pending.md#step-3--langfuse-cloud-export-선택-langfuse-키-발급-시) | README §10.17 (b) |
 | S-3 | **온톨로지 SHACL/pydantic 검증** | ✅ **완료** — 핵심 6 yaml + **보조 4 yaml(Y-1: `auto`/`finance` extractors · system_taxonomy · plants, `extra='forbid'` strict)** + cypher↔yaml cross-check 모두 PASS. cross-domain ref strict 모드(Y-2 `--strict-cross`). `make audit-ontology`(`ontology_validate.py` + `tests/test_ontology_aux.py` 5건). **잔여**: SHACL 정식 shape 그래프는 pydantic v2 로 대체(의도된 trade-off, PRD §11.1) | (완료) | — | README §10.17 (c) |
-| S-4 | **축소 평가 매트릭스 실측 (4 어댑터 × FAST tier 1종 + rerank ablation)** | (wired, **ablation 정합 수정 완료**) — 8 cells enumerate PASS. **2026-06-04**: rerank ablation 이 `run_agent→research_worker→search_documents` 까지 실제 전파(hybrid_rerank0≠rerank1 분리, 이전엔 hybrid no-op) + thesis hits@k fallback 부활(`_run_cell_full` 의 `multi_hop_hits` 추출 누락 수정). **full 실행 결과 전 셀 0.000 — LLM 키 3종(OpenAI 401/Google expired/Anthropic 401) 전부 만료**로 thesis 측정 차단 (과금 0). 코드측 준비 완료, 유효 키 1개면 즉시 실측 | **P0+** | LLM 키(다음 주 갱신 예정, [api_keys_pending §0](./docs/operations/api_keys_pending.md)) → `make audit-eval-matrix-full` → `eval/reports/<run>/summary.md` 첨부 + Allganize 외부 벤치 stub 채움 · [runbook Step 1](./docs/operations/api_keys_pending.md#step-1--평가-매트릭스-full-실측-15-30-분-5-20) | README §10.17 (d) |
+| S-4 | **축소 평가 매트릭스 실측 (4 어댑터 × FAST tier 1종 + rerank ablation)** | ✅ **측정 완료** (2026-06-05, Anthropic claude-haiku-4-5, 10 cells × 30 row = 300 evals, total **$0.60**) — **thesis hybrid−vector = +0.0%p ❌** (둘 다 EM=0). hits@k: **vector 0.967 > sql_vec 0.900 > hybrid 0.433 > graph 0.300** — ⚠️ **반증 신호** (vector 가 hybrid 보다 우세, PRD §10.7 가정 반대 방향. 가설: gold 30 row 의 multi-hop 비율 낮음 + Neo4j 그래프 sparse). planner ablation: 룰 $0.051 / LLM $0.044 (LLM 저렴), 양쪽 EM=0. DoD §10.7/§10.13/§10.17.d ❌ 실측 신규 / §10.14 ✅ internal pass=100%. (잔여: OpenAI billing + Google SDK + 데이터 보강 후 재측정) | **P0+** | (1) OpenAI billing 충전 후 8 cells 추가 (2) `pip install google-generativeai` + 키 검증 → 12 cells (3) gold QA 확장 + Neo4j 적재 보강 후 thesis 재검증 · [runbook Step 1](./docs/operations/api_keys_pending.md#step-1--평가-매트릭스-full-실측-15-30-분-5-20) | README §10.17 (d), 결과 JSON: `data/reports/audit_eval_matrix_20260605T065225Z.json` |
 | S-5 | **§10.12 baseline reset 정책 dashboard 자동 반영** | (wired) — baseline reset 2회 이력 | P1 | `make audit-dod` 출력에 baseline commit + 누적 reset 이력 + "도메인 추가 마다 reset" 명시 (대부분 완료, dashboard 표시만 보강) | README §10.12 |
 | S-6 | **api_keys_pending.md §"One-Shot Runbook" ↔ BACKLOG cross-link** | ✅ **완료** (2026-06-05) — 5 row 활성화 트리거에 `[runbook Step N]` cross-link 추가: S-4·E-1 → Step 1, Q-2 → Step 2, S-2 → Step 3, E-3 → Step 4. D-2/D-3/D-8 은 runbook 비대상(LLM 키 외 외부 API) — 미적용. | (완료) | — | docs/operations/api_keys_pending.md §"One-Shot Runbook" |
 
@@ -131,9 +134,9 @@
 
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
-| E-1 | **12 조합 매트릭스 실측** (4 어댑터 × 3 LLM) | 측정 대기 | P1 | `make eval-full / eval-auto / eval-cross` 풀 실행 + LLM 키 + `eval/reports/<run>/summary.md` PR 첨부 · [runbook Step 1](./docs/operations/api_keys_pending.md#step-1--평가-매트릭스-full-실측-15-30-분-5-20) | README §12.6 |
+| E-1 | **12 조합 매트릭스 실측** (4 어댑터 × 3 LLM) | ⚠️ **Anthropic 단일 실측 완료** (2026-06-05, 4 cells × FAST × rerank ablation = 10 cells, $0.60) — vector hits 0.97 (max) > sql_vec 0.90 > hybrid 0.43 > graph 0.30. 모든 cell EM=0 (gold answer mismatch, data shortage 가설). multi-provider 비교는 OpenAI billing + Google SDK 후 8 cells 보강 | P1 | OpenAI billing 충전 + `pip install google-generativeai` 후 anthropic + openai + google 풀 매트릭스 실측. cross-provider 차이 + thesis 재검증 · [runbook Step 1](./docs/operations/api_keys_pending.md#step-1--평가-매트릭스-full-실측-15-30-분-5-20) | README §12.6, 결과 JSON: `data/reports/audit_eval_matrix_20260605T065225Z.json` |
 | E-2 | **gold QA 확장** — finance 30 / auto 46 / cross 44 / ip 30 → 각 100 row + 외부 큐레이터 30% | seed 적재 완료 | P1 | 사람 라벨링 + 외부 큐레이터 채널 확보 (Allganize 흡수 워크플로 포함) | README §12.6, docs/gold_qa_guide.md |
-| E-3 | **§10.13/14 trace 메트릭** — hop 수 + tool call sequence | ✅ **구현** — `agents/hop_metrics.py` (tool_results→hop/seq 파생) → per-turn trace 기록 (Langfuse `end_meta` + PG `chat.messages.agent_trace`) + eval pred_row `hop_count`(cypher 파생) + `main_hop_efficiency` 실제 hop 경로(`hybrid_vs_vector_hops`). 테스트 15건. **잔여**: §10.13 ✅ 전환은 LLM eval 1회 실행 후(현재 manifest 는 simulation) | (도구 완료) | LLM 키 → `make eval-auto` · [runbook Step 4](./docs/operations/api_keys_pending.md#step-4--dod-20항-트래픽라이트-재측정-5-분) | README §12.6 |
+| E-3 | **§10.13/14 trace 메트릭** — hop 수 + tool call sequence | ✅ **구현 + 실측** (2026-06-05) — `agents/hop_metrics.py` (tool_results→hop/seq 파생) → per-turn trace 기록 (Langfuse `end_meta` + PG `chat.messages.agent_trace`) + eval pred_row `hop_count`(cypher 파생) + `main_hop_efficiency` 실제 hop 경로(`hybrid_vs_vector_hops`). 테스트 15건. **simulation → 실측 전환 완료**: §10.13 ❌ (hybrid/vector ev_avg ratio 1.067 > 0.7, audit_eval_matrix_20260605T065225Z.json) / §10.14 ✅ (internal pass=100%) | (완료, 실측) | (잔여) hybrid 가 vector 보다 효율 떨어지는 원인 분석 + 그래프 적재 보강 후 재측정 | README §12.6 |
 | E-4 | **답변 사용자 피드백 루프** — 👍/👎/📝 → 저장소 + 분석 | ✅ **분석 routine 완료** (2026-06-05) — `anxg_chat.feedback` 스키마는 `01_schema.sql:132-140` 에 이미 존재 (BACKLOG stale 정정), UI `record_feedback`(ui/storage.py) 도 작동. 본 PR 보강: 마이그 30 (`updated_at` 컬럼 신규 — ON CONFLICT 시 created_at 보존), UI ON CONFLICT 정정, 신규 `feedback_stats.py` (전 기간/최근 N일 분포 + 부정 message 상위), Makefile `feedback-stats`, 회귀 가드 14건. **잔여**: 저주파 retraining loop (분기 단위) 는 비전 단계 — 별도 항목. | (도구 완료) | feedback 누적 후 retraining 정책 수립 | README §12.6 |
 | E-5 | **Vector RAG 공정성 검증** — gold QA "Vector 도 풀 수 있는 질문" 비율 | 매트릭스 내 Vector adapter 단독 측정 | P2 | 작성자 편향 완화 — 사람 검증 또는 외부 큐레이터 | README §12.6 |
 | E-6 | **performance benchmark** — p50/p95/p99 latency + 평균 토큰·cost/turn | PRD 목표만, 실측 미수행 | P3 | E-1 풀 실측 후 dashboard 구축 | README §12.7 |
@@ -162,8 +165,8 @@
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
 | PG-1 | **DoD #19 회사 귀속 인스턴스 `PERFORMED_AT` ≥ 30** | ✅ **충족 94/30** — manual_seed 35 validated + factoryon 59 candidate(A공장/추론공정). :Plant 29→103, OWNS_PLANT 53→60. **ProcessGraph "주요 축" 핵심 게이트 통과** | (완료) | — | README §10.19, docs/process_graph.md |
-| PG-2 | **DoD #20 cross 정확도 ≥ 50% — 공정↔재무 / 결함전파** | ⚠️ 부분 — G-1(PERFORMED_AT 94)+G-4(CAUSED_BY_PROCESS 96) 적재로 **결함전파·공정↔재무 경로 구조 완성**. 정확도 실측만 LLM 키 대기 | P1 | LLM 키 (G-1·G-4 ✅) | README §10.20 |
-| PG-3 | **row 단위 동적 confidence 격상 실측** | wired (`scripts/upgrade_processes_confidence.py`) | P2 | 1회 풀런 ≤ $2 + GPU 1분 (idempotent). 격상률 15~30% 예상 | README §4.0.1 |
+| PG-2 | **DoD #20 cross 정확도 ≥ 50% — 공정↔재무 / 결함전파** | ⚠️ 부분 — G-1(PERFORMED_AT 94)+G-4(CAUSED_BY_PROCESS 96) 적재로 **결함전파·공정↔재무 경로 구조 완성**. 2026-06-05 audit-eval-matrix-full 측정 완료 (Anthropic, EM=0 / hits hybrid 0.43) — **cross 정확도 별도 측정 미실행** (eval-cross 따로 필요) | P1 | `LLM_PROVIDER=anthropic make eval-cross` → cross-domain 4단계 (CD-L1~L4) 정확도 측정 + 결과 PR 첨부 | README §10.20 |
+| PG-3 | **row 단위 동적 confidence 격상 실측** | ⚠️ **시그니처 잠금만 (P0-B)** — `src/autograph/extractors/process_confidence.py:62` `compute()` 가 `NotImplementedError` (PR-P3-B 대기). caller: `tests/test_process_confidence.py` (raise 검증). `scripts/upgrade_processes_confidence.py` 는 docstring 상 import 약속만, 실 import 미실현 | P2 | PR-P3-B 본문 (PRD §3.5.1 8 시그널 수식 + 등급 판정) 채우기 → `scripts/upgrade_processes_confidence.py` 에서 import + 1회 풀런 ≤ $2 + GPU 1분 (idempotent). 격상률 15~30% 예상 | README §4.0.1 |
 | PG-4 | **KAMP 카탈로그 + 산단공 정규화 사전 적재** | ✅ **`auto.kamp_catalog` 50 row** (data.go.kr 15089213 무인증 다운, 13 industry × 11 process_category, 37 unique 공정 → 33 정규화 매핑 inline `_PROCESS_NORM`) + 신규 OEM/공정 출처 3건 (KAMP catalog + NASA PCoE + EU Safety Gate) — 가이드 우선순위 (KAMP→MaintNet→DEFECT_MATCHES→...) 5/7 완료 | (완료) | KAMP 본체 데이터셋은 **냉철 평가 후 보류 결정** — 출처 익명+단일 라인이라 NHTSA+KOTSA 자체 :DefectType 50 + NASA PCoE :FailureMode 18 보다 한계 효용 낮음 | docs/data_lineage.md §2.14 |
 
 ---
