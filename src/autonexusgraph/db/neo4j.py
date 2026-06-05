@@ -7,8 +7,37 @@ PRD §4.3 — Neo4j는 관계 중심(자회사/임원/산업) 저장소.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from ..config import get_settings
+
+
+def serialize_value(v: Any) -> Any:
+    """neo4j.time.* / Duration 등 msgpack 비호환 객체를 ISO string 으로 변환.
+
+    LangGraph checkpointer 가 ``msgpack`` 으로 AgentState 를 직렬화할 때
+    ``neo4j.time.Date`` 같은 외부 타입은 'Type is not msgpack serializable: Date'
+    로 실패해 함수체인 폴백을 유발한다 (eval matrix 2026-06-05 발견, BACKLOG A-7).
+    원시 타입은 그대로, ``isoformat()`` 이 있으면 그것을, 그 외는 ``str()`` 으로 변환.
+    """
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    if isinstance(v, list):
+        return [serialize_value(x) for x in v]
+    if isinstance(v, dict):
+        return {k: serialize_value(x) for k, x in v.items()}
+    iso = getattr(v, "isoformat", None)
+    if callable(iso):
+        try:
+            return iso()
+        except Exception:   # noqa: BLE001 — isoformat() 실패 시 str fallback
+            pass
+    return str(v)
+
+
+def serialize_record(rec: Any) -> dict:
+    """Neo4j ``Record`` → dict + value sanitize. ``_run`` 결과 row 표준 변환."""
+    return {k: serialize_value(v) for k, v in dict(rec).items()}
 
 
 @lru_cache(maxsize=1)
