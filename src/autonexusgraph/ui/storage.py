@@ -180,13 +180,15 @@ def record_feedback(message_id: int, rating: int, comment: str | None = None) ->
     anxg_chat.messages.id (BIGINT) 가 필요하다 → load_history 가 id 도 같이 반환하도록 확장.
     """
     from ..db.postgres import get_pool
+    # ON CONFLICT 갱신 시 created_at 은 첫 작성 시각으로 보존, updated_at 만 갱신.
+    # 마이그 30_chat_feedback_updated_at.sql 적용 후 동작 (이전엔 created_at 덮어씀).
     sql = """
     INSERT INTO anxg_chat.feedback (message_id, rating, comment)
     VALUES (%s, %s, %s)
     ON CONFLICT (message_id) DO UPDATE
       SET rating = EXCLUDED.rating,
           comment = EXCLUDED.comment,
-          created_at = now()
+          updated_at = now()
     """
     try:
         with get_pool().connection() as conn, conn.cursor() as cur:

@@ -379,6 +379,9 @@ embed-chunks:                                        # vec.chunks.embedding 채�
 embed-status:                                        # vec.chunks 임베딩 backfill 진행률 (Q-4, read-only; --json)
 	PYTHONPATH=src $(PYTHON) -m autonexusgraph.embed_status $(ARGS)
 
+feedback-stats:                                      # anxg_chat.feedback 분포·최근 N일·부정 message 상위 (E-4, read-only; --json --days N)
+	PYTHONPATH=src $(PYTHON) -m autonexusgraph.feedback_stats $(ARGS)
+
 # ── API + Web UI ────────────────────────────────────────────────────────────
 serve-api:                                           # FastAPI /chat 엔드포인트
 	$(PYTHON) -m uvicorn autonexusgraph.api.main:app --host 0.0.0.0 --port 31020 --reload
