@@ -13,7 +13,6 @@ from autonexusgraph.safety import (
     escape_for_xml_tag,
     extract_bind_params,
     is_high_risk_injection,
-    korean_char_ratio,
     sanitize_user_input,
 )
 

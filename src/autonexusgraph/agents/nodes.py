@@ -17,11 +17,10 @@ cost guard 적용 원칙 (사용자 명시):
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from . import session
 from ._domain_handler import call_handler_method, get_handler
-from .policy import classify_question, select_tools, turn_budget_exceeded
+from .policy import classify_question, turn_budget_exceeded
 from .state import AgentState
 from .temporal import extract_year_hint, normalize_temporal_terms
 

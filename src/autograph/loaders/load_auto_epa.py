@@ -51,7 +51,7 @@ import io
 import json
 import logging
 import zipfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 

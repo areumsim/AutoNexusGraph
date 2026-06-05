@@ -15,13 +15,11 @@ from pathlib import Path
 import pytest
 
 from autonexusgraph.agents._domain_handler import (
-    DomainHandler,
     auto_detect_domain,
     call_handler_method,
     get_handler,
     list_handlers,
     register_handler,
-    register_router,
     unregister_handler,
 )
 

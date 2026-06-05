@@ -32,7 +32,6 @@ from pathlib import Path
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._license import (
-    LICENSE_POLICY,
     OEM_NEWSROOM_POLICY,
     allow_body,
 )

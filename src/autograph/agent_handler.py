@@ -22,7 +22,6 @@ from collections.abc import Callable
 from typing import Any
 
 from autonexusgraph.agents._domain_handler import (
-    DomainHandler,
     register_handler,
     register_router,
 )

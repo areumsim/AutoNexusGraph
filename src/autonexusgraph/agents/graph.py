@@ -26,14 +26,12 @@ from .state import AgentState
 from .supervisor import (
     mid_execution_reflect,
     sup_send_directives,
-    supervisor_done,
     supervisor_node,
 )
 from .tracing import start_turn_context
 from .validator import MAX_REPLANS, mark_replan, should_replan, validator_node
 from .workers import (
     calculator_worker,
-    dispatch_one,
     graph_worker,
     research_worker,
     sql_worker,

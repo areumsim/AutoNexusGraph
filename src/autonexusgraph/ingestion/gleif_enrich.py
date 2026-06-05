@@ -32,7 +32,6 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
 
 log = logging.getLogger(__name__)
 

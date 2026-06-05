@@ -19,7 +19,6 @@ import yaml
 
 from autonexusgraph.ontology import (
     EDGE_REQUIRED_META_KEYS,
-    OntologyFile,
     OntologyValidationError,
     load_and_validate,
     validate_dict,

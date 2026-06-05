@@ -11,7 +11,6 @@ conn.commit()`` 7회 반복 패턴을 단일 helper 로 통합.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
 

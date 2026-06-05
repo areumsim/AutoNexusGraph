@@ -13,9 +13,7 @@ cost guard:
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 
-from ..config import get_settings
 from .state import AgentState, QuestionKind
 
 # 룰 기반 1차 분류 — 빠르고 LLM 호출 없음. 모호하면 'unknown' → planner LLM 이 재분류.

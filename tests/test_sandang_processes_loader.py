@@ -6,9 +6,7 @@ integration 테스트 영역.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 from autograph.loaders.load_sandang_processes import (
     _find_csv,
@@ -99,7 +97,6 @@ def test_run_dry_run_with_explicit_csv(tmp_path):
 
 def test_run_missing_csv_returns_graceful(tmp_path, monkeypatch):
     """CSV 없으면 0 returns + warning 만 — exit 1 안 함."""
-    from autonexusgraph.config import get_settings
     # csv_path None + datagokr 디렉토리 비어있음 → 빈 결과
     result = run(csv_path=str(tmp_path / "nonexistent.csv"), dry_run=True)
     assert result["inserted"] == 0

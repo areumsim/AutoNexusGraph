@@ -9,9 +9,8 @@ READ-ONLY 쿼리만. PG 측에서도 read-only role 권장 (운영 시).
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
 from ..db.postgres import get_connection
 

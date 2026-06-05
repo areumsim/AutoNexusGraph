@@ -5,14 +5,10 @@ DB / HTTP 모두 mock — 파서·매핑·CSV iteration 만 실제.
 
 from __future__ import annotations
 
-import csv
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 
 # ── ingestion 모듈 ─────────────────────────────────────────

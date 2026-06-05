@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
 
 from autonexusgraph.agents.temporal import extract_year_hint, normalize_temporal_terms
 

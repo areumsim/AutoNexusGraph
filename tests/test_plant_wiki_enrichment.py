@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from unittest import mock
 
-import pytest
 
 from autograph.loaders import load_plant_wiki_enrichment as L
 

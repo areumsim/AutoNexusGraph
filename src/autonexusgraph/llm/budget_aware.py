@@ -62,7 +62,6 @@ class BudgetAwareLLMClient(LLMClient):
         # stream 은 provider 가 usage 를 노출 안 하는 경우가 많아 char/3 보수적 추정.
         # (과거: 여기서 record 를 안 해 스트리밍 비용이 tracker 누적에 빠져 guard 가
         # 영영 안 터지는 누수가 있었음 — finally 에서 종료/중단 시 1회 record.)
-        from .cost import cost_of_call
         t0 = time.monotonic()
         chunks: list[str] = []
         try:

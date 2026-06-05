@@ -5,13 +5,10 @@ DB / 파일 시스템 모킹 — TAB 파싱 + variant 매칭 + 청크 적재 시
 
 from __future__ import annotations
 
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 
 # ── ingestion 모듈 — manual mode ──────────────────────────

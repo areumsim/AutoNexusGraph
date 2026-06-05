@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
 
 KIPRIS_BASE = "http://plus.kipris.or.kr/openapi/rest"
 

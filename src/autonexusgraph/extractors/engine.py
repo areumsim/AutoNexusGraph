@@ -17,7 +17,7 @@ import logging
 import time
 from collections.abc import Sequence
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..llm.cost_tracker import BudgetExceeded
 from .base import BaseExtractor, ExtractorResult, RunContext

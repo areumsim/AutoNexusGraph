@@ -20,9 +20,8 @@ import argparse
 import csv
 import json
 import logging
-from pathlib import Path
 
-from autonexusgraph.ingestion._common import raw_dir, save_raw
+from autonexusgraph.ingestion._common import raw_dir
 
 from ..config import get_auto_settings
 

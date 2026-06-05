@@ -60,7 +60,6 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection

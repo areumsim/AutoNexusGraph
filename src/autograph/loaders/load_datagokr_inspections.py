@@ -15,7 +15,6 @@ import argparse
 import json
 import logging
 import sys
-from pathlib import Path
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection

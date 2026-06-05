@@ -14,7 +14,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 def _patch_path(monkeypatch, tmp_path: Path) -> Path:

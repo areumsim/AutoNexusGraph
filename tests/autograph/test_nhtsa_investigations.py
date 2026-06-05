@@ -5,13 +5,10 @@ DB / Neo4j / HTTP 모두 mock — 파서·매핑·zip iteration·SQL 호출 시�
 
 from __future__ import annotations
 
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 
 # ── ingestion 모듈 ─────────────────────────────────────────

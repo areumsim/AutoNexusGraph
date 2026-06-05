@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -16,7 +15,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.ingestion._common import (
     CheckpointStore,
-    fetch_with_retry,
     get_rate_limiter,
     save_raw,
 )

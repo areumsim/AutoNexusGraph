@@ -7,10 +7,8 @@ integration 영역.
 from __future__ import annotations
 
 import zipfile
-from pathlib import Path
 from unittest import mock
 
-import pytest
 
 from autograph.extractors.dart_production_parser import PlantRow
 from autograph.loaders import load_dart_production as L

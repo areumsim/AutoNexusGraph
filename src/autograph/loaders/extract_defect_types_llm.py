@@ -17,7 +17,6 @@ import argparse
 import json
 import logging
 import re
-from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
 

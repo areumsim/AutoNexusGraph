@@ -11,7 +11,6 @@ CrossDomainHandler / route_domain 이 등록되어 ``auto`` / ``cross_domain``
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 from unittest import mock
 

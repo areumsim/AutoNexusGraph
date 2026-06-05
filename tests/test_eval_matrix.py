@@ -12,8 +12,6 @@ from __future__ import annotations
 from eval.adapters import ADAPTER_REGISTRY, get_adapter
 from eval.runners.run_matrix_smoke import (
     DEFAULT_ADAPTERS,
-    DEFAULT_RERANK,
-    DEFAULT_TIERS,
     compute_thesis_headline,
     enumerate_cells,
 )
@@ -270,7 +268,6 @@ def test_thesis_full_mode_with_manifest_metrics():
 # ── C1 회귀 — env / CLI 매트릭스 변수 ─────────────────────────────
 def test_run_qa_eval_module_imports():
     """run_qa_eval 모듈이 매트릭스 변수 import 후 에러 없이 로드."""
-    import importlib
 
     import eval.runners.run_qa_eval as m
     assert hasattr(m, "main")

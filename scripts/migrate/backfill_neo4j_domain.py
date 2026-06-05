@@ -20,7 +20,6 @@ sys.path.insert(0, str(_ROOT / "src"))
 
 from autonexusgraph.db.neo4j import get_session  # noqa: E402
 from autonexusgraph.ontology.domain import (  # noqa: E402
-    KNOWN_DOMAINS,
     all_labels,
     domain_for,
 )

@@ -32,7 +32,7 @@ from xml.etree import ElementTree as ET
 # 표준 xml.etree 는 strict parser 라 첫 violation 에서 전체 파싱 실패.
 # lxml.html (또는 bs4 의 html.parser) 의 lenient 모드로 우회.
 try:
-    from lxml import etree as _lxml_etree
+    from lxml import etree as _lxml_etree  # noqa: F401 — lxml 가용성 게이트 (_HAS_LXML)
     from lxml import html as _lxml_html
     _HAS_LXML = True
 except ImportError:

@@ -14,7 +14,6 @@ assignee_id 등) 를 갖되, 다음 공통 부분은 본 모듈을 사용:
 
 from __future__ import annotations
 
-from typing import Any
 
 DEFAULT_TOPK: int = 8
 HARD_TOPK: int = 50
