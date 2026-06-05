@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..db.neo4j import get_session
+from ..db.neo4j import get_session, serialize_record
 from .cypher_templates import TemplateError, render_template
 
 log = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def _run(cypher: str, **params: Any) -> list[dict]:
 
     with get_session() as session:
         result = session.run(cypher, **params)
-        return [dict(r) for r in result]
+        return [serialize_record(r) for r in result]
 
 
 def _cap(limit: int | None) -> int:

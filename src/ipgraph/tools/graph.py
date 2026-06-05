@@ -30,7 +30,7 @@ def _cap(limit: int | None, hard: int = _HARD_LIMIT) -> int:
 def _run(cypher: str, **params: Any) -> list[dict]:
     """READ 단일 — cypher_guard 검사 + Neo4j 호출. fail-soft."""
     try:
-        from autonexusgraph.db.neo4j import get_session
+        from autonexusgraph.db.neo4j import get_session, serialize_record
         from autonexusgraph.safety.cypher_guard import assert_read_only
     except Exception as e:   # noqa: BLE001 — [graph] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.graph._run] core import 실패: %s", e)
@@ -40,7 +40,7 @@ def _run(cypher: str, **params: Any) -> list[dict]:
 
         with get_session() as session:
             result = session.run(cypher, **params)
-            return [dict(r) for r in result]
+            return [serialize_record(r) for r in result]
     except Exception as e:   # noqa: BLE001 — [graph] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.graph._run] cypher 실행 실패 (fail-soft): %s", e)
         return []
