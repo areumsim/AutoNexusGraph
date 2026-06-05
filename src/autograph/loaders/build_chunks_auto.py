@@ -344,7 +344,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
                 rcept_no = z.stem
                 try:
                     with zipfile.ZipFile(z) as zf:
-                        xml_name = f"{rcept_no}.xml"
+                        xml_name: str | None = f"{rcept_no}.xml"
                         if xml_name not in zf.namelist():
                             xml_name = next(
                                 (nm for nm in zf.namelist()

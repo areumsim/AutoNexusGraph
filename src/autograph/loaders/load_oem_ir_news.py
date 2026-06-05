@@ -216,7 +216,7 @@ def run_oem(oem: str, *, dry_run: bool = False) -> dict:
 def run(*, oems: list[str] | None = None, dry_run: bool = False) -> dict:
     """전체 또는 명시 OEM 적재. 통계 누계."""
     targets = oems or sorted(OEM_NEWSROOM_POLICY.keys())
-    total = {"inserted": 0, "updated": 0, "skipped": 0,
+    total: dict = {"inserted": 0, "updated": 0, "skipped": 0,
              "metadata_only": 0, "rejected": 0, "by_oem": {}}
     for oem in targets:
         stats = run_oem(oem, dry_run=dry_run)

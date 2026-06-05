@@ -216,7 +216,7 @@ def _row_to_plant_rows(data_cells: list[str], years: list[int],
                        expected_full_count: int,
                        *,
                        plant_col: int = 0,
-                       region_col: int = 1,
+                       region_col: int | None = 1,
                        ) -> tuple[list[PlantRow], str | None]:
     """한 데이터 행 → PlantRow list (연도 수만큼).
 
@@ -444,11 +444,13 @@ def parse_section(xml_text: str, section: str) -> list[PlantRow]:
         # 컬럼 매핑 자동 검출 — Kia 사업보고서는 header[1]='품목' 이라
         # plant 식별자가 header[2]='소재지' 에 들어있음.
         # Hyundai: header[1]='법인명' (plant_code), header[2]='소재지' (region)
-        plant_col, region_col = 0, 1     # default Hyundai
+        plant_col = 0
+        region_col: int | None = 1     # default Hyundai
         h1 = re.sub(r"\s+", "", (header[1] if len(header) > 1 else ""))
         if "품목" in h1:
             # Kia 스타일 — body[0]='품목', body[1]='소재지' (plant 식별자)
-            plant_col, region_col = 1, None
+            plant_col = 1
+            region_col = None
             log.info("[dart_production] Kia-style header detected (품목/소재지) — "
                      "plant_col=1")
 

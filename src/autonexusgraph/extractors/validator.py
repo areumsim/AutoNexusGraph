@@ -153,7 +153,7 @@ def validate_relations(
         # 충돌 검사 (head-tail 양쪽 resolve 된 경우만 의미 있음)
         conflict = None
         if head_corp and tail_corp:
-            conflict = _check_conflict(head_corp, tail_corp, rtype)
+            conflict = _check_conflict(head_corp, tail_corp, str(rtype))
             if conflict:
                 discard.append(ValidationResult(
                     rel=rel, decision="discard",

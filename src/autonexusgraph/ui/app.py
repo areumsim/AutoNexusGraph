@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 # src/ 를 path 에 추가 (streamlit 진입 시)
 _ROOT = Path(__file__).resolve().parents[3]
@@ -181,12 +182,12 @@ if user_input:
             if interrupted_payload:
                 kind = interrupted_payload.get("kind")
                 key_prefix = f"{thread_id}_{len(st.session_state.messages)}"
-                resume_value: any = None
+                resume_value: Any = None
                 if kind == "company_clarification":
-                    idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
-                    if idx is None:
+                    clar_idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
+                    if clar_idx is None:
                         st.stop()
-                    resume_value = {"index": idx}
+                    resume_value = {"index": clar_idx}
                 elif kind == "cost_approval":
                     approved = render_cost_approval(interrupted_payload, key_prefix=key_prefix)
                     if approved is None:

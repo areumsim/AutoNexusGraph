@@ -248,6 +248,7 @@ def _process_row(cur, row: dict[str, str], stats: LoadStats) -> None:
 
     # variant 단위 청크 — 매칭된 variant 별로 1청크 (동일 본문 dedup metadata.uniq 분리).
     # variant 0개면 model_id 단위로 1청크. 그것도 없으면 manufacturer_id 만.
+    targets: list[tuple[int | None, int | None, int | None]]
     if variant_ids:
         targets = [(mfr_id, model_id, vid) for vid in variant_ids]
     else:

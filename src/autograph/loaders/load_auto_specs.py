@@ -192,7 +192,7 @@ def load_specs(*, make_filter: str | None = None,
                     myr_raw = specs.get("MYR")
                     # MYR 가 '23' 같은 2자리 → 4자리.
                     try:
-                        myr = int(myr_raw)
+                        myr = int(myr_raw)  # type: ignore[arg-type]  # None/비정상은 except 로 skip
                         if myr < 100:
                             myr += 2000
                     except (TypeError, ValueError):

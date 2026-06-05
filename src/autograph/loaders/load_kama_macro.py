@@ -224,11 +224,11 @@ def run(*, root: Path | None = None,
                 y_skip += 1
 
         for r in monthly_rows:
-            parsed = _parse_monthly_row(r)
-            if parsed is None:
+            m_parsed = _parse_monthly_row(r)
+            if m_parsed is None:
                 m_skip += 1
                 continue
-            year, month, dom, eu, ev = parsed
+            year, month, dom, eu, ev = m_parsed
             cur.execute("SAVEPOINT sp_kama_m")
             try:
                 if _upsert_monthly(cur, year=year, month=month,

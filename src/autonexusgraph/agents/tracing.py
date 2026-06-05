@@ -273,6 +273,7 @@ def start_turn_context(thread_id: str, state: Mapping[str, Any], *,
         if question_kind:
             extra["question_kind"] = question_kind
         # E-3 (DoD §10.13): per-turn cypher hop 수 + tool 호출 sequence 기록.
+        hop: dict | None = None
         try:
             hop = trace_hop_summary(turn.state)
             extra["hop_count"] = hop["hop_count"]

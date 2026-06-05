@@ -121,7 +121,8 @@ def get_process_metrics(process_name_norm: str | None = None,
 
     anxg_auto.process_metrics 조회. KAMP 미수집 시 빈결과(DATA_GO_KR_API_KEY 필요).
     """
-    where, params = [], {"lim": _cap(limit)}
+    where: list[str] = []
+    params: dict[str, Any] = {"lim": _cap(limit)}
     if (process_name_norm or "").strip():
         where.append("process_name_norm = %(n)s")
         params["n"] = process_name_norm

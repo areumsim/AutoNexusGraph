@@ -91,7 +91,7 @@ def plan_ip_tasks(*, question: str, target_assignees: list[str] | None = None,
         tasks.append({
             "id": "lookup_assignee",
             "intent": "lookup_assignee_graph",
-            "args": {"query": (target_assignees or target_corps)[0]},
+            "args": {"query": (target_assignees or target_corps or [""])[0]},
             "depends_on": [],
         })
         tasks.append({
