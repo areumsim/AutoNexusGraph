@@ -104,11 +104,12 @@ def _validate_tasks(state: AgentState, raw_tasks: list, catalog: dict[str, list[
         while tid in used_ids:
             tid = f"{tid}_{i}"
         used_ids.add(tid)
-        args = t.get("args") if isinstance(t.get("args"), dict) else {}
+        _args_raw = t.get("args")
+        args = _args_raw if isinstance(_args_raw, dict) else {}
         # calculator 사전 가드 (BACKLOG A-8) — expr 도 aggregate 도 없으면 worker
         # 가 '[calculator] failed: expr 필요' 로 떨어지므로 미리 drop.
         if agent == "calculator" and not args.get("expr") and not args.get("aggregate"):
-            dropped.append(f"calculator:no_expr_or_aggregate")
+            dropped.append("calculator:no_expr_or_aggregate")
             continue
         deps = [str(d) for d in (t.get("depends_on") or []) if isinstance(d, (str, int))]
         out.append(make_task(tid, agent, intent, args, depends_on=deps))
