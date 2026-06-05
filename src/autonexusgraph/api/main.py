@@ -1,9 +1,11 @@
 """FastAPI 진입점 — 에이전트 채팅 API.
 
 엔드포인트:
-- POST /chat                : 단일 turn 실행 → 답변 + 인용 + 비용
-- GET  /threads/{id}        : 대화 히스토리 조회 (PG anxg_chat.messages)
-- POST /threads/{id}/message: 멀티턴 — history 자동 주입
+- POST /chat         : 단일 turn 실행 → 답변 + 인용 + 비용 (use_history=True 면 멀티턴 자동 주입)
+- POST /chat/stream  : SSE — 노드 진입마다 partial state, 마지막 data: [DONE]
+- POST /chat/resume  : HITL interrupt 후 사용자 응답으로 graph 재개 (SSE)
+- GET  /threads/{id} : 대화 히스토리 조회 (PG anxg_chat.messages, 소유자만)
+- GET  /health       : PG/Neo4j ping (인증 없음)
 
 응답 메타에 cost_usd / tokens 포함 (사용자 명시 — 모든 호출 비용 가시화).
 
@@ -38,6 +40,10 @@ from .auth import authenticate
 
 log = logging.getLogger(__name__)
 
+# settings.log_level 적용 — 미설정 시 app INFO 로그(history/worker/cost)가 표면화 안 됨.
+from ..logging_setup import configure_logging  # noqa: E402
+
+configure_logging()
 
 app = FastAPI(title="AutoNexusGraph Agent API", version="0.1")
 
@@ -325,6 +331,8 @@ def _load_history(thread_id: str, limit: int = 20) -> list[dict]:
             out.append({"role": role, "content": content,
                          "citations": citations or [], "agent_trace": trace or {},
                          "created_at": created.isoformat() if created else None})
+    log.info("[history] thread=%s loaded=%d msgs (src=PG anxg_chat.messages, limit=%d)",
+             thread_id, len(out), limit)
     return list(reversed(out))
 
 

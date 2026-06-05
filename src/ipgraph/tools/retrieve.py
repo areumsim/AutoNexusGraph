@@ -10,9 +10,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
-from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
+from autonexusgraph.tools._vector_search import vector_search
+from common.retrieve_base import DEFAULT_TOPK
 
 log = logging.getLogger(__name__)
 
@@ -63,69 +63,26 @@ def search_patents(query: str, *,
     """특허 abstract+claims 의 벡터 의미 검색 + 메타 필터 + (옵션) rerank.
 
     PRD §10 DoD #17 (d) — rerank ablation 1급. False 시 vector 유사도만.
+
+    ip 도메인 정책 = **fail-soft**: 임베딩/PG/rerank 실패 시 raise 대신 [] 반환(log 동반).
+    공통 ``vector_search`` 는 raise 하므로 본 함수가 try 로 흡수.
     """
-    if not query or not query.strip():
-        return []
-
-    client = get_embedding_client()
-    try:
-        qvec = client.embed_one(query)
-    except EmbeddingError as e:
-        log.warning("[ip.search_patents] 임베딩 실패 (fail-soft): %s", e)
-        return []
-
     where, params = _build_where(
         assignee_id=assignee_id, cpc=cpc, jurisdiction=jurisdiction,
         source=source, require_embedding=True,
     )
-    params["q"] = qvec
-    effective_k = _cap(top_k * rerank_candidate_multiplier if rerank else top_k)
-    params["k"] = effective_k
-
-    sql = f"""
-    SELECT id, source, section, chunk_idx, text, token_count, metadata,
-           1 - (embedding <=> %(q)s::vector) AS score
-      FROM anxg_vec.chunks
-     WHERE {where}
-     ORDER BY embedding <=> %(q)s::vector
-     LIMIT %(k)s
-    """
+    # ef_search=400 — auto 와 동일 (ip 청크도 anxg_vec.chunks 의 소수).
     try:
-        from pgvector.psycopg import register_vector
-        pool = get_pool()
-        with pool.connection() as conn:
-            register_vector(conn)
-            with conn.cursor() as cur:
-                cur.execute("SET LOCAL hnsw.ef_search = 400")
-                cur.execute(sql, params)
-                cols = [d.name for d in cur.description]
-                hits = [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → [] 반환 (log 동반)
-        log.warning("[ip.search_patents] PG/벡터 실패 (fail-soft): %s", e)
+        return vector_search(
+            query=query, where=where, params=params,
+            select_columns="id, source, section, chunk_idx, text, token_count, metadata",
+            top_k=top_k, rerank=rerank,
+            rerank_candidate_multiplier=rerank_candidate_multiplier,
+            ef_search=400,
+        )
+    except Exception as e:   # noqa: BLE001 — ip fail-soft 정책 → [] 반환 (log 동반)
+        log.warning("[ip.search_patents] 검색 실패 (fail-soft): %s", e)
         return []
-
-    if not rerank or not hits:
-        for h in hits[:_cap(top_k)]:
-            h["reranked"] = False
-        return hits[:_cap(top_k)]
-
-    texts = [(h.get("text") or "") for h in hits]
-    try:
-        ranked = client.rerank(query, texts, top_k=_cap(top_k))
-    except EmbeddingError:
-        for h in hits[:_cap(top_k)]:
-            h["reranked"] = False
-        return hits[:_cap(top_k)]
-    out: list[dict] = []
-    for r in ranked:
-        idx = getattr(r, "index", None)
-        if idx is None or idx >= len(hits):
-            continue
-        row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
-        row["reranked"] = True
-        out.append(row)
-    return out
 
 
 def search_by_metadata_ip(*,

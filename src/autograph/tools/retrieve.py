@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
-from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
-
+from autonexusgraph.tools._vector_search import vector_search
+from common.retrieve_base import DEFAULT_TOPK
 
 # 자동차 청크의 source 컨벤션 (build_chunks_auto 와 일치).
 # 2026-06-01 확장: oem_ir (IR/뉴스룸 본문) + dart_narrative (supplier OEM DART)
@@ -85,17 +84,6 @@ def search_documents_auto(query: str, *,
         rerank: True (기본) 시 vector top_k × multiplier 후보를 BGE-Reranker 재정렬.
             False 시 vector 유사도만. PRD §10 DoD #17 (d) ablation 셀 토글.
     """
-    if not query or not query.strip():
-        return []
-
-    client = get_embedding_client()
-    try:
-        qvec = client.embed_one(query)
-    except EmbeddingError as e:
-        raise RuntimeError(
-            f"임베딩 호출 실패. BGE-M3 서버(EMBEDDING_URL) 가동 확인. {e}"
-        ) from e
-
     where, params = _build_where(
         manufacturer_id=manufacturer_id,
         model_id=model_id,
@@ -103,52 +91,16 @@ def search_documents_auto(query: str, *,
         source=source,
         require_embedding=True,
     )
-    params["q"] = qvec
-    effective_k = _cap(top_k * rerank_candidate_multiplier if rerank else top_k)
-    params["k"] = effective_k
-    sql = f"""
-    SELECT id, manufacturer_id, model_id, variant_id, source, section,
-           chunk_idx, text, token_count, metadata,
-           1 - (embedding <=> %(q)s::vector) AS score
-      FROM anxg_vec.chunks
-     WHERE {where}
-     ORDER BY embedding <=> %(q)s::vector
-     LIMIT %(k)s
-    """
-    pool = get_pool()
-    from pgvector.psycopg import register_vector
-    with pool.connection() as conn:
-        register_vector(conn)
-        with conn.cursor() as cur:
-            # pgvector HNSW 의 ef_search 증가 (기본 40) — auto 청크가 finance 748k
-            # 가운데 소수 (16k) 라 기본 ef 로는 source 필터 후 0 rows 발생.
-            cur.execute("SET LOCAL hnsw.ef_search = 400")
-            cur.execute(sql, params)
-            cols = [d.name for d in cur.description]
-            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
-
-    if not rerank or not hits:
-        for h in hits[:_cap(top_k)]:
-            h["reranked"] = False
-        return hits[:_cap(top_k)]
-
-    texts = [(h.get("text") or "") for h in hits]
-    try:
-        ranked = client.rerank(query, texts, top_k=_cap(top_k))
-    except EmbeddingError:
-        for h in hits[:_cap(top_k)]:
-            h["reranked"] = False
-        return hits[:_cap(top_k)]
-    out: list[dict] = []
-    for r in ranked:
-        idx = getattr(r, "index", None)
-        if idx is None or idx >= len(hits):
-            continue
-        row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
-        row["reranked"] = True
-        out.append(row)
-    return out
+    # ef_search=400 — auto 청크가 anxg_vec.chunks 의 소수(≈16k/748k) 라 HNSW 기본
+    # ef(40) 로는 source 필터 후 0 rows. finance(다수) 와의 데이터 분포 차이.
+    return vector_search(
+        query=query, where=where, params=params,
+        select_columns=("id, manufacturer_id, model_id, variant_id, source, section, "
+                        "chunk_idx, text, token_count, metadata"),
+        top_k=top_k, rerank=rerank,
+        rerank_candidate_multiplier=rerank_candidate_multiplier,
+        ef_search=400,
+    )
 
 
 def search_by_metadata_auto(*,

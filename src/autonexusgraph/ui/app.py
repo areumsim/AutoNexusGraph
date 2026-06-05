@@ -26,6 +26,7 @@ if str(_SRC) not in sys.path:
 
 import streamlit as st
 
+from autonexusgraph.logging_setup import configure_logging
 from autonexusgraph.ui.storage import (
     get_or_create_thread_id, reset_thread,
     load_history, persist_turn, list_recent_threads,
@@ -38,6 +39,8 @@ from autonexusgraph.ui.components import (
     render_clarification, render_cost_approval,
 )
 
+
+configure_logging()   # app INFO 로그(history/worker) 표면화 — settings.log_level
 
 st.set_page_config(page_title="AutoNexusGraph", layout="wide")
 
