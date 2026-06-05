@@ -137,7 +137,7 @@ _CONSTRAINTS_CYPHER = [
 ]
 
 # 7-key edge meta — PRD §6.7.
-_EDGE_META = {
+_EDGE_META: dict[str, Any] = {
     "source_type":       "usgs_mcs",
     "source_id":         "usgs_mcs_2025",
     "confidence_score":  _CONF_A,
@@ -246,7 +246,8 @@ def _neo4j_load(seed: dict, snapshot_year: int,
                             r.updated_at        = datetime()
                         RETURN count(r) AS n
                     """, mat=mat_code, mname=mname, **module_edge_meta)
-                    stats["made_of_merged"] += (res.single() or {}).get("n", 0)
+                    rec = res.single()
+                    stats["made_of_merged"] += rec.get("n", 0) if rec else 0
     finally:
         drv.close()
     return stats
