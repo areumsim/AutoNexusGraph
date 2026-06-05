@@ -38,14 +38,24 @@ def lookup_vehicle(query: str, *,
                v.model_year, v.trim, v.fuel_type, v.body_class,
                CASE WHEN m.name ILIKE %(q)s THEN 100
                     WHEN m.name ILIKE %(q)s || '%%' THEN 80
+                    -- 한국어 모델 alias (코나/쏘나타 등 m.aliases) — KO 질의 매칭
+                    WHEN EXISTS (SELECT 1 FROM unnest(m.aliases) a
+                                 WHERE a ILIKE '%%' || %(q)s || '%%') THEN 70
                     WHEN m.name ILIKE '%%' || %(q)s || '%%' THEN 60
                     WHEN mm.name ILIKE '%%' || %(q)s || '%%' THEN 40
+                    -- 한국어 제조사 alias (현대차/기아 등 mm.aliases) — KO 질의 매칭
+                    WHEN EXISTS (SELECT 1 FROM unnest(mm.aliases) a
+                                 WHERE a ILIKE '%%' || %(q)s || '%%') THEN 30
                     ELSE 0 END AS score
           FROM anxg_auto.master_vehicle_variants v
           JOIN anxg_auto.master_vehicle_models m ON v.model_id = m.model_id
           JOIN anxg_auto.master_manufacturers mm ON m.manufacturer_id = mm.manufacturer_id
          WHERE (m.name ILIKE '%%' || %(q)s || '%%'
-                OR mm.name ILIKE '%%' || %(q)s || '%%')
+                OR mm.name ILIKE '%%' || %(q)s || '%%'
+                OR EXISTS (SELECT 1 FROM unnest(m.aliases) a
+                           WHERE a ILIKE '%%' || %(q)s || '%%')
+                OR EXISTS (SELECT 1 FROM unnest(mm.aliases) a
+                           WHERE a ILIKE '%%' || %(q)s || '%%'))
            AND (%(year)s::int IS NULL OR v.model_year = %(year)s::int)
          ORDER BY score DESC, v.model_year DESC, m.name
          LIMIT %(lim)s

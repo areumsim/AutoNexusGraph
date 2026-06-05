@@ -28,6 +28,7 @@
         load-auto-recall-components load-auto-supplier-edges \
         load-auto-seed-standards-plants load-auto-complaints-neo4j \
         load-auto-aihub load-auto-specs load-auto-safety load-auto-epa \
+        load-korean-model-aliases \
         load-auto-investigations load-auto-oem-sec load-auto-mfrcomm \
         derive-auto-contains-system load-wikidata-part-supplies \
         extract-auto-p3 extract-auto-p3-cost validate-auto-p4 extract-validate-auto \
@@ -523,6 +524,10 @@ load-auto-aihub:
 
 load-auto-specs:
 	$(PYTHON) -m autograph.loaders.master.load_auto_specs
+
+# 한국어 모델 alias → master_vehicle_models.aliases 보강 (KO 질의 → recall-보유 영문 행 매칭).
+load-korean-model-aliases:
+	$(PYTHON) -m autograph.loaders.master.load_korean_model_aliases
 
 load-auto-safety:
 	$(PYTHON) -m autograph.loaders.recall.load_auto_safety
