@@ -99,15 +99,20 @@ def load_component_taxonomy(*, dry_run: bool = False) -> LoadStats:
         cat_to_id: dict[str, int] = {}
         for name, _n in _iter_categories(cur):
             stats.distinct_categories += 1
+            # SAVEPOINT 격리 — 한 카테고리 INSERT 실패(예: 비정상 긴 system_code →
+            # varchar(40) truncation)가 트랜잭션 전체를 poison 하지 않도록. 실패 행만 skip.
+            cur.execute("SAVEPOINT sp_comp")
             try:
                 cid, inserted = _ensure_component(cur, name,
                                                     snapshot_year=cur_year)
+                cur.execute("RELEASE SAVEPOINT sp_comp")
                 cat_to_id[name] = cid
                 if inserted:
                     stats.components_inserted += 1
                 else:
                     stats.components_existing += 1
             except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
+                cur.execute("ROLLBACK TO SAVEPOINT sp_comp")
                 stats.errors.append(f"comp[{name}]: {e}")
 
         # 2) events_recalls.component_id 를 backfill (현재 NULL 인 행만).
