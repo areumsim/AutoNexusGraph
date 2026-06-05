@@ -323,6 +323,7 @@ flowchart LR
 
 - arXiv 2304.04893 (EVKG) 의 EVO — 20 클래스·17 객체속성·54 데이터타입 속성 (EV 분류·부품·충전·커넥터·에너지원·규제·추진계·환경영향).
 - `ontology/auto/*.yaml` 의 EV/배터리 확장 시 EVO 클래스명·속성을 정렬 베이스로 인용 → "임의 설계" 아닌 "학계 온톨로지 정렬". SHACL/pydantic 검증 (§11.1) 과 시너지.
+- **alignment 스켈레톤**: [`ontology/auto/evo_alignment.yaml`](../ontology/auto/evo_alignment.yaml) — 우리 entity·relation ↔ EVO IRI 매핑표 (시드, 대다수 placeholder). 자명한 1:1 매핑은 후속 PR 에서 점진 채움. 회귀 가드: `tests/test_evo_alignment.py` (우리 라벨이 entities.yaml / relations.yaml 에 실재하는지 + 채워진 IRI 가 placeholder 문자열 아닌지).
 
 #### EV 충전 인프라
 

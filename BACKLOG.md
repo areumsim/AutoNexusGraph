@@ -186,7 +186,7 @@
 | L6-2 | **알루미늄 합금 / 다이캐스팅 등 공법 ontology** | ✅ **완료** (2026-06-05) — seed `ontology/auto/materials_metals_seed.yaml` 9 alloys (Al 4 / 강 4 / Ti 1) + 13 module mappings (26 flat rows). loader `src/autograph/loaders/load_materials_metals.py` (Anxg_Material UNWIND + MADE_OF 7-key meta, conf 0.50 candidate). Makefile `load-materials-metals[-dry]` 타겟. `MaterialsMetalsFile` strict 검증 + 회귀 가드 18건 (`test_materials_metals_seed.py` 8 + `test_load_materials_metals.py` 10). audit-ontology `auto.materials_metals(9)` PASS. dry-run: 9 materials / 26 made_of rows. **잔여**: 실 적재 (Module 노드 적재 후 매칭률 실측) | (완료) | 실 환경에서 `make load-materials-metals` 1회 + Module 매칭률 확인 | README §12.5 |
 | L6-3 | **회사단위 셀↔OEM 소싱 (SUPPLIES)** | grade C candidate (sparse) | P2 | 공개 IR PDF 또는 manual seed. 자동 만료 (6개월 미검토 → rejected) | docs/autograph.md §2.5.4 |
 | L6-4 | **무역통계 — 관세청 / K-stat (Li/Ni/Co 한국 수입)** | 0 | P2 | `macro.trade_minerals` 신규 스키마 + ingestion | docs/autograph.md §2.5.4 |
-| L6-5 | **EVO 온톨로지 정렬** (arXiv 2304.04893 — 20 클래스·17 객체속성·54 데이터타입) | 미적용 | P3 | EV/배터리 확장 시 EVO 클래스명·속성 정렬 참조. SHACL/pydantic 검증과 시너지 | docs/autograph.md §2.5.4 |
+| L6-5 | **EVO 온톨로지 정렬** (arXiv 2304.04893 — 20 클래스·17 객체속성·54 데이터타입) | ✅ **스켈레톤 적재** (2026-06-05) — `ontology/auto/evo_alignment.yaml` 신규 (17 entities + 12 relations 매핑 시드, upstream 메타 20/17/54). 자명한 1:1 매핑은 placeholder 상태로 두고 (false IRI 가 SPARQL 호환성 깨지 않도록), 실제 IRI 채움은 후속 EVO 논문 re-read + ontology review board. 회귀 가드 10건(`tests/test_evo_alignment.py`): 우리 라벨이 entities.yaml/relations.yaml 실재 / iri 가 placeholder 문자열 아닐 것 / applicable=false 일관성. docs/autograph.md §2.5.4 cross-link. | (스켈레톤 완료) | EVO 논문 re-read 후 IRI 점진 채움 → SHACL shape 그래프 등장 시 sh:targetClass 로 reuse | docs/autograph.md §2.5.4 |
 
 ---
 
