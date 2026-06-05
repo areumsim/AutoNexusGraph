@@ -29,7 +29,6 @@ from autonexusgraph.extractors.base import (
     RunContext,
 )
 
-
 log = logging.getLogger(__name__)
 
 

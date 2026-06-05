@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Any
 
 import httpx
 
@@ -30,7 +29,6 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     fetch_with_retry,
 )
-
 
 log = logging.getLogger(__name__)
 

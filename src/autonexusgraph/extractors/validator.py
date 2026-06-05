@@ -20,11 +20,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from ..db.neo4j import get_session
-
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +137,7 @@ def validate_relations(
                 "review" if conf >= review_threshold else "discard"
             )
             res = ValidationResult(rel=rel, decision=decision,
-                                    reason=f"PRODUCES conf-only", final_confidence=conf)
+                                    reason="PRODUCES conf-only", final_confidence=conf)
             (accept if decision == "accept" else
              review if decision == "review" else discard).append(res)
             continue
@@ -154,7 +153,7 @@ def validate_relations(
         # 충돌 검사 (head-tail 양쪽 resolve 된 경우만 의미 있음)
         conflict = None
         if head_corp and tail_corp:
-            conflict = _check_conflict(head_corp, tail_corp, rtype)
+            conflict = _check_conflict(head_corp, tail_corp, str(rtype))
             if conflict:
                 discard.append(ValidationResult(
                     rel=rel, decision="discard",

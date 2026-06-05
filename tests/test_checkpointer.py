@@ -5,8 +5,6 @@ langgraph 미설치 환경에서도 동작하도록 fail-soft 경로를 모킹.
 
 from __future__ import annotations
 
-import pytest
-
 from autonexusgraph.agents import checkpointer
 
 

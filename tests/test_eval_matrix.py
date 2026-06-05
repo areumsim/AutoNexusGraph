@@ -12,8 +12,6 @@ from __future__ import annotations
 from eval.adapters import ADAPTER_REGISTRY, get_adapter
 from eval.runners.run_matrix_smoke import (
     DEFAULT_ADAPTERS,
-    DEFAULT_RERANK,
-    DEFAULT_TIERS,
     compute_thesis_headline,
     enumerate_cells,
 )
@@ -184,6 +182,7 @@ def test_thesis_unavailable_when_missing_cells():
 def test_search_documents_accepts_rerank_kwarg():
     """retrieve.search_documents 가 rerank 인자 수용 — C2 회귀 방지."""
     import inspect
+
     from autonexusgraph.tools.retrieve import search_documents
     sig = inspect.signature(search_documents)
     assert "rerank" in sig.parameters
@@ -193,6 +192,7 @@ def test_search_documents_accepts_rerank_kwarg():
 def test_search_documents_auto_accepts_rerank_kwarg():
     """autograph retrieve.search_documents_auto 도 rerank 수용."""
     import inspect
+
     from autograph.tools.retrieve import search_documents_auto
     sig = inspect.signature(search_documents_auto)
     assert "rerank" in sig.parameters
@@ -268,7 +268,7 @@ def test_thesis_full_mode_with_manifest_metrics():
 # ── C1 회귀 — env / CLI 매트릭스 변수 ─────────────────────────────
 def test_run_qa_eval_module_imports():
     """run_qa_eval 모듈이 매트릭스 변수 import 후 에러 없이 로드."""
-    import importlib
+
     import eval.runners.run_qa_eval as m
     assert hasattr(m, "main")
     # ENV 변수 처리 코드가 main 안에 있어야 함 — import 시점은 부수효과 없음.

@@ -59,7 +59,7 @@ def _make_embed_app(model_name: str, device: str):
                 "dim": model.get_sentence_embedding_dimension()}
 
     @app.post("/embed")
-    def embed(req: dict = Body(...)):
+    def embed(req: dict = Body(...)):  # noqa: B008 — FastAPI Body() 기본값 관례
         inputs = req.get("inputs") or []
         if not inputs:
             return []
@@ -91,7 +91,7 @@ def _make_rerank_app(model_name: str, device: str):
         return {"status": "ok", "model": model_name, "device": device}
 
     @app.post("/rerank")
-    def rerank(req: dict = Body(...)):
+    def rerank(req: dict = Body(...)):  # noqa: B008 — FastAPI Body() 기본값 관례
         query = req.get("query") or ""
         texts = req.get("texts") or []
         if not texts:

@@ -27,13 +27,11 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Iterable
 
 log = logging.getLogger(__name__)
 
@@ -351,6 +349,8 @@ def run(*, max_institutions: int | None = None,
     try:
         for entry in pool:
             qid = entry["qid"]
+            if not qid:
+                continue
             stats["qids_searched"] += 1
             try:
                 rec = lookup_institution_by_qid(qid, hint_name=entry.get("name"))
@@ -378,6 +378,7 @@ def run(*, max_institutions: int | None = None,
             if dry_run:
                 continue
 
+            assert conn is not None   # dry_run 가드 통과 = 실연결 (mypy narrowing)
             with conn.cursor() as cur:
                 cur.execute("SAVEPOINT sp_inst")
                 try:

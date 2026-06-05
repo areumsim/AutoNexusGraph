@@ -32,7 +32,6 @@ from ..ontology import canonical_system_code
 from ._neo4j_helpers import run_batched
 from .load_bridge import _ensure_supplier
 
-
 log = logging.getLogger(__name__)
 
 

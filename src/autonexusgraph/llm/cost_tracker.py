@@ -40,7 +40,6 @@ from .cost import (
     get_session_limit_usd,
 )
 
-
 log = logging.getLogger(__name__)
 
 
@@ -52,6 +51,7 @@ def _read_session_base() -> float:
     """
     try:
         from datetime import datetime, timedelta, timezone
+
         from .cost_log import total_cost
         hrs = get_cost_window_hours()
         since = None
@@ -63,7 +63,7 @@ def _read_session_base() -> float:
         return 0.0
 
 
-class BudgetExceeded(Exception):
+class BudgetExceeded(Exception):  # noqa: N818 — 제어흐름 예외(의도적 비-Error 명명)
     """누적 비용이 한도 도달 — turn/batch abort 신호."""
 
 
@@ -223,6 +223,7 @@ class CostTracker:
     def _persist_initial(self) -> None:
         try:
             import json
+
             from ..db.postgres import get_pool
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
@@ -239,6 +240,7 @@ class CostTracker:
     def _persist_final(self, status: str) -> None:
         try:
             import json
+
             from ..db.postgres import get_pool
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
@@ -281,7 +283,7 @@ class CostTracker:
             log.debug(f"[COST] llm_calls persist failed: {e}")
 
     # ── 컨텍스트 매니저 ────────────────────────────────────────
-    def __enter__(self) -> "CostTracker":
+    def __enter__(self) -> CostTracker:
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
@@ -296,7 +298,7 @@ class CostTracker:
 # ─── ContextVar 격리 ─────────────────────────────────────────────
 # FastAPI threadpool / asyncio task 단위로 자동 분리.
 # 동시 turn A/B 가 서로의 tracker 를 덮어쓰지 않는다.
-_tracker_ctx: ContextVar["CostTracker | None"] = ContextVar(
+_tracker_ctx: ContextVar[CostTracker | None] = ContextVar(
     "autonexus_cost_tracker", default=None,
 )
 
@@ -345,12 +347,12 @@ def reset_tracker() -> None:
     _tracker_ctx.set(None)
 
 
-def set_current_tracker(tracker: "CostTracker | None") -> None:
+def set_current_tracker(tracker: CostTracker | None) -> None:
     """ctx 변수에 tracker 박기 — start_turn_context 가 사용."""
     _tracker_ctx.set(tracker)
 
 
-def current_tracker() -> "CostTracker | None":
+def current_tracker() -> CostTracker | None:
     """현재 context 의 tracker (없으면 None) — 진단·테스트용."""
     return _tracker_ctx.get()
 

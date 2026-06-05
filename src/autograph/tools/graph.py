@@ -15,7 +15,6 @@ from typing import Any
 from autonexusgraph.db.neo4j import get_session
 from autonexusgraph.tools.cypher_templates import render_template
 
-
 log = logging.getLogger(__name__)
 
 

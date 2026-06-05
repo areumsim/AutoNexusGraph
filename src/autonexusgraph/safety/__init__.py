@@ -11,12 +11,6 @@ PRD §7.5.11 (보안):
 이 패키지는 LLM 호출 / Neo4j 호출 / 답변 출력 직전 wrapping 으로 사용된다.
 """
 
-from .prompt_safety import (
-    detect_injection_signals,
-    escape_for_xml_tag,
-    is_high_risk_injection,
-    sanitize_user_input,
-)
 from .cypher_guard import (
     CypherGuardError,
     assert_read_only,
@@ -24,6 +18,12 @@ from .cypher_guard import (
     extract_bind_params,
 )
 from .language_guard import check_korean, korean_char_ratio
+from .prompt_safety import (
+    detect_injection_signals,
+    escape_for_xml_tag,
+    is_high_risk_injection,
+    sanitize_user_input,
+)
 
 __all__ = [
     "detect_injection_signals",

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
-
+from common.retrieve_base import DEFAULT_TOPK
+from common.retrieve_base import cap_topk as _cap
 
 # 자동차 청크의 source 컨벤션 (build_chunks_auto 와 일치).
 # 2026-06-01 확장: oem_ir (IR/뉴스룸 본문) + dart_narrative (supplier OEM DART)
@@ -125,7 +125,7 @@ def search_documents_auto(query: str, *,
             cur.execute("SET LOCAL hnsw.ef_search = 400")
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+            hits = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
     if not rerank or not hits:
         for h in hits[:_cap(top_k)]:
@@ -145,7 +145,7 @@ def search_documents_auto(query: str, *,
         if idx is None or idx >= len(hits):
             continue
         row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
+        row["score"] = float(getattr(r, "score", row.get("score", 0.0)) or 0.0)
         row["reranked"] = True
         out.append(row)
     return out
@@ -177,7 +177,7 @@ def search_by_metadata_auto(*,
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
 
 def get_chunk_auto(chunk_id: int) -> dict | None:
@@ -195,7 +195,7 @@ def get_chunk_auto(chunk_id: int) -> dict | None:
         if not row:
             return None
         cols = [d.name for d in cur.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))
 
 
 __all__ = [

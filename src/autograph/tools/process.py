@@ -121,11 +121,14 @@ def get_process_metrics(process_name_norm: str | None = None,
 
     anxg_auto.process_metrics 조회. KAMP 미수집 시 빈결과(DATA_GO_KR_API_KEY 필요).
     """
-    where, params = [], {"lim": _cap(limit)}
+    where: list[str] = []
+    params: dict[str, Any] = {"lim": _cap(limit)}
     if (process_name_norm or "").strip():
-        where.append("process_name_norm = %(n)s"); params["n"] = process_name_norm
+        where.append("process_name_norm = %(n)s")
+        params["n"] = process_name_norm
     if (process_category or "").strip():
-        where.append("process_category = %(c)s"); params["c"] = process_category
+        where.append("process_category = %(c)s")
+        params["c"] = process_category
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     return query_dicts(f"""
         SELECT process_name_norm, process_category, metric_type, unit,

@@ -5,14 +5,9 @@ DB / HTTP 모두 mock — 파서·매핑·CSV iteration 만 실제.
 
 from __future__ import annotations
 
-import csv
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 
 # ── ingestion 모듈 ─────────────────────────────────────────
@@ -51,7 +46,7 @@ def test_map_covers_core_fields():
 def test_map_value_types_valid():
     from autograph.loaders.load_auto_epa import _MAP
     allowed = {"num", "score", "text", "yn", "count"}
-    for csv_field, measure_key, unit, vtype in _MAP:
+    for csv_field, _measure_key, _unit, vtype in _MAP:
         assert vtype in allowed, f"{csv_field}: {vtype}"
 
 

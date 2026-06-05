@@ -37,8 +37,8 @@ from autonexusgraph.ingestion._common import (
     raw_dir,
     save_raw,
 )
-from ..config import get_auto_settings
 
+from ..config import get_auto_settings
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ QUERIES = {
 }
 
 
-def _parse_retry_after(resp: "httpx.Response") -> float | None:
+def _parse_retry_after(resp: httpx.Response) -> float | None:
     """``Retry-After`` 헤더 파싱 — 초 단위. 무효 시 None."""
     raw = resp.headers.get("retry-after") or resp.headers.get("Retry-After")
     if not raw:

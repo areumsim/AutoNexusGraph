@@ -34,16 +34,16 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import psycopg
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
-
 
 # SAVEPOINT 패턴 안에서 흡수해도 안전한 예외 종류 — DB 적재 시 row-level 데이터
 # 결함 (FK, type, 누락, ON CONFLICT 외 unique 위배) 만. AttributeError 같은
@@ -63,7 +63,8 @@ log = logging.getLogger(__name__)
 # 보수적 deny rule (의심스러우면 keep):
 #   1. 회사 접미사 패턴 (Inc / Corp / Industries / Ltd / Co\. / LLC / GmbH / N\.V\.)
 #   2. 알려진 자회사·부문 키워드 (Mobis / Steel / Translead / Trailers)
-import re as _re
+import re as _re  # noqa: E402 — 모듈 상단 코드 후 지역 배치(의도적)
+
 # False positive 회피: "Ford LTD" (실제 옛 차종), "Honda Civic" 같은 일반 모델은 keep.
 # 명확한 회사 접미사 — comma + Inc/Corp/Industries 또는 끝에 'Inc.'/'Corp.'/'LLC' 등.
 _NOISE_MODEL_PATTERNS = (
@@ -380,7 +381,7 @@ def load_recalls(*, dry_run: bool = False) -> LoadStats:
         return stats
 
     conn = get_connection()
-    _COMMIT_EVERY = 500     # SAVEPOINT/subtxn 누적 방지를 위한 mid-commit interval.
+    _COMMIT_EVERY = 500     # noqa: N806 — 지역 상수. SAVEPOINT/subtxn 누적 방지 mid-commit interval.
     _rows_since_commit = 0
     with conn.cursor() as cur:
         for f in root.glob("*/*/*.json"):
@@ -463,7 +464,7 @@ def load_complaints(*, dry_run: bool = False) -> LoadStats:
         return stats
 
     conn = get_connection()
-    _COMMIT_EVERY = 500     # 16k complaints — SAVEPOINT 누적 차단 mid-commit.
+    _COMMIT_EVERY = 500     # noqa: N806 — 지역 상수. 16k complaints SAVEPOINT 누적 차단 mid-commit.
     _rows_since_commit = 0
     with conn.cursor() as cur:
         for f in root.glob("*/*/*.json"):

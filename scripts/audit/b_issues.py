@@ -58,6 +58,7 @@ def _load_env_once() -> None:
 def _pg_conn():
     """psycopg2 connection — .env 또는 env override."""
     import os
+
     import psycopg2
     _load_env_once()
     dsn = os.environ.get("POSTGRES_DSN")
@@ -68,6 +69,7 @@ def _pg_conn():
 
 def _neo4j_driver():
     import os
+
     from neo4j import GraphDatabase
     _load_env_once()
     return GraphDatabase.driver(

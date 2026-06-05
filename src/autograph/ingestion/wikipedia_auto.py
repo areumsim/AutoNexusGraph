@@ -42,7 +42,6 @@ from autonexusgraph.ingestion._common import (
 )
 from autonexusgraph.ingestion.wikipedia_client import WikipediaClient
 
-
 log = logging.getLogger(__name__)
 
 
@@ -298,7 +297,6 @@ def ingest(
         out[f"{lang}/{tgt}"] = stats
 
         # 미발견 entity (+ ko-skipped non-Korean) 모두 fallback_lang 시도.
-        fallback_rows = rows if tgt == "plants" else rows
         if (fallback_lang and fallback_lang != lang
                 and (stats["missing"] or
                      len(rows_for_primary) < len(rows))):

@@ -21,11 +21,11 @@ import argparse
 import csv
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
-
 
 log = logging.getLogger(__name__)
 

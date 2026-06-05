@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO = Path(__file__).resolve().parents[1]
 SEED = REPO / "ontology" / "auto" / "materials_metals_seed.yaml"
 

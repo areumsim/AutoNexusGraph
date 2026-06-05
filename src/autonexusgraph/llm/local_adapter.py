@@ -74,7 +74,7 @@ class LocalLLMClient(LLMClient):
         except Exception as e:   # noqa: BLE001 — stream 모든 실패 흡수 → LLMError 변환 (통일 boundary)
             raise LLMError(f"Local LLM stream failed: {e}") from e
         for chunk in stream:
-            delta = chunk.choices[0].delta.content if chunk.choices else None
+            delta = chunk.choices[0].delta.content if chunk.choices else None  # type: ignore[union-attr]  # openai-compat Stream
             if delta:
                 yield delta
 
@@ -92,7 +92,7 @@ class LocalLLMClient(LLMClient):
         만 지원하거나 그것도 안 되면 system message 에 schema 박고 자유 파싱.
         """
         try:
-            resp = self._client.chat.completions.create(
+            resp = self._client.chat.completions.create(  # type: ignore[call-overload]  # openai-compat SDK kwargs 동적
                 model=self.model,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=temperature,

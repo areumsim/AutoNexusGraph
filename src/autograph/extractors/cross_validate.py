@@ -27,7 +27,6 @@ from autonexusgraph.db.postgres import get_connection
 
 from ..loaders._neo4j_helpers import run_batched
 
-
 log = logging.getLogger(__name__)
 
 
@@ -236,7 +235,7 @@ def _fetch_staging(cur, *, only_pending: bool = True) -> list[dict]:
         sql += " WHERE p4_decision IS NULL AND gate_status <> 'rejected'"
     cur.execute(sql)
     cols = [d.name for d in cur.description]
-    return [dict(zip(cols, r)) for r in cur.fetchall()]
+    return [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
 
 
 def run_p4(*, dry_run: bool = False, batch: int = 200) -> P4Stats:

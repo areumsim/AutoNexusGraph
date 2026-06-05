@@ -48,7 +48,6 @@ from ..ontology import canonical_system_code, load_system_taxonomy
 from ._neo4j_helpers import run_batched
 from .load_auto_process_nodes import _fetch_processes, merge_processes
 
-
 log = logging.getLogger(__name__)
 
 

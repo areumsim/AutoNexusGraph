@@ -27,7 +27,6 @@ import yaml
 
 from autonexusgraph.ontology.loaders import make_domain_loaders
 
-
 # repo_root/ontology/auto/
 _ONTOLOGY_DIR = Path(__file__).resolve().parents[2] / "ontology" / "auto"
 

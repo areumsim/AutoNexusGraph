@@ -76,7 +76,7 @@ def test_legacy_plan_also_populated_for_executor_fallback():
     planner_node(s)
     # plan 은 항상 tasks 와 1:1 미러
     assert len(s["plan"]) == len(s["tasks"])
-    for t, p in zip(s["tasks"], s["plan"]):
+    for t, p in zip(s["tasks"], s["plan"], strict=False):
         assert p["tool"] == t["intent"]
         assert p["args"] == t["args"]
 

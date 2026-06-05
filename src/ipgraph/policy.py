@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 IPQuestionKind = Literal[
     "patent_lookup",       # 특정 특허 식별 (lookup_patent)
     "assignee_patents",    # assignee 의 특허 목록·집계
@@ -92,7 +91,7 @@ def plan_ip_tasks(*, question: str, target_assignees: list[str] | None = None,
         tasks.append({
             "id": "lookup_assignee",
             "intent": "lookup_assignee_graph",
-            "args": {"query": (target_assignees or target_corps)[0]},
+            "args": {"query": (target_assignees or target_corps or [""])[0]},
             "depends_on": [],
         })
         tasks.append({

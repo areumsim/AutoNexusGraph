@@ -23,7 +23,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 from ..ontology import load_plants, load_standards, load_system_taxonomy
 from ._neo4j_helpers import run_batched
 
-
 log = logging.getLogger(__name__)
 
 

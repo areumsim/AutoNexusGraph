@@ -25,9 +25,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
-
 
 # 시계열 정의 — (org_id, tbl_id, period_type, label)
 SERIES = {
@@ -78,7 +80,7 @@ def main() -> int:
                 else:
                     s_p, e_p = args.start, args.end
                 rows = fetch_with_retry(
-                    lambda: cli.fetch_series(org, tbl, prd, s_p, e_p),
+                    lambda org=org, tbl=tbl, prd=prd, s_p=s_p, e_p=e_p: cli.fetch_series(org, tbl, prd, s_p, e_p),
                     max_tries=3,
                 )
                 save_raw("kosis", f"{tbl}/{s_p}-{e_p}.json", rows)

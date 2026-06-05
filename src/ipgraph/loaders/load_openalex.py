@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 _SCHEMA_VERSION = "v2.2"
 _CONF_A = 0.95
 
-_EDGE_META = {
+_EDGE_META: dict[str, Any] = {
     "source_type":       "openalex",
     "confidence_score":  _CONF_A,
     "validated_status":  "validated",
@@ -58,8 +58,8 @@ def _dsn_from_env() -> str:
 def load_neo4j() -> dict:
     """anxg_ip.institution / anxg_ip.works / anxg_ip.work_institution → Neo4j MERGE."""
     logging.getLogger("neo4j.notifications").setLevel(logging.WARNING)
-    from neo4j import GraphDatabase
     import psycopg2
+    from neo4j import GraphDatabase
 
     pg = psycopg2.connect(os.environ.get("POSTGRES_DSN") or _dsn_from_env())
     drv = GraphDatabase.driver(os.environ["NEO4J_URI"],
@@ -112,7 +112,7 @@ def load_neo4j() -> dict:
                          source_id=f"openalex:{oa}|corp_code:{cc}",
                          snapshot_year=2024,
                          **_EDGE_META).single()
-                    stats["is_entity_merged"] += (r or {}).get("n", 0)
+                    stats["is_entity_merged"] += (r.get("n", 0) if r else 0)
 
             # 1-2. Works.
             cur.execute("""
@@ -156,7 +156,7 @@ def load_neo4j() -> dict:
                      source_id=f"openalex:{oa}->{ror}",
                      snapshot_year=sy or 2024,
                      **_EDGE_META).single()
-                stats["authored_at_merged"] += (r or {}).get("n", 0)
+                stats["authored_at_merged"] += (r.get("n", 0) if r else 0)
     finally:
         pg.close()
         drv.close()

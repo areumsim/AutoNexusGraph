@@ -19,7 +19,6 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import urllib.parse
@@ -122,7 +121,7 @@ def parse_xml(xml_text: str, *, snapshot_year: int | None = None
     / patent_inventors 다대다 link 생성.
     """
     sy = snapshot_year if snapshot_year is not None else datetime.now(timezone.utc).year
-    out = {
+    out: dict[str, Any] = {
         "patents":          [],
         "assignees":        [],
         "inventors":        [],
@@ -136,7 +135,7 @@ def parse_xml(xml_text: str, *, snapshot_year: int | None = None
         from lxml import etree
         root = etree.fromstring(xml_text.encode("utf-8") if isinstance(xml_text, str) else xml_text)
     except ImportError:
-        import xml.etree.ElementTree as etree
+        import xml.etree.ElementTree as etree  # noqa: N813 — etree 표준 별칭 관례
         root = etree.fromstring(xml_text)
     except Exception as e:   # noqa: BLE001 — [kipris] XML parse 실패 흡수 → out 반환
         log.warning("[kipris] XML parse 실패: %s", e)
@@ -289,7 +288,7 @@ def collect(*, applicants: list[str] | None = None,
         log.warning("[kipris] KIPRIS_API_KEY 미설정 — fetch skip, raw 파일이 있으면 parse 만")
 
     # 2. raw_dir 의 모든 *.xml + *.txt parse → 합산.
-    aggregate = {k: [] for k in ("patents", "assignees", "inventors",
+    aggregate: dict[str, list] = {k: [] for k in ("patents", "assignees", "inventors",
                                    "patent_assignees", "patent_inventors", "patent_cpc")}
     seen_pat = set()
     seen_asn = set()

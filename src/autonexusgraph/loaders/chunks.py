@@ -20,7 +20,6 @@ from ..config import get_settings
 from ..extraction import chunk_text, parse_dart_zip
 from ._common import LoadStats, chunked
 
-
 SQL_INSERT_CHUNK = """
 INSERT INTO anxg_vec.chunks
   (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata,
@@ -253,7 +252,7 @@ def embed_chunks(
         with transaction() as conn:
             register_vector(conn)
             with conn.cursor() as cur:
-                for rid, vec in zip(ids, vectors):
+                for rid, vec in zip(ids, vectors, strict=False):
                     cur.execute(SQL_UPDATE_EMBEDDING, (vec, rid))
 
         stats.inserted += len(rows)

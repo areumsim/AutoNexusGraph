@@ -20,7 +20,6 @@ from typing import Any
 
 import httpx
 
-
 # data.go.kr — 공정거래위원회 기업집단 (상호출자제한 + 공시대상)
 # 무료 키 발급 후 ?serviceKey=... 로 호출
 DATA_GO_KR_BASE = "https://api.odcloud.kr/api"
@@ -61,7 +60,7 @@ class FtcClient:
             "Accept": "application/json",
         })
 
-    def __enter__(self) -> "FtcClient":
+    def __enter__(self) -> FtcClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -78,7 +77,7 @@ class FtcClient:
                 "또는 수동: https://www.ftc.go.kr → 대규모기업집단 → 지정현황 CSV/HWP 다운"
             )
         url = f"{self.base_url}{self.endpoint}"
-        params = {
+        params: dict[str, Any] = {
             "serviceKey": self.api_key,
             "page": page,
             "perPage": per_page,

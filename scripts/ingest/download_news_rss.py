@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -27,14 +26,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion._license import policy
 from autonexusgraph.ingestion.news_client import KOREAN_FEEDS, NewsRssClient
 
 
 def _article_hash(source: str, link: str) -> str:
-    return hashlib.sha256(f"{source}||{link}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{source}||{link}".encode()).hexdigest()
 
 
 def main() -> int:

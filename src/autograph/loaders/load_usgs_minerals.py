@@ -34,7 +34,9 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[3]
 SEED_PATH = ROOT / "ontology" / "auto" / "materials_seed.yaml"
 
-from ._neo4j_helpers import default_schema_version as _default_schema_version
+from ._neo4j_helpers import (  # noqa: E402 — ROOT/SEED_PATH 정의 후 지역 배치
+    default_schema_version as _default_schema_version,
+)
 
 # _SCHEMA_VERSION 은 ontology 헤더 SoT (lazy 회수). 본 모듈 외에서 import 하지 마라.
 # PRD §10 DoD #17 (c) — yaml schema_version 헤더 변경 시 자동 전파.
@@ -135,7 +137,7 @@ _CONSTRAINTS_CYPHER = [
 ]
 
 # 7-key edge meta — PRD §6.7.
-_EDGE_META = {
+_EDGE_META: dict[str, Any] = {
     "source_type":       "usgs_mcs",
     "source_id":         "usgs_mcs_2025",
     "confidence_score":  _CONF_A,
@@ -244,7 +246,8 @@ def _neo4j_load(seed: dict, snapshot_year: int,
                             r.updated_at        = datetime()
                         RETURN count(r) AS n
                     """, mat=mat_code, mname=mname, **module_edge_meta)
-                    stats["made_of_merged"] += (res.single() or {}).get("n", 0)
+                    rec = res.single()
+                    stats["made_of_merged"] += rec.get("n", 0) if rec else 0
     finally:
         drv.close()
     return stats

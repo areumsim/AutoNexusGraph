@@ -10,10 +10,10 @@ finance 의 corp_code 필터와 분리한 별도 SELECT.
 from __future__ import annotations
 
 import logging
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from autonexusgraph.db.postgres import get_pool
-
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ def select_ir_chunks(
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
     log.info("[chunk_selector:ir] %d chunks (oems=%s)",
              len(rows), oems or "all")
     return rows
@@ -140,7 +140,7 @@ def select_auto_chunks(
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
 
     log.info("[p3.select] %d chunks (manufacturers=%s sources=%s)",
              len(rows),

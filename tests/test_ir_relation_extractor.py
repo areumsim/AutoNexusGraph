@@ -10,7 +10,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from autograph.extractors.ir_relation_extractor import (
-    IRRelationExtractor, load_ir_prompt,
+    IRRelationExtractor,
+    load_ir_prompt,
 )
 
 

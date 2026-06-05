@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -15,13 +14,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.gleif_client import GleifClient
 
 
 def main() -> int:
-    limiter = get_rate_limiter("gleif")
+    get_rate_limiter("gleif")
     ckpt = CheckpointStore("gleif_kr")
 
     all_records: list[dict] = []

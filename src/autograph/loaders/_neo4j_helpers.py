@@ -21,10 +21,9 @@ helper 가 합리적 기본값으로 보강 (year=현재, schema_version=ontolog
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from ..ontology import load_edge_required_meta, ontology_schema_version
-
 
 # 의무 메타 키 — ontology SSOT.
 EDGE_META_KEYS: tuple[str, ...] = load_edge_required_meta()

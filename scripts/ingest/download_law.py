@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings
 
-
 KEY_LAWS_BY_NAME = [
     "자본시장과 금융투자업에 관한 법률",
     "주식회사 등의 외부감사에 관한 법률",

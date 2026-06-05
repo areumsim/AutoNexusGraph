@@ -97,7 +97,7 @@ class DartClient:
         from ._common import make_http_client
         self._client = make_http_client(timeout=timeout)
 
-    def __enter__(self) -> "DartClient":
+    def __enter__(self) -> DartClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:

@@ -13,11 +13,9 @@ ar-poc-dev 환경에서 한국 IP 로 호출 (FSS 가 일부 페이지 IP 제한
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 import httpx
-
 
 FSS_BASE = "https://www.fss.or.kr"
 
@@ -25,6 +23,15 @@ USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
+
+
+def _as_str(v: object) -> str:
+    """bs4 ``Tag.get()`` 반환(str | AttributeValueList(list) | None) → 단일 str."""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        return str(v[0]) if v else ""
+    return ""
 
 
 @dataclass(frozen=True)
@@ -48,7 +55,7 @@ class FssClient:
         self.base_url = base_url.rstrip("/")
         self._client = httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT})
 
-    def __enter__(self) -> "FssClient":
+    def __enter__(self) -> FssClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -74,7 +81,7 @@ class FssClient:
         from bs4 import BeautifulSoup
 
         url = f"{self.base_url}/fss/main/list.do"
-        params = {
+        params: dict[str, Any] = {
             "bbsId": bbs_id, "cmsCd": cms_cd, "pageIndex": page,
             "pageUnit": size,
         }
@@ -94,7 +101,7 @@ class FssClient:
             a = row.find("a")
             if not a:
                 continue
-            href = a.get("href", "")
+            href = _as_str(a.get("href"))
             title = a.get_text(strip=True)
             # 날짜 — td 또는 span 안
             date_el = row.select_one("td.date, .date, .reg-date")
@@ -132,7 +139,7 @@ class FssClient:
         # 첨부 파일 링크
         attachments = []
         for a in soup.select("a[href*='download'], a[href*='atch']"):
-            href = a.get("href", "")
+            href = _as_str(a.get("href"))
             if href:
                 full = self.base_url + href if href.startswith("/") else href
                 attachments.append(full)

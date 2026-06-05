@@ -24,7 +24,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def _run(sql: str, params: Sequence | None = None, *, fetch: str = "none") -> An
         cur.execute(sql, tuple(params or ()))
         if fetch == "rows":
             cols = [d.name for d in cur.description]
-            out: Any = [dict(zip(cols, r)) for r in cur.fetchall()]
+            out: Any = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
         elif fetch == "scalar":
             row = cur.fetchone()
             out = row[0] if row else None

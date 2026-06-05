@@ -17,7 +17,8 @@ ingestion / loaders 의 OpenAlex 적재는 별도 (기존 코드 보존).
 """
 
 # import 부작용으로 핸들러·라우터·템플릿 등록.
-from . import agent_handler   # noqa: F401  부작용: register_handler + register_router
+from . import agent_handler  # noqa: F401  부작용: register_handler + register_router
+
 # tools 패키지 import 시 ip_* Cypher 템플릿 자동 병합 (autograph 패턴 동일).
 # tools 내부 PG/Neo4j 의존이라 lazy import — 호출 시점에 등록.
 

@@ -26,7 +26,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import normalize_corp_name
 
-
 UPSERT_ESG = """
 INSERT INTO anxg_esg.ratings
   (corp_code, year, source, e_grade, s_grade, g_grade, total_grade, raw)

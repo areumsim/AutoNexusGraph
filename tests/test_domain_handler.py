@@ -15,16 +15,13 @@ from pathlib import Path
 import pytest
 
 from autonexusgraph.agents._domain_handler import (
-    DomainHandler,
     auto_detect_domain,
     call_handler_method,
     get_handler,
     list_handlers,
     register_handler,
-    register_router,
     unregister_handler,
 )
-
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -114,7 +111,9 @@ def test_autograph_handler_allowed_intents_partition():
         AUTO_SQL_ALLOWED,
     )
     from autonexusgraph.agents.workers import (
-        FIN_GRAPH_ALLOWED, FIN_RESEARCH_INTENTS, FIN_SQL_ALLOWED,
+        FIN_GRAPH_ALLOWED,
+        FIN_RESEARCH_INTENTS,
+        FIN_SQL_ALLOWED,
     )
 
     assert auto.allowed_intents("graph") == AUTO_GRAPH_ALLOWED

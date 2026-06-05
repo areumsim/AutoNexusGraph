@@ -28,9 +28,6 @@ from typing import Any
 import yaml
 
 from ..config import get_settings
-from ..llm.base import get_llm_client
-from ..llm.budget_aware import budget_aware_client
-
 
 log = logging.getLogger(__name__)
 
@@ -116,7 +113,7 @@ def filter_target_chunks(
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+        rows = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
     # 2단 — signal-based selectivity (Python). LLM 호출 전 추가 절감.
     if apply_selectivity and rows:

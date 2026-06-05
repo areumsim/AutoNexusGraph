@@ -5,7 +5,7 @@ system_code→공정 매핑 + candidate 등급 + 외주 모듈 기본 의장 검
 
 from __future__ import annotations
 
-from autograph.loaders.load_uses_process import _proc_for, _build_rows
+from autograph.loaders.load_uses_process import _build_rows, _proc_for
 
 
 def test_body_chassis_to_press():

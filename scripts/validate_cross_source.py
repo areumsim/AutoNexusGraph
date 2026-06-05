@@ -31,7 +31,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.db.postgres import get_pool
 
-
 INSERT_CHECK = """
 INSERT INTO anxg_ops.quality_checks (check_name, target_id, severity, message, details)
 VALUES (%s, %s, %s, %s, %s)
@@ -84,7 +83,7 @@ def main() -> int:
              WHERE peh.role LIKE '%대표%' OR peh.role LIKE '%CEO%'
         """)
         dart_ceos = defaultdict(set)
-        for cc, nm, role in cur.fetchall():
+        for cc, nm, _role in cur.fetchall():
             dart_ceos[cc].add(nm)
         # Wikidata CEO: anxg_wiki.wikidata_facts where property='P169'
         # value 는 QID 형태 → label 매칭은 별도 fetch 필요. 여기선 P169 존재 여부만 체크.
@@ -96,7 +95,7 @@ def main() -> int:
         wd_p169 = {cc: n for cc, n in cur.fetchall()}
 
     overlap = set(dart_ceos) & set(wd_p169)
-    report_lines.append(f"\n## 2. CEO 정보 출처 매핑\n")
+    report_lines.append("\n## 2. CEO 정보 출처 매핑\n")
     report_lines.append(f"- DART CEO 정보 보유 회사: **{len(dart_ceos)}**")
     report_lines.append(f"- Wikidata P169 보유 회사: **{len(wd_p169)}**")
     report_lines.append(f"- 양쪽 모두 보유 (cross-validation 가능): **{len(overlap)}**")
@@ -121,7 +120,7 @@ def main() -> int:
         ]:
             cnt[key] = session.run(q).single()["c"]
 
-    report_lines.append(f"\n## 3. Neo4j 그래프 적재량\n")
+    report_lines.append("\n## 3. Neo4j 그래프 적재량\n")
     for k, v in cnt.items():
         report_lines.append(f"- **{k}**: {v:,}")
         sev = "info" if v > 0 else "warn"
@@ -156,7 +155,7 @@ def main() -> int:
         n_no_since = cur.fetchone()[0]
         cur.execute("SELECT count(*) FROM anxg_master.person_executive_history")
         n_pe_total = cur.fetchone()[0]
-    report_lines.append(f"\n## 5. 시점 메타 완전성\n")
+    report_lines.append("\n## 5. 시점 메타 완전성\n")
     report_lines.append(f"- 뉴스 기사 — published_at NULL: {n_no_pub} / {n_total}")
     report_lines.append(f"- 임원 이력 — since_date NULL : {n_no_since} / {n_pe_total} (DART API 미제공 — 후속 보강 대상)")
     add("ts_meta_news", None, "info" if n_no_pub == 0 else "warn",
@@ -177,7 +176,7 @@ def main() -> int:
             WHERE c.is_active = TRUE
         """)
         wqid, wwp, both = cur.fetchone()
-    report_lines.append(f"\n## 6. Wikidata × Wikipedia 교차 보유\n")
+    report_lines.append("\n## 6. Wikidata × Wikipedia 교차 보유\n")
     report_lines.append(f"- Wikidata QID 보유: **{wqid}**")
     report_lines.append(f"- Wikipedia 제목 보유: **{wwp}**")
     report_lines.append(f"- 둘 다 보유 (cross-source 가능): **{both}**")

@@ -33,14 +33,12 @@ import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import yaml
 
 from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import default_schema_version as _default_schema_version
-
 
 log = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import zipfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -61,7 +61,7 @@ def test_dart_parse_corp_codes():
         "    <modify_date>20240101</modify_date>\n"
         "  </list>\n"
         "</result>\n"
-    ).encode("utf-8")
+    ).encode()
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("CORPCODE.xml", xml)
@@ -101,7 +101,7 @@ def test_ecos_key_stats_keys():
 
     assert "base_rate" in KEY_STATS
     assert "usd_krw" in KEY_STATS
-    for name, meta in KEY_STATS.items():
+    for _name, meta in KEY_STATS.items():
         assert "stat_code" in meta
         assert "cycle" in meta
         assert meta["cycle"] in {"D", "M", "Q", "A"}

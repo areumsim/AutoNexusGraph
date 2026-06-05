@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
+from common.retrieve_base import DEFAULT_TOPK
+from common.retrieve_base import cap_topk as _cap
+
 from ..db.postgres import get_pool
 from ..embeddings import EmbeddingError, get_embedding_client
 
@@ -134,7 +136,7 @@ def search_documents(
         with conn.cursor() as cur:
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+            hits = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
     # rerank 비활성 — vector 유사도 결과 그대로 top_k 잘라 반환.
     if not rerank or not hits:
@@ -158,7 +160,7 @@ def search_documents(
         if idx is None or idx >= len(hits):
             continue
         row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
+        row["score"] = float(getattr(r, "score", row.get("score", 0.0)) or 0.0)
         row["reranked"] = True
         out.append(row)
     return out
@@ -196,7 +198,7 @@ def search_by_metadata(
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
 
 def get_chunk(chunk_id: int) -> dict | None:
@@ -214,7 +216,7 @@ def get_chunk(chunk_id: int) -> dict | None:
         if not row:
             return None
         cols = [d.name for d in cur.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))
 
 
 __all__ = [

@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-
 # ─── 모델별 가격표 (USD per 1M tokens) ───────────────────────────────
 # (input_per_1m, output_per_1m)
 PRICING: dict[str, tuple[float, float]] = {
@@ -177,7 +176,7 @@ class BudgetCheck:
         self.auto_approve = auto_approve
 
     @classmethod
-    def from_env(cls, caller: str) -> "BudgetCheck":
+    def from_env(cls, caller: str) -> BudgetCheck:
         return cls(caller, get_hard_limit_usd(), get_auto_approve_usd())
 
     def review(
@@ -213,7 +212,7 @@ class BudgetCheck:
                 if ans in ("y", "yes"):
                     approved_via = "interactive-yes"
                 else:
-                    print(f"[COST GATE] 사용자 거절. 종료.")
+                    print("[COST GATE] 사용자 거절. 종료.")
                     raise SystemExit(3)
             else:
                 print(f"[COST GATE] 추정 ${est.cost_usd:.4f} > auto_approve ${self.auto_approve:.4f}. "
@@ -226,7 +225,7 @@ class BudgetCheck:
 
         print(f"[COST GATE] {est.format()}  → {approved_via} (limit ${limit:.4f})")
         if dry_run:
-            print(f"[COST GATE] --dry-run: 실제 LLM 호출 안 함. 종료 코드 0")
+            print("[COST GATE] --dry-run: 실제 LLM 호출 안 함. 종료 코드 0")
             raise SystemExit(0)
         return True
 

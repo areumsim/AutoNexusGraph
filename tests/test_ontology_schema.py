@@ -19,12 +19,10 @@ import yaml
 
 from autonexusgraph.ontology import (
     EDGE_REQUIRED_META_KEYS,
-    OntologyFile,
     OntologyValidationError,
     load_and_validate,
     validate_dict,
 )
-
 
 # ── 정상 (실제 SSOT) ──────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,7 +102,7 @@ def test_invalid_cardinality_rejected():
             to: B
             cardinality: many-to-zero    # invalid enum
     """)
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — 잘못된 스키마 거부만 검증 (예외 타입 비결합)
         validate_dict(data)
 
 
@@ -174,7 +172,7 @@ def test_bom_level_out_of_range():
             required: [id]
             bom_level: 99
     """)
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — 잘못된 스키마 거부만 검증 (예외 타입 비결합)
         validate_dict(data)
 
 
@@ -195,7 +193,7 @@ def test_confidence_default_out_of_range():
             to: B
             confidence_default: 1.5     # > 1.0
     """)
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — 잘못된 스키마 거부만 검증 (예외 타입 비결합)
         validate_dict(data)
 
 

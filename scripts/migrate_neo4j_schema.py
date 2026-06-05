@@ -24,7 +24,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.db.neo4j import get_session
 
-
 MIGRATIONS = [
     # 1. Sector 노드 라벨 → Industry  (Sector 만 단독 라벨일 때만)
     (

@@ -30,14 +30,13 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import logging
 import re
 import sys
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from autonexusgraph.config import get_settings
 
@@ -45,9 +44,8 @@ from ..extractors.dart_production_parser import (
     PlantRow,
     parse_business_report,
 )
-from ._neo4j_helpers import edge_meta_cypher, run_batched
 from ._neo4j_helpers import default_schema_version as _default_schema_version
-
+from ._neo4j_helpers import edge_meta_cypher, run_batched
 
 log = logging.getLogger(__name__)
 

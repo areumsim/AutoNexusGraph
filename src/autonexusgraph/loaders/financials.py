@@ -23,7 +23,6 @@ from pathlib import Path
 from ..config import get_settings
 from ._common import LoadStats, chunked, iter_jsonl, parse_amount, parse_int
 
-
 SQL_UPSERT = """
 INSERT INTO anxg_fin.financials
   (corp_code, bsns_year, reprt_code, fs_div, sj_div, account_id, account_nm,
@@ -117,9 +116,11 @@ def load_financials(
     # 진행률 (필수 아님)
     try:
         from tqdm import tqdm
-        wrap = lambda it: tqdm(it, desc="financials", unit="batch") if progress else it
+        def wrap(it):
+            return tqdm(it, desc="financials", unit="batch") if progress else it
     except ImportError:
-        wrap = lambda it: it
+        def wrap(it):
+            return it
 
     from ..db.postgres import transaction
     with transaction() as conn:

@@ -210,7 +210,6 @@ def test_process_cik_file_bridge_and_facts(tmp_path, monkeypatch):
     fact_calls: list = []
 
     cur = MagicMock()
-    state = {"step": 0}
 
     def fake_execute(sql, params=None):
         # 1) bridge sec_cik lookup → 없음.
@@ -331,8 +330,8 @@ def test_process_cik_file_no_facts(tmp_path):
 # ── bridge tool 함수 ──────────────────────────────────────
 def test_bridge_tools_exposed():
     from autograph.tools import (
-        bridge_sec_cik_to_entity,
         bridge_entity_to_sec_cik,
+        bridge_sec_cik_to_entity,
         get_oem_financials_sec,
     )
     assert callable(bridge_sec_cik_to_entity)

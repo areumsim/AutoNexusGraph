@@ -37,16 +37,14 @@ import urllib.request
 import urllib.robotparser
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 from autonexusgraph.config import get_settings
-from autonexusgraph.ingestion._common import RateLimiter, save_raw
+from autonexusgraph.ingestion._common import RateLimiter
 from autonexusgraph.ingestion._license import (
     OEM_NEWSROOM_POLICY,
     is_url_allowed,
     newsroom_policy,
 )
-
 
 log = logging.getLogger(__name__)
 

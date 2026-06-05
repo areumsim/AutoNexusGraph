@@ -25,7 +25,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import normalize_corp_name
 
-
 UPSERT_PAGE = """
 INSERT INTO anxg_wiki.wikipedia_pages
   (corp_code, lang, title, page_id, revision_id, extract, infobox, last_modified)

@@ -118,7 +118,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
     submodule import 패턴 — 테스트에서 patch('autonexusgraph.tools.retrieve.search_documents')
     또는 patch('autograph.tools.retrieve.search_documents_auto') 가 정상 작동하도록.
     """
-    from ..tools.retrieve import search_documents, search_by_metadata, get_chunk
+    from ..tools.retrieve import get_chunk, search_by_metadata, search_documents
 
     intent = task.get("intent") or "search"
     args = resolve_arg_bindings(state, task.get("args"))   # (a) closed-loop 데이터 흐름
@@ -258,7 +258,7 @@ def _safe_calculator(expr: str, variables: dict) -> float:
     if not _EXPR_ALLOWED_RE.match(expr):
         raise ValueError(f"허용되지 않은 문자 포함: {expr!r}")
     # 위험 키워드 차단
-    BAD = ("import", "exec", "eval", "open", "__", "lambda", "compile",
+    BAD = ("import", "exec", "eval", "open", "__", "lambda", "compile",  # noqa: N806 — 지역 상수(블랙리스트)
            "globals", "locals", "vars", "getattr", "setattr", "delattr",
            "type", "object", "subprocess", "os.")
     for w in BAD:
@@ -274,7 +274,7 @@ def _safe_calculator(expr: str, variables: dict) -> float:
         safe_vars[k] = float(v)
 
     try:
-        import numexpr   # type: ignore[import-not-found]
+        import numexpr  # type: ignore[import-not-found]
     except ImportError as e:
         raise RuntimeError(
             "calculator_worker 는 numexpr 의존 — `pip install numexpr` 필요. "

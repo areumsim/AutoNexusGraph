@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def _reload(monkeypatch, **env):
     for k, v in env.items():

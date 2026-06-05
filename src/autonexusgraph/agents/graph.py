@@ -18,21 +18,20 @@ PRD §7.6.5: Streaming — UI node-by-node 진행 표시
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator, Mapping
+from typing import Any
 
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
 from .state import AgentState
 from .supervisor import (
     mid_execution_reflect,
-    supervisor_done,
-    supervisor_node,
     sup_send_directives,
+    supervisor_node,
 )
 from .tracing import start_turn_context
 from .validator import MAX_REPLANS, mark_replan, should_replan, validator_node
 from .workers import (
     calculator_worker,
-    dispatch_one,
     graph_worker,
     research_worker,
     sql_worker,
@@ -48,7 +47,7 @@ except ImportError:
     _HAS_LANGGRAPH = False
 
 try:
-    from langgraph.types import Command   # type: ignore[import-not-found]
+    from langgraph.types import Command  # type: ignore[import-not-found]
     _HAS_COMMAND = True
 except ImportError:
     _HAS_COMMAND = False
@@ -186,7 +185,7 @@ def _get_langgraph_app():
     return _LG_APP
 
 
-def _make_run_config(thread_id: str, *, state: dict | None = None) -> dict:
+def _make_run_config(thread_id: str, *, state: Mapping[str, Any] | None = None) -> dict:
     """LangGraph app.invoke 에 넘길 config — checkpoint + LangSmith 태그.
 
     Langfuse 4.x 는 OTEL native ─ start_turn_context 의 ``start_as_current_observation``

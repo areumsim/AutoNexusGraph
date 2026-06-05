@@ -15,9 +15,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
-
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -43,8 +40,8 @@ def test_neo4j_label_uses_capitalized_namespace_prefix():
 
 
 def test_qdrant_collection_default_and_derived():
-    from autonexusgraph.db.qdrant import collection_name
     from autonexusgraph.config import get_settings
+    from autonexusgraph.db.qdrant import collection_name
     s = get_settings()
     # base="chunks" 는 config qdrant_collection 직접 반환 (env override 가능).
     assert collection_name("chunks") == s.qdrant_collection
@@ -83,13 +80,15 @@ def test_get_session_injects_database_when_configured(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setattr(get_settings(), "neo4j_database", "")
     captured.clear()
-    with N.get_session() as _: pass
+    with N.get_session() as _:
+        pass
     assert "database" not in captured
 
     # neo4j_database 설정 시 주입.
     monkeypatch.setattr(get_settings(), "neo4j_database", "autonexusgraph")
     captured.clear()
-    with N.get_session() as _: pass
+    with N.get_session() as _:
+        pass
     assert captured.get("database") == "autonexusgraph"
 
 
@@ -116,7 +115,8 @@ def test_get_session_respects_explicit_database_kwarg(monkeypatch):
     monkeypatch.setattr(get_settings(), "neo4j_database", "autonexusgraph")
 
     captured.clear()
-    with N.get_session(database="test_override") as _: pass
+    with N.get_session(database="test_override") as _:
+        pass
     assert captured.get("database") == "test_override", \
         "명시 database kwarg 가 config 보다 우선해야 한다 (multi-kwarg TypeError 회귀 가드)"
 
@@ -129,8 +129,8 @@ def test_relabel_node_labels_derived_from_domain_registry():
     회귀 가드: 과거 hardcoded NODE_LABELS 가 _DOMAIN_MAP 과 drift 하면서
     Component/FailureMode/Product 등 누락 사고 발생. 본 테스트가 동기 보장.
     """
-    from scripts.migrate.relabel_neo4j_namespace import NODE_LABELS, _TEMPLATE_ONLY_LABELS
     from autonexusgraph.ontology.domain import _DOMAIN_MAP
+    from scripts.migrate.relabel_neo4j_namespace import _TEMPLATE_ONLY_LABELS, NODE_LABELS
 
     expected = (set(_DOMAIN_MAP) | _TEMPLATE_ONLY_LABELS) - {"Sector"}
     assert set(NODE_LABELS) == expected, \
@@ -173,7 +173,7 @@ def test_pg_rename_script_covers_all_create_schemas():
             created.add(m.group(1))
 
     missing = created - rename_schemas
-    extra = rename_schemas - created
+    rename_schemas - created
     assert not missing, f"rename SQL 에서 누락된 스키마 (init 에는 있음): {missing}"
     # rename 에만 있는 건 OK — 과거 스키마 호환용일 수 있음. 경고만.
 
@@ -397,7 +397,7 @@ def test_transaction_invalidates_cache_on_rollback_failure(monkeypatch):
     monkeypatch.setattr(pg, "_open_connection", lambda: fake)
     # cache_clear 호출 검증용 카운터.
     cleared = {"n": 0}
-    orig_clear = type(pg._open_connection).cache_clear if hasattr(pg._open_connection, "cache_clear") else None
+    type(pg._open_connection).cache_clear if hasattr(pg._open_connection, "cache_clear") else None
     # monkeypatch 후 _open_connection 은 plain 함수라 cache_clear 속성 없음 — 대체 mock.
     pg._open_connection.cache_clear = lambda: cleared.__setitem__("n", cleared["n"] + 1)  # type: ignore[attr-defined]
 

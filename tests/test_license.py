@@ -16,8 +16,8 @@ from typing import get_args
 from autonexusgraph.ingestion._license import (
     BODY_ALLOWED,
     LICENSE_POLICY,
-    LicenseTier,
     OEM_NEWSROOM_POLICY,
+    LicenseTier,
     allow_body,
     is_url_allowed,
     newsroom_policy,
@@ -25,7 +25,6 @@ from autonexusgraph.ingestion._license import (
     require_attribution,
     require_share_alike,
 )
-
 
 REQUIRED_SOURCES_BY_DOMAIN: dict[str, list[str]] = {
     "finance": ["dart", "fss_press", "ftc", "kosis", "ecos", "law",

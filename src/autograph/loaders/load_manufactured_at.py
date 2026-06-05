@@ -30,7 +30,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 from ..ontology import load_manufactured_at_seed
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 

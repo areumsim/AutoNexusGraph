@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
     from ipgraph.ingestion import kipris as ing
-    from ipgraph.loaders.load_uspto_odp import upsert_pg, load_neo4j
+    from ipgraph.loaders.load_uspto_odp import load_neo4j, upsert_pg
 
     apps: list[str] | None = None
     if args.applicants:

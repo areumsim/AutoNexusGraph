@@ -10,9 +10,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
+from common.retrieve_base import DEFAULT_TOPK
+from common.retrieve_base import cap_topk as _cap
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +100,7 @@ def search_patents(query: str, *,
                 cur.execute("SET LOCAL hnsw.ef_search = 400")
                 cur.execute(sql, params)
                 cols = [d.name for d in cur.description]
-                hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+                hits = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.search_patents] PG/벡터 실패 (fail-soft): %s", e)
         return []
@@ -122,7 +123,7 @@ def search_patents(query: str, *,
         if idx is None or idx >= len(hits):
             continue
         row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
+        row["score"] = float(getattr(r, "score", row.get("score", 0.0)) or 0.0)
         row["reranked"] = True
         out.append(row)
     return out
@@ -153,7 +154,7 @@ def search_by_metadata_ip(*,
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.search_by_metadata_ip] PG 실패: %s", e)
         return []
@@ -174,7 +175,7 @@ def get_chunk_ip(chunk_id: int) -> dict | None:
             if not row:
                 return None
             cols = [d.name for d in cur.description]
-            return dict(zip(cols, row))
+            return dict(zip(cols, row, strict=False))
     except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[ip.get_chunk_ip] PG 실패: %s", e)
         return None

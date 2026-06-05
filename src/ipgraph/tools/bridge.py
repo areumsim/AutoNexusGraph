@@ -47,7 +47,7 @@ def bridge_assignee_to_corp(assignee_id: str) -> dict[str, Any] | None:
             if not row:
                 return None
             cols = [d.name for d in cur.description]
-            return dict(zip(cols, row))
+            return dict(zip(cols, row, strict=False))
     except Exception as e:   # noqa: BLE001 — [bridge] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[ip.bridge_assignee_to_corp] PG 실패: %s", e)
         return None
@@ -86,7 +86,7 @@ def bridge_corp_to_assignee(corp_code: str,
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, (corp_code,))
             cols = [d.name for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except Exception as e:   # noqa: BLE001 — [bridge] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.bridge_corp_to_assignee] PG 실패: %s", e)
         return []

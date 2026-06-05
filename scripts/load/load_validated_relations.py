@@ -219,7 +219,7 @@ def main() -> int:
                 session.run(cypher, rows=rows[i:i+BATCH])
             print(f"[P4] {rtype} adapted: {len(rows)}")
 
-    print(f"[P4] Neo4j 적재 완료")
+    print("[P4] Neo4j 적재 완료")
     return 0
 
 

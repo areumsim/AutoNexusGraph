@@ -15,7 +15,6 @@ from pathlib import Path
 from ..config import get_settings
 from ._common import LoadStats, chunked, iter_jsonl, parse_date
 
-
 SQL_UPSERT = """
 INSERT INTO anxg_fin.filings
   (rcept_no, corp_code, report_nm, rcept_dt, flr_nm, pblntf_ty, raw, ingested_at)
@@ -61,7 +60,7 @@ def load_filings(
     if not bulk_root.exists():
         raise FileNotFoundError(f"bulk_root 없음: {bulk_root}")
 
-    def _iter_all() -> "list[dict]":
+    def _iter_all() -> list[dict]:
         rows = []
         for corp_dir in sorted(bulk_root.iterdir()):
             if not corp_dir.is_dir():

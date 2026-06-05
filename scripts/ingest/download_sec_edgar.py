@@ -26,10 +26,12 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.sec_client import SecEdgarClient
-
 
 SELECT_CIK = """
 SELECT em.corp_code, em.id_value AS cik, c.corp_name
@@ -73,7 +75,7 @@ def main() -> int:
             limiter.acquire()
             print(f"[SEC] cik={cik} corp_code={corp_code} name={name}")
             try:
-                sub = fetch_with_retry(lambda: cli.get_submissions(cik), max_tries=3)
+                sub = fetch_with_retry(lambda cik=cik: cli.get_submissions(cik), max_tries=3)
                 if not sub:
                     ckpt.mark_failed(entity_id, "submissions_404")
                     continue
@@ -81,7 +83,7 @@ def main() -> int:
 
                 if args.with_facts:
                     limiter.acquire()
-                    facts = fetch_with_retry(lambda: cli.get_company_facts(cik), max_tries=3)
+                    facts = fetch_with_retry(lambda cik=cik: cli.get_company_facts(cik), max_tries=3)
                     if facts:
                         save_raw("sec", f"{entity_id}/companyfacts.json", facts)
 

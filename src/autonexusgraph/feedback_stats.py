@@ -23,7 +23,8 @@ Makefile: ``make feedback-stats``.
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 # ── DB 실행기 (테스트 monkeypatch 지점) ──────────────────────────────
@@ -35,7 +36,7 @@ def _run(sql: str, params: Sequence | None = None, *, fetch: str = "rows") -> An
         cur.execute(sql, tuple(params or ()))
         if fetch == "rows":
             cols = [d.name for d in cur.description]
-            out: Any = [dict(zip(cols, r)) for r in cur.fetchall()]
+            out: Any = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
         else:  # scalar
             row = cur.fetchone()
             out = row[0] if row else None
@@ -155,7 +156,7 @@ def _format_table(st: dict[str, Any]) -> str:
     ]
     if st["top_negative"]:
         lines.append("")
-        lines.append(f"  부정(-1) 누적 상위 (message_id · n_down · preview)")
+        lines.append("  부정(-1) 누적 상위 (message_id · n_down · preview)")
         lines.append(f"  {'-'*72}")
         for tn in st["top_negative"]:
             preview = (tn["content_preview"] or "").replace("\n", " ")[:50]

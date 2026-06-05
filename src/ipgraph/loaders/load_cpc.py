@@ -49,7 +49,7 @@ RAW_DIR = ROOT / "data/raw/cpc"
 _SCHEMA_VERSION = "v2.2"
 _CONF_A = 0.95
 
-_EDGE_META = {
+_EDGE_META: dict = {
     "source_type":       "cpc_scheme",
     "confidence_score":  _CONF_A,
     "validated_status":  "validated",

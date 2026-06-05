@@ -13,7 +13,6 @@ turn budget / circuit breaker 체크는 worker 진입 직전에도 다시 한다
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from .dag import (
     all_done,
@@ -168,10 +167,10 @@ def sup_send_directives(state: AgentState):
     빈 리스트면 langgraph 가 conditional edge 의 'done' 경로로 이동한다.
     """
     try:
-        from langgraph.types import Send   # type: ignore[import-not-found]
+        from langgraph.types import Send  # type: ignore[import-not-found]
     except ImportError:
         try:
-            from langgraph.graph import Send   # type: ignore[attr-defined]
+            from langgraph.graph import Send  # type: ignore[attr-defined,no-redef]
         except ImportError:
             return []
 
@@ -188,7 +187,7 @@ def sup_send_directives(state: AgentState):
         return []
 
     # worker 노드명은 graph.py 의 add_node 명과 일치해야 한다.
-    NODE_BY_AGENT = {
+    NODE_BY_AGENT = {  # noqa: N806 — 지역 상수(매핑)
         "research": "worker_research",
         "graph": "worker_graph",
         "sql": "worker_sql",
