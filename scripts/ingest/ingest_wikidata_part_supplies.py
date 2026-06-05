@@ -64,7 +64,8 @@ def _sparql(query: str, *, retries: int = 3) -> dict:
 def ingest(*, limit: int = 3000, max_suppliers: int = 60) -> int:
     qids = _supplier_qids(max_suppliers)
     if not qids:
-        print("supplier QID 없음"); return 0
+        print("supplier QID 없음")
+        return 0
     values = " ".join(f"wd:{q}" for q in qids)
     query = f"""
     SELECT ?part ?partLabel ?supplier ?supplierLabel WHERE {{
