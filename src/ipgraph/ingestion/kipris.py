@@ -297,7 +297,7 @@ def collect(*, applicants: list[str] | None = None,
     for fp in sorted(list(raw_dir.glob("*.xml")) + list(raw_dir.glob("*.txt"))):
         try:
             xml_text = fp.read_text(encoding="utf-8")
-        except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+        except Exception as e:   # noqa: BLE001 — [kipris] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
             log.warning("[kipris] read 실패 %s: %s", fp.name, e)
             continue
         parsed = parse_xml(xml_text, snapshot_year=snapshot_year)

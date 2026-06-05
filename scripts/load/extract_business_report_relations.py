@@ -198,7 +198,7 @@ def _existing_chunk_ids(root: Path) -> set[int]:
                 d = json.loads(line)
                 if "chunk_id" in d:
                     ids.add(int(d["chunk_id"]))
-        except Exception:   # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
+        except Exception:   # noqa: BLE001 — [extract_business_report_relations] 1 unit 실패 흡수 → continue (부분 성공 보존)
             continue
     return ids
 

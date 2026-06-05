@@ -68,7 +68,7 @@ def main() -> int:
                     ),
                     max_tries=3,
                 )
-            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+            except Exception as e:   # noqa: BLE001 — [download_fss_press] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 print(f"  [page {page}] list failed: {e}", file=sys.stderr)
                 ckpt_list.mark_failed(f"page_{page}", str(e))
                 continue

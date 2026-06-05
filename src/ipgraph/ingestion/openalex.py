@@ -354,7 +354,7 @@ def run(*, max_institutions: int | None = None,
             stats["qids_searched"] += 1
             try:
                 rec = lookup_institution_by_qid(qid, hint_name=entry.get("name"))
-            except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+            except Exception as exc:   # noqa: BLE001 — [openalex] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 log.warning("[openalex] inst lookup fail %s: %s", qid, exc)
                 rec = None
             if not rec:
@@ -387,7 +387,7 @@ def run(*, max_institutions: int | None = None,
                         stats["institutions_inserted"] += 1
                     else:
                         stats["institutions_updated"] += 1
-                except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+                except Exception as exc:   # noqa: BLE001 — [openalex] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                     cur.execute("ROLLBACK TO SAVEPOINT sp_inst")
                     log.warning("[openalex:inst] %s fail: %s", inst.get("ror_id"), exc)
                     continue
@@ -419,7 +419,7 @@ def run(*, max_institutions: int | None = None,
                             stats["works_inserted"] += 1
                         else:
                             stats["works_updated"] += 1
-                    except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+                    except Exception as exc:   # noqa: BLE001 — [openalex] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                         cur.execute("ROLLBACK TO SAVEPOINT sp_w")
                         log.warning("[openalex:work] %s fail: %s", nw.get("openalex_id"), exc)
                         continue

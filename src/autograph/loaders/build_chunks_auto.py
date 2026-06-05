@@ -353,7 +353,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
                             continue
                         xml = zf.read(xml_name).decode("utf-8",
                                                         errors="replace")
-                except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+                except Exception as e:   # noqa: BLE001 — [build_chunks_auto] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                     log.warning("[chunks:dart_narrative] %s 손상: %s", z.name, e)
                     continue
 

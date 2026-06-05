@@ -63,7 +63,7 @@ def main() -> int:
             try:
                 items = fetch_with_retry(lambda u=url, n=name: cli.fetch(u, source_name=n),
                                          max_tries=3)
-            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+            except Exception as e:   # noqa: BLE001 — [download_news_rss] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 print(f"   fetch failed: {e}")
                 ckpt.mark_failed(name, str(e))
                 continue

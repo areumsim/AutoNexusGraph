@@ -77,7 +77,7 @@ def collect_rows(raw_dir: Path | None = None) -> list[dict]:
     for fp, stat_code in _iter_raw_files(raw_dir):
         try:
             payload = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+        except Exception as e:   # noqa: BLE001 — [load_kosis_industry] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
             log.warning("[kosis.load] %s 파싱 실패: %s", fp, e)
             continue
         rows.extend(_coerce_rows(payload, stat_code_hint=stat_code))

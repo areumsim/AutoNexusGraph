@@ -108,7 +108,7 @@ def main() -> int:
                 save_raw("kcgs", f"press/{p['no']}/body.html", body.get("body_html", ""))
                 if body.get("file_calls"):
                     save_raw("kcgs", f"press/{p['no']}/file_calls.json", body["file_calls"])
-            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
+            except Exception as e:   # noqa: BLE001 — [download_kcgs] 1 unit 실패 흡수 → continue (부분 성공 보존)
                 ckpt.mark_failed(p["no"], str(e))
                 continue
         ckpt.mark_done(p["no"], {"title": p["title"], "date": p["date"]})

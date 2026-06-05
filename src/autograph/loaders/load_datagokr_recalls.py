@@ -81,7 +81,7 @@ def _iter_items(root: Path):
     for f in sorted(root.glob("page_*.json")):
         try:
             payload = json.loads(f.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+        except Exception as exc:  # noqa: BLE001 — [load_datagokr_recalls] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
             log.warning("[load:datagokr_recalls] %s 파싱 실패: %s", f.name, exc)
             continue
         items = payload.get("data") or payload.get("items") or []

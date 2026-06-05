@@ -92,7 +92,7 @@ def _file_mode() -> int:
     for json_path in sorted(jsons):
         try:
             payload = json.loads(json_path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+        except Exception as exc:  # noqa: BLE001 — [kncap] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
             log.warning("[kncap] %s 파싱 실패: %s", json_path.name, exc)
             continue
         items = payload.get("data") or payload.get("items") or payload

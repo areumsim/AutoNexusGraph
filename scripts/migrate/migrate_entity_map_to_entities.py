@@ -90,7 +90,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                     stats["inserted"] += 1
                 else:
                     stats["updated"] += 1
-            except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+            except Exception as e:   # noqa: BLE001 — [migrate_entity_map_to_entities] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 stats["errors"] += 1
                 log.warning("[migrate] companies %s 실패: %s", corp_code, e)
                 conn.rollback()
@@ -128,7 +128,7 @@ def migrate(*, dry_run: bool = False, limit: int | None = None) -> dict:
                     """, (id_value, entity_id))
                     if cur.rowcount > 0:
                         stats["enriched"] += 1
-                except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
+                except Exception as e:   # noqa: BLE001 — [migrate_entity_map_to_entities] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                     stats["errors"] += 1
                     log.warning("[migrate] enrich %s/%s 실패: %s",
                                 corp_code, id_type, e)

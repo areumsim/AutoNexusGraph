@@ -144,7 +144,7 @@ class CostTracker:
         try:
             from ..config import get_settings
             warn_at = max(0.0, float(get_settings().llm_session_warn_at_usd))
-        except Exception:   # noqa: BLE001 — 예외 silent (best-effort, 메인 흐름 보존)
+        except Exception:   # noqa: BLE001 — [cost_tracker] settings 로드 실패 silent → warn_at 기본값(limit*0.9) 유지
             pass
         if n % self._report_every == 0 or cum >= warn_at:
             log.info(f"[COST] {self.state.caller} n_calls={n} cum=${cum:.4f} "

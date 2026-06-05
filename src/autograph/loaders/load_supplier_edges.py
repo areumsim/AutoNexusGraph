@@ -288,7 +288,7 @@ def load_supplier_edges(*, dry_run: bool = False, batch: int = 200) -> LoadStats
                     source="manual_supplier_seed", source_ref="ontology/auto/supplier_seed.yaml",
                     confidence=base_conf)
                 stats.suppliers_upserted += 1
-            except Exception as e:  # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
+            except Exception as e:  # noqa: BLE001 — [load_supplier_edges] 1 unit 실패 흡수 → continue (부분 성공 보존)
                 stats.errors.append(f"supplier upsert {sname}: {e}")
                 continue
 
