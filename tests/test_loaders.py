@@ -55,8 +55,8 @@ def test_chunked():
 
 # ── 통합 토큰 추정 (3 모듈 동일 결과) ─────────────────────────
 def test_estimate_tokens_unified_across_chunkers():
-    """extraction/chunker.estimate_tokens 가 finance/auto 양 도메인의 단일 진실."""
-    from autonexusgraph.extraction.chunker import estimate_tokens
+    """chunking/chunker.estimate_tokens 가 finance/auto 양 도메인의 단일 진실."""
+    from autonexusgraph.chunking.chunker import estimate_tokens
 
     # 한영 혼합 기준 char//3.
     assert estimate_tokens("") == 0
@@ -65,7 +65,7 @@ def test_estimate_tokens_unified_across_chunkers():
     assert estimate_tokens("a" * 1200) == 400   # 1200//3
 
     # chunk_text 가 동일 estimator 를 사용 — 과거 //2 와 다른 값.
-    from autonexusgraph.extraction.chunker import chunk_text
+    from autonexusgraph.chunking.chunker import chunk_text
     chunks = chunk_text("가" * 600, target_chars=400)
     if chunks:
         # 청크 char_count 와 token_est 가 //3 비율을 따라야.
