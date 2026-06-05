@@ -98,7 +98,7 @@ def build_tool_manifest(domain: str = "all") -> list[ToolSpec]:
                 # module export name 보존 — alias (예: lookup_vehicle_graph) 도
                 # 분리된 tool 이 되도록.
                 spec = tool_function(fn, name=name)
-            except Exception:   # noqa: BLE001
+            except Exception:   # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                 # type hint 추출 실패 — skip.
                 continue
             specs.append(spec)
@@ -125,7 +125,7 @@ def _signature_to_jsonschema(fn: Callable[..., Any]) -> dict[str, Any]:
     """
     try:
         hints = get_type_hints(fn)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
         hints = {}
     sig = inspect.signature(fn)
     properties: dict[str, Any] = {}

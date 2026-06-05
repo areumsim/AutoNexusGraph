@@ -47,7 +47,7 @@ def _detect_provider(model: str) -> str:
     try:
         from .base import detect_provider
         return detect_provider(model)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
         return "?"
 
 
@@ -73,7 +73,7 @@ def append(entry: dict[str, Any]) -> None:
         with _lock:
             with path.open("a", encoding="utf-8") as f:
                 f.write(line + "\n")
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
         # LLM 호출 흐름을 막지 않기 위해 silent.
         log.debug("[cost_log] append failed: %s", exc)
 

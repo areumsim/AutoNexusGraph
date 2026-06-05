@@ -329,7 +329,7 @@ def identify_auto_targets(state: dict, *,
             break
         try:
             hits = lookup_vehicle(word, year=year, limit=max_per_word)
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
             continue
         for h in hits:
             vid = h.get("variant_id")

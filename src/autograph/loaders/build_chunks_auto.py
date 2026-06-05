@@ -134,7 +134,7 @@ def build_from_recalls() -> int:
                     model_id=model_id,
                     variant_id=variant_id)
                 n_by_src[chunk_src] = n_by_src.get(chunk_src, 0) + 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                 log.warning("[chunks:recall] %s: %s", no, e)
     conn.commit()
     total = sum(n_by_src.values())
@@ -170,7 +170,7 @@ def build_from_complaints() -> int:
                     model_id=model_id,
                     variant_id=variant_id)
                 n += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                 log.warning("[chunks:complaint] %s: %s", no, e)
     conn.commit()
     log.info("[chunks:complaint] inserted=%d", n)
@@ -285,7 +285,7 @@ def build_from_wikipedia(*, max_html_chars: int = 4000) -> int:
                     model_id=model_id,
                     variant_id=None)
                 n += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                 log.warning("[chunks:wiki] %s: %s", uniq, e)
     conn.commit()
     log.info("[chunks:wiki] inserted/updated=%d", n)
@@ -353,7 +353,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
                             continue
                         xml = zf.read(xml_name).decode("utf-8",
                                                         errors="replace")
-                except Exception as e:   # noqa: BLE001
+                except Exception as e:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                     log.warning("[chunks:dart_narrative] %s 손상: %s", z.name, e)
                     continue
 
@@ -392,7 +392,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
                             variant_id=None,
                         )
                         n += 1
-                    except Exception as e:   # noqa: BLE001
+                    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                         log.warning("[chunks:dart_narrative] %s: %s", uniq, e)
     conn.commit()
     log.info("[chunks:dart_narrative] inserted/updated=%d "
@@ -449,7 +449,7 @@ def build_from_oem_ir() -> int:
                     variant_id=None,
                 )
                 n += 1
-            except Exception as e:   # noqa: BLE001
+            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                 log.warning("[chunks:oem_ir] %s: %s", url, e)
     conn.commit()
     log.info("[chunks:oem_ir] inserted/updated=%d skipped_too_short=%d",

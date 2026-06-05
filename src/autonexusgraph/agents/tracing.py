@@ -51,7 +51,7 @@ def _resolve_backend() -> str:
         try:
             from ..config import get_settings
             raw = get_settings().trace_backend or ""
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — config 로드 실패 흡수 → 빈 backend (trace off)
             raw = ""
     raw = (raw or "").strip().lower()
     if raw in ("none", "off"):
@@ -97,14 +97,14 @@ def _get_langfuse_client() -> Any | None:
         if host:
             kwargs["host"] = host
         client = Langfuse(**kwargs)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — Langfuse SDK 초기화 실패 흡수 → trace 비활성 (None)
         logger.warning("Langfuse 클라이언트 초기화 실패 (skip): %s", exc)
         return None
 
     # 실측 진단 — auth_check 실패 시 비활성 처리.
     try:
         auth_ok = bool(client.auth_check())
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — auth_check 실패 흡수 → 비활성 (네트워크/키 만료)
         logger.warning("Langfuse auth_check 실패 (skip): %s", exc)
         auth_ok = False
 
@@ -245,7 +245,7 @@ def start_turn_context(thread_id: str, state: dict, *,
             except AttributeError as exc:
                 # 4.x 일부 마이너 버전이 update_current_trace 미노출 — fail-soft.
                 logger.debug("Langfuse update_current_trace 미노출 (skip): %s", exc)
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — Langfuse span 시작 실패 흡수 → trace 없이 계속
             logger.warning("Langfuse span 시작 실패 (fail-soft): %s", exc)
             span_cm = None
 
@@ -265,7 +265,7 @@ def start_turn_context(thread_id: str, state: dict, *,
         #    n_replans/domain + 총합 영구 적재.
         try:
             n_replans = int(turn.state.get("n_replans") or 0)
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — n_replans 형변환 실패 흡수 → 0 (메타 적재용)
             n_replans = 0
         question_kind = turn.state.get("question_kind") if isinstance(turn.state, dict) else None
         extra: dict = {}
@@ -277,13 +277,13 @@ def start_turn_context(thread_id: str, state: dict, *,
             extra["hop_count"] = hop["hop_count"]
             extra["max_hop_depth"] = hop["max_hop_depth"]
             extra["tool_sequence"] = hop["tool_sequence"]
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — hop_metrics 계산 실패 흡수 → 메타 hop_* 누락만 (메인 흐름 보존)
             logger.debug("hop_metrics 계산 실패 (skip): %s", exc)
             hop = None
         try:
             tracker.finalize(status, n_replans=n_replans,
                              extra_meta=extra or None)
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — tracker finalize 실패 흡수 (cost telemetry, 메인 흐름 보존)
             logger.warning("tracker.finalize 실패 (fail-soft): %s", exc)
 
         # 2. Langfuse span update + flush
@@ -312,15 +312,15 @@ def start_turn_context(thread_id: str, state: dict, *,
                     output={"answer": (turn.state.get("answer") or "")[:1000]
                                        if isinstance(turn.state, dict) else None},
                 )
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — Langfuse span update 실패 흡수 → trace 일부 누락만
                 logger.warning("Langfuse span update 실패 (fail-soft): %s", exc)
             try:
                 span_cm.__exit__(None, None, None)
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — span context exit 실패 흡수 (이미 update 완료)
                 logger.debug("Langfuse span exit 실패: %s", exc)
             try:
                 client.flush()
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — flush 실패 흡수 (네트워크 일시 불통, 다음 turn 재시도)
                 logger.debug("Langfuse flush 실패: %s", exc)
 
         # 3. ctx 정리 — 다음 turn 이 새 tracker 받게.

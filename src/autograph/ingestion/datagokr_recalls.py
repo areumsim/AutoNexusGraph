@@ -64,7 +64,7 @@ def _fetch_page(page: int, per_page: int = 100) -> dict:
     except urllib.error.HTTPError as e:
         log.error("[datagokr_recalls] page=%d HTTP %s: %s", page, e.code, e.reason)
         return {}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → {} 반환 (log 동반)
         log.error("[datagokr_recalls] page=%d 실패: %s", page, e)
         return {}
 

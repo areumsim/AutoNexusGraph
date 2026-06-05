@@ -185,7 +185,7 @@ def fetch_with_retry(
     for attempt in range(1, max_tries + 1):
         try:
             return fn()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
             last_exc = e
             if attempt >= max_tries:
                 break

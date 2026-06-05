@@ -81,7 +81,7 @@ def _make_robots_parser(host: str) -> urllib.robotparser.RobotFileParser:
     rp.set_url(f"https://{host}/robots.txt")
     try:
         rp.read()
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
         log.warning("[oem_ir] %s/robots.txt 읽기 실패: %s", host, exc)
         # 보수적: 모든 경로 disallow 로 설정
         rp.parse(["User-agent: *", "Disallow: /"])
@@ -128,7 +128,7 @@ def _fetch_text(url: str, *, user_agent: str, timeout: float = 20.0
             log.warning("[oem_ir] 429 — Retry-After %.0fs", wait)
             time.sleep(min(wait, 300.0))
         return None
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[oem_ir] %s 실패: %s", url, e)
         return None
 

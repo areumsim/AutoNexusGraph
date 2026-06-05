@@ -54,7 +54,7 @@ def _fetch_token() -> str | None:
         with urllib.request.urlopen(req, timeout=15) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
             return payload.get("access_token")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[katri] token 발급 실패: %s", exc)
         return None
 
@@ -70,7 +70,7 @@ def _fetch_endpoint(token: str, endpoint: str, params: dict) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — fail-soft 흡수 → {} 반환 (log 동반)
         log.error("[katri] %s 실패: %s", endpoint, exc)
         return {}
 

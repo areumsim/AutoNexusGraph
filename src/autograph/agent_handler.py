@@ -98,7 +98,7 @@ class AutoHandler:
     ) -> tuple[str, Callable, dict] | None:
         try:
             from .tools import search_documents_auto
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.warning("[auto.fallback] tools.search_documents_auto unavailable: %s",
                         exc)
             return None
@@ -114,7 +114,7 @@ class AutoHandler:
         try:
             from .tools import retrieve
             return retrieve
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.warning("[auto.retrieve] tools.retrieve unavailable: %s", exc)
             return None
 

@@ -94,7 +94,7 @@ def _upsert_minerals(cur, rows: list[dict]) -> tuple[int, int, int]:
             else:
                 upd += 1
             cur.execute("RELEASE SAVEPOINT sp_min")
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
             cur.execute("ROLLBACK TO SAVEPOINT sp_min")
             log.warning("[load:usgs] %s upsert fail: %s", r.get("commodity"), exc)
             skip += 1

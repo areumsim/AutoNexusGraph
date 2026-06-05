@@ -146,7 +146,7 @@ def discover_plugins(*, force: bool = False) -> list[str]:
                 importlib.import_module(name)
                 loaded.append(name)
                 log.info("[domain] plugin %r loaded", name)
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                 log.warning("[domain] plugin %r import failed: %s", name, exc)
         return loaded
 

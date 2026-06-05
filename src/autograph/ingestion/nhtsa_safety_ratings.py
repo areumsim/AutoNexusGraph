@@ -81,7 +81,7 @@ def fetch_safety_ratings(make: str, model: str, year: int) -> dict:
                 for k, v in dres.items():
                     if k not in merged or merged[k] in (None, ""):
                         merged[k] = v
-            except Exception as e:   # noqa: BLE001
+            except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 log.warning("[safety] VehicleId=%s detail 실패: %s", vid, e)
         enriched.append(merged)
 
@@ -120,7 +120,7 @@ def ingest_make_year(make: str, year: int, *,
             n_done += 1
             n_rated_trims += len(data.get("Results") or [])
             ckpt.mark_done(key, {"rated_trims": len(data.get("Results") or [])})
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
             log.exception("[safety] failed %s", key)
             ckpt.mark_failed(key, str(e))
 

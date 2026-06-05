@@ -184,7 +184,7 @@ def run() -> dict:
                     inserted += 1
                 else:
                     updated += 1
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_dg_insp")
                 log.warning("[load:inspections] %s 실패: %s",
                             row.get("inspection_id"), exc)

@@ -128,7 +128,7 @@ def _resolve_float(env_key: str, settings_attr: str, default: float) -> float:
         v = getattr(get_settings(), settings_attr, None)
         if v is not None:
             return float(v)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
         pass
     return default
 

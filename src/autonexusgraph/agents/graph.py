@@ -202,7 +202,7 @@ def _make_run_config(thread_id: str, *, state: dict | None = None) -> dict:
             domain = state.get("domain") if isinstance(state, dict) else None
             cfg["tags"] = tags_for_domain(domain)
             cfg["metadata"] = metadata_for_state(state)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
         log.debug("tracing config skip: %s", exc)
     return cfg
 
@@ -259,7 +259,7 @@ def run_agent(question: str, *,
                 result = _run_with_langgraph(state)
                 turn.state = result   # type: ignore[assignment]
                 return result
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
                 log.warning("[run_agent] LangGraph 실행 실패 — 함수 체인 폴백: %s", exc)
         result = _run_with_fallback_chain(state)
         turn.state = result   # type: ignore[assignment]
@@ -291,7 +291,7 @@ def run_agent_stream(question: str, *,
                     turn.state = partial   # type: ignore[assignment]
                     yield (node_name, partial)
                 return
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
                 state = _init_state(question, thread_id, history, domain=domain,
                                     rerank=rerank, llm_planner=llm_planner)

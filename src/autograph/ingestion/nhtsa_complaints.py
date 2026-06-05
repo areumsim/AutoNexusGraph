@@ -80,7 +80,7 @@ def ingest_make_year(make: str, year: int, *,
             n_done += 1
             n_complaints += len(data.get("results") or [])
             ckpt.mark_done(key, {"complaints": len(data.get("results") or [])})
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
             log.exception("[complaints] failed %s", key)
             ckpt.mark_failed(key, str(e))
 

@@ -118,7 +118,7 @@ class IPGraphHandler:
     ) -> tuple[str, Callable, dict] | None:
         try:
             from .tools.retrieve import search_patents
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.warning("[ip.fallback] tools.search_patents unavailable: %s", exc)
             return None
         args: dict[str, Any] = {"query": query, "top_k": 6}
@@ -131,7 +131,7 @@ class IPGraphHandler:
         try:
             from .tools import retrieve
             return retrieve
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.warning("[ip.retrieve] tools.retrieve unavailable: %s", exc)
             return None
 

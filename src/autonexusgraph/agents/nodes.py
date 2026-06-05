@@ -210,7 +210,7 @@ def _llm_planner_enabled(state: AgentState | None = None) -> bool:
     try:
         from ..config import get_settings
         return bool(getattr(get_settings(), "agent_llm_planner", False))
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → False 반환
         return False
 
 
@@ -606,7 +606,7 @@ def _attempt_fallback_recovery(state: AgentState) -> bool:
     _maybe_inject_rerank(state, fb_fn, fb_args)
     try:
         fb_out = fb_fn(**fb_args)
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → False 반환 (log 동반)
         log.warning("[recovery] fallback %s failed: %s", fb_tool, e)
         return False
     if not fb_out:
@@ -781,7 +781,7 @@ def synthesizer_node(state: AgentState,
             "ok": False, "error_type": "BudgetExceeded", "error": str(e),
             "llm_called": False, "fallback_used": "budget",
         }
-    except Exception as e:    # noqa: BLE001
+    except Exception as e:    # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
         # fail-soft 유지 (eval 진행 보장) — 단, 실패 정보를 state 에 명시.
         log.warning("[synth] LLM failed: %s: %s", type(e).__name__, e)
         from .answering import build_deterministic_brief

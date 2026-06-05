@@ -58,7 +58,7 @@ def _read_session_base() -> float:
         if hrs and hrs > 0:
             since = datetime.now(timezone.utc) - timedelta(hours=hrs)
         return float(total_cost(since=since))
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
         log.debug("[COST] session base read failed: %s", e)
         return 0.0
 
@@ -144,7 +144,7 @@ class CostTracker:
         try:
             from ..config import get_settings
             warn_at = max(0.0, float(get_settings().llm_session_warn_at_usd))
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — 예외 silent (best-effort, 메인 흐름 보존)
             pass
         if n % self._report_every == 0 or cum >= warn_at:
             log.info(f"[COST] {self.state.caller} n_calls={n} cum=${cum:.4f} "

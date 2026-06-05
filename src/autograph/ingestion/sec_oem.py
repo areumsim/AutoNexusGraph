@@ -106,7 +106,7 @@ def fetch_company_facts(cik: int | str, *,
     with SecEdgarClient(user_agent=_USER_AGENT) as client:
         try:
             data = client.get_company_facts(cik10)
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.exception("[sec_oem] CIK%s facts fetch failed", cik10)
             ckpt.mark_failed(key, str(e))
             return None
@@ -140,7 +140,7 @@ def fetch_submissions(cik: int | str, *,
     with SecEdgarClient(user_agent=_USER_AGENT) as client:
         try:
             data = client.get_submissions(cik10)
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.exception("[sec_oem] CIK%s submissions failed", cik10)
             ckpt.mark_failed(key, str(e))
             return None

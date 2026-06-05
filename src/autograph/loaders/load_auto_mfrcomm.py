@@ -284,7 +284,7 @@ def _process_row(cur, row: dict[str, str], stats: LoadStats) -> None:
                 stats.rows_updated += 1
             else:
                 stats.rows_skipped += 1
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
             cur.execute("ROLLBACK TO SAVEPOINT sp_tsb")
             stats.errors.append(f"{nhtsa_id}/{vid}: {e}")
 

@@ -43,7 +43,7 @@ def nhtsa_http_get(url: str,
                 # NHTSA "결과 없음" 으로 400 + JSON body 보내는 케이스 흡수.
                 try:
                     body = r.json()
-                except Exception:   # noqa: BLE001
+                except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
                     body = None
                 if isinstance(body, dict) and (
                     "Count" in body or "results" in body or "Results" in body

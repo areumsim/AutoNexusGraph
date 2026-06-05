@@ -159,7 +159,7 @@ def load_part_supplies(*, dry_run: bool = False) -> LoadStats:
                     stats.rows_inserted += 1
                 else:
                     stats.rows_updated += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
                 cur.execute("ROLLBACK TO SAVEPOINT sp_wd_p176")
                 stats.errors.append(f"{part_qid}->{supplier_qid}: {e}")
 

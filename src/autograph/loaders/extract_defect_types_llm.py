@@ -184,7 +184,7 @@ def upsert_defect_types(types: list[dict], *, model_tag: str) -> int:
                 ))
                 n += cur.rowcount or 0
         conn.commit()
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 예외 silent (best-effort, 메인 흐름 보존)
         log.warning("[llm.taxonomy] upsert 실패 — rollback: %s", e)
         try:
             conn.rollback()

@@ -297,7 +297,7 @@ def _parse_dart_xml(xml_text: str):
             # XML 선언 제거 — lxml.html 은 str 입력에 XML 선언 거부
             text = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", xml_text)
             return _lxml_html.fromstring(text)
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
             log.debug("[dart_production] lxml.html 실패: %s", exc)
 
     # 2차: 표준 etree

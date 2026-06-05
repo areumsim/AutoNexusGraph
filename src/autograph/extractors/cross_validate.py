@@ -261,7 +261,7 @@ def run_p4(*, dry_run: bool = False, batch: int = 200) -> P4Stats:
                 continue
             try:
                 decision, payload = validator(cur, r)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                 stats.errors.append(f"{rt}/{r['staging_id']}: {e}")
                 decisions.append((r["staging_id"], "rejected", f"error:{e}"))
                 stats.rejected += 1

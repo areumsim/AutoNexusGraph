@@ -195,7 +195,7 @@ def upsert_pg(rows: list[dict]) -> tuple[int, int, int]:
                     if (i + 1) % 5000 == 0:
                         conn.commit()
                         log.info("[cpc:pg] progress %d", i + 1)
-                except Exception as exc:   # noqa: BLE001
+                except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                     cur.execute("ROLLBACK TO SAVEPOINT sp_cpc")
                     log.warning("[cpc:pg] %s fail: %s", r.get("code"), exc)
                     skip += 1

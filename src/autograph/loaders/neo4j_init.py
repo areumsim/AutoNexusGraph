@@ -86,7 +86,7 @@ def init_neo4j() -> None:
             try:
                 session.run(stmt)
                 log.info("[neo4j_init] %s", stmt.split()[1])
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 log.warning("[neo4j_init] skip %s — %s", stmt[:80], e)
 
 

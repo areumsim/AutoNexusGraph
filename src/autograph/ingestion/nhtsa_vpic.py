@@ -119,7 +119,7 @@ def ingest_make_year(make: str, year: int, *, with_canspec: bool = True) -> dict
                 log.warning("[vpic] canspec %s %s failed: %s", make, year, e)
         ckpt.mark_done(key, {"models": len(models)})
         return {"models": len(models)}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
         log.exception("[vpic] failed %s", key)
         ckpt.mark_failed(key, str(e))
         return {"error": str(e)}

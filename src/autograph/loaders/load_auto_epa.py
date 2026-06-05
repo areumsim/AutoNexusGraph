@@ -286,7 +286,7 @@ def _process_row(cur, row: dict, stats: LoadStats,
             stats.measurements_inserted += inserted
             if deleted:
                 stats.measurements_replaced += min(deleted, inserted)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
             cur.execute("ROLLBACK TO SAVEPOINT sp_epa")
             stats.errors.append(f"variant {vid} {make}/{model}/{year}: {e}")
 

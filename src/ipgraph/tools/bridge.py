@@ -48,7 +48,7 @@ def bridge_assignee_to_corp(assignee_id: str) -> dict[str, Any] | None:
                 return None
             cols = [d.name for d in cur.description]
             return dict(zip(cols, row))
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[ip.bridge_assignee_to_corp] PG 실패: %s", e)
         return None
 
@@ -87,7 +87,7 @@ def bridge_corp_to_assignee(corp_code: str,
             cur.execute(sql, (corp_code,))
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.bridge_corp_to_assignee] PG 실패: %s", e)
         return []
 
@@ -145,7 +145,7 @@ def cross_query_ip(corp_code: str,
             cur.execute(sql, params)
             for r in cur.fetchall():
                 counts[r[0]] = int(r[1])
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
         log.warning("[ip.cross_query_ip] PG 실패: %s", e)
 
     enriched = [

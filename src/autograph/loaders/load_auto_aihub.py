@@ -120,7 +120,7 @@ def _iter_71347_labels(root: Path):
                 try:
                     with z.open(info) as f:
                         yield json.loads(f.read().decode("utf-8"))
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                     continue
     for zip_path in root.rglob("VL.zip"):
         with zipfile.ZipFile(zip_path) as z:
@@ -130,7 +130,7 @@ def _iter_71347_labels(root: Path):
                 try:
                     with z.open(info) as f:
                         yield json.loads(f.read().decode("utf-8"))
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                     continue
 
 
@@ -392,7 +392,7 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
                     aliases=[korean], source="aihub_71347")
                 cur.execute("RELEASE SAVEPOINT sp_comp")
                 stats.components_inserted += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_comp")
                 stats.errors.append(f"71347 component {canonical}: {e}")
                 continue
@@ -417,7 +417,7 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
                     stats.chunks_inserted += 1
                 elif op == "updated":
                     stats.chunks_updated += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
                 cur.execute("ROLLBACK TO SAVEPOINT sp_chunk")
                 stats.errors.append(f"71347 chunk {uniq}: {e}")
 
@@ -474,7 +474,7 @@ def load_578(*, dry_run: bool = False) -> LoadStats:
                     aliases=[korean], source="aihub_578")
                 cur.execute("RELEASE SAVEPOINT sp_comp")
                 stats.components_inserted += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 1 unit 실패 흡수 → continue (부분 성공 보존)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_comp")
                 stats.errors.append(f"578 component {canonical}: {e}")
                 continue
@@ -496,7 +496,7 @@ def load_578(*, dry_run: bool = False) -> LoadStats:
                     stats.chunks_inserted += 1
                 elif op == "updated":
                     stats.chunks_updated += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
                 cur.execute("ROLLBACK TO SAVEPOINT sp_chunk")
                 stats.errors.append(f"578 chunk {uniq}: {e}")
 

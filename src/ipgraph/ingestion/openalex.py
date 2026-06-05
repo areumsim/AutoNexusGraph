@@ -59,7 +59,7 @@ def _http_get(url: str, *, params: dict | None = None, retries: int = 3) -> dict
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read())
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — boundary → RuntimeError 변환 (raise, silent 아님)
             last = exc
             log.warning("[openalex] fetch fail %d/%d: %s", i + 1, retries, exc)
             time.sleep(1.5 ** i)
@@ -131,7 +131,7 @@ def lookup_institution_by_qid(qid: str, *,
             body = _http_get(f"{_OA_BASE}/institutions/ror:{ror}", params={})
             if body and body.get("id"):
                 return body
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
             log.debug("[openalex] ror:%s lookup failed: %s", ror, exc)
     return None
 
@@ -143,7 +143,7 @@ def _wikidata_qid_to_ror(qid: str) -> str | None:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
         log.debug("[openalex] wikidata fetch %s failed: %s", qid, exc)
         return None
     ent = (data.get("entities") or {}).get(qid) or {}
@@ -235,7 +235,7 @@ def _reconstruct_abstract(inverted: dict | None) -> str | None:
                 if 0 <= p < len(tokens):
                     tokens[p] = term
         return " ".join(t for t in tokens if t)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → None 반환
         return None
 
 
@@ -354,7 +354,7 @@ def run(*, max_institutions: int | None = None,
             stats["qids_searched"] += 1
             try:
                 rec = lookup_institution_by_qid(qid, hint_name=entry.get("name"))
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 log.warning("[openalex] inst lookup fail %s: %s", qid, exc)
                 rec = None
             if not rec:
@@ -387,7 +387,7 @@ def run(*, max_institutions: int | None = None,
                         stats["institutions_inserted"] += 1
                     else:
                         stats["institutions_updated"] += 1
-                except Exception as exc:   # noqa: BLE001
+                except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                     cur.execute("ROLLBACK TO SAVEPOINT sp_inst")
                     log.warning("[openalex:inst] %s fail: %s", inst.get("ror_id"), exc)
                     continue
@@ -398,7 +398,7 @@ def run(*, max_institutions: int | None = None,
                 works = fetch_works_for_institution(
                     inst["openalex_id"], per_page=works_per_inst,
                     max_pages=1, from_year=from_year)
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 log.warning("[openalex] works fetch fail %s: %s", inst["openalex_id"], exc)
                 works = []
 
@@ -419,7 +419,7 @@ def run(*, max_institutions: int | None = None,
                             stats["works_inserted"] += 1
                         else:
                             stats["works_updated"] += 1
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                         cur.execute("ROLLBACK TO SAVEPOINT sp_w")
                         log.warning("[openalex:work] %s fail: %s", nw.get("openalex_id"), exc)
                         continue
@@ -431,7 +431,7 @@ def run(*, max_institutions: int | None = None,
                                                   pos, nw.get("publication_year"))
                         stats["work_inst_edges"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_wi")
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                         cur.execute("ROLLBACK TO SAVEPOINT sp_wi")
                         log.warning("[openalex:wi] %s/%s fail: %s",
                                     nw["openalex_id"], inst["ror_id"], exc)

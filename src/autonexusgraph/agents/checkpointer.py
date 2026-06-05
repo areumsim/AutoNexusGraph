@@ -138,7 +138,7 @@ def _ensure_schema_exists(dsn: str, schema: str) -> bool:
             from psycopg.sql import SQL, Identifier
             cur.execute(SQL("CREATE SCHEMA IF NOT EXISTS {}").format(Identifier(schema)))
         return True
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → False 반환 (log 동반)
         logger.warning("CREATE SCHEMA %s 실패 (계속 진행, public 사용 가능): %s", schema, exc)
         return False
 
@@ -181,7 +181,7 @@ def _postgres_saver() -> Any | None:
         saver = PostgresSaver(conn)
         try:
             saver.setup()
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
             logger.warning("PostgresSaver.setup() 실패 (계속 진행): %s", exc)
         logger.info("LangGraph PostgresSaver 활성 (schema=%s, dsn=%s)",
                     schema, _redact(dsn_with_path))

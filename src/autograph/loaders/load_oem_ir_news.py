@@ -87,7 +87,7 @@ def _read_body_text(html_path: str, *, body_allowed: bool) -> str | None:
         return None
     try:
         html = p.read_text(encoding="utf-8", errors="replace")
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — fail-soft 흡수 → None 반환
         return None
     # 텍스트 추출은 ingestion 측에서 이미 했지만 here 도 재 추출 가능.
     from autograph.ingestion.oem_ir_newsroom import _extract_text
@@ -199,7 +199,7 @@ def run_oem(oem: str, *, dry_run: bool = False) -> dict:
                 else:
                     upd += 1
                 cur.execute("RELEASE SAVEPOINT sp_oem_ir")
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 cur.execute("ROLLBACK TO SAVEPOINT sp_oem_ir")
                 log.warning("[load:oem_ir:%s] %s 실패: %s",
                             oem, meta.get("url"), exc)

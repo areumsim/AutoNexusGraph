@@ -114,7 +114,7 @@ def upsert_staging(rels: Iterable[dict], *, extractor_name: str,
                     extractor_name, extractor_version, gate,
                     json.dumps(r, ensure_ascii=False, default=str),
                 ))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
                 counts["errors"] += 1
                 log.warning("[staging] upsert failed for %s: %s", r.get("relation"), e)
     conn.commit()

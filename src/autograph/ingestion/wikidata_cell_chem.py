@@ -71,7 +71,7 @@ def _sparql(query: str) -> dict:
         })
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → {} 반환 (log 동반)
         log.warning("[wikidata_cell_chem] SPARQL 실패 (graceful skip): %s", e)
         return {}
 

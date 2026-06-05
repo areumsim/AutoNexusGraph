@@ -50,12 +50,12 @@ def build_mcp_server(domain: str = "all") -> tuple[Server, list[ToolSpec]]:
             return [TextContent(type="text", text=f"unknown tool: {name}")]
         try:
             result = spec.fn(**(arguments or {}))
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
             return [TextContent(type="text", text=f"error: {exc}")]
         # 결과 정규화 — dict/list/scalar → JSON string.
         try:
             text = json.dumps(result, ensure_ascii=False, default=str, indent=2)
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
             text = str(result)
         return [TextContent(type="text", text=text)]
 

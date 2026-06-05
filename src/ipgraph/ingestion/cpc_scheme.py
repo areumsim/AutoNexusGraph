@@ -118,7 +118,7 @@ def _download_index(url: str, target: Path) -> bool:
         with urllib.request.urlopen(req, timeout=15) as resp:
             target.write_bytes(resp.read())
         return True
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → False 반환 (log 동반)
         log.warning("[cpc] index 다운로드 실패 (graceful skip): %s", e)
         return False
 
