@@ -47,6 +47,11 @@ DEFAULT_ADAPTERS = ("vector", "graph", "hybrid", "sql_vec")
 DEFAULT_TIERS = ("fast",)                 # PRD: "FAST tier 1종"
 DEFAULT_RERANK = (True, False)            # ablation 양 셀
 
+# multi-hop EM 을 thesis primary 로 신뢰하려면 양 어댑터 모두 이만큼의
+# gold_answer_text 보유 표본이 필요. 미달 시 primary 를 hits@k 로 전환 (gold
+# curation 미완을 prose-vs-short-string EM 0 으로 오판하지 않기 위함).
+MIN_EM_SCORABLE = 5
+
 
 def enumerate_cells(adapters: tuple[str, ...] = DEFAULT_ADAPTERS,
                      tiers:    tuple[str, ...] = DEFAULT_TIERS,
@@ -128,6 +133,7 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
 
     # manifest.json 의 summary + DoD #13/#14 메트릭 추출.
     multi_hop_em: float | None = None
+    multi_hop_em_scorable_n: int | None = None   # EM 측정 가능(gold_answer_text 보유) 표본 수
     multi_hop_hits: float | None = None    # hits@k fallback (gold_answer_text 부재 시)
     em: float | None = None
     f1: float | None = None
@@ -145,7 +151,8 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
             cell_summary = summary.get(cell["label"]) or summary.get(cell["adapter"]) or {}
             if cell_summary:
                 multi_hop_em = cell_summary.get("multi_hop_em")
-                # hits@k fallback — run_qa_eval.py:359 가 manifest 에 생성. 이 추출이
+                multi_hop_em_scorable_n = cell_summary.get("multi_hop_em_scorable_n")
+                # hits@k fallback — run_qa_eval.py 가 manifest 에 생성. 이 추출이
                 # 없으면 compute_thesis_headline 의 hits fallback 이 항상 None 으로 죽음.
                 multi_hop_hits = cell_summary.get("multi_hop_hits")
                 em = cell_summary.get("em")
@@ -170,6 +177,7 @@ def _run_cell_full(cell: dict[str, Any], gold: Path, run_root: Path,
         "em":                   em,
         "f1":                   f1,
         "multi_hop_em":         multi_hop_em,
+        "multi_hop_em_scorable_n": multi_hop_em_scorable_n,
         "multi_hop_hits":       multi_hop_hits,
         "cost_usd":             cost_usd,
         "ev_avg_correct":       ev_avg_correct,         # DoD #13
@@ -205,6 +213,11 @@ def compute_thesis_headline(cells_with_metrics: list[dict[str, Any]]
     em_diff_pp, em_met = compute_diff_pp(
         hybrid_best["multi_hop_em"], vector_baseline["multi_hop_em"],
     )
+    # EM 표본 충분성 — 양 어댑터 모두 MIN_EM_SCORABLE 이상의 gold 보유 row 가
+    # 있어야 EM 을 primary 로 신뢰. 미달이면 hits@k 를 primary 로.
+    h_em_n = hybrid_best.get("multi_hop_em_scorable_n") or 0
+    v_em_n = vector_baseline.get("multi_hop_em_scorable_n") or 0
+    em_scorable = min(h_em_n, v_em_n) >= MIN_EM_SCORABLE
     # hits@k 도 비교 — gold_answer_text 부재 시 entity-level fallback.
     h_hits = hybrid_best.get("multi_hop_hits")
     v_hits = vector_baseline.get("multi_hop_hits")
@@ -212,15 +225,18 @@ def compute_thesis_headline(cells_with_metrics: list[dict[str, Any]]
         hits_diff_pp, hits_met = compute_diff_pp(h_hits, v_hits)
     else:
         hits_diff_pp, hits_met = None, False
-    target_met = em_met or hits_met
-    # diff_pp 는 primary (em) 표시, 단 hits 가 met 이면 hits 기준으로 표기.
-    primary_metric = "hits" if (hits_met and not em_met) else "em"
-    primary_diff = hits_diff_pp if primary_metric == "hits" else em_diff_pp
+    # primary: EM 표본 충분 → em, 아니면 hits (gold curation 미완 시 정직 대체).
+    if em_scorable:
+        primary_metric, primary_diff, target_met = "em", em_diff_pp, em_met
+    else:
+        primary_metric, primary_diff, target_met = "hits", hits_diff_pp, bool(hits_met)
     return {
         "available":     True,
         "hybrid_em":     hybrid_best["multi_hop_em"],
         "vector_em":     vector_baseline["multi_hop_em"],
         "em_diff_pp":    em_diff_pp,
+        "em_scorable_n": {"hybrid": h_em_n, "vector": v_em_n},
+        "em_status":     "ok" if em_scorable else "insufficient_gold",
         "hybrid_hits":   h_hits,
         "vector_hits":   v_hits,
         "hits_diff_pp":  hits_diff_pp,

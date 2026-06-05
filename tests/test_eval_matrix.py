@@ -137,6 +137,7 @@ def test_thesis_available_in_full_mode():
     """full 모드 시 hybrid_rerank1 vs vector_rerank0 multi-hop EM 차이 계산."""
     cells = enumerate_cells()
     # hybrid_fast_rerank1 = 0.85, vector_fast_rerank0 = 0.40 → +45%p (target met)
+    # scorable_n ≥ MIN_EM_SCORABLE 이어야 EM 이 primary 로 신뢰됨.
     results = []
     for c in cells:
         em = None
@@ -144,9 +145,11 @@ def test_thesis_available_in_full_mode():
             em = 0.85
         elif c["label"] == "vector_fast_rerank0":
             em = 0.40
-        results.append({**c, "multi_hop_em": em})
+        results.append({**c, "multi_hop_em": em, "multi_hop_em_scorable_n": 10})
     thesis = compute_thesis_headline(results)
     assert thesis["available"] is True
+    assert thesis["primary"] == "em"
+    assert thesis["em_status"] == "ok"
     assert thesis["hybrid_em"] == 0.85
     assert thesis["vector_em"] == 0.40
     assert thesis["diff_pp"] == 45.0
@@ -163,10 +166,37 @@ def test_thesis_target_not_met():
             em = 0.55
         elif c["label"] == "vector_fast_rerank0":
             em = 0.50
-        results.append({**c, "multi_hop_em": em})
+        results.append({**c, "multi_hop_em": em, "multi_hop_em_scorable_n": 10})
     thesis = compute_thesis_headline(results)
     assert thesis["available"] is True
+    assert thesis["primary"] == "em"
     assert thesis["diff_pp"] == 5.0
+    assert thesis["target_met"] is False
+
+
+def test_thesis_falls_back_to_hits_when_em_gold_insufficient():
+    """gold_answer_text 표본 부족(<MIN_EM_SCORABLE) 시 primary=hits + insufficient_gold.
+
+    EM 이 prose-vs-short-string artifact 로 0 으로 깔리는 상황을 'thesis EM +0%p'
+    로 오판하지 않도록 — primary 를 entity-level hits 로 전환하고 EM 은 보류 표시.
+    """
+    cells = enumerate_cells()
+    results = []
+    for c in cells:
+        em = hits = None
+        n = 1   # 표본 1 < MIN_EM_SCORABLE
+        if c["label"] == "hybrid_fast_rerank1":
+            em, hits = 0.0, 0.31
+        elif c["label"] == "vector_fast_rerank0":
+            em, hits = 0.0, 1.0
+        results.append({**c, "multi_hop_em": em,
+                        "multi_hop_em_scorable_n": n, "multi_hop_hits": hits})
+    thesis = compute_thesis_headline(results)
+    assert thesis["available"] is True
+    assert thesis["primary"] == "hits"
+    assert thesis["em_status"] == "insufficient_gold"
+    # 진짜 신호 = hits 격차 (hybrid 가 vector 대비 열위) 가 보존됨.
+    assert thesis["hits_diff_pp"] < 0
     assert thesis["target_met"] is False
 
 
@@ -255,7 +285,8 @@ def test_thesis_full_mode_with_manifest_metrics():
         elif c["label"] == "vector_fast_rerank0":
             em_mh = 0.42
         results.append({**c, "ran": True, "mode": "full",
-                        "multi_hop_em": em_mh, "em": em_mh, "f1": em_mh,
+                        "multi_hop_em": em_mh, "multi_hop_em_scorable_n": 30,
+                        "em": em_mh, "f1": em_mh,
                         "cost_usd": 0.05, "n_questions": 30})
     thesis = compute_thesis_headline(results)
     assert thesis["available"] is True

@@ -432,19 +432,18 @@ flowchart TD
 
 ### 3.3 AgentState (TypedDict)
 
-[확정] **36 필드** — `src/autonexusgraph/agents/state.py:156-225`. 카테고리별 분류:
+[확정] **39 필드** — `src/autonexusgraph/agents/state.py:155-230`. 카테고리별 분류:
 
 | 카테고리 | 필드 | 채우는 노드 |
 |---|---|---|
 | **Input** (9) | thread_id, question, history, domain, target_vehicles, target_models, target_makes, rerank, llm_planner | 외부 호출자 / `run_agent` (`rerank`·`llm_planner` 는 entry-only ablation 토글) |
-| **Triage 산출** (4) | question_rewritten, temporal_audit, rewrite_audit, safety_signals | triage |
+| **Triage 산출** (4) | question_rewritten, temporal_audit, rewrite_audit, safety_signals (`_list_extend`) | triage / 모든 노드(safety_signals 만 누적) |
 | **Planning 산출** (5) | question_kind, target_companies, session_carryover, plan, tasks | triage(부분) + planner |
-| **Task 결과** (1) | task_results | supervisor (append-only) |
-| **Execution** (4) | tool_results, evidence_chunks, graph_subgraph, fallback_used | workers + executor_legacy |
-| **Synthesis** (3) | answer, citations, visualizations | synthesizer |
+| **누적 채널** (5) | task_results, tool_results, evidence_chunks, graph_subgraph, fallback_used | workers + executor_legacy (dedup-merge reducer) |
+| **Synthesis** (4) | answer, citations, visualizations, synth_status | synthesizer |
 | **Validation** (4) | validation_status, validation_issues, grounding, replan_hint | validator / mark_replan |
 | **HITL** (3) | pending_interrupt, interrupt_response, interrupt_handled | triage / planner / synthesizer (depends on kind) |
-| **Meta** (3) | llm_usage_usd, n_replans, aborted_reason | 모든 노드 (누적) |
+| **Meta·비용** (5) | llm_usage_usd, llm_tokens_used, n_replans, aborted_reason, sensitive_blocked | tracing / validator / 모든 노드 |
 
 이 표는 "어느 노드가 어느 키를 쓰는가" 를 한눈에 보여준다. 새 노드를 추가하면 이 표를 갱신해야 한다.
 
@@ -1596,7 +1595,7 @@ python3 -c "from autograph.tools.bridge import bridge_corp_to_entity; \
 
 **A.** LangChain 진영의 **에이전트 워크플로우 프레임워크**. 코어는 **StateGraph**:
 
-- **State** = TypedDict (본 시스템은 `AgentState` 36 필드)
+- **State** = TypedDict (본 시스템은 `AgentState` 39 필드)
 - **Node** = state 받아서 새 state 반환하는 함수 (본 시스템 11 개)
 - **Edge** = 노드 간 흐름 (정적 / 조건부)
 
@@ -1683,7 +1682,7 @@ RETURN v.name, count(*) AS variant_count
 **A.** 우선순위 진입점 (mental_model.md §6.1 가 SSOT):
 
 1. **`src/autonexusgraph/agents/graph.py`** — StateGraph 진입점 (140 줄)
-2. **`src/autonexusgraph/agents/state.py`** — AgentState 36 필드 (클래스 `:156-225`, reducers `:19-126`)
+2. **`src/autonexusgraph/agents/state.py`** — AgentState 39 필드 (클래스 `:155-230`, reducers `:19-152`)
 3. **`src/autonexusgraph/agents/_domain_handler.py`** — domain plug-in 메커니즘 (220 줄)
 4. **`src/autograph/agent_handler.py`** — 도메인 핸들러 1:1 미러 예제 (167 줄)
 5. **`src/autograph/tools/bridge.py`** — Cross-Domain 진입점 (100 줄)
@@ -1875,7 +1874,7 @@ plt.plot(bins[:-1], bin_correct, 'o-'); plt.plot([0, 1], [0, 1], '--'); plt.save
 ### 11.6 MCP (Model Context Protocol) 상호운용
 
 - **출처**: Anthropic, "Model Context Protocol" 표준 (2024-11 발표, 2025년 OpenAI Agents SDK 채택)
-- **본 시스템 현황**: **wired (partial)** — `src/autonexusgraph/mcp/` 에 59 tools 자동 discovery + JSON Schema 변환 + stdio server. `pip install -e ".[mcp]"` 후 `python -m autonexusgraph.mcp` 로 부팅. Claude Desktop / Cline / Cursor / OpenAI Agents 등이 .mcp.json 으로 본 서버 등록 후 호출 가능.
+- **본 시스템 현황**: **wired (partial)** — `src/autonexusgraph/mcp/` 에 78 tools (finance 21 + auto 38 + ip 19) 자동 discovery + JSON Schema 변환 + stdio server. `pip install -e ".[mcp]"` 후 `python -m autonexusgraph.mcp` 로 부팅. Claude Desktop / Cline / Cursor / OpenAI Agents 등이 .mcp.json 으로 본 서버 등록 후 호출 가능.
 - **적용 가능성**: 이미 적용. 추가 보강 — MCP resource (PG/Neo4j 직접 조회) + MCP prompts (도메인별 시스템 프롬프트 노출).
 
 ### 11.7 LLM-as-judge 평가

@@ -24,8 +24,21 @@ def test_build_tool_manifest_all_has_tools():
 def test_build_tool_manifest_domain_filter():
     fin = build_tool_manifest("finance")
     auto = build_tool_manifest("auto")
+    ip = build_tool_manifest("ip")
     assert all(s.domain == "finance" for s in fin)
     assert all(s.domain == "auto" for s in auto)
+    assert all(s.domain == "ip" for s in ip)
+
+
+def test_ip_tools_present_in_all_manifest():
+    """ipgraph.tools 가 'all' manifest 에 포함 — typed pool 위 MCP 노출."""
+    specs = build_tool_manifest("all")
+    domains = {s.domain for s in specs}
+    assert "ip" in domains
+    ip_names = {s.name for s in specs if s.domain == "ip"}
+    # patents / graph / retrieve / bridge 대표 tool 노출 확인.
+    assert {"lookup_patent", "list_patents_in_cpc",
+            "bridge_assignee_to_corp"} <= ip_names
 
 
 def test_tool_function_extracts_docstring_first_line():
