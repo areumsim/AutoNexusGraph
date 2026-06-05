@@ -54,7 +54,7 @@ def _http_get_json(url: str, *, retries: int = 3) -> dict:
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read())
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — GLEIF HTTP 모든 변종 흡수 → exponential backoff retry
             last_exc = exc
             log.warning("[gleif] fetch fail (attempt %d/%d): %s", i + 1, retries, exc)
             time.sleep(1.5 ** i)
@@ -283,7 +283,7 @@ def enrich(*, rows: list[dict] | None = None,
                         stats["sec_lei_corp_filled"] += 1
                     stats["sec_lei_upserted"] += 1
                     cur.execute("RELEASE SAVEPOINT sp_sec_lei")
-                except Exception as exc:   # noqa: BLE001
+                except Exception as exc:   # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                     cur.execute("ROLLBACK TO SAVEPOINT sp_sec_lei")
                     log.warning("[gleif:sec_lei] %s fail: %s", lei, exc)
 
@@ -318,7 +318,7 @@ def enrich(*, rows: list[dict] | None = None,
                         else:
                             stats["em_lei_updated"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_em")
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                         cur.execute("ROLLBACK TO SAVEPOINT sp_em")
                         log.warning("[gleif:em] %s/%s fail: %s", cc, lei, exc)
 
@@ -352,7 +352,7 @@ def enrich(*, rows: list[dict] | None = None,
                             if mm == "lei":
                                 stats["bridge_match_upgraded"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_bridge")
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — SAVEPOINT 롤백 → 다음 row 진행 (멱등 UPSERT)
                         cur.execute("ROLLBACK TO SAVEPOINT sp_bridge")
                         log.warning("[gleif:bridge] %s/%s fail: %s", cc, lei, exc)
 

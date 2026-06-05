@@ -38,7 +38,7 @@ def _coerce_rows(payload, stat_code_hint: str) -> list[dict]:
     """KOSIS raw payload → KosisRow dict list."""
     try:
         from autonexusgraph.ingestion.kosis_client import KosisClient
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — KosisClient import 실패 흡수 → 빈 list 폴백 (kosis 미설치 환경)
         return []
     # payload 가 list (raw rows) 또는 dict (wrap) 양쪽 지원.
     raw_rows = payload if isinstance(payload, list) else payload.get("data") or payload.get("items") or []
@@ -77,7 +77,7 @@ def collect_rows(raw_dir: Path | None = None) -> list[dict]:
     for fp, stat_code in _iter_raw_files(raw_dir):
         try:
             payload = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — file 읽기/JSON 파싱 실패 흡수 → continue (다음 raw 파일 진행)
             log.warning("[kosis.load] %s 파싱 실패: %s", fp, e)
             continue
         rows.extend(_coerce_rows(payload, stat_code_hint=stat_code))
@@ -89,7 +89,7 @@ def upsert_pg(rows: list[dict]) -> int:
         return 0
     try:
         from autonexusgraph.db.postgres import get_pool
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — postgres 모듈 미가용 (db 미설치) 흡수 → 적재 skip
         log.warning("[kosis.load_pg] postgres 모듈 미가용: %s", e)
         return 0
     sql = """
@@ -114,7 +114,7 @@ def upsert_pg(rows: list[dict]) -> int:
                 cur.execute(sql, r)
                 n += cur.rowcount or 0
             return n
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 적재 실패 흡수 → 0 반환 (fail-soft, 다음 호출 시 재시도)
         log.warning("[kosis.load_pg] PG 적재 실패 (fail-soft): %s", e)
         return 0
 
