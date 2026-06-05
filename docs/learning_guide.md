@@ -599,6 +599,40 @@ def should_replan(state):
 
 상세 설계 SSOT 는 [docs/ipgraph.md](./ipgraph.md). PRD §12.5 (어댑터 슬롯 + 작업 순서 + 측정 게이트) 가 후속 PR 작업 항목 SSOT.
 
+### 3.7 멀티테넌트 격리 — 공유 DB 위의 namespace (적용)
+
+**문제 (이론)**: Neo4j/PostgreSQL/벡터 스토어를 **여러 프로젝트가 한 서버에서 공유**할 때,
+프로젝트 A 의 `:Company` 노드와 프로젝트 B 의 `:Company` 가 같은 그래프에 섞이면 질의·집계가
+오염된다. 멀티테넌시 격리 전략은 3 단계로 정리된다:
+1. **물리 격리** — 인스턴스/컨테이너를 프로젝트별로 분리. 가장 강하지만 자원·운영 비용 최대.
+2. **논리 DB 격리** — 같은 서버 안에서 named database/database 명으로 분리(PG database, Neo4j Enterprise multi-db).
+3. **레코드-수준 격리** — 같은 DB 안에서 프리픽스/태그/RLS 로 분리(스키마 프리픽스, 라벨 프리픽스, PG Row-Level Security).
+
+**본 시스템의 구현 (적용)**: 단일 토큰 `app_namespace`(env `APP_NAMESPACE`, 기본 `anxg`)에서
+스토어별 namespace 를 파생 — 논리 DB 격리 + 레코드-수준 격리를 **병행**한다.
+
+| 스토어 | 격리 | 코드 (이름 우선) | 격리 단계 |
+|---|---|---|---|
+| PostgreSQL | DSN database `autonexusgraph` + 스키마 `anxg_<schema>` | `config.pg_schema()`, `infra/postgres/init/*.sql` | 논리 DB + 레코드 |
+| Neo4j | `NEO4J_DATABASE`(Enterprise) + 노드 라벨 `Anxg_<Label>` | `db/neo4j.get_session()`, `config.neo4j_label()` | 논리 DB + 레코드 |
+| pgvector / Qdrant | PG `anxg_vec.chunks` / Qdrant 컬렉션 프리픽스 | `db/qdrant.collection_name()` | (PG 상속) / 레코드 |
+
+**왜 라벨 프리픽스까지 (Neo4j 의 핵심 트레이드오프)**: Neo4j **Community Edition(`neo4j:5.18-community`)
+는 named database 가 없다** — `neo4j` 단일 db 만 존재. 따라서 논리 DB 격리(2단계)가 불가능하고,
+**레코드-수준 격리(라벨 프리픽스)가 유일한 수단**이다. Enterprise 면 `NEO4J_DATABASE=autonexusgraph`
+로 논리 DB 격리가 되지만, 코드는 community 에서도 동작해야 하므로 **둘 다** 적용한다. 관계 타입은
+프리픽스하지 않는다 — 라벨만으로 노드 소속이 확정되고, 관계는 양 끝 노드에 종속되기 때문(`(:Anxg_Company)-[:SUPPLIED_BY]->(:Anxg_Supplier)`).
+
+**한계·대안 (정직)**:
+- 라벨 프리픽스는 **쿼리 표면을 늘린다** — 모든 Cypher 템플릿/로더가 프리픽스 라벨을 써야 한다(`Anxg_` 31종). 누락 시 "보이지 않는 노드" 버그. 그래서 `get_session()` 단일 진입점 + 코드리뷰 게이트로 강제.
+- PG 스키마 프리픽스는 **정적 SQL 문자열**에 박혀 있어, `eval`(파이썬 패키지)·`reg`(변수) 같은 **동음이의 토큰과 충돌** 위험이 있다 — 그래서 마이그레이션은 `.sql` 의 실재 `schema.table` 화이트리스트로만 치환(아무 `eval.` 이나 바꾸지 않음).
+- `(미적용, 참고)` **PG Row-Level Security(RLS)** — 같은 테이블을 `tenant_id` 컬럼 + RLS 정책으로 행 단위 분리하는 대안. 본 시스템은 스키마 프리픽스를 택했지만, 단일 스키마 공유가 필요해지면 RLS 가 더 세밀(출처: PostgreSQL 공식 문서, `CREATE POLICY`). 기대효과: 스키마 폭증 회피. 비용: 모든 쿼리에 정책 평가 오버헤드 + 정책 누락 시 누수.
+- `(미적용, 참고)` **Neo4j 4.x+ Enterprise multi-database + Fabric** — 프로젝트별 물리 DB + Fabric 으로 cross-db 질의. 격리는 가장 깨끗하나 Enterprise 라이선스 필요.
+
+기존 적재 DB 이동: `scripts/migrate/relabel_neo4j_namespace.py`(라벨 relabel) +
+`rename_pg_schemas_namespace.sql`(`ALTER SCHEMA RENAME`). 둘 다 멱등. 구조 SSOT 는
+[docs/architecture.md §4.4](architecture.md).
+
 ---
 
 ## 4. 추론 흐름의 깊이 — 청중 질문이 가장 많이 나오는 절

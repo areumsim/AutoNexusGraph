@@ -45,6 +45,12 @@
 > 으로 작성되어 재실행해도 무해. 단 `ALTER COLUMN SET NOT NULL` / `ADD CONSTRAINT` (10번) 은
 > backfill 직후 실행되므로 순서를 지킬 것.
 
+> **공유 DB namespace 마이그레이션** (스키마 `anxg_*` / 라벨 `Anxg_*` — 구조 SSOT [architecture.md §4.4](../architecture.md)):
+> 코드는 이미 프리픽스를 참조하므로, **기존 적재된 DB**는 한 번 이동해야 일치한다.
+> - PG: `psql "$POSTGRES_DSN" -f scripts/migrate/rename_pg_schemas_namespace.sql` (`ALTER SCHEMA <s> RENAME TO anxg_<s>`, 멱등)
+> - Neo4j: `python scripts/migrate/relabel_neo4j_namespace.py [--dry-run]` (라벨별 `SET n:Anxg_X REMOVE n:X`, 멱등)
+> - 순서: **DB 백업([backup_dr.md](backup_dr.md)) → rename/relabel → 앱 재기동 → audit**. 빈 볼륨 첫 부팅이면 init SQL 이 이미 `anxg_*` 로 생성하므로 rename 불필요.
+
 > **확인 명령** — 어느 마이그레이션이 적용됐는지:
 > ```bash
 > # 현재 모든 auto.* / bridge.* / ip.* 테이블 목록 — 위 파일들과 매핑
