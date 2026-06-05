@@ -46,6 +46,7 @@
         load-dart-production audit-data-channels \
         load-factoryon load-factoryon-dry load-kosis load-kosis-dry \
         load-kamp-process-metrics \
+        load-materials-metals load-materials-metals-dry \
         ingest-wikidata-cell-chem \
         ingest-oem-ir-hyundai ingest-oem-ir-mobis ingest-oem-ir-policies \
         load-oem-ir-news load-oem-ir-news-dry
@@ -702,6 +703,14 @@ load-kamp-process-metrics:
 	# KAMP 제조AI(15089213) CSV → anxg_auto.process_metrics 적재 (4단계 익명, grade B).
 	# raw 미존재 시 graceful skip (DATA_GO_KR_API_KEY 수집 후 재시도). BACKLOG D-4.
 	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_kamp_process_metrics
+
+load-materials-metals:
+	# materials_metals_seed.yaml → Neo4j :Anxg_Material (metal_alloy) + MADE_OF 엣지.
+	# Module 매칭 0건이면 graceful (Module 미적재 환경). BACKLOG L6-2.
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_materials_metals
+
+load-materials-metals-dry:
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_materials_metals --dry-run
 
 ingest-wikidata-cell-chem:
 	# Wikidata 배터리 셀 chem (cathode) 메타 수집 — CC0, 무인증.
