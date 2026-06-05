@@ -30,17 +30,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings  # noqa: E402
 from autonexusgraph.db.neo4j import get_session  # noqa: E402
+from autonexusgraph.ontology.domain import _DOMAIN_MAP  # noqa: E402
 
 log = logging.getLogger("relabel_neo4j_namespace")
 
-# Cypher 템플릿/로더에서 namespace 프리픽스를 부여한 노드 라벨 (관계 타입 제외).
-NODE_LABELS = [
-    "Assignee", "CPCCode", "Cell", "Company", "Complaint", "DefectType", "Equipment",
-    "Group", "Industry", "Institution", "Inventor", "Investigation", "Manufacturer",
-    "Market", "Material", "Mineral", "Module", "NewsEvent", "Part", "Patent", "Person",
-    "Plant", "ProcessStep", "Process", "Recall", "Standard", "Supplier", "System",
-    "VehicleModel", "VehicleVariant", "Work",
-]
+# 노드 라벨(관계 타입 제외)의 **권위 SSOT = `ontology/domain.py` `_DOMAIN_MAP`** — 하드코딩 대신
+# 레지스트리에서 파생해 드리프트 방지(과거 Component/FailureMode 누락 사고 재발 방지).
+# `Sector` 는 `scripts/migrate_neo4j_schema.py` 가 → Industry 로 폐기(0 노드)하므로 제외.
+# 레지스트리 밖 템플릿 전용 라벨(Cell/Product 등)도 포함 — DB 에 0 노드면 무해 no-op.
+_TEMPLATE_ONLY_LABELS = {"Cell", "Product"}
+NODE_LABELS = sorted((set(_DOMAIN_MAP) | _TEMPLATE_ONLY_LABELS) - {"Sector"})
 
 
 def _prefixed(label: str) -> str:

@@ -4,7 +4,7 @@ NHTSA complaint 의 ``components`` 컬럼은 string array (예: ``['ELECTRICAL S
 각 component string 을 anxg_auto.components.canonical_name (NHTSA taxonomy loader 가
 적재한 것) 과 정확/별칭 매칭 후 Neo4j edge 생성:
 
-    (:Anxg_Complaint {id: N})-[:COMPLAINT_OF {meta...}]->(:Anxg_Module|:Component {name})
+    (:Anxg_Complaint {id: N})-[:COMPLAINT_OF {meta...}]->(:Anxg_Module|:Anxg_Component {name})
 
 선행 필요: ``python -m autograph.loaders.load_nhtsa_component_taxonomy``.
 
@@ -42,7 +42,7 @@ _MERGE_COMPLAINT_OF = """
 UNWIND $rows AS row
 MATCH (cp:Anxg_Complaint {id: row.complaint_id})
 MATCH (m {name_norm: row.comp_norm})
-WHERE (m:Anxg_Module OR m:Component)
+WHERE (m:Anxg_Module OR m:Anxg_Component)
 MERGE (cp)-[r:COMPLAINT_OF]->(m)
 ON CREATE SET r.source_type      = 'nhtsa_complaint',
               r.source_id        = row.source_id,
