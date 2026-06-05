@@ -153,9 +153,9 @@ flowchart LR
     end
 
     subgraph DB[저장소]
-        PG[(PostgreSQL<br/>master / sec / wiki / auto / ip / vec / bridge)]
-        NEO[(Neo4j<br/>Company / Vehicle / Patent / RECALL_OF / SUPPLIED_BY ...)]
-        VEC[(pgvector<br/>vec.chunks BGE-M3 1024-dim)]
+        PG[(PostgreSQL<br/>anxg_master / anxg_sec / anxg_wiki / anxg_auto / anxg_ip / anxg_vec / anxg_bridge)]
+        NEO[(Neo4j<br/>Anxg_Company / Anxg_VehicleModel / Anxg_Patent / RECALL_OF / SUPPLIED_BY ...)]
+        VEC[(pgvector<br/>anxg_vec.chunks BGE-M3 1024-dim)]
     end
 
     subgraph A[adapters]

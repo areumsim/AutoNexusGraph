@@ -12,6 +12,11 @@
 - ``NEO4J_DATABASE`` (config ``neo4j_database``) 격리 db 대상.
 - bare 라벨 대상 orphan constraint/index 는 drop (프리픽스 라벨용은 로더가 IF NOT EXISTS 재생성).
 
+**대용량 주의 (APOC 부재 시)**: apoc 가 설치되지 않으면 라벨별로 단일 트랜잭션이 돌아간다.
+한 라벨에 1M+ 노드가 있으면 트랜잭션 메모리/락 한계로 OOM 또는 lock-timeout 가능 — 운영 전
+``apoc.periodic.iterate`` 사용 가능한 환경(neo4j-apoc 플러그인)을 권장한다. 카운트는
+``--dry-run`` 으로 미리 확인.
+
 사용:
     python scripts/migrate/relabel_neo4j_namespace.py            # 실제 실행
     python scripts/migrate/relabel_neo4j_namespace.py --dry-run  # 카운트만
@@ -75,6 +80,10 @@ def relabel(dry_run: bool = False, drop_old_constraints: bool = False) -> dict:
                     u=f"SET n:`{new}` REMOVE n:`{label}`",
                 )
             else:
+                # 대용량 경고 — APOC 없으면 단일 TX. 100k 초과면 OOM/lock 위험.
+                if n > 100_000:
+                    log.warning("APOC 부재 + %s 라벨 %d 노드 — 단일 TX 위험. apoc 설치 권장.",
+                                label, n)
                 s.run(f"MATCH (n:`{label}`) SET n:`{new}` REMOVE n:`{label}`")
 
         if drop_old_constraints and not dry_run:
@@ -85,8 +94,20 @@ def relabel(dry_run: bool = False, drop_old_constraints: bool = False) -> dict:
                     if any(lbl in NODE_LABELS for lbl in labels):
                         s.run(f"DROP CONSTRAINT `{rec['name']}` IF EXISTS")
                         log.info("dropped orphan constraint %s (%s)", rec["name"], labels)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — constraint cleanup 실패 흡수 → 다음 단계 진행
                 log.warning("constraint cleanup skipped: %s", e)
+            # 인덱스도 동일 패턴으로 정리 — 프리픽스 라벨용은 로더가 IF NOT EXISTS 재생성.
+            try:
+                for rec in list(s.run("SHOW INDEXES YIELD name, labelsOrTypes, type")):
+                    labels = rec.get("labelsOrTypes") or []
+                    # LOOKUP 같은 시스템 인덱스 (labelsOrTypes 없음) 는 skip.
+                    if not labels:
+                        continue
+                    if any(lbl in NODE_LABELS for lbl in labels):
+                        s.run(f"DROP INDEX `{rec['name']}` IF EXISTS")
+                        log.info("dropped orphan index %s (%s)", rec["name"], labels)
+            except Exception as e:  # noqa: BLE001 — index cleanup 실패 흡수 → 마이그 완료
+                log.warning("index cleanup skipped: %s", e)
 
     moved = sum(v for v in stats.values())
     log.info("done — %d nodes across %d labels %s",
