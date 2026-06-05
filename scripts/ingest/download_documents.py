@@ -159,7 +159,7 @@ def main() -> int:
     bytes_total = 0
 
     with DartClient(api_key=s.dart_api_key, rate_limit_per_sec=s.ingest_rate_limit_per_sec) as client:
-        for corp_code, rcept_no, report_nm in tqdm(targets, desc="documents", unit="rpt"):
+        for corp_code, rcept_no, _report_nm in tqdm(targets, desc="documents", unit="rpt"):
             if stop["flag"]:
                 break
             zip_path = _zip_path(out_dir, corp_code, rcept_no)

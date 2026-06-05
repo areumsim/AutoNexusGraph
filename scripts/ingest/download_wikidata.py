@@ -180,8 +180,8 @@ def step_b(corp_to_qid: dict[str, str] | None = None, limit: int | None = None,
             limiter.acquire()
             try:
                 entity = fetch_with_retry(
-                    lambda: wd.fetch_entity(qid),
-                    on_retry=lambda a, e: print(f"  retry#{a} {qid}: {e}"),
+                    lambda qid=qid: wd.fetch_entity(qid),
+                    on_retry=lambda a, e, qid=qid: print(f"  retry#{a} {qid}: {e}"),
                 )
                 if entity is None:
                     ckpt.mark_failed(qid, "not_found")

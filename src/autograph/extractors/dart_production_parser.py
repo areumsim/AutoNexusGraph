@@ -264,7 +264,7 @@ def _row_to_plant_rows(data_cells: list[str], years: list[int],
     value_cells = body_cells[-len(years):]
 
     rows: list[PlantRow] = []
-    for year, vcell in zip(years, value_cells):
+    for year, vcell in zip(years, value_cells, strict=False):
         val = _parse_number(vcell)
         if val is None and plant_code in ("", "-"):
             continue

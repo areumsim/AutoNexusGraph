@@ -15,7 +15,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
-
 def _patch_path(monkeypatch, tmp_path: Path) -> Path:
     log_path = tmp_path / "cost.jsonl"
     monkeypatch.setenv("LLM_COST_LOG_PATH", str(log_path))
@@ -83,7 +82,7 @@ def test_logging_client_chat_records(monkeypatch, tmp_path):
     resp = client.chat([{"role": "user", "content": "ping"}])
     assert resp.content == "hi"
 
-    es = [json.loads(l) for l in log_path.read_text().splitlines()]
+    es = [json.loads(ln) for ln in log_path.read_text().splitlines()]
     assert len(es) == 1
     e = es[0]
     assert e["caller"] == "test_role"
@@ -103,15 +102,14 @@ def test_logging_client_chat_stream_records(monkeypatch, tmp_path):
         model = "claude-haiku-4-5"
         def chat(self, *a, **kw): raise NotImplementedError
         def chat_stream(self, messages, **kw):
-            for chunk in ["안", "녕", "하세요"]:
-                yield chunk
+            yield from ["안", "녕", "하세요"]
         def chat_json(self, *a, **kw): raise NotImplementedError
 
     client = LoggingLLMClient(FakeInner(), caller="stream_test")
     out = list(client.chat_stream([{"role": "user", "content": "안녕"}]))
     assert out == ["안", "녕", "하세요"]
 
-    es = [json.loads(l) for l in log_path.read_text().splitlines()]
+    es = [json.loads(ln) for ln in log_path.read_text().splitlines()]
     assert len(es) == 1
     assert es[0]["method"] == "chat_stream"
     assert es[0]["estimated"] is True
@@ -133,7 +131,7 @@ def test_logging_client_chat_json_records(monkeypatch, tmp_path):
                               schema={"type": "object"})
     assert result["intent"] == "search"
 
-    es = [json.loads(l) for l in log_path.read_text().splitlines()]
+    es = [json.loads(ln) for ln in log_path.read_text().splitlines()]
     assert len(es) == 1
     assert es[0]["method"] == "chat_json"
 

@@ -95,7 +95,7 @@ def _iter_inv_rows(zip_path: Path) -> Iterator[dict[str, str]]:
                     continue
                 # 짧은 row (마지막 줄 끊김) 도 dict 으로 — 부족분은 빈 문자열.
                 values = list(row) + [""] * (len(_COLUMNS) - len(row))
-                yield dict(zip(_COLUMNS, values[: len(_COLUMNS)]))
+                yield dict(zip(_COLUMNS, values[: len(_COLUMNS)], strict=False))
 
 
 def _parse_date(s: str | None) -> str | None:

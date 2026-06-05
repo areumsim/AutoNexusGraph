@@ -180,8 +180,10 @@ def test_turn_context_isolated_per_thread(monkeypatch):
 
     threads = [threading.Thread(target=_run, args=(t,))
                for t in ("A", "B")]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     assert results == {"A": "A", "B": "B"}
 
 

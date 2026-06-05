@@ -101,7 +101,7 @@ def test_ecos_key_stats_keys():
 
     assert "base_rate" in KEY_STATS
     assert "usd_krw" in KEY_STATS
-    for name, meta in KEY_STATS.items():
+    for _name, meta in KEY_STATS.items():
         assert "stat_code" in meta
         assert "cycle" in meta
         assert meta["cycle"] in {"D", "M", "Q", "A"}

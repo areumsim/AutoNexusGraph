@@ -111,10 +111,14 @@ def build_from_recalls() -> int:
              comp, defect, conseq, remedy, rdate) = r
             chunk_src = _RECALL_SRC_MAP.get(src, "other_recall")
             text_parts = []
-            if comp:    text_parts.append(f"부품: {comp}")
-            if defect:  text_parts.append(f"결함: {defect}")
-            if conseq:  text_parts.append(f"위험: {conseq}")
-            if remedy:  text_parts.append(f"조치: {remedy}")
+            if comp:
+                text_parts.append(f"부품: {comp}")
+            if defect:
+                text_parts.append(f"결함: {defect}")
+            if conseq:
+                text_parts.append(f"위험: {conseq}")
+            if remedy:
+                text_parts.append(f"조치: {remedy}")
             text = "\n".join(text_parts).strip()
             if not text:
                 continue
@@ -314,15 +318,15 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
     import re
     import zipfile
 
-    SUPPLIER_OEMS = {
+    SUPPLIER_OEMS = {  # noqa: N806 — 지역 상수(매핑)
         "00164788": "mobis",     # 현대모비스
         "00161125": "hanon",     # 한온시스템
         "01042775": "mando",     # HL만도
         "00106623": "wia",       # 현대위아
     }
-    KEYWORD_RE = re.compile(r"생산\s*능력|가동\s*률|생산\s*실적")
-    XML_TAG_RE = re.compile(r"<[^>]+>")
-    WS_RE = re.compile(r"\s+")
+    KEYWORD_RE = re.compile(r"생산\s*능력|가동\s*률|생산\s*실적")  # noqa: N806 — 지역 정규식 상수
+    XML_TAG_RE = re.compile(r"<[^>]+>")  # noqa: N806 — 지역 정규식 상수
+    WS_RE = re.compile(r"\s+")  # noqa: N806 — 지역 정규식 상수
 
     bulk_root = get_settings().ingest_raw_dir / "dart_bulk" / "corp"
     if not bulk_root.exists():

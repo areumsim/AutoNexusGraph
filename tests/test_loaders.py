@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 
-
 # ── _common ─────────────────────────────────────────────────────────
 def test_parse_amount():
     from autonexusgraph.loaders._common import parse_amount

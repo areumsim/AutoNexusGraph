@@ -85,7 +85,7 @@ def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse
                           history=history, domain=req.domain)
     except Exception as e:   # noqa: BLE001 — agent 실패 → HTTP 500 (HTTPException, raise)
         log.exception("[chat] agent failed")
-        raise HTTPException(500, f"agent failed: {e}")
+        raise HTTPException(500, f"agent failed: {e}") from e
 
     # PG anxg_chat.messages 에 user + assistant 두 turn 적재
     _persist_turn(req.thread_id, "user", req.message, citations=None, trace=None,

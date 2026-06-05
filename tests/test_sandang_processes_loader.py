@@ -6,8 +6,6 @@ integration 테스트 영역.
 
 from __future__ import annotations
 
-
-
 from autograph.loaders.load_sandang_processes import (
     _find_csv,
     _normalize_process_name,

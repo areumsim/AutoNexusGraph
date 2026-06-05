@@ -60,7 +60,7 @@ def main() -> int:
             limiter.acquire()
             try:
                 data = fetch_with_retry(
-                    lambda: cli.search_by_applicant(name, year_from=args.year_from),
+                    lambda name=name: cli.search_by_applicant(name, year_from=args.year_from),
                     max_tries=3,
                 )
                 save_raw("kipris", f"{corp_code}/applicant_{args.year_from}.json", data)

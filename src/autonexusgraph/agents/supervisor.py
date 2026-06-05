@@ -187,7 +187,7 @@ def sup_send_directives(state: AgentState):
         return []
 
     # worker 노드명은 graph.py 의 add_node 명과 일치해야 한다.
-    NODE_BY_AGENT = {
+    NODE_BY_AGENT = {  # noqa: N806 — 지역 상수(매핑)
         "research": "worker_research",
         "graph": "worker_graph",
         "sql": "worker_sql",

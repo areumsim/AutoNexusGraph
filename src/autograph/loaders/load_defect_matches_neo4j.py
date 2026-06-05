@@ -255,7 +255,9 @@ def main() -> int:
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
     if args.dry_run:
-        rec = _fetch_recalls(); dt = _fetch_defect_types(); mt = _fetch_matches()
+        rec = _fetch_recalls()
+        dt = _fetch_defect_types()
+        mt = _fetch_matches()
         print(f"[dry-run] recalls={len(rec)} defect_types={len(dt)} matches={len(mt)}")
         if dt:
             t = dt[0]

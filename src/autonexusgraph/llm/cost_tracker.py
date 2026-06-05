@@ -63,7 +63,7 @@ def _read_session_base() -> float:
         return 0.0
 
 
-class BudgetExceeded(Exception):
+class BudgetExceeded(Exception):  # noqa: N818 — 제어흐름 예외(의도적 비-Error 명명)
     """누적 비용이 한도 도달 — turn/batch abort 신호."""
 
 

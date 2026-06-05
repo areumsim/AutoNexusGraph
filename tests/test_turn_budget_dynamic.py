@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 def _reload(monkeypatch, **env):
     for k, v in env.items():
         if v is None:

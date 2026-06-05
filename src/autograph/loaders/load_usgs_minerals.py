@@ -34,7 +34,9 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[3]
 SEED_PATH = ROOT / "ontology" / "auto" / "materials_seed.yaml"
 
-from ._neo4j_helpers import default_schema_version as _default_schema_version
+from ._neo4j_helpers import (  # noqa: E402 — ROOT/SEED_PATH 정의 후 지역 배치
+    default_schema_version as _default_schema_version,
+)
 
 # _SCHEMA_VERSION 은 ontology 헤더 SoT (lazy 회수). 본 모듈 외에서 import 하지 마라.
 # PRD §10 DoD #17 (c) — yaml schema_version 헤더 변경 시 자동 전파.

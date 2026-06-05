@@ -33,12 +33,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:   # 런타임 의존 회피 — httpx 는 make_http_client() 내부에서 lazy import
+    import httpx
 
 log = logging.getLogger(__name__)
 
-from ..config import get_settings
-from ._license import LICENSE_POLICY, allow_body
+from ..config import get_settings  # noqa: E402 — log 정의 후 배치(의도적)
+from ._license import LICENSE_POLICY, allow_body  # noqa: E402 — log 정의 후 배치(의도적)
 
 _WARNED_UNKNOWN_SOURCES: set[str] = set()
 
@@ -358,7 +361,7 @@ class CheckpointStore:
 # 영문 법인격 token — word boundary 매칭만 (substring 매칭 X).
 # 옛 .replace() 방식은 'Transit Connect' → 'Transit nnect' (Connect 의 Co)
 # 같은 over-matching 버그.
-import re as _re_norm
+import re as _re_norm  # noqa: E402 — 정규식 헬퍼 지역 배치(의도적)
 
 _EN_LEGAL_RE = _re_norm.compile(
     r"\b(?:Inc|Ltd|Co|Corp|Corporation|Company|Limited)\b\.?",

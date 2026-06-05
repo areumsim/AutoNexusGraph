@@ -99,8 +99,7 @@ class AnthropicClient(LLMClient):
                 max_tokens=max_tokens or 4096,
                 **kwargs,
             ) as stream:
-                for text in stream.text_stream:
-                    yield text
+                yield from stream.text_stream
         except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"Anthropic stream failed: {e}") from e
 

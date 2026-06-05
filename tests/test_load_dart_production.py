@@ -9,7 +9,6 @@ from __future__ import annotations
 import zipfile
 from unittest import mock
 
-
 from autograph.extractors.dart_production_parser import PlantRow
 from autograph.loaders import load_dart_production as L
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -81,13 +80,15 @@ def test_get_session_injects_database_when_configured(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setattr(get_settings(), "neo4j_database", "")
     captured.clear()
-    with N.get_session() as _: pass
+    with N.get_session() as _:
+        pass
     assert "database" not in captured
 
     # neo4j_database 설정 시 주입.
     monkeypatch.setattr(get_settings(), "neo4j_database", "autonexusgraph")
     captured.clear()
-    with N.get_session() as _: pass
+    with N.get_session() as _:
+        pass
     assert captured.get("database") == "autonexusgraph"
 
 
@@ -114,7 +115,8 @@ def test_get_session_respects_explicit_database_kwarg(monkeypatch):
     monkeypatch.setattr(get_settings(), "neo4j_database", "autonexusgraph")
 
     captured.clear()
-    with N.get_session(database="test_override") as _: pass
+    with N.get_session(database="test_override") as _:
+        pass
     assert captured.get("database") == "test_override", \
         "명시 database kwarg 가 config 보다 우선해야 한다 (multi-kwarg TypeError 회귀 가드)"
 

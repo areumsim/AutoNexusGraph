@@ -110,7 +110,7 @@ def _iter_rows(zip_path: Path) -> Iterator[dict[str, str]]:
                 if not row:
                     continue
                 values = list(row) + [""] * (len(_COLUMNS) - len(row))
-                yield dict(zip(_COLUMNS, values[: len(_COLUMNS)]))
+                yield dict(zip(_COLUMNS, values[: len(_COLUMNS)], strict=False))
 
 
 def _parse_year(s: str | None) -> int | None:

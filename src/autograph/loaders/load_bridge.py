@@ -143,7 +143,7 @@ def match_manufacturers_by_name(cur) -> int:
                                   = mm.name_norm
     """)
     n = 0
-    for corp_code, corp_name, mfr_id, name in cur.fetchall():
+    for corp_code, _corp_name, mfr_id, name in cur.fetchall():
         _upsert_bridge(cur,
             corp_code=corp_code,
             entity_id=str(mfr_id),

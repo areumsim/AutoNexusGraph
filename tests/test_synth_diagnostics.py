@@ -16,7 +16,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
-
 def _state_with_evidence():
     return {
         "question": "삼성전자 매출은?",

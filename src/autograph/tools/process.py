@@ -123,9 +123,11 @@ def get_process_metrics(process_name_norm: str | None = None,
     """
     where, params = [], {"lim": _cap(limit)}
     if (process_name_norm or "").strip():
-        where.append("process_name_norm = %(n)s"); params["n"] = process_name_norm
+        where.append("process_name_norm = %(n)s")
+        params["n"] = process_name_norm
     if (process_category or "").strip():
-        where.append("process_category = %(c)s"); params["c"] = process_category
+        where.append("process_category = %(c)s")
+        params["c"] = process_category
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     return query_dicts(f"""
         SELECT process_name_norm, process_category, metric_type, unit,

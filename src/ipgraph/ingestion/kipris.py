@@ -135,7 +135,7 @@ def parse_xml(xml_text: str, *, snapshot_year: int | None = None
         from lxml import etree
         root = etree.fromstring(xml_text.encode("utf-8") if isinstance(xml_text, str) else xml_text)
     except ImportError:
-        import xml.etree.ElementTree as etree
+        import xml.etree.ElementTree as etree  # noqa: N813 — etree 표준 별칭 관례
         root = etree.fromstring(xml_text)
     except Exception as e:   # noqa: BLE001 — [kipris] XML parse 실패 흡수 → out 반환
         log.warning("[kipris] XML parse 실패: %s", e)

@@ -258,7 +258,7 @@ def _safe_calculator(expr: str, variables: dict) -> float:
     if not _EXPR_ALLOWED_RE.match(expr):
         raise ValueError(f"허용되지 않은 문자 포함: {expr!r}")
     # 위험 키워드 차단
-    BAD = ("import", "exec", "eval", "open", "__", "lambda", "compile",
+    BAD = ("import", "exec", "eval", "open", "__", "lambda", "compile",  # noqa: N806 — 지역 상수(블랙리스트)
            "globals", "locals", "vars", "getattr", "setattr", "delattr",
            "type", "object", "subprocess", "os.")
     for w in BAD:

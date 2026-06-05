@@ -47,7 +47,7 @@ class InterruptPayload(TypedDict, total=False):
     thread_id: str                   # resume 시 식별용
 
 
-class InterruptUnavailable(RuntimeError):
+class InterruptUnavailable(RuntimeError):  # noqa: N818 — 제어흐름 예외(의도적 비-Error 명명)
     """langgraph interrupt API 사용 불가 — 호출부가 폴백 처리."""
 
 

@@ -118,7 +118,7 @@ def main() -> int:
             limiter.acquire()
             try:
                 page = fetch_with_retry(
-                    lambda: wp.fetch(title, with_html=True, with_infobox=True),
+                    lambda title=title: wp.fetch(title, with_html=True, with_infobox=True),
                     max_tries=3,
                 )
                 if page is None and not t["wiki_title"]:
@@ -129,7 +129,7 @@ def main() -> int:
                         if "회사" in h.get("snippet", "") or "기업" in h.get("snippet", ""):
                             limiter.acquire()
                             page = fetch_with_retry(
-                                lambda: wp.fetch(h["title"], with_html=True, with_infobox=True),
+                                lambda h=h: wp.fetch(h["title"], with_html=True, with_infobox=True),
                                 max_tries=3,
                             )
                             if page:

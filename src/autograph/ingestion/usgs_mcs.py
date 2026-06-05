@@ -169,7 +169,7 @@ def _find_row_with_n_nums(text: str, label_substring: str, *,
         if len(tokens) >= min_nums:
             return tokens, i
     # 2차: wrap — 라벨 라인의 다음 1~2 줄에서 검색.
-    for i, line in label_lines:
+    for i, _line in label_lines:
         for j in (i + 1, i + 2):
             if j >= len(lines):
                 break

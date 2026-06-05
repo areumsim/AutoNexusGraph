@@ -252,7 +252,7 @@ def embed_chunks(
         with transaction() as conn:
             register_vector(conn)
             with conn.cursor() as cur:
-                for rid, vec in zip(ids, vectors):
+                for rid, vec in zip(ids, vectors, strict=False):
                     cur.execute(SQL_UPDATE_EMBEDDING, (vec, rid))
 
         stats.inserted += len(rows)

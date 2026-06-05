@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 
-
 # ── ingestion 모듈 import smoke ─────────────────────────────
 def test_wikipedia_auto_module_importable():
     import autograph.ingestion.wikipedia_auto as w

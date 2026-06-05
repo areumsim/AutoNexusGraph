@@ -223,7 +223,7 @@ def _replan_escalate_kind(kind: str, hint: dict) -> str:
     issues = hint.get("prev_issues") or []
     if any(str(i).startswith("hallucinated_numbers") for i in issues):
         return "structural" if kind == "narrative" else kind
-    _ESCALATE = {
+    _ESCALATE = {  # noqa: N806 — 지역 상수(매핑)
         "factual": "multi_hop",
         "structural": "multi_hop",
         "narrative": "multi_hop",

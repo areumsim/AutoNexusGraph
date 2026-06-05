@@ -178,9 +178,12 @@ def load_recall_components(*, dry_run: bool = False, batch: int = 500) -> MatchS
         if c is None:
             stats.no_match += 1
             continue
-        if kind == "exact":   stats.matched_exact += 1
-        elif kind == "alias": stats.matched_alias += 1
-        else:                 stats.matched_token += 1
+        if kind == "exact":
+            stats.matched_exact += 1
+        elif kind == "alias":
+            stats.matched_alias += 1
+        else:
+            stats.matched_token += 1
         matched_ids.append((recall_id, int(c["id"]), kind, conf))
         edges.append({
             "recall_id": recall_id, "component_id": int(c["id"]),

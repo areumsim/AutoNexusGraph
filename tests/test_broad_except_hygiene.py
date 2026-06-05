@@ -32,8 +32,7 @@ def _iter_python_files():
     for root in SCAN_ROOTS:
         if not root.is_dir():
             continue
-        for p in root.rglob("*.py"):
-            yield p
+        yield from root.rglob("*.py")
 
 
 def _code_lines(text: str) -> set[int]:

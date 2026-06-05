@@ -80,7 +80,7 @@ def main() -> int:
                 else:
                     s_p, e_p = args.start, args.end
                 rows = fetch_with_retry(
-                    lambda: cli.fetch_series(org, tbl, prd, s_p, e_p),
+                    lambda org=org, tbl=tbl, prd=prd, s_p=s_p, e_p=e_p: cli.fetch_series(org, tbl, prd, s_p, e_p),
                     max_tries=3,
                 )
                 save_raw("kosis", f"{tbl}/{s_p}-{e_p}.json", rows)

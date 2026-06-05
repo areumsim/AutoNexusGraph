@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-
 from autonexusgraph.agents.interrupts import InterruptUnavailable
 from autonexusgraph.agents.nodes import triage_node
 

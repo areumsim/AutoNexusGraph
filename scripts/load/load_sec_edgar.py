@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
-from autonexusgraph.ingestion.sec_client import SecEdgarClient, SecFiling
+from autonexusgraph.ingestion.sec_client import SecEdgarClient
 
 UPSERT_FILING = """
 INSERT INTO anxg_sec.filings

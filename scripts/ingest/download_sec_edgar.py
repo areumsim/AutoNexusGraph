@@ -75,7 +75,7 @@ def main() -> int:
             limiter.acquire()
             print(f"[SEC] cik={cik} corp_code={corp_code} name={name}")
             try:
-                sub = fetch_with_retry(lambda: cli.get_submissions(cik), max_tries=3)
+                sub = fetch_with_retry(lambda cik=cik: cli.get_submissions(cik), max_tries=3)
                 if not sub:
                     ckpt.mark_failed(entity_id, "submissions_404")
                     continue
@@ -83,7 +83,7 @@ def main() -> int:
 
                 if args.with_facts:
                     limiter.acquire()
-                    facts = fetch_with_retry(lambda: cli.get_company_facts(cik), max_tries=3)
+                    facts = fetch_with_retry(lambda cik=cik: cli.get_company_facts(cik), max_tries=3)
                     if facts:
                         save_raw("sec", f"{entity_id}/companyfacts.json", facts)
 

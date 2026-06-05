@@ -83,7 +83,7 @@ def main() -> int:
              WHERE peh.role LIKE '%대표%' OR peh.role LIKE '%CEO%'
         """)
         dart_ceos = defaultdict(set)
-        for cc, nm, role in cur.fetchall():
+        for cc, nm, _role in cur.fetchall():
             dart_ceos[cc].add(nm)
         # Wikidata CEO: anxg_wiki.wikidata_facts where property='P169'
         # value 는 QID 형태 → label 매칭은 별도 fetch 필요. 여기선 P169 존재 여부만 체크.

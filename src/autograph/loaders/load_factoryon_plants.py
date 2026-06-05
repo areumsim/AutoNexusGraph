@@ -133,7 +133,7 @@ def _fetch_registry() -> list[dict]:
               FROM anxg_auto.factoryon_registry
         """)
         cols = [c[0] for c in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
 
 def _edge_meta(method: str, conf: float) -> dict:

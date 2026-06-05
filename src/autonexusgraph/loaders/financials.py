@@ -116,9 +116,11 @@ def load_financials(
     # 진행률 (필수 아님)
     try:
         from tqdm import tqdm
-        wrap = lambda it: tqdm(it, desc="financials", unit="batch") if progress else it
+        def wrap(it):
+            return tqdm(it, desc="financials", unit="batch") if progress else it
     except ImportError:
-        wrap = lambda it: it
+        def wrap(it):
+            return it
 
     from ..db.postgres import transaction
     with transaction() as conn:

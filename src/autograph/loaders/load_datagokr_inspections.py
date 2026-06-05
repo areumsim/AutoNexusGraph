@@ -71,8 +71,7 @@ def _iter_csv_rows(csv_path):
                 if "검사" in head:
                     log.info("[load:inspections] %s encoding=%s",
                              csv_path.name, enc)
-                    for row in _csv.DictReader(f):
-                        yield row
+                    yield from _csv.DictReader(f)
                     return
         except UnicodeDecodeError:
             continue

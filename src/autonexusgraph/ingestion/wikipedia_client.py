@@ -170,7 +170,7 @@ class WikipediaClient:
 
 
 # ── Infobox 파서 ────────────────────────────────────────────
-import re
+import re  # noqa: E402 — 파서 섹션 지역 배치(의도적)
 
 _INFOBOX_HEAD = re.compile(r"\{\{\s*(Infobox|정보상자)\b", re.IGNORECASE)
 

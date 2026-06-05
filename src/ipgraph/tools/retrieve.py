@@ -100,7 +100,7 @@ def search_patents(query: str, *,
                 cur.execute("SET LOCAL hnsw.ef_search = 400")
                 cur.execute(sql, params)
                 cols = [d.name for d in cur.description]
-                hits = [dict(zip(cols, row)) for row in cur.fetchall()]
+                hits = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.search_patents] PG/벡터 실패 (fail-soft): %s", e)
         return []
@@ -154,7 +154,7 @@ def search_by_metadata_ip(*,
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, params)
             cols = [d.name for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.search_by_metadata_ip] PG 실패: %s", e)
         return []
@@ -175,7 +175,7 @@ def get_chunk_ip(chunk_id: int) -> dict | None:
             if not row:
                 return None
             cols = [d.name for d in cur.description]
-            return dict(zip(cols, row))
+            return dict(zip(cols, row, strict=False))
     except Exception as e:   # noqa: BLE001 — [retrieve] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[ip.get_chunk_ip] PG 실패: %s", e)
         return None

@@ -29,9 +29,9 @@ def _write_listings_csv(listings, path: Path) -> None:
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["stock_code", "name", "market", "market_cap", "sector", "isin"])
-        for l in listings:
-            writer.writerow([l.stock_code, l.name, l.market, l.market_cap or "",
-                             l.sector or "", l.isin or ""])
+        for item in listings:
+            writer.writerow([item.stock_code, item.name, item.market, item.market_cap or "",
+                             item.sector or "", item.isin or ""])
 
 
 def main() -> int:

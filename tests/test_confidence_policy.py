@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from autograph.ingestion._confidence import (
     GRADE_TO_CONFIDENCE,
     KIND_OVERRIDE,

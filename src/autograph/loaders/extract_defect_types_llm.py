@@ -72,7 +72,7 @@ def sample_recall_texts(n: int = 200, seed: int = 42) -> list[tuple]:
 def format_corpus(samples: list[tuple]) -> str:
     """샘플 → LLM 입력 텍스트 블록. 각 행은 source/component/defect 한 줄."""
     lines: list[str] = []
-    for i, (rid, src, no, comp, defect) in enumerate(samples, 1):
+    for i, (_rid, src, _no, comp, defect) in enumerate(samples, 1):
         comp_s = (comp or "-").strip()[:80]
         defect_s = (defect or "").strip().replace("\n", " ")[:400]
         src_tag = "NHTSA" if src == "nhtsa" else ("KOTSA" if src == "datagokr_kotsa" else src)

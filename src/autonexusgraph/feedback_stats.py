@@ -36,7 +36,7 @@ def _run(sql: str, params: Sequence | None = None, *, fetch: str = "rows") -> An
         cur.execute(sql, tuple(params or ()))
         if fetch == "rows":
             cols = [d.name for d in cur.description]
-            out: Any = [dict(zip(cols, r)) for r in cur.fetchall()]
+            out: Any = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
         else:  # scalar
             row = cur.fetchone()
             out = row[0] if row else None

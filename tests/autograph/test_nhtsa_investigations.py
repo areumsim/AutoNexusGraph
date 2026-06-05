@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 
-
 # ── ingestion 모듈 ─────────────────────────────────────────
 def test_ingestion_module_importable():
     from autograph.ingestion import nhtsa_investigations as I

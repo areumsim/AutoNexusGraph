@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 
-
 # ── ingestion 모듈 ─────────────────────────────────────────
 def test_ingestion_module_importable():
     from autograph.ingestion import epa_fueleconomy as ing
@@ -47,7 +46,7 @@ def test_map_covers_core_fields():
 def test_map_value_types_valid():
     from autograph.loaders.load_auto_epa import _MAP
     allowed = {"num", "score", "text", "yn", "count"}
-    for csv_field, measure_key, unit, vtype in _MAP:
+    for csv_field, _measure_key, _unit, vtype in _MAP:
         assert vtype in allowed, f"{csv_field}: {vtype}"
 
 

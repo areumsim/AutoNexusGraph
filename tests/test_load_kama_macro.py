@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest import mock
 
-
 from autograph.loaders.load_kama_macro import (
     _coerce_int,
     _find_csvs,
