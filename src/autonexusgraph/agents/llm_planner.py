@@ -50,11 +50,15 @@ PLAN_SCHEMA: dict[str, Any] = {
 _SYSTEM = (
     "당신은 그래프 RAG 시스템의 계획 에이전트다. 사용자 질문을 도구 task 들의 DAG 로 "
     "분해한다. 규칙:\n"
-    "1) 아래 '허용 도구' 목록에 있는 (agent, intent) 만 사용. 그 외는 절대 금지.\n"
+    "1) 아래 '허용 도구' 목록에 있는 (agent, intent) 만 사용. **intent 는 반드시 enum "
+    "중 하나의 정확한 식별자**여야 한다 — 자연어 description 금지. 예: "
+    "intent='lookup_company'(O) / intent='회사 매출 조회'(X — drop 됨).\n"
     "2) 의존이 있으면 depends_on 에 선행 task 의 id 를 넣어라(예: SQL 이 그래프 결과 필요).\n"
     "3) args 는 도구가 받는 인자명으로. 회사는 corp_code(8자리), 연도는 year(정수).\n"
-    "4) 불필요한 task 를 만들지 말고 질문에 답하기 위한 최소 DAG 만.\n"
-    "5) 반드시 JSON 으로만 응답."
+    "4) calculator 사용 시 args 에 **반드시 expr(수식 문자열) 또는 aggregate+over(집계+값목록)** "
+    "둘 중 하나를 채워라. 예: args={'expr': '(a-b)/b*100', 'variables': {'a': 100, 'b': 80}}.\n"
+    "5) 불필요한 task 를 만들지 말고 질문에 답하기 위한 최소 DAG 만.\n"
+    "6) 반드시 JSON 으로만 응답."
 )
 
 
@@ -101,6 +105,11 @@ def _validate_tasks(state: AgentState, raw_tasks: list, catalog: dict[str, list[
             tid = f"{tid}_{i}"
         used_ids.add(tid)
         args = t.get("args") if isinstance(t.get("args"), dict) else {}
+        # calculator 사전 가드 (BACKLOG A-8) — expr 도 aggregate 도 없으면 worker
+        # 가 '[calculator] failed: expr 필요' 로 떨어지므로 미리 drop.
+        if agent == "calculator" and not args.get("expr") and not args.get("aggregate"):
+            dropped.append(f"calculator:no_expr_or_aggregate")
+            continue
         deps = [str(d) for d in (t.get("depends_on") or []) if isinstance(d, (str, int))]
         out.append(make_task(tid, agent, intent, args, depends_on=deps))
 
@@ -137,6 +146,15 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
         issues = (replan_hint.get("prev_issues") or [])[:3]
         hint_line = (f"\n[이전 계획 실패] 이슈={issues} — 다른 전략(다른 도구/더 넓은 "
                      f"검색/추가 근거)으로 재계획하라.")
+    # 각 agent 의 intent enum 을 강조 ([] 가 아닌 list 그대로 노출하면 LLM 이
+    # 자연어 description 으로 오인하는 사례 다수 — eval matrix 2026-06-05 발견.
+    # 명시적 "intent enum 정확히:" prefix 로 catalog 가 enum 임을 강조.
+    def _enum_line(agent: str) -> str:
+        items = catalog.get(agent) or []
+        if not items:
+            return f"- {agent}: (사용 가능 intent 없음 — 이 agent 호출 금지)"
+        return f"- {agent} intent enum (정확히 하나 선택): {items}"
+
     user_msg = (
         f"[질문]\n{q}\n\n"
         f"[도메인] {state.get('domain') or 'finance'}\n"
@@ -144,10 +162,11 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
         f"[대상 회사 corp_code] {targets_line}\n"
         f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
         f"[허용 도구]\n"
-        f"- research: {catalog.get('research')}\n"
-        f"- graph: {catalog.get('graph')}\n"
-        f"- sql: {catalog.get('sql')}\n"
-        f"- calculator: expr/aggregate (수식·집계)\n"
+        f"{_enum_line('research')}\n"
+        f"{_enum_line('graph')}\n"
+        f"{_enum_line('sql')}\n"
+        f"- calculator: args 에 'expr' (수식 문자열, 필수) 또는 'aggregate'+'over' "
+        f"(집계 op + 값 list, 대안). expr 누락 시 task fail.\n"
         f"{hint_line}"
     )
 
