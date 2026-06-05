@@ -3,7 +3,8 @@
 본 파일은 **P0-B 의 시그니처만** 정의한다. 구현 본문 (`compute` 의 수식 + 등급 판정)은
 PR-P3-B 에서 채워진다. 다른 모듈(`scripts/upgrade_processes_confidence.py`, 향후
 `extractors/cross_validate.py::_VALIDATORS["CAUSED_BY_PROCESS"]` 등) 가 본 모듈을 import
-한다는 약속만 잠근다.
+**할 약속만** 잠근다 — 현재 운영 진입점에서의 실제 import 는 미실현, PR-P3-B 에서 본문
+구현과 함께 동시 wire-up (BACKLOG PG-3 참조).
 
 PRD §3.5.1 인용 — 8 시그널 → ``conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)``.
 정적 등급표 ``_confidence.py::SOURCE_TO_GRADE`` 와 ``validator.py::LOW_CONFIDENCE_THRESHOLD``

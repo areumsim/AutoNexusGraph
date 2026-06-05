@@ -78,11 +78,11 @@ flowchart TB
 
 ### 핵심 용어 (자세한 정의는 [docs/learning_guide.md](./docs/learning_guide.md))
 
-- **bridge.corp_entity** — 한국 corp_code ↔ 글로벌 entity (manufacturer/supplier/assignee) 양방향 매칭. 설계 우선순위 `wikidata_qid > LEI > sec_cik > business_no > name` (현 로더 `src/autograph/loaders/load_bridge.py:38` 은 `wikidata_qid` 정확 → `name_norm` 정확 매칭 + confidence 등급 부여 qid 1.0 / business_no 0.95 / name 0.80 을 구현; LEI·sec_cik 우선순위 확정은 §11.1 열린 설계). 함수: `bridge_corp_to_entity(corp_code, *, entity_type=None, min_confidence=0.0, include_candidate=True)` / `bridge_entity_to_corp` / `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:23, 47, 64`). `reviewed_status='rejected'` 자동 제외.
+- **bridge.corp_entity** — 한국 corp_code ↔ 글로벌 entity (manufacturer/supplier/assignee) 양방향 매칭. 설계 우선순위 `wikidata_qid > LEI > sec_cik > business_no > name` (현 로더 `src/autograph/loaders/master/load_bridge.py:38` 은 `wikidata_qid` 정확 → `name_norm` 정확 매칭 + confidence 등급 부여 qid 1.0 / business_no 0.95 / name 0.80 을 구현; LEI·sec_cik 우선순위 확정은 §11.1 열린 설계). 함수: `bridge_corp_to_entity(corp_code, *, entity_type=None, min_confidence=0.0, include_candidate=True)` / `bridge_entity_to_corp` / `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:23, 47, 64`). `reviewed_status='rejected'` 자동 제외.
 - **도메인 plug-in** — core 는 외부 도메인 패키지를 직접 import 하지 않는다. ENV 모듈을 첫 호출 시 soft-load 후 `register_handler` 부작용으로 활성. core ↔ 도메인 어댑터 분리.
 - **4 가드** — `prompt_safety` (injection 단발 차단) · `cypher_guard` (READ-ONLY 강제 + APOC write 블록, `safety/cypher_guard.py:assert_read_only`) · `number_guard` (큰 숫자 화이트리스트, `agents/number_guard.py`) · `language_guard` (한국어 비율 ≥ `FINGRAPH_MIN_KOREAN_RATIO=0.30`, `safety/language_guard.py:16`).
 - **cost tier** — 비용 가드는 3 계층: **세션** hard limit (`LLM_SESSION_HARD_LIMIT_USD`) → **도메인별 turn** budget (`config.turn_budget_for_domain`, ENV override) → **호출별 사전 추정** (Rewriter / Synthesizer / Title, `cost_estimator.py`) + `LLM_COST_AUTO_APPROVE_USD` (기본 $0.50) 초과 시 HITL 승인.
-- **AgentState** — TypedDict, **36 필드** (입력 9 / 전처리 4 / triage·planner 5 / 누적 5 / 합성 3 / 검증 4 / HITL 3 / 메타 3 — 입력에 `rerank`·`llm_planner` ablation 토글, 검증에 `replan_hint` 포함, `agents/state.py:156-225`). 누적 채널(`task_results`/`evidence_chunks`/`tool_results`)은 **dedup-merge reducer** 로 병렬 Send fan-in 무손실(공유 pre-fork 를 key 로 멱등 흡수), clear 는 `_ClearedDict`/`_ClearedList` 마커, 그 외는 `_last_wins` (`agents/state.py`).
+- **AgentState** — TypedDict, **39 필드** (입력 9 / 전처리 4 / triage·planner 5 / 누적 5 / 합성 4 / 검증 4 / HITL 3 / 메타 5 — 입력에 `rerank`·`llm_planner` ablation 토글, 합성에 `synth_status`, 검증에 `replan_hint`, 메타에 `llm_tokens_used`·`sensitive_blocked` 포함, `agents/state.py:155-230`). 누적 채널(`task_results`/`evidence_chunks`/`tool_results`)은 **dedup-merge reducer** 로 병렬 Send fan-in 무손실(공유 pre-fork 를 key 로 멱등 흡수), clear 는 `_ClearedDict`/`_ClearedList` 마커, 그 외는 `_last_wins` (`agents/state.py`).
 
 ### 진입점 다이어그램
 
@@ -183,7 +183,7 @@ flowchart TB
 > - **`bridge.corp_entity` 4,806** — manufacturer candidate 1 + reviewed 11 + supplier candidate 4,790 + reviewed 4 = 합 일치.
 > - **SUPPLIED_BY 30 edges** — yaml 46 `(supplier, customer, component)` tuple → Neo4j 는 supplier↔component dedupe (customer 다중은 `:CONTAINS_COMPONENT` 엣지). `edge_meta_invariants` 8 invariant 모두 PASS.
 > - **strong_match 15/15 (100%)** — `confidence_score >= 0.9` 기준: manufacturer 11 + supplier 4.
-> - **Cypher 템플릿** — finance **22** (정적 14 + 동적 helper `find_paths_{1..5}hops` 5 + `get_subgraph_d{1..3}` 3, `list_templates()` enumerate 기준) / auto **24** (정적 20 + 동적 `auto_find_paths_{1..4}hops` 4, `AUTO_TEMPLATES` dict) / ip **25** (`IP_TEMPLATES` dict).
+> - **Cypher 템플릿** — finance **22** (정적 14 + 동적 helper `find_paths_{1..5}hops` 5 + `get_subgraph_d{1..3}` 3, `list_templates()` enumerate 기준) / auto **27** (정적 23 + 동적 `auto_find_paths_{1..4}hops` 4, `AUTO_TEMPLATES` dict) / ip **25** (`IP_TEMPLATES` dict). 합계 **74**.
 
 ### IPGraph 도메인 (ip — 보조축 / corp_entity 브리지 전용 / 코드·온톨로지·도구 완료, 데이터 부분 적재)
 
@@ -796,7 +796,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | 데이터 파이프라인 (auto) | NHTSA vPIC/Recalls/Complaints/SafetyRatings/Investigations/TSB, EPA fueleconomy, SEC EDGAR (글로벌 OEM XBRL), Wikidata mfr/model/supplier/P176, AI Hub, KOTSA 수리검사, NHTSA component taxonomy 자동 도출. `bridge.corp_entity` 4,806 (한국 OEM/부품사 corp_code + 글로벌 OEM sec_cik 9개) |
 | 제조 / 공정 (auto) | DART 사업보고서 본문 파서 (LLM 0%) — 생산능력·가동률·공장명 자동 추출. 산단공 합성 공정데이터 → `:Process` 사전. 팩토리온 공장등록 (15087611) 부분 적재 90행 (OEM 5사 + tier-1, `DATA_GO_KR_API_KEY` 작동) |
 | 도구 (tools) | finance: `tools/financials,graph,retrieve.py` — 사전 정의 함수 풀. auto: `src/autograph/tools/{spec,graph,retrieve,bridge}.py`. 자유 SQL/Cypher 금지 |
-| Cypher 템플릿 | finance 22 = 14 정적 + 5 `find_paths_{1..5}hops` + 3 `get_subgraph_d{1..3}` (`tools/cypher_templates.py`). auto **24** (`src/autograph/cypher_templates_auto.py` — 기존 19 + `auto_plants_of_manufacturer` / `auto_plants_of_model` / `auto_investigations_by_model` / `auto_investigations_by_variant` / `auto_investigation_recall_chain` 5건 추가). ip 25 (`src/ipgraph/cypher_templates_ip.py`). type/range/regex 검증 + bool reject |
+| Cypher 템플릿 | finance 22 = 14 정적 + 5 `find_paths_{1..5}hops` + 3 `get_subgraph_d{1..3}` (`tools/cypher_templates.py`). auto **27** = 정적 23 + 동적 `auto_find_paths_{1..4}hops` 4 (`src/autograph/cypher_templates_auto.py` — proc_* 3건 + plants/investigations 5건 등 누적 추가). ip 25 (`src/ipgraph/cypher_templates_ip.py`). 합계 **74**. type/range/regex 검증 + bool reject |
 | 멀티에이전트 (LangGraph) | StateGraph 11 노드 (triage/planner/supervisor/4 worker/executor_legacy/synthesizer/validator/finalize) + 함수 체인 fallback. `agents/graph.py` |
 | Planner DAG | 룰 템플릿 + **LLM 자율 planner**(opt-in `AGENT_LLM_PLANNER`, 화이트리스트 검증·실패 시 룰 폴백, `agents/llm_planner.py`). `make_task`/`make_spawn_task`/**`resolve_arg_bindings`**(`$from` upstream 결과→args, closed-loop)/`unblocked_tasks`/`topologically_valid` (`agents/dag.py`) |
 | Supervisor + Send API | 순차 + 병렬 (LangGraph `Send`) + **ReAct mid-execution reflect**(완료 batch 관측→동적 task fan-out, `MAX_DYNAMIC_TASKS=20`·재확장 방지, `mid_execution_reflect`). 병렬 fan-in **dedup-merge reducer**(무손실). turn budget circuit breaker |
@@ -941,7 +941,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 
 ### 핵심 정직 결론
 
-BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공정 인스턴스(#19)** 는 충족 (`PERFORMED_AT` 94 = manual_seed 35 validated + factoryon 59 candidate). **LLM 품질 연결(#20 일부)** 은 LLM 키 대기 — **허위 엣지를 만들지 않고 coverage 를 그대로 표기**. 잔여 (KAMP CSV / LLM P3 정밀화) 가 풀리면 추가 적재 가능 (CAUSED_BY_PROCESS 96 candidate 적재 완료) — **DoD #20 "내부 데이터 수용 규격"** 가 코드로 보유 (`load_performed_at.py` source allowlist + `process_confidence.py` row 단위 격상 §4.0.1).
+BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공정 인스턴스(#19)** 는 충족 (`PERFORMED_AT` 94 = manual_seed 35 validated + factoryon 59 candidate). **LLM 품질 연결(#20 일부)** 은 2026-06-05 Anthropic 키 활성 후 측정 진행 — **허위 엣지를 만들지 않고 coverage 를 그대로 표기**. 잔여 (KAMP CSV / LLM P3 정밀화) 가 풀리면 추가 적재 가능 (CAUSED_BY_PROCESS 96 candidate 적재 완료) — **DoD #20 "내부 데이터 수용 규격"** 가 코드로 보유 (`load_performed_at.py` source allowlist + `process_confidence.py` row 단위 격상 §4.0.1).
 
 ---
 
@@ -1122,7 +1122,7 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 | **부품사 IR cross-reference** | 미구현 | DART finance 의 현대모비스/한온/만도 사업보고서 → auto 도메인 SUPPLIED_BY/MANUFACTURED_AT 보강 (reverse-direction Bridge) |
 | **NHTSA TSB / Manufacturer Communications** | 수동 zip 다운로드 모드만 | URL 자동 다운 routine (NHTSA URL 변경 추적) |
 | **KNCAP / Euro NCAP / IIHS** | 인터페이스만 (KNCAP) / 미구현 (Euro/IIHS) | PDF 파서 + Standard 노드 매핑 |
-| **Cypher 템플릿 추가** | finance **22** + auto **24** + ip **25** (총 71) | 새 use case (recall 전파·공급 집중도·시점 정합 cross) 별 템플릿 — 자유 Cypher 금지 원칙 유지 |
+| **Cypher 템플릿 추가** | finance **22** + auto **27** + ip **25** (총 74) | 새 use case (recall 전파·공급 집중도·시점 정합 cross) 별 템플릿 — 자유 Cypher 금지 원칙 유지 |
 | **HITL `sensitive_decision`** | wired + 활성 (trigger=키워드 휴리스틱 / fallback=거절) | 고위험 답변 (투자 자문 / 법적 조언 / 주가 예측 인접) 키워드 자동 감지 + synthesizer 직후 게이트. SENSITIVE_KEYWORDS 보수 10종으로 시작 — 누적 false-positive 기반 정정 |
 | **P3 LLM 4종 활성화** | `enabled:false` (COMPETES_WITH / MANUFACTURED_AT(LLM) / CONTAINS_MODULE / CONTAINS_PART) | 비용·환각 위험 검증 후 selectively 활성. validation gate 강화 |
 | **N-domain bridge 일반화** | `bridge.corp_entity` 만 (2-domain 가정) | 3번째 도메인 추가 시 `bridge.drug_entity` / `bridge.component_entity` 등 다리 추가. 또는 `bridge.cross` 다형 1 테이블 |
@@ -1169,8 +1169,8 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — 내부 기여 가이드 (개발환경 · `make smoke-e2e` 게이트 · 도메인 불변식 8항 · PR 절차)
 - [SECURITY.md](./SECURITY.md) — 보안 정책 (비공개 취약점 보고 · 구현된 통제 · 알려진 한계 정직표기)
 - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) — 진단 포인터 (SSOT = [docs/faq.md](./docs/faq.md) Q1~Q7)
-- [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 36 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
-- [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 36 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
+- [docs/architecture.md](./docs/architecture.md) — **시스템 구조 SSOT** — 패키지 토폴로지·LangGraph 11 노드·AgentState 39 필드 read/write 매트릭스·설계 결정 트레이드오프·plug-in 등록·SSOT 색인
+- [docs/learning_guide.md](./docs/learning_guide.md) — **시스템 심화 가이드** — 문제 정의·이론적 기초·아키텍처 (StateGraph 11 노드 / AgentState 39 필드 / 4 가드 / cost 3 tier)·추론 흐름 깊이·예상 질문 (세미나 수준 발표용)
 - [docs/mental_model.md](./docs/mental_model.md) — **결정 카탈로그** — 모든 설계 결정의 [확정]/[잠정]/[미정] 라벨, 트레이드오프 박스, 열린 질문 리스트
 - [docs/design/](./docs/design/) — **ADR** (F-3) — 굳은 핵심 결정 4건 (LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 / P1~P4 추출), context·decision·consequences
 - [docs/autograph.md](./docs/autograph.md) — **AutoGraph (auto 도메인) 단독** 가이드 (구조 / 데이터 흐름 / 실행 순서 / 알려진 제약 / §2.5.4 배터리·소재 L5/L6 부분 적재)
