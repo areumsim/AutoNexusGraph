@@ -235,7 +235,7 @@ def test_sql_vec_adapter_passes_rerank_flag(monkeypatch):
     # 단 search_documents 호출 자체는 try-except 안에서 일어나므로 captured 됨.
     try:
         a.query("삼성전자 2024 매출은?", domain="finance")
-    except Exception:
+    except Exception:   # noqa: BLE001 — adapter 내부 실패 무시 (본 테스트는 search_documents 호출 captured 만 확인)
         pass
     # mock 이 호출됐다면 rerank=False 가 들어와야.
     if "rerank" in captured:

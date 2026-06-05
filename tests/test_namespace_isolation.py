@@ -206,7 +206,7 @@ def test_no_bare_labels_in_cypher_templates():
         for p in (REPO / root).rglob('*.py'):
             try:
                 text = p.read_text(encoding="utf-8")
-            except Exception:
+            except Exception:   # noqa: BLE001 — 파일 읽기 실패 (binary/encoding) 흡수 → 다음 파일 진행 (가드 정합 가드)
                 continue
             # migrate_neo4j_schema.py 는 의도적으로 bare Sector 매칭 (마이그 source).
             if p.name == "migrate_neo4j_schema.py":
@@ -257,13 +257,13 @@ def test_no_close_on_singleton_get_connection():
                 continue
             try:
                 text = p.read_text(encoding="utf-8")
-            except Exception:
+            except Exception:   # noqa: BLE001 — 파일 읽기 실패 흡수 → 다음 파일 진행
                 continue
             if 'get_connection' not in text:
                 continue
             try:
                 tree = ast.parse(text)
-            except Exception:
+            except Exception:   # noqa: BLE001 — syntax error 파일 흡수 → 다음 파일 진행 (AST 가드 회복성)
                 continue
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -424,7 +424,7 @@ def test_no_bare_pg_schemas_in_sql_strings():
         for p in (REPO / root).rglob('*.py'):
             try:
                 text = p.read_text(encoding="utf-8")
-            except Exception:
+            except Exception:   # noqa: BLE001 — 파일 읽기 실패 (binary/encoding) 흡수 → 다음 파일 진행
                 continue
             for i, line in enumerate(text.splitlines(), 1):
                 ls = line.strip()

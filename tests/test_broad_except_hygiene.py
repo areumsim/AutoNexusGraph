@@ -1,4 +1,4 @@
-"""broad-except 위생 회귀 가드 — src/ + scripts/.
+"""broad-except 위생 회귀 가드 — src/ + scripts/ + tests/.
 
 R1~R10 누적 처리 결과 보존:
 - bare `except:` (모든 예외 + KeyboardInterrupt 도 잡음) 절대 금지.
@@ -7,8 +7,11 @@ R1~R10 누적 처리 결과 보존:
 목적은 silent swallow 의 신규 유입 차단. 사유가 명시되면 reviewer 가 의도를
 검토 가능하고, `BLE001` 룰이 활성화되어 ruff/flake8 이 자동으로 잡아준다.
 
-검사 범위: `src/` + `scripts/`. R10 에서 scripts/ 정리 완료 후 확장.
-`tests/` 는 의도된 except (예외 동작 테스트) 가 있어 제외.
+검사 범위: `src/` + `scripts/` + `tests/` 도 부분 적용.
+- src/ 와 scripts/ 는 R8/R9/R10 처리 후 잔여 0.
+- tests/ 는 본 라운드(2026-06-05) 7건 사유 명시 후 0. **예외 패턴**: `with
+  pytest.raises(Exception)` 같이 raise 검증용은 본 가드의 `except` 패턴이
+  아니라 자연 통과 (가드 무관).
 
 예외:
 - module docstring(`\"\"\" ... \"\"\"`) 안의 예제 코드 — 실제 실행되지 않음.
@@ -23,7 +26,7 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
-SCAN_ROOTS = (REPO / "src", REPO / "scripts")
+SCAN_ROOTS = (REPO / "src", REPO / "scripts", REPO / "tests")
 
 
 def _iter_python_files():

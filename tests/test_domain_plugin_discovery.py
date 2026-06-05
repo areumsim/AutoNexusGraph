@@ -49,8 +49,7 @@ def _reset_registry():
     if not DH._HANDLERS or not DH._ROUTERS:
         try:
             DH.discover_plugins(force=True)
-        except Exception:
-            # discovery 실패는 무시 — 본 테스트 외부에서 자체 처리.
+        except Exception:   # noqa: BLE001 — discovery 실패 무시 (테스트 fixture cleanup, 본 테스트 외부에서 자체 처리)
             pass
 
 
