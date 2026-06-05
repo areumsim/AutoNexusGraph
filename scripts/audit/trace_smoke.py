@@ -61,7 +61,7 @@ def _langfuse_ready() -> tuple[bool, str]:
             s = get_settings()
             pub = pub or getattr(s, "langfuse_public_key", "")
             sec = sec or getattr(s, "langfuse_secret_key", "")
-        except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → False, "LANGFUSE_PUBLIC_KEY... 반환
             pass
     if not (pub and sec):
         return False, "LANGFUSE_PUBLIC_KEY/SECRET_KEY 미설정"
@@ -125,7 +125,7 @@ def _verify_pg(thread_id: str) -> dict:
     """anxg_ops.llm_usage 의 thread_id 일치 최신 row 검증."""
     try:
         from autonexusgraph.db.postgres import get_pool
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"pg import 실패: {e}"}
 
     try:
@@ -142,7 +142,7 @@ def _verify_pg(thread_id: str) -> dict:
                 (thread_id,),
             )
             row = cur.fetchone()
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"pg query 실패: {e}"}
 
     if not row:
@@ -152,7 +152,7 @@ def _verify_pg(thread_id: str) -> dict:
     if isinstance(meta, str):
         try:
             meta = json.loads(meta)
-        except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, 반환
             meta = {}
     required = ("thread_id", "turn_id", "n_replans", "domain")
     missing = [k for k in required if k not in (meta or {})]
@@ -184,13 +184,13 @@ def _verify_langfuse() -> dict:
     try:
         from autonexusgraph.agents.tracing import _get_langfuse_client
         client = _get_langfuse_client()
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"langfuse client init 실패: {e}"}
     if client is None:
         return {"passed": False, "reason": "langfuse 비활성 (SDK 또는 auth 실패)"}
     try:
         client.flush()
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"flush 실패: {e}"}
     return {"passed": True, "auth": "ok"}
 

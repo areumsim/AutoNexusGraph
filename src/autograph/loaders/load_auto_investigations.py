@@ -398,7 +398,7 @@ def load_investigations(*, dry_run: bool = False, batch: int = 500,
                 if since_commit >= commit_every:
                     conn.commit()
                     since_commit = 0
-            except Exception as e:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+            except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
                 conn.rollback()
                 stats.rows_errors += 1
                 if len(stats.errors) < 20:

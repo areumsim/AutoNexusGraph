@@ -35,7 +35,7 @@ def _collect_db_up() -> list[dict]:
     for comp, mod in (("postgres", postgres), ("neo4j", neo4j)):
         try:
             up = 1.0 if mod.ping() else 0.0
-        except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → out 반환
             up = 0.0
         out.append(_m("up", up, help="DB component reachable (1/0)", labels={"component": comp}))
     return out
@@ -107,7 +107,7 @@ def collect_metrics() -> list[dict]:
     for c in COLLECTORS:
         try:
             out.extend(c())
-        except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as e:   # noqa: BLE001 — [metrics] collector %s 실패 흡수 → out 반환
             errors += 1
             log.warning("[metrics] collector %s 실패: %s", getattr(c, "__name__", c), e)
     out.append(_m("scrape_errors", errors, help="이번 scrape 에서 실패한 collector 수"))

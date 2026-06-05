@@ -120,7 +120,7 @@ def ingest_make_year(make: str, year: int, *,
             n_done += 1
             n_rated_trims += len(data.get("Results") or [])
             ckpt.mark_done(key, {"rated_trims": len(data.get("Results") or [])})
-        except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as e:  # noqa: BLE001 — [safety] failed %s 흡수 → {"models_fetched": n_done, ... 반환
             log.exception("[safety] failed %s", key)
             ckpt.mark_failed(key, str(e))
 

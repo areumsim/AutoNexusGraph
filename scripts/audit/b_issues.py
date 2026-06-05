@@ -93,7 +93,7 @@ def check_b6() -> dict[str, Any]:
                  GROUP BY source ORDER BY source
             """)
             rows = cur.fetchall()
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B6", "status": "ERR... 반환
         return {"id": "B6", "status": "ERROR",
                 "reason": f"PG 조회 실패: {exc}"}
     return {
@@ -120,7 +120,7 @@ def check_b7() -> dict[str, Any]:
                     OR (relation_type = 'SUPPLIED_BY' AND extractor_name ILIKE '%p176%')
             """)
             n = cur.fetchone()[0] or 0
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B7", "status": "ERR... 반환
         return {"id": "B7", "status": "ERROR",
                 "reason": f"PG 조회 실패: {exc}"}
     status = "RESOLVED" if n > 0 else "ACTIVE"
@@ -156,7 +156,7 @@ def check_b10() -> dict[str, Any]:
                 "MATCH (s:Anxg_Supplier) RETURN count(s) AS n"
             ).single()["n"]
         drv.close()
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B10", "status": "ER... 반환
         return {"id": "B10", "status": "ERROR",
                 "reason": f"Neo4j 조회 실패: {exc}"}
     extra_nodes = extra_nodes or 0
@@ -194,7 +194,7 @@ def check_b11() -> dict[str, Any]:
         nhtsa_map = {k.strip().upper(): str(v).lower()
                      for k, v in (ydoc.get("mapping") or {}).items()}
         excluded = {str(x).strip().upper() for x in (ydoc.get("excluded") or [])}
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B11", "status": "ER... 반환
         return {"id": "B11", "status": "ERROR", "reason": f"매핑 로드 실패: {exc}"}
     try:
         with _pg_conn() as c, c.cursor() as cur:
@@ -207,7 +207,7 @@ def check_b11() -> dict[str, Any]:
             cur.execute("SELECT components FROM anxg_auto.events_complaints "
                         "WHERE components IS NOT NULL AND array_length(components, 1) > 0")
             arrays = [r[0] for r in cur.fetchall()]
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B11", "status": "ER... 반환
         return {"id": "B11", "status": "ERROR", "reason": f"PG 조회 실패: {exc}"}
 
     total = matched = excl = 0

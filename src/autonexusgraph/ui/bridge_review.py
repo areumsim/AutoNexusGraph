@@ -28,7 +28,7 @@ st.sidebar.markdown("---")
 # ── 진행률 KPI ──────────────────────────────────────────────────────
 try:
     kpi = review_progress_kpi()
-except Exception as e:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
     st.error(f"KPI 조회 실패 (DB 연결 확인): {e}")
     st.stop()
 

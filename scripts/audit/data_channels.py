@@ -75,7 +75,7 @@ def _try_pg_count(sql: str) -> int | str:
             cur.execute(sql)
             r = cur.fetchone()
             return int(r[0]) if r else 0
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → f"?({type(exc).__name__})" 반환
         return f"?({type(exc).__name__})"
 
 
@@ -85,7 +85,7 @@ def _try_neo4j_count(cypher: str) -> int | str:
         with get_session() as s:
             r = s.run(cypher).single()
             return int(r["n"]) if r else 0
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → f"?({type(exc).__name__})" 반환
         return f"?({type(exc).__name__})"
 
 

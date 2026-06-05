@@ -211,7 +211,7 @@ def main() -> int:
 
     try:
         rows = run_all()
-    except Exception as exc:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+    except Exception as exc:  # noqa: BLE001 — 호출 실패 흡수 → 2 반환
         print(f"[edge_meta_invariants] DB 연결 실패: {exc}", file=sys.stderr)
         return 2
 

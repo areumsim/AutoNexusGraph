@@ -173,7 +173,7 @@ def chat_stream(req: ChatRequest, user_id: str = Depends(authenticate)) -> Strea
                                           **_hop_fields(st)})
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as exc:   # noqa: BLE001 — [chat_stream] failed 흡수 → StreamingResponse( 반환
             log.exception("[chat_stream] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
@@ -236,7 +236,7 @@ def chat_resume(req: ResumeRequest, user_id: str = Depends(authenticate)) -> Str
                    "error": f"resume_unavailable: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as exc:   # noqa: BLE001 — [chat_resume] failed 흡수 → StreamingResponse( 반환
             log.exception("[chat_resume] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"

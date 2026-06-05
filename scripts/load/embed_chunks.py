@@ -28,7 +28,7 @@ def main() -> int:
 
     try:
         stats = embed_chunks(batch_size=args.batch_size, progress=not args.no_progress)
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 2 반환
         print(f"[ERROR] {e}", file=sys.stderr)
         return 2
     print(f"[OK] embedded — {stats.summary()}")

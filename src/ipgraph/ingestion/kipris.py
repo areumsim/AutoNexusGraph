@@ -138,7 +138,7 @@ def parse_xml(xml_text: str, *, snapshot_year: int | None = None
     except ImportError:
         import xml.etree.ElementTree as etree
         root = etree.fromstring(xml_text)
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [kipris] XML parse 실패 흡수 → out 반환
         log.warning("[kipris] XML parse 실패: %s", e)
         return out
 

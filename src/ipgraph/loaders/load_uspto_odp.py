@@ -167,7 +167,7 @@ def _upsert_patents(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_pat")
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:patents] %s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_pat")
             log.warning("[uspto:pg:patents] %s fail: %s", r.get("pub_no"), exc)
             skip += 1
@@ -205,7 +205,7 @@ def _upsert_assignees(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_asn")
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:assignees] %s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_asn")
             log.warning("[uspto:pg:assignees] %s fail: %s", r.get("assignee_id"), exc)
             skip += 1
@@ -237,7 +237,7 @@ def _upsert_inventors(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_inv")
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:inventors] %s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_inv")
             log.warning("[uspto:pg:inventors] %s fail: %s", r.get("inventor_id"), exc)
             skip += 1
@@ -262,7 +262,7 @@ def _upsert_link(cur: Any, table: str, pk: tuple[str, ...],
                 tuple(r.get(c) for c in cols),
             )
             cur.execute("RELEASE SAVEPOINT sp_link")
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:%s] %s fail 흡수 → {"inserted_or_updated": len... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_link")
             log.warning("[uspto:pg:%s] %s fail: %s", table, {k: r.get(k) for k in pk}, exc)
             skip += 1
@@ -294,7 +294,7 @@ def _upsert_citations(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_cit")
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:citations] %s→%s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_cit")
             log.warning("[uspto:pg:citations] %s→%s fail: %s",
                         r.get("citing_pub_no"), r.get("cited_pub_no"), exc)

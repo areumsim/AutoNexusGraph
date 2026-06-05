@@ -57,7 +57,7 @@ def _download_for_corp(
             try:
                 content = client.download_filing_document(fl.rcept_no)
                 doc_path.write_bytes(content)
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → len(filings) 반환
                 print(f"[WARN] {fl.rcept_no} 다운로드 실패: {e}", file=sys.stderr)
     return len(filings)
 

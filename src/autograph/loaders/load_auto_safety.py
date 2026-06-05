@@ -278,7 +278,7 @@ def load_safety(*, dry_run: bool = False, batch: int = 200) -> LoadStats:
                             "snapshot_year": year_dir,
                             "overall_rating": overall,
                         })
-                except Exception as e:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+                except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
                     cur.execute("ROLLBACK TO SAVEPOINT sp_safety")
                     stats.errors.append(f"safety row {f} variant={vid}: {e}")
 

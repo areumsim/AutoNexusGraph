@@ -96,7 +96,7 @@ class BaseExtractor(ABC):
             return self.extract(chunk, ctx)
         except BudgetExceeded:
             raise
-        except Exception as exc:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+        except Exception as exc:  # noqa: BLE001 — 호출 실패 흡수 → ExtractorResult.empty( 반환
             elapsed = int((time.monotonic() - t0) * 1000)
             return ExtractorResult.empty(
                 self.name, self.version,

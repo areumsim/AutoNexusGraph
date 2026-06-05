@@ -256,7 +256,7 @@ def load_specs(*, make_filter: str | None = None,
                     stats.rows_inserted += inserted_this_variant
                     if deleted:
                         stats.rows_replaced += min(deleted, inserted_this_variant)
-                except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+                except Exception as e:  # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
                     cur.execute("ROLLBACK TO SAVEPOINT sp_specs")
                     stats.errors.append(f"specs row {canspec_path}: {e}")
 

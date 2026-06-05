@@ -125,7 +125,7 @@ def _signature_to_jsonschema(fn: Callable[..., Any]) -> dict[str, Any]:
     """
     try:
         hints = get_type_hints(fn)
-    except Exception:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+    except Exception:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
         hints = {}
     sig = inspect.signature(fn)
     properties: dict[str, Any] = {}

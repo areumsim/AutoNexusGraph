@@ -107,7 +107,7 @@ def load_component_taxonomy(*, dry_run: bool = False) -> LoadStats:
                     stats.components_inserted += 1
                 else:
                     stats.components_existing += 1
-            except Exception as e:   # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+            except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
                 stats.errors.append(f"comp[{name}]: {e}")
 
         # 2) events_recalls.component_id 를 backfill (현재 NULL 인 행만).

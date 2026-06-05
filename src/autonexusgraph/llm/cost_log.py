@@ -47,7 +47,7 @@ def _detect_provider(model: str) -> str:
     try:
         from .base import detect_provider
         return detect_provider(model)
-    except Exception:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception:   # noqa: BLE001 — 호출 실패 흡수 → "?" 반환
         return "?"
 
 

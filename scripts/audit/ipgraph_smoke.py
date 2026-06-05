@@ -32,7 +32,7 @@ def _check_handler() -> dict:
         import ipgraph    # noqa: F401
         from ipgraph.agent_handler import IPGraphHandler, IP_GRAPH_ALLOWED
         from autonexusgraph.agents._domain_handler import get_handler
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"ipgraph import 실패: {e}"}
     h = get_handler("ip")
     if h is None or not isinstance(h, IPGraphHandler):
@@ -51,7 +51,7 @@ def _check_router() -> dict:
     try:
         from autonexusgraph.agents._domain_handler import _ROUTERS    # type: ignore[attr-defined]
         from ipgraph.policy import route_domain_ip
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"router import 실패: {e}"}
     if route_domain_ip not in _ROUTERS:
         return {"passed": False, "reason": "route_domain_ip 미등록"}
@@ -68,7 +68,7 @@ def _check_router() -> dict:
 def _check_ontology() -> dict:
     try:
         from autonexusgraph.ontology import load_and_validate, OntologyValidationError
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"ontology 모듈 import 실패: {e}"}
     out: dict = {"passed": True, "files": []}
     for fname in ("ontology/ip/entities.yaml", "ontology/ip/relations.yaml"):
@@ -99,7 +99,7 @@ def _check_cypher_templates() -> dict:
         from ipgraph.cypher_templates_ip import IP_TEMPLATES
         from ipgraph import tools          # noqa: F401  부작용: register_templates(_IP_TEMPLATES)
         from autonexusgraph.tools.cypher_templates import TEMPLATES
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"cypher_templates import 실패: {e}"}
     ip_count = len(IP_TEMPLATES)
     registered = [k for k in TEMPLATES if k.startswith("ip_")]

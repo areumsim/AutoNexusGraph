@@ -523,7 +523,7 @@ def _process_one_zip(cur, *, corp_code: str, rcept_no: str, zip_path: Path,
             )
             stats["neo4j_edges"] = sync["edges_created"]
             stats["neo4j_plants_skipped"] = sync["plants_skipped"]
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [dart_prod:neo4j] %s/%s sync 실패 흡수 → stats 반환
             log.warning("[dart_prod:neo4j] %s/%s sync 실패: %s",
                         corp_code, rcept_no, exc)
 

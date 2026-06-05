@@ -85,7 +85,7 @@ _QUERIES: list[tuple[str, str]] = [
 def _run_query(session, key: str, cypher: str) -> dict:
     try:
         rec = list(session.run(cypher))
-    except Exception as exc:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as exc:  # noqa: BLE001 — 호출 실패 흡수 → {"_error": str(exc)} 반환
         return {"_error": str(exc)}
     if not rec:
         return {}

@@ -181,7 +181,7 @@ def _postgres_saver() -> Any | None:
         saver = PostgresSaver(conn)
         try:
             saver.setup()
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — PostgresSaver.setup() 실패 (계속 진행) 흡수 → saver 반환
             logger.warning("PostgresSaver.setup() 실패 (계속 진행): %s", exc)
         logger.info("LangGraph PostgresSaver 활성 (schema=%s, dsn=%s)",
                     schema, _redact(dsn_with_path))

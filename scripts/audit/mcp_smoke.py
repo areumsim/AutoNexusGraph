@@ -45,7 +45,7 @@ def _check_server_boot() -> dict:
         return {"passed": False, "reason": f"server import 실패: {e}"}
     try:
         server, specs = build_mcp_server("all")
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"build_mcp_server 실패: {e}"}
 
     # list_tools 핸들러를 in-process 로 호출 — 외부 에이전트 (Claude Desktop / Cline)
@@ -62,7 +62,7 @@ def _check_server_boot() -> dict:
             inner = getattr(result, "root", result)
             tools = getattr(inner, "tools", None) or []
             list_tools_count = len(tools)
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+    except Exception as exc:   # noqa: BLE001 — list_tools round-trip 실패 (fail-soft) 흡수 → {"passed": True, "n_tools":... 반환
         log.debug("list_tools round-trip 실패 (fail-soft): %s", exc)
 
     return {"passed": True, "n_tools": len(specs),

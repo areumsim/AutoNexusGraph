@@ -192,7 +192,7 @@ def load(*, dry_run: bool = False) -> LoadStats:
                 stats.chunks_inserted += 1
             elif op == "updated":
                 stats.chunks_updated += 1
-        except Exception as e:  # noqa: BLE001 — 예외 흡수 → 다음 단계 진행
+        except Exception as e:  # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
             cur.execute("ROLLBACK TO SAVEPOINT sp_kotsa")
             stats.errors.append(f"kotsa chunk: {e}")
 

@@ -111,7 +111,7 @@ def fetch_flat_inv(*, force: bool = False) -> Path:
         try:
             _download(INV_DICT_URL, dict_path)
             log.info("[inv] cached data dictionary %s", dict_path)
-        except Exception as e:  # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+        except Exception as e:  # noqa: BLE001 — [inv] dictionary fetch failed (skip) 흡수 → dest 반환
             log.warning("[inv] dictionary fetch failed (skip): %s", e)
 
     return dest

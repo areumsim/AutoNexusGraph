@@ -58,7 +58,7 @@ def _read_session_base() -> float:
         if hrs and hrs > 0:
             since = datetime.now(timezone.utc) - timedelta(hours=hrs)
         return float(total_cost(since=since))
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 기본값 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [COST] session base read failed 흡수 → 0.0 반환
         log.debug("[COST] session base read failed: %s", e)
         return 0.0
 

@@ -114,7 +114,7 @@ def _iter_rows(src: Path) -> Iterable[dict]:
                     for r in csv.DictReader(f):
                         r["_src"] = str(fp)
                         yield r
-        except Exception as exc:   # noqa: BLE001 — 예외 흡수 → log + 다음 단계 (silent 아님)
+        except Exception as exc:   # noqa: BLE001 — [allganize] read %s 실패 흡수 → _LEVEL_MAP.get(diff, default) 반환
             log.warning("[allganize] read %s 실패: %s", fp.name, exc)
 
 
