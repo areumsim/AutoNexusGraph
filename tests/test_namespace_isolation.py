@@ -337,6 +337,39 @@ def test_get_connection_auto_invalidates_closed_cache_entry():
         pg._open_connection.cache_clear()
 
 
+def test_get_pool_auto_invalidates_closed_cache_entry(monkeypatch):
+    """get_pool() 도 get_connection() 과 대칭 — 손상된 pool 자동 폐기·재생성.
+
+    회귀 가드: 외부에서 pool.close() 호출 (현재 db.postgres.close() 한 곳만)
+    이후 cache 가 stale 한 채 다음 호출자가 `pool.connection()` 시 PoolClosed.
+    health check 가 자동 복구.
+    """
+    from autonexusgraph.db import postgres as pg
+
+    pg._open_pool.cache_clear()
+    counter = {"n": 0}
+
+    class _FakePool:
+        def __init__(self, *, closed: bool):
+            self.closed = closed
+
+    def _fake_pool_ctor(*_a, **_kw):
+        counter["n"] += 1
+        return _FakePool(closed=(counter["n"] == 1))
+
+    import psycopg_pool as _real
+    orig = _real.ConnectionPool
+    _real.ConnectionPool = _fake_pool_ctor
+    try:
+        pool = pg.get_pool()
+        assert counter["n"] == 2, \
+            f"health check 가 closed pool 감지·재생성 실패 (호출={counter['n']})"
+        assert pool.closed is False, "재생성된 pool 은 열려있어야 함"
+    finally:
+        _real.ConnectionPool = orig
+        pg._open_pool.cache_clear()
+
+
 def test_transaction_invalidates_cache_on_rollback_failure(monkeypatch):
     """`transaction()` 컨텍스트에서 rollback 실패 시 cache 무효화.
 

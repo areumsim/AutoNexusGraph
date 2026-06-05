@@ -9,10 +9,10 @@ psycopg3 사용 (psycopg[binary,pool]).
 - transaction(): with 블록 context manager
 - copy_from(): 대량 적재용 (loaders 가 사용)
 
-**싱글톤 컨벤션**: `get_connection()` 은 @lru_cache 로 프로세스 1 conn 재사용.
-호출자는 `conn.close()` 호출 금지 (다음 호출자가 closed conn 받아 깨짐).
-정리는 `close()` 가 `cache_clear()` 와 함께 일괄 처리. 손상된 conn (rollback
-실패, 서버 disconnect 등) 은 `get_connection()` 의 health check 가 자동 폐기·재생성.
+**싱글톤 컨벤션**: `get_connection()` 과 `get_pool()` 둘 다 @lru_cache 로 프로세스 1개
+재사용. 호출자는 `conn.close()` / `pool.close()` 호출 금지 (다음 호출자가 closed
+인스턴스 받아 깨짐). 정리는 `close()` 가 `cache_clear()` 와 함께 일괄 처리. 손상된
+인스턴스는 게이트 함수의 health check 가 자동 폐기·재생성.
 """
 
 from __future__ import annotations
@@ -50,11 +50,25 @@ def get_connection() -> Any:
 
 
 @lru_cache(maxsize=1)
-def get_pool():
-    """ConnectionPool 싱글톤 — 동시성 필요 시 (FastAPI, agent)."""
+def _open_pool():
+    """ConnectionPool 싱글톤 raw 생성. 호출자는 `get_pool()` 사용 (health check 우회 금지)."""
     from psycopg_pool import ConnectionPool
     s = get_settings()
     return ConnectionPool(s.postgres_dsn, min_size=2, max_size=10, open=True)
+
+
+def get_pool():
+    """ConnectionPool 싱글톤 — 동시성 필요 시 (FastAPI, agent). **호출자 close() 금지**.
+
+    Health check: pool 이 닫혔으면 (외부에서 close 됐거나 cache 가 stale)
+    자동으로 폐기·재생성. 개별 connection 손상은 pool 내부가 처리 (re-connect).
+    `get_connection()` 의 health check 와 대칭 — singleton + lru_cache 패턴 일관.
+    """
+    pool = _open_pool()
+    if getattr(pool, "closed", False):
+        _open_pool.cache_clear()
+        pool = _open_pool()
+    return pool
 
 
 def ping() -> bool:
@@ -99,6 +113,9 @@ def close() -> None:
         except Exception:   # noqa: BLE001 — 이미 손상된 conn close 실패 흡수
             pass
         _open_connection.cache_clear()
-    if get_pool.cache_info().currsize > 0:
-        get_pool().close()
-        get_pool.cache_clear()
+    if _open_pool.cache_info().currsize > 0:
+        try:
+            _open_pool().close()
+        except Exception:   # noqa: BLE001 — 이미 손상된 pool close 실패 흡수
+            pass
+        _open_pool.cache_clear()

@@ -514,6 +514,10 @@ def collect_dashboard() -> dict[str, Any]:
             base = (cd["baseline_commit"] or "")[:10]
             label = (f"baseline `{base}` → {cd['changed_loc']:,}/{cd['baseline_loc']:,} "
                      f"LOC = {pct:.2f}%")
+            ledger = cd.get("ledger") or {}
+            resets = int(ledger.get("resets_total") or 0)
+            if resets:
+                label += f" | resets={resets} (도메인 추가/대형 기능 마다 reset)"
             status = "pass" if cd["target_met"] else "fail"
             detail = label
     except Exception as e:   # noqa: BLE001

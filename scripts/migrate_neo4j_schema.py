@@ -134,7 +134,7 @@ def main() -> int:
                 row = result.single()
                 affected = row["n"] if row and "n" in row.keys() else "—"
                 print(f"[migrate] {name:45s} affected={affected}")
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — migration 1건 실패 흡수 → stderr 로그 + 다음 migration 진행 (전체 멱등)
                 print(f"[migrate] {name:45s} FAIL: {e}", file=sys.stderr)
     print("\n[migrate] 완료. 변경 카운트가 0 이면 이미 마이그레이션 완료된 상태.")
     return 0

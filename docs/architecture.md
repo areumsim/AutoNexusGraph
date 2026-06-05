@@ -386,7 +386,7 @@ flowchart TD
 - **단일 한도의 한계**: 한 한도만 두면 (a) 세션 누적은 작은데 한 turn 이 폭주 / (b) 한 turn 은 작은데 세션 누적이 큰 두 실패 모드를 모두 방어 못 함.
 - **각 tier 가 막는 실패 모드**:
   - **세션 hard limit** (`LLM_SESSION_HARD_LIMIT_USD=5.00`, `llm/cost.py:141`) — 영속 누적. 일·주 단위 폭주 차단. cost_log.jsonl 기반.
-  - **도메인별 turn budget** (`config.turn_budget_for_domain`, ENV `LLM_TURN_BUDGET_<DOMAIN>_USD` override) — 한 대화 turn 의 LLM 비용 한도. finance·auto·ip 가 다른 한도 (정형 도메인 ip 는 1/10 수준).
+  - **도메인별 turn budget** (`config.turn_budget_for_domain`, ENV `AGENT_TURN_BUDGET_<DOMAIN>_USD` override) — 한 대화 turn 의 LLM 비용 한도. **현재 모든 도메인 fallback `$0.20` 동일** (`agent_turn_budget_usd`). declared field (`agent_turn_budget_{finance,auto,cross_domain}_usd`) 는 `0.0` → fallback 상속. 도메인별 차등화 필요 시 env 또는 settings field 양수 지정.
   - **호출별 사전 추정** (`agents/cost_estimator.py`) — Rewriter·Synthesizer·Title 각 호출 시작 전 토큰·비용 추정. `LLM_COST_AUTO_APPROVE_USD=0.50` 초과 시 HITL 승인 interrupt.
 - **선택 = 3 tier 직교** — 세 tier 가 직교적 실패 모드를 막음. ENV override 로 도메인·운영 환경별 조정 가능.
 

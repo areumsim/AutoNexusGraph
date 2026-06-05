@@ -230,7 +230,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 #### 2.2.3 사전 정의 도구 풀 — LLM 의 권한 경계
 
-- **정의**: LLM 은 함수명 + 파라미터만 결정. SQL/Cypher 직접 생성 금지 (`docs/operations/agents.md (구 PRD §7.5).10`, `README:160`).
+- **정의**: LLM 은 함수명 + 파라미터만 결정. SQL/Cypher 직접 생성 금지 (`docs/operations/agents.md` §1 도구 풀, `README:160`).
 - **목록**:
   - `autonexusgraph.tools.financials` — PG 정형 (lookup_company, get_revenue, compare_companies, …)
   - `autonexusgraph.tools.graph` — Neo4j 탐색 (list_subsidiaries, get_executives, find_paths, …)
@@ -285,7 +285,7 @@ Triage → Planner(DAG) → Supervisor(Send 병렬) → Workers(4종) → Synthe
 ```
 
 - **Triage** (`agents/nodes.py:32`): 안전 가드 + coreference 해소 + 시간 정규화 + question_kind 분류 + 1차 회사/차량 식별. LLM 0건 (룰).
-- **Planner** (`agents/nodes.py` 의 planner_node): DAG `tasks` 생성. 룰 기반 (docs/operations/agents.md (구 PRD §7.5).3) — 향후 LLM 업그레이드 가능 (`agents/nodes.py:12`).
+- **Planner** (`agents/nodes.py` 의 planner_node): DAG `tasks` 생성. 룰 기반 (`docs/operations/agents.md` §2 한 turn 흐름) — 향후 LLM 업그레이드 가능 (`agents/nodes.py:12`).
 - **Supervisor** (`agents/supervisor.py`): 의존성·순환 검증, budget guard, LangGraph `Send` API 로 worker 병렬 디스패치.
 - **Workers 4종** (`agents/workers.py`):
   - `research_worker` — pgvector 검색
@@ -694,7 +694,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **LLM 자유 SQL/Cypher 생성** — 유연하지만 모든 보안 가드를 LLM 뒤에서 사후 검증해야 함.
   - **DSL 중간층** — LLM 이 DSL 생성 → DSL 컴파일러가 SQL/Cypher 생성. 표현력은 사전 정의보다 높고 자유 SQL 보다 안전.
 - **대안 트레이드오프**: 자유 SQL → 1건의 prompt injection 이 전체 DB 노출. DSL → 컴파일러 자체가 또 하나의 시스템.
-- [확정] 사전 정의만. docs/operations/agents.md (구 PRD §7.5).10.
+- [확정] 사전 정의만. `docs/operations/agents.md` §1 도구 풀 박스.
 
 ### 4.4 왜 Deterministic-first 추출 (LLM 은 selective)
 
@@ -822,7 +822,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 - **[가정]** `cost_estimator` 의 사전 추정이 실제 비용과 ±20% 이내. 검증 없음.
 - **[열린 질문]** budget guard 가 turn 중간에 발동하면 — 이미 시작된 worker 의 sunk cost 처리?
 - **[열린 질문]** HARD_LIMIT 도달 시 사용자 경험 — "예산 초과로 답변 불가" 가 신뢰를 어떻게 깎는가?
-- 관련: `agents/cost_estimator.py`, `llm/budget_aware.py`, `docs/operations/agents.md (구 PRD §7.5).6`.
+- 관련: `agents/cost_estimator.py`, `llm/budget_aware.py`, `docs/operations/agents.md` §7.5 HITL.
 
 ### 5.6 동명이인 / 다중 식별자 충돌
 
@@ -1094,9 +1094,9 @@ from . import agent_handler  # 등록 부작용
 | **prompt_safety** | injection 신호 감지 + XML 경계 escape | `src/autonexusgraph/safety/prompt_safety.py` |
 | **QID** | Wikidata 의 엔티티 ID (Q123…) | `PRD §3.2` |
 | **RAG** | Retrieval-Augmented Generation | `PRD §1` |
-| **replan** | Validator 실패 시 Planner 로 복귀. 최대 2회 | `state.py:71`, `docs/operations/agents.md (구 PRD §7.5).5` |
+| **replan** | Validator 실패 시 Planner 로 복귀. 최대 2회 | `state.py:71`, `docs/operations/agents.md` §5 Replan |
 | **route_domain** | finance/auto/cross_domain 키워드 룰 라우터 | `src/autograph/policy.py:87` |
-| **Send (LangGraph)** | Supervisor 의 worker 병렬 디스패치 API | `docs/operations/agents.md (구 PRD §7.5).7` |
+| **Send (LangGraph)** | Supervisor 의 worker 병렬 디스패치 API | `docs/operations/agents.md` §2 (Send 다이어그램) |
 | **snapshot_year** | 엣지의 기준 연도 메타. 시점 분리 | `ontology/auto/relations.yaml:23` |
 | **SSOT** | Single Source of Truth | 전반 |
 | **stage_relations** | P3 LLM 산출 임시 테이블 (`auto.staging_relations`) | `docs/autograph.md §7.4` |
