@@ -297,6 +297,87 @@ def test_no_close_on_singleton_get_connection():
         "\n".join(violations[:10])
 
 
+def test_get_connection_auto_invalidates_closed_cache_entry():
+    """싱글톤 conn 이 손상되면 자동 폐기·재생성 — 후속 호출자 보호.
+
+    회귀 가드: fail-soft 경로에서 rollback 실패로 conn 손상되거나 서버
+    disconnect 시, cache 가 손상된 conn 을 들고 있어 다음 호출자가
+    `the connection is closed` 로 깨지는 함정을 방지한다.
+    """
+    from autonexusgraph.db import postgres as pg
+
+    # 기존 cache 비우기.
+    pg._open_connection.cache_clear()
+
+    # 가짜 conn 클래스 — 첫 생성은 closed=True, 두 번째는 정상.
+    counter = {"n": 0}
+
+    class _FakeConn:
+        def __init__(self, *, closed: bool):
+            self.closed = closed
+            self.broken = False
+
+    def _fake_psycopg_connect(_dsn):
+        counter["n"] += 1
+        # 첫 호출 → closed conn (이전 호출자가 fail-soft 후 손상 시뮬).
+        # 두 번째 호출 → 정상 conn.
+        return _FakeConn(closed=(counter["n"] == 1))
+
+    import psycopg as _real
+    orig_connect = _real.connect
+    _real.connect = _fake_psycopg_connect
+    try:
+        conn1 = pg.get_connection()
+        # health check 가 closed=True 를 감지 → cache_clear + 재생성 → 두 번째 호출.
+        assert counter["n"] == 2, \
+            f"health check 가 손상된 conn 감지·재생성 실패 (호출 횟수={counter['n']})"
+        assert conn1.closed is False, "재생성된 conn 은 정상이어야 한다"
+    finally:
+        _real.connect = orig_connect
+        pg._open_connection.cache_clear()
+
+
+def test_transaction_invalidates_cache_on_rollback_failure(monkeypatch):
+    """`transaction()` 컨텍스트에서 rollback 실패 시 cache 무효화.
+
+    회귀 가드: yield 후 예외 발생 → rollback() 도 실패 (conn 손상) 시
+    cache 가 손상된 conn 보존하면 다음 호출 깨짐. cache_clear() 호출 검증.
+    """
+    from autonexusgraph.db import postgres as pg
+
+    pg._open_connection.cache_clear()
+
+    class _FakeConn:
+        def __init__(self):
+            self.closed = False
+            self.broken = False
+            self.committed = False
+        def cursor(self):
+            raise RuntimeError("simulated query failure")
+        def commit(self):
+            self.committed = True
+        def rollback(self):
+            # rollback 자체도 실패 — conn 손상 상황 시뮬.
+            raise RuntimeError("simulated rollback failure")
+
+    fake = _FakeConn()
+    monkeypatch.setattr(pg, "_open_connection", lambda: fake)
+    # cache_clear 호출 검증용 카운터.
+    cleared = {"n": 0}
+    orig_clear = type(pg._open_connection).cache_clear if hasattr(pg._open_connection, "cache_clear") else None
+    # monkeypatch 후 _open_connection 은 plain 함수라 cache_clear 속성 없음 — 대체 mock.
+    pg._open_connection.cache_clear = lambda: cleared.__setitem__("n", cleared["n"] + 1)  # type: ignore[attr-defined]
+
+    try:
+        with pg.transaction() as conn:
+            with conn.cursor() as _:
+                pass
+    except RuntimeError:
+        pass
+
+    assert cleared["n"] >= 1, "rollback 실패 시 _open_connection.cache_clear() 호출되어야 함"
+
+
 def test_no_bare_pg_schemas_in_sql_strings():
     """src/scripts 의 SQL 문자열에 bare schema 가 없어야 한다 (anxg_ 프리픽스 강제)."""
     bare_schemas = ('master', 'auto', 'bridge', 'sec', 'wiki', 'ip', 'vec',
