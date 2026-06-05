@@ -116,7 +116,7 @@ class AnthropicClient(LLMClient):
         tool_name = schema.get("name", "structured_response")
         input_schema = schema.get("schema", schema)
         try:
-            resp = self._client.messages.create(
+            resp = self._client.messages.create(  # type: ignore[call-overload]  # anthropic SDK kwargs 동적
                 model=self.model,
                 system=system if system is not None else "",
                 messages=msgs,  # type: ignore[arg-type]

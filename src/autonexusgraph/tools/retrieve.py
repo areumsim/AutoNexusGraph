@@ -160,7 +160,7 @@ def search_documents(
         if idx is None or idx >= len(hits):
             continue
         row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
+        row["score"] = float(getattr(r, "score", row.get("score", 0.0)) or 0.0)
         row["reranked"] = True
         out.append(row)
     return out

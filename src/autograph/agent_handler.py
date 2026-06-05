@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from autonexusgraph.agents._domain_handler import (
     register_handler,
@@ -71,7 +71,7 @@ class AutoHandler:
     domain = "auto"
 
     def identify_targets(self, state: AgentState, *, question: str) -> None:
-        identify_auto_targets(state, question=question)
+        identify_auto_targets(cast(dict, state), question=question)
 
     def plan_tasks(self, state: AgentState, *, question: str) -> list[dict]:
         return plan_auto_tasks(

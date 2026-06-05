@@ -11,8 +11,7 @@ finance 의 ``autonexusgraph.agents.policy`` 와 동일한 인터페이스를 �
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
-from typing import Any, Literal
+from typing import Literal
 
 AutoQuestionKind = Literal[
     "vehicle_spec",        # 차종 제원 (SQL)
@@ -284,7 +283,7 @@ def _extract_year(q: str) -> int | None:
 
 
 # ── 자동차 도메인 entity 식별 (triage 보조) ─────────────────
-def identify_auto_targets(state: Mapping[str, Any], *,
+def identify_auto_targets(state: dict, *,
                           question: str | None = None,
                           max_per_word: int = 2,
                           max_total_vehicles: int = 5,

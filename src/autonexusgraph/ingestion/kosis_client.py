@@ -87,7 +87,7 @@ class KosisClient:
         for r in raw_rows:
             try:
                 val_s = r.get("DT")
-                val = float(val_s) if val_s not in ("", None, "-") else None
+                val = float(val_s) if val_s is not None and val_s not in ("", "-") else None
             except (ValueError, TypeError):
                 val = None
             out.append(KosisRow(
