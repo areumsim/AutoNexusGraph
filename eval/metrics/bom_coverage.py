@@ -131,21 +131,20 @@ def collect_bom_coverage() -> dict[str, Any]:
     #   (c) 컴플레인 hop: VehicleModel-[:HAS_VARIANT]->Variant<-[:REPORTED_IN]-Complaint
     #                     -[:COMPLAINT_OF]->(Module|Component)
     try:
-        from autonexusgraph.db.neo4j import get_driver
-        driver = get_driver()
-        with driver.session() as s:
+        from autonexusgraph.db.neo4j import get_session
+        with get_session() as s:
             rec = s.run(
                 """
-                MATCH (mfr:Manufacturer)-[:MANUFACTURES]->(vm:VehicleModel)
+                MATCH (mfr:Anxg_Manufacturer)-[:MANUFACTURES]->(vm:Anxg_VehicleModel)
                 WHERE mfr.name IN $mvp
                 OPTIONAL MATCH (vm)-[:CONTAINS_COMPONENT|CONTAINS_SYSTEM]->(c1)
-                  WHERE (c1:Module OR c1:Component)
-                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:VehicleVariant)
-                          -[:AFFECTED_BY]->(:Recall)-[:RECALL_OF]->(c2)
-                  WHERE (c2:Module OR c2:Component)
-                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:VehicleVariant)
-                          -[:REPORTED_IN]->(:Complaint)-[:COMPLAINT_OF]->(c3)
-                  WHERE (c3:Module OR c3:Component)
+                  WHERE (c1:Anxg_Module OR c1:Anxg_Component)
+                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:Anxg_VehicleVariant)
+                          -[:AFFECTED_BY]->(:Anxg_Recall)-[:RECALL_OF]->(c2)
+                  WHERE (c2:Anxg_Module OR c2:Anxg_Component)
+                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:Anxg_VehicleVariant)
+                          -[:REPORTED_IN]->(:Anxg_Complaint)-[:COMPLAINT_OF]->(c3)
+                  WHERE (c3:Anxg_Module OR c3:Anxg_Component)
                 WITH vm, (c1 IS NOT NULL OR c2 IS NOT NULL OR c3 IS NOT NULL) AS has_l4
                 RETURN count(DISTINCT vm) AS tot,
                        count(DISTINCT CASE WHEN has_l4 THEN vm END) AS withcomp
