@@ -17,11 +17,12 @@ cost guard 적용 원칙 (사용자 명시):
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 from . import session
 from ._domain_handler import call_handler_method, get_handler
 from .policy import classify_question, turn_budget_exceeded
-from .state import AgentState
+from .state import AgentState, QuestionKind
 from .temporal import extract_year_hint, normalize_temporal_terms
 
 log = logging.getLogger(__name__)
@@ -295,7 +296,7 @@ def planner_node(state: AgentState) -> AgentState:
             log.info("[planner] replan#%s — kind 승격 %s→%s (issues=%s)",
                      replan_hint.get("n"), kind, new_kind,
                      (replan_hint.get("prev_issues") or [])[:2])
-        kind = new_kind
+        kind = cast(QuestionKind, new_kind)
         state["question_kind"] = kind
 
     # ── 축2: LLM 자율 planner (opt-in) ──────────────────────────────
@@ -323,7 +324,7 @@ def planner_node(state: AgentState) -> AgentState:
     domain = str(state.get("domain") or "finance").lower()
     handler = get_handler(domain)
     if handler is not None and hasattr(handler, "plan_tasks"):
-        tasks = call_handler_method(state, handler, "plan_tasks", state, question=q)
+        tasks: list[dict] = call_handler_method(state, handler, "plan_tasks", state, question=q)
         state["tasks"] = tasks or []
         # task_results 는 planner 진입부에서 이미 마커로 리셋됨 — 재대입 금지(마커 보존).
         state["plan"] = [
@@ -334,7 +335,7 @@ def planner_node(state: AgentState) -> AgentState:
         log.info("[planner:%s] tasks=%d", domain, len(state["tasks"]))
         return _planner_cost_gate(state, kind, targets, len(state["tasks"]))
 
-    tasks: list[dict] = []
+    tasks = []
     tid = 0
 
     def _next_id(prefix: str) -> str:
@@ -633,7 +634,7 @@ def executor_node(state: AgentState) -> AgentState:
             break
         tool_name = step.get("tool")
         args = step.get("args") or {}
-        fn = getattr(toolbox, tool_name, None)
+        fn = getattr(toolbox, tool_name or "", None)
         if fn is None:
             log.warning(f"[executor] unknown tool: {tool_name}")
             continue
@@ -839,14 +840,14 @@ def synthesizer_node(state: AgentState,
         )
         try:
             resp = request_interrupt(payload)
-            approved = coerce_sensitive_response(resp)
+            sensitive_approved = coerce_sensitive_response(resp)
         except InterruptUnavailable:
             # 폴백 환경 — 보수적 거절 (외부 노출 회피).
-            approved = False
+            sensitive_approved = False
             state.setdefault("safety_signals", []).append(
                 f"sensitive_blocked_fallback:{hit}"
             )
-        if not approved:
+        if not sensitive_approved:
             log.warning("[synth] sensitive answer blocked — hit=%r", hit)
             state["answer"] = (
                 f"민감/외부 보고 인접 답변으로 분류 ('{hit}') — 공개 보류됨. "

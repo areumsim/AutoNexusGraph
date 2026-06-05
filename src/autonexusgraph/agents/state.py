@@ -203,6 +203,10 @@ class AgentState(TypedDict, total=False):
     answer: Annotated[str, _last_wins]
     citations: Annotated[list[dict], _last_wins]
     visualizations: Annotated[list[dict], _last_wins]
+    # synth 호출 상태 — eval/adapter 가 LLM 실패 여부 즉시 감지 (silent skip 방지).
+    # {"ok": bool, "error_type": str|None, "error": str|None, "llm_called": bool,
+    #  "fallback_used": "budget"|"exception"|None}
+    synth_status: Annotated[dict, _last_wins]
 
     # Validation (PRD §7.5.5)
     validation_status: Annotated[str, _last_wins]
@@ -220,5 +224,7 @@ class AgentState(TypedDict, total=False):
 
     # 메타·비용
     llm_usage_usd: Annotated[float, _last_wins]
+    llm_tokens_used: Annotated[int, _last_wins]   # eval adapter tokens_used 측정용 누적
     n_replans: Annotated[int, _last_wins]
     aborted_reason: Annotated[str, _last_wins]
+    sensitive_blocked: Annotated[bool, _last_wins]   # PRD §7.0 — 민감 답변 공개 보류 플래그
