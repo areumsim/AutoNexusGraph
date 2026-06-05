@@ -183,7 +183,7 @@
 | ID | 항목 | 상태 | 우선순위 | 활성화 트리거 | 위치 |
 |---|---|---|:---:|---|---|
 | L6-1 | **Wikidata 배터리 셀 chem 확장** | :Material 6 적재는 **manual seed** (materials_seed.yaml: NCM811/622/523/NCA/LFP/GRAPHITE_ANODE). **Wikidata 자동 보강은 비활성** — `CATHODE_QIDS` 빈 dict (이전 QID 오류: Q899037=루마니아 마을, Q900614=carbochemistry) | P2 | `wikidata_cell_chem.py` 의 `CATHODE_QIDS` 정확한 QID 재큐레이션 (CC0, 무인증) → manual seed 자동 보강 | docs/autograph.md §2.5.4 |
-| L6-2 | **알루미늄 합금 / 다이캐스팅 등 공법 ontology** | 미정의 | P2 | `:Material` ontology 확장 (배터리/금속 seed) + `:Process` 와 연결 (USES_PROCESS) | README §12.5 |
+| L6-2 | **알루미늄 합금 / 다이캐스팅 등 공법 ontology** | ✅ **시드 적재** (2026-06-05) — `ontology/auto/materials_metals_seed.yaml` 9 alloys (Al 4 / 강 4 / Ti 1) + 11 module mappings. `Material` entity 에 `material_class` / `alloy_family` / `typical_processes` / `typical_modules` / `density_kg_m3` optional 필드 추가. `MaterialsMetalsFile` strict pydantic 검증 + `tests/test_materials_metals_seed.py` 8건 (typical_processes ↔ KAMP catalog 정합, module mapping 양방향 일치, alloy_family coverage). audit-ontology `auto.materials_metals(9)` PASS. **잔여**: loader (실제 :Module 매칭 + MADE_OF 적재) 는 후속 PR. | (시드 완료) | loader 구현 시 confidence 0.50 candidate 적재 | README §12.5 |
 | L6-3 | **회사단위 셀↔OEM 소싱 (SUPPLIES)** | grade C candidate (sparse) | P2 | 공개 IR PDF 또는 manual seed. 자동 만료 (6개월 미검토 → rejected) | docs/autograph.md §2.5.4 |
 | L6-4 | **무역통계 — 관세청 / K-stat (Li/Ni/Co 한국 수입)** | 0 | P2 | `macro.trade_minerals` 신규 스키마 + ingestion | docs/autograph.md §2.5.4 |
 | L6-5 | **EVO 온톨로지 정렬** (arXiv 2304.04893 — 20 클래스·17 객체속성·54 데이터타입) | 미적용 | P3 | EV/배터리 확장 시 EVO 클래스명·속성 정렬 참조. SHACL/pydantic 검증과 시너지 | docs/autograph.md §2.5.4 |
