@@ -83,6 +83,28 @@ flowchart TD
 
 ---
 
+## 2.5 계층 책임·경계 (data / model / app / bridge)
+
+패키지 토폴로지(§2)가 "누가 누구를 import 하나"라면, 본 절은 "각 계층이 무엇을 책임지고
+어디서 끝나나"의 수평 분해다. 한 모듈이 두 계층을 겸하면(예: finance tool 이 app+model)
+경계가 흐려지므로, 아래 책임 분리를 SSOT 로 둔다.
+
+| 계층 | 책임 | 코드 위치 | 경계 규칙 (넘으면 안 되는 선) |
+|---|---|---|---|
+| **Data** | 외부 raw 수집 → 정규화 → PG/Neo4j 멱등 적재. 스키마·제약·인덱스 정의. | `ingestion/` · `loaders/` · `infra/postgres/init/*.sql` | LLM 호출 금지(추출 Pass 제외). 답변 로직 모름 — 적재만. |
+| **Model** | 온톨로지(entities/relations/extractors yaml) + 추출 Pass(P1~P4) + 신뢰도 등급. 그래프 "의미" 정의. | `ontology/` · `extractors/` · `*/ontology.py` | 사용자 질의·UI 모름. 도메인 schema_version 의 SSOT. |
+| **App** | LangGraph multi-agent(triage→…→validator) + 도구 풀(tools) + 안전 가드 + cost. 질의→답변. | `agents/` · `tools/` · `safety/` · `llm/` | raw 적재 로직·SQL DDL 모름. 사전 정의 도구만 호출(자유 SQL/Cypher 금지). |
+| **Bridge** | 도메인 간 entity 연결 — `bridge.corp_entity`(corp↔글로벌) + `ip.assignee_corp_map`. cross-domain 진입점. | `bridge.corp_entity` 테이블 · `*/tools/bridge.py` · `loaders/load_bridge.py` | 한 도메인에 종속 안 함. confidence 임계로 false match 차단(§5.1(g)). |
+
+**왜 이 4 분할인가 (대안·기각)**: (1) **계층 없이 도메인별 수직 슬라이스만** — 도메인 추가마다
+ingestion~app 전체를 복제, 공통 인프라(LLM/cost/guard) 중복. **기각**. (2) **app+model 통합**(tool 이
+온톨로지까지) — 추출 규칙 변경이 답변 코드에 번져 테스트 격리 불가. **기각**. (3) **선택 = 4 계층 수평 +
+도메인 plug-in 수직** — 공통 인프라는 코어 1벌, 도메인은 plug-in, bridge 는 양쪽에 안 종속. 데이터
+적재(Data)와 답변(App)이 분리돼 "DB 없이 app 단위 테스트"·"app 없이 적재 배치"가 각각 가능
+(`tests/` 의 unit/integration 이층 구조가 이를 반영).
+
+---
+
 ## 3. 도메인별 모듈 매트릭스
 
 | 모듈 카테고리 | autonexusgraph (코어/finance) | autograph (auto) | ipgraph (ip) |
@@ -218,6 +240,35 @@ MIGRATE_FILE=<파일>` 으로 hot-apply ([docs/operations/migrations.md](operati
   cost 누적, em/f1/hits@k/cypher_execution_accuracy 산정)
 - `eval/runners/run_matrix_smoke.py` — README §10.17(d) 축소 매트릭스 (4 어댑터 × rerank{on/off} = 8 셀,
   simulation/full 모드, thesis headline 자동 계산)
+
+---
+
+## 4.4 공유 DB 멀티테넌시 — namespace 격리
+
+3-store(Neo4j/PostgreSQL/pgvector·Qdrant)는 **다른 프로젝트와 공유되는 기존 서버**를 쓴다.
+프로젝트별 데이터가 충돌하지 않도록, **단일 토큰 `app_namespace`**(env `APP_NAMESPACE`, 기본 `anxg`)
+에서 스토어별 namespace 를 파생한다 — 토큰 한 곳만 바꾸면 전체 일관.
+
+| 스토어 | 격리 메커니즘 | 코드 SSOT | 비고 |
+|---|---|---|---|
+| **PostgreSQL** | (1) DSN **database 명** `autonexusgraph` (1차) + (2) **스키마 프리픽스** `anxg_<schema>` (2차) | `config.pg_schema(name)` (`config.py`) · `infra/postgres/init/*.sql` `CREATE SCHEMA anxg_*` | 17 스키마(master/auto/ip/vec/bridge/…) 전부 `anxg_` 프리픽스. LangGraph 체크포인트 = `anxg_chat`. |
+| **Neo4j** | (1) **named database** `NEO4J_DATABASE`(Enterprise) + (2) **노드 라벨 프리픽스** `Anxg_<Label>` | `db/neo4j.get_session()`(database 주입) · `config.neo4j_label(label)` | community 단일 db 에선 라벨 프리픽스가 유일 격리. **관계 타입은 불변**(라벨만 대상). 노드 라벨 31종. |
+| **pgvector / Qdrant** | pgvector = PG `anxg_vec.chunks`(DB명+스키마 격리). Qdrant = **컬렉션 프리픽스** | `db/qdrant.collection_name()` · `config.qdrant_collection`(기본 `anxg_chunks`) | 현 주력은 pgvector(PG 격리 상속). Qdrant 활성 시 컬렉션 namespace. |
+
+**왜 db명 위에 프리픽스까지 (이중 방어)**: PG 는 database 명으로 이미 격리되지만, 같은 database 를
+여러 프로젝트가 공유하는 운영도 대비해 스키마 프리픽스를 더한다. Neo4j community 는 named database 가
+**없어**(`neo4j:5.18-community`, 단일 `neo4j` db) 라벨 프리픽스가 사실상 유일한 격리 수단 —
+그래서 둘 다 적용한다.
+
+**핵심 규약 (코드 리뷰 게이트)**:
+- 모든 Neo4j 세션은 `get_session()` 으로 연다 — `driver.session()` 직접 호출 금지(database 주입 누락 방지).
+- 노드 라벨은 `Anxg_*`, **관계 타입은 프리픽스 없음**(예: `(:Anxg_Company)-[:SUPPLIED_BY]->(:Anxg_Supplier)`).
+- PG 참조는 `anxg_<schema>.<table>` 정적 사용. 동적 조립은 `pg_schema()` 헬퍼.
+
+**기존 적재 DB 마이그레이션** (코드는 이미 프리픽스를 참조하므로 기존 데이터도 한 번 옮겨야 일치):
+- Neo4j: `scripts/migrate/relabel_neo4j_namespace.py` — 라벨별 `SET n:Anxg_X REMOVE n:X`(apoc 배치, 멱등).
+- PG: `scripts/migrate/rename_pg_schemas_namespace.sql` — `ALTER SCHEMA <s> RENAME TO anxg_<s>`(멱등).
+- 절차: DB 백업([operations/backup_dr.md](operations/backup_dr.md)) → 마이그레이션 실행 → 앱 재기동 → audit.
 
 ---
 
@@ -423,6 +474,9 @@ flowchart TD
 | 어댑터 인터페이스 | `eval/adapters/base.py` `AgentResponse` / `Evidence` | base 한 곳 |
 | LangGraph 노드 정의 | `src/autonexusgraph/agents/graph.py` `_build_langgraph_app()` | 코드 한 곳 |
 | Plug-in 등록 정책 | `src/autonexusgraph/agents/_domain_handler.py` | ENV + 한 곳 |
+| DB namespace 토큰·헬퍼 | `config.py` `app_namespace` / `pg_schema()` / `neo4j_label()`; `db/qdrant.collection_name()` | env `APP_NAMESPACE` 한 곳 (§4.4) |
+| Neo4j 세션(격리 db) | `src/autonexusgraph/db/neo4j.py:get_session()` | 모든 세션 진입점 |
+| DB namespace 마이그레이션 | `scripts/migrate/relabel_neo4j_namespace.py` · `rename_pg_schemas_namespace.sql` | 기존 적재 DB 1회 이동 |
 
 ---
 
@@ -431,7 +485,7 @@ flowchart TD
 | 문서 | 라인 수 | 분담 |
 |---|---:|---|
 | README.md | ~1470 | **통합 SSOT v3.0** — 정량 수치 + 요구사항 + DoD 20항 + 로드맵 + 의사결정 로그 + Quickstart |
-| **docs/architecture.md (본 문서)** | ~470 | **구조 SSOT** — 패키지/노드/SSOT 색인 |
+| **docs/architecture.md (본 문서)** | ~525 | **구조 SSOT** — 패키지/계층/노드/namespace 격리/SSOT 색인 |
 | docs/autograph.md | ~695 | 도메인2 (auto) 단독 SSOT |
 | docs/process_graph.md | ~115 | 도메인2-심화 (process BoP, 주요 축) 단독 SSOT |
 | docs/ipgraph.md | ~285 | 도메인3 (ip 보조축) 단독 SSOT |
