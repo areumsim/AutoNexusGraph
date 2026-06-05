@@ -137,7 +137,7 @@ def _match_one(text: str, components: list[dict]
 _MERGE_RECALL_OF = """
 UNWIND $rows AS r
 MATCH (rc:Anxg_Recall {id: r.recall_id})
-OPTIONAL MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
+OPTIONAL MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Anxg_Part)
 WITH rc, r, c WHERE c IS NOT NULL
 MERGE (rc)-[rel:RECALL_OF]->(c)
 SET   rel.source_type      = r.source_type,

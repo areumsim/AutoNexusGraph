@@ -82,7 +82,7 @@ def _resolve_recall_id(cur, head_text_norm: str) -> int | None:
 # (:Anxg_Module|:Part)-[:SUPPLIED_BY]->(:Anxg_Supplier) — staging 에서 발생.
 _MERGE_SUPPLIED_BY = """
 UNWIND $rows AS r
-MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
+MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Anxg_Part)
 MATCH (s:Anxg_Supplier {entity_id: r.supplier_entity_id})
 MERGE (c)-[rel:SUPPLIED_BY]->(s)
 SET   rel.source_type      = 'llm_p3',
@@ -99,7 +99,7 @@ SET   rel.source_type      = 'llm_p3',
 _MERGE_RECALL_OF = """
 UNWIND $rows AS r
 MATCH (rc:Anxg_Recall {id: r.recall_id})
-MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
+MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Anxg_Part)
 MERGE (rc)-[rel:RECALL_OF]->(c)
 SET   rel.source_type      = 'llm_p3',
       rel.source_id        = r.source_id,
@@ -152,7 +152,7 @@ def _validate_supplied_by(cur, row: dict) -> tuple[str, dict | None]:
         rec = session.run(
             """
             MATCH (c)-[r:SUPPLIED_BY]->(s:Anxg_Supplier {entity_id: $sid})
-             WHERE c.id = $cid AND (c:Anxg_Module OR c:Part)
+             WHERE c.id = $cid AND (c:Anxg_Module OR c:Anxg_Part)
             RETURN r.source_type AS source_type, r.confidence_score AS conf
             """, cid=component_id, sid=str(sup_id),
         ).single()

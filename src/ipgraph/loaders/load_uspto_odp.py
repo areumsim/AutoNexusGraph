@@ -257,7 +257,7 @@ def _upsert_link(cur: Any, table: str, pk: tuple[str, ...],
             cols = (*pk, *extra)
             placeholders = ",".join(["%s"] * len(cols))
             cur.execute(
-                f"INSERT INTO ip.{table} ({','.join(cols)}) "
+                f"INSERT INTO anxg_ip.{table} ({','.join(cols)}) "
                 f"VALUES ({placeholders}) ON CONFLICT DO NOTHING",
                 tuple(r.get(c) for c in cols),
             )

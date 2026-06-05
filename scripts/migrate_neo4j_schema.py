@@ -31,7 +31,7 @@ MIGRATIONS = [
         "label Sector → Industry",
         """
         MATCH (s:Sector)
-        WHERE NOT s:Industry
+        WHERE NOT s:Anxg_Industry
         SET s:Anxg_Industry
         REMOVE s:Sector
         RETURN count(s) AS n

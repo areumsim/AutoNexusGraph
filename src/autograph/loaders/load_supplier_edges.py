@@ -152,7 +152,7 @@ def _prefetch_customer_models(cur, customer_names: set[str]) -> dict[str, list[i
 _MERGE_SUPPLIED_BY = """
 UNWIND $rows AS r
 MATCH (sup:Anxg_Supplier {entity_id: r.supplier_entity_id})
-MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Part)
+MATCH (c) WHERE c.id = r.component_id AND (c:Anxg_Module OR c:Anxg_Part)
 MERGE (c)-[rel:SUPPLIED_BY]->(sup)
 SET   rel.source_type      = r.source_type,
       rel.source_id        = r.source_id,

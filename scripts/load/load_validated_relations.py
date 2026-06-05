@@ -84,7 +84,7 @@ CYPHER_BY_TYPE = {
     "PRODUCES": """
         UNWIND $rows AS r
         MATCH (a:Anxg_Company {corp_code: r.head_corp})
-        MERGE (p:Product {name: r.tail, company_corp_code: r.head_corp})
+        MERGE (p:Anxg_Product {name: r.tail, company_corp_code: r.head_corp})
         ON CREATE SET p.source = 'p3_llm', p.created_at = datetime()
         MERGE (a)-[rel:PRODUCES]->(p)
         SET rel.source       = 'p3_llm',

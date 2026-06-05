@@ -70,7 +70,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     "auto_list_components_by_model": {
         "cypher": """
         MATCH (m:Anxg_VehicleModel {id: $model_id})-[rel:CONTAINS_COMPONENT]->(c)
-        WHERE (c:Anxg_Module OR c:Part)
+        WHERE (c:Anxg_Module OR c:Anxg_Part)
           AND ($system_code IS NULL OR c.system_code = $system_code)
         RETURN c.id            AS component_id,
                labels(c)[0]    AS kind,
@@ -95,7 +95,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
         "cypher": """
         MATCH (v:Anxg_VehicleVariant {id: $variant_id})<-[:HAS_VARIANT]-(m:Anxg_VehicleModel)
         MATCH (m)-[rel:CONTAINS_COMPONENT]->(c)
-        WHERE (c:Anxg_Module OR c:Part)
+        WHERE (c:Anxg_Module OR c:Anxg_Part)
           AND ($system_code IS NULL OR c.system_code = $system_code)
         RETURN c.id            AS component_id,
                labels(c)[0]    AS kind,
@@ -225,7 +225,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     "auto_recalls_for_component": {        # Module 또는 Part 에 영향을 준 리콜
         "cypher": """
         MATCH (rc:Anxg_Recall)-[rel:RECALL_OF]->(c)
-        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Part)
+        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Anxg_Part)
         RETURN rc.id              AS recall_id,
                rc.source          AS source,
                rc.source_recall_no AS source_recall_no,
@@ -245,7 +245,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     "auto_suppliers_of_component": {
         "cypher": """
         MATCH (c)-[rel:SUPPLIED_BY]->(s:Anxg_Supplier)
-        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Part)
+        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Anxg_Part)
         RETURN s.entity_id    AS supplier_id,
                s.name         AS name,
                s.country      AS country,
@@ -264,7 +264,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
     "auto_vehicles_using_component": {
         "cypher": """
         MATCH (c)<-[rel:CONTAINS_COMPONENT]-(m:Anxg_VehicleModel)
-        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Part)
+        WHERE c.id = $component_id AND (c:Anxg_Module OR c:Anxg_Part)
         MATCH (mm:Anxg_Manufacturer)-[:MANUFACTURES]->(m)
         RETURN m.id  AS model_id,
                m.name AS model_name,
@@ -284,7 +284,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
         MATCH (s:Anxg_Supplier {entity_id: $entity_id})<-[:SUPPLIED_BY]-(c)
               <-[:CONTAINS_COMPONENT]-(m:Anxg_VehicleModel)
               <-[:MANUFACTURES]-(mm:Anxg_Manufacturer)
-        WHERE (c:Anxg_Module OR c:Part)
+        WHERE (c:Anxg_Module OR c:Anxg_Part)
         RETURN DISTINCT
                mm.id   AS manufacturer_id,
                mm.name AS mfr_name,
@@ -455,7 +455,7 @@ AUTO_TEMPLATES: dict[str, dict] = {
             MATCH p = shortestPath(
               (a:Anxg_VehicleVariant {{id: $a}})-[*1..{h}]-(b)
             )
-            WHERE (b:Anxg_Module OR b:Part) AND b.id = $b
+            WHERE (b:Anxg_Module OR b:Anxg_Part) AND b.id = $b
             RETURN [n IN nodes(p) | coalesce(n.name, toString(n.id))] AS node_path,
                    [r IN relationships(p) | type(r)] AS rel_types,
                    length(p) AS hops
