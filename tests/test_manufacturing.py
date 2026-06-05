@@ -99,7 +99,7 @@ def test_utilization_table_function_exists():
 
 
 def test_plant_utilization_table_in_pg_schema():
-    """auto.plant_utilization 테이블 정의 SQL 존재 확인."""
+    """anxg_auto.plant_utilization 테이블 정의 SQL 존재 확인."""
     sql_file = ROOT / "infra" / "postgres" / "init" / "15_autograph_production.sql"
     assert sql_file.exists()
     content = sql_file.read_text(encoding="utf-8")
@@ -195,14 +195,14 @@ def test_pg_init_24_factoryon_exists():
     p = ROOT / "infra" / "postgres" / "init" / "24_auto_factoryon.sql"
     assert p.exists()
     content = p.read_text(encoding="utf-8")
-    assert "auto.factoryon_registry" in content
+    assert "anxg_auto.factoryon_registry" in content
     assert "factory_no" in content
 
 
 def test_pg_init_kosis_macro_exists():
-    """KOSIS 적재 대상 테이블 (macro.kosis_series) SQL 정의 확인."""
+    """KOSIS 적재 대상 테이블 (anxg_macro.kosis_series) SQL 정의 확인."""
     p = ROOT / "infra" / "postgres" / "init" / "04_external_data.sql"
     assert p.exists()
     content = p.read_text(encoding="utf-8")
-    assert "macro.kosis_series" in content
+    assert "anxg_macro.kosis_series" in content
     assert "stat_code" in content

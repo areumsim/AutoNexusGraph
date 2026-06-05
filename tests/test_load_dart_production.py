@@ -182,7 +182,7 @@ def test_read_main_xml_no_xml_returns_none(tmp_path):
 
 # ── _resolve_manufacturer_id with mocks ───────────────────────
 def test_resolve_manufacturer_id_uses_bridge_first(monkeypatch):
-    """bridge.corp_entity 에 매핑이 있으면 그것을 우선."""
+    """anxg_bridge.corp_entity 에 매핑이 있으면 그것을 우선."""
     fake_cur = mock.MagicMock()
     fake_cur.fetchone.return_value = (498,)
     fake_conn = mock.MagicMock()

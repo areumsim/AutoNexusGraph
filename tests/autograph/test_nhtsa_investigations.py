@@ -155,9 +155,9 @@ def _make_cur_with_resolve(variant=None, model=None, mfr=None):
     state = {"step": 0}
 
     def fake_execute(sql, params=None):
-        if "FROM auto.master_manufacturers" in sql and "SELECT mm.manufacturer_id" in sql:
+        if "FROM anxg_auto.master_manufacturers" in sql and "SELECT mm.manufacturer_id" in sql:
             cur._row = (mfr, model, variant)
-        elif "INSERT INTO auto.events_investigations" in sql:
+        elif "INSERT INTO anxg_auto.events_investigations" in sql:
             cur._row = (12345, True)   # investigation_id, inserted=True
 
     def fake_fetchone():

@@ -136,7 +136,7 @@ def test_companies_dry_run(tmp_path):
     stats = load_companies(targets_path=targets, bulk_root=bulk, dry_run=True)
     assert stats.inserted == 2
     assert stats.batches == 1
-    assert "INSERT INTO master.companies" in stats.sql_preview[0]
+    assert "INSERT INTO anxg_master.companies" in stats.sql_preview[0]
 
 
 # ── filings ──────────────────────────────────────────────────────────

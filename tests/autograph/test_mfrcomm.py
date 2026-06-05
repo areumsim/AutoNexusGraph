@@ -171,13 +171,13 @@ def test_process_row_variant_matched_inserts(monkeypatch):
 
     def fake_execute(sql, params=None):
         state["q"] += 1
-        if "FROM auto.master_manufacturers" in sql:
+        if "FROM anxg_auto.master_manufacturers" in sql:
             cur._row = (10, 5)  # (mfr_id, model_id)
         elif "SELECT variant_id" in sql and "master_vehicle_variants" in sql:
             cur._fetch = [(42,)]
-        elif "SELECT id, text FROM vec.chunks" in sql:
+        elif "SELECT id, text FROM anxg_vec.chunks" in sql:
             cur._row = None          # 기존 청크 없음
-        elif "INSERT INTO vec.chunks" in sql:
+        elif "INSERT INTO anxg_vec.chunks" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchone = lambda: cur._row
@@ -196,7 +196,7 @@ def test_process_row_variant_matched_inserts(monkeypatch):
     assert stats.variants_touched == 1
     assert len(inserts) == 1
     params = inserts[0]
-    # vec.chunks INSERT params:
+    # anxg_vec.chunks INSERT params:
     # (section, text, token_count, metadata, source, mfr_id, model_id, variant_id)
     assert params[0] == "auto.mfrcomm"
     assert "Brake pedal soft" in params[1]
@@ -214,11 +214,11 @@ def test_process_row_unmatched_still_chunks(monkeypatch):
     cur = MagicMock()
 
     def fake_execute(sql, params=None):
-        if "FROM auto.master_manufacturers" in sql:
+        if "FROM anxg_auto.master_manufacturers" in sql:
             cur._row = None
-        elif "SELECT id, text FROM vec.chunks" in sql:
+        elif "SELECT id, text FROM anxg_vec.chunks" in sql:
             cur._row = None
-        elif "INSERT INTO vec.chunks" in sql:
+        elif "INSERT INTO anxg_vec.chunks" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchone = lambda: cur._row
@@ -245,13 +245,13 @@ def test_process_row_year_9999_falls_back_to_model_level(monkeypatch):
     cur = MagicMock()
 
     def fake_execute(sql, params=None):
-        if "FROM auto.master_manufacturers" in sql:
+        if "FROM anxg_auto.master_manufacturers" in sql:
             cur._row = (1, 2)
         elif "SELECT variant_id" in sql and "master_vehicle_variants" in sql:
             cur._fetch = []
-        elif "SELECT id, text FROM vec.chunks" in sql:
+        elif "SELECT id, text FROM anxg_vec.chunks" in sql:
             cur._row = None
-        elif "INSERT INTO vec.chunks" in sql:
+        elif "INSERT INTO anxg_vec.chunks" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchone = lambda: cur._row

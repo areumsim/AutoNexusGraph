@@ -57,7 +57,7 @@ def test_get_plant_capacity_sql_uses_corp_code_filter(mock_db):
     spec.get_plant_capacity("00164742", year=2024)
     assert qd.call_count == 1
     sql, params = qd.call_args[0]
-    assert "auto.plant_capacity" in sql
+    assert "anxg_auto.plant_capacity" in sql
     assert params["cc"] == "00164742"
     assert params["year"] == 2024
     assert params["plant"] is None

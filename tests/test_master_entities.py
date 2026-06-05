@@ -1,4 +1,4 @@
-"""master.entities 스키마 + 마이그레이션 unit 테스트.
+"""anxg_master.entities 스키마 + 마이그레이션 unit 테스트.
 
 PG 미연결 환경에서도 동작하도록 SQL 파일 텍스트 검증과 모듈 importability
 중심으로 작성. 실제 PG round-trip 은 별도 integration 테스트가 담당.
@@ -33,10 +33,10 @@ def test_sql_defines_master_entities_table():
         "valid_from", "valid_to", "schema_version",
     ]
     create = re.search(
-        r"CREATE TABLE IF NOT EXISTS\s+master\.entities\s*\((.*?)\);",
+        r"CREATE TABLE IF NOT EXISTS\s+anxg_master\.entities\s*\((.*?)\);",
         text, re.DOTALL,
     )
-    assert create, "CREATE TABLE master.entities 정의 없음"
+    assert create, "CREATE TABLE anxg_master.entities 정의 없음"
     body = create.group(1)
     for col in required_columns:
         assert re.search(rf"\b{col}\b", body), f"컬럼 누락: {col}"
@@ -71,7 +71,7 @@ def test_sql_has_partial_indexes_for_external_ids():
 
 def test_sql_defines_active_view_and_updated_at_trigger():
     text = SQL_FILE.read_text(encoding="utf-8")
-    assert re.search(r"CREATE OR REPLACE VIEW\s+master\.entities_active",
+    assert re.search(r"CREATE OR REPLACE VIEW\s+anxg_master\.entities_active",
                      text), "entities_active 뷰 없음"
     assert "tg_entities_updated_at" in text, "updated_at 트리거 없음"
 

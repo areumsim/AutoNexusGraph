@@ -27,7 +27,7 @@ CRITERIA = [
     ("10.3",  "LLM Provider 환경변수 전환", "config"),
     ("10.4",  "MVP 범위 (OEM 5~8 × 모델 30~50 × 2022~2024)", "data"),
     ("10.5",  "BOM Level 0~3 안정 + Level 4 coverage ≥ 60%", "data"),
-    ("10.6",  "bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+", "bridge"),
+    ("10.6",  "anxg_bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+", "bridge"),
     ("10.7",  "Hybrid vs Vector Multi-hop +30%p", "eval-llm"),
     ("10.8",  "Cross-Domain QA 4단계 (CD-L1 80%+/L2 70%+/L3 50%+/L4 40%+)", "eval-llm"),
     ("10.9",  "제원 수치 EM 95%+", "eval-llm"),

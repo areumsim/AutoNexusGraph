@@ -118,7 +118,7 @@ def test_resolve_manufacturer_id_via_bridge_sec_cik():
 
     cur = MagicMock()
     def fake_execute(sql, params=None):
-        if "sec_cik" in sql and "bridge.corp_entity" in sql:
+        if "sec_cik" in sql and "anxg_bridge.corp_entity" in sql:
             cur._row = (42,)
         else:
             cur._row = None
@@ -216,14 +216,14 @@ def test_process_cik_file_bridge_and_facts(tmp_path, monkeypatch):
         # 1) bridge sec_cik lookup → 없음.
         # 2) name_norm 매칭 → mfr_id=42.
         # 3+) bridge UPSERT, facts INSERT.
-        if "sec_cik = %s" in sql and "bridge.corp_entity" in sql:
+        if "sec_cik = %s" in sql and "anxg_bridge.corp_entity" in sql:
             cur._row = None
-        elif "FROM auto.master_manufacturers" in sql and "name_norm" in sql:
+        elif "FROM anxg_auto.master_manufacturers" in sql and "name_norm" in sql:
             cur._row = (42,)
-        elif "INSERT INTO bridge.corp_entity" in sql:
+        elif "INSERT INTO anxg_bridge.corp_entity" in sql:
             bridge_calls.append(params)
             cur._row = None
-        elif "INSERT INTO auto.oem_financials_sec" in sql:
+        elif "INSERT INTO anxg_auto.oem_financials_sec" in sql:
             fact_calls.append(params)
             cur._row = (True,)
     cur.execute = fake_execute
@@ -278,7 +278,7 @@ def test_process_cik_file_unmatched_manufacturer(tmp_path, monkeypatch):
 
     def fake_execute(sql, params=None):
         # 모든 lookup 실패.
-        if "INSERT INTO auto.oem_financials_sec" in sql:
+        if "INSERT INTO anxg_auto.oem_financials_sec" in sql:
             fact_calls.append(params)
             cur._row = (True,)
         else:

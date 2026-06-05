@@ -28,7 +28,7 @@ def _safe_query(cur, sql: str, params: tuple = ()) -> list[tuple]:
 
 
 def collect_bridge_quality() -> dict[str, Any]:
-    """bridge.corp_entity + auto.master_* 통계.
+    """anxg_bridge.corp_entity + auto.master_* 통계.
 
     Returns:
         {
@@ -71,7 +71,7 @@ def collect_bridge_quality() -> dict[str, Any]:
 
     try:
         with conn.cursor() as cur:
-            # bridge.corp_entity 전체 통계.
+            # anxg_bridge.corp_entity 전체 통계.
             # PRD §10.6 정확한 정의:
             #   "Wikidata QID + LEI 매칭 confidence ≥ 0.9 비율 80%+"
             # → fuzzy name match 는 본래 candidate 라 모수 외. deterministic
@@ -87,7 +87,7 @@ def collect_bridge_quality() -> dict[str, Any]:
                        COUNT(*) FILTER (WHERE reviewed_status = 'candidate'),
                        COUNT(*) FILTER (WHERE reviewed_status = 'rejected'),
                        COUNT(*) FILTER (WHERE confidence_score >= 0.9)
-                  FROM bridge.corp_entity
+                  FROM anxg_bridge.corp_entity
             """)
             if rows:
                 total, reviewed, candidate, rejected, high_conf = rows[0]
@@ -107,7 +107,7 @@ def collect_bridge_quality() -> dict[str, Any]:
             rows = _safe_query(cur, """
                 SELECT COUNT(*),
                        COUNT(*) FILTER (WHERE confidence_score >= 0.9)
-                  FROM bridge.corp_entity
+                  FROM anxg_bridge.corp_entity
                  WHERE match_method = ANY(%s)
                    AND reviewed_status <> 'rejected'
             """, (list(STRONG_METHODS),))
@@ -127,7 +127,7 @@ def collect_bridge_quality() -> dict[str, Any]:
             rows = _safe_query(cur, """
                 SELECT COUNT(*),
                        COUNT(*) FILTER (WHERE confidence_score >= 0.9)
-                  FROM bridge.corp_entity
+                  FROM anxg_bridge.corp_entity
                  WHERE reviewed_status = 'reviewed'
             """)
             if rows:
@@ -142,7 +142,7 @@ def collect_bridge_quality() -> dict[str, Any]:
             # by_entity_type 분포.
             rows = _safe_query(cur, """
                 SELECT entity_type, COUNT(*)
-                  FROM bridge.corp_entity
+                  FROM anxg_bridge.corp_entity
                  WHERE reviewed_status <> 'rejected'
                  GROUP BY entity_type
                  ORDER BY COUNT(*) DESC
@@ -152,7 +152,7 @@ def collect_bridge_quality() -> dict[str, Any]:
             # by_match_method 분포.
             rows = _safe_query(cur, """
                 SELECT match_method, COUNT(*)
-                  FROM bridge.corp_entity
+                  FROM anxg_bridge.corp_entity
                  WHERE reviewed_status <> 'rejected'
                  GROUP BY match_method
                  ORDER BY COUNT(*) DESC
@@ -163,7 +163,7 @@ def collect_bridge_quality() -> dict[str, Any]:
             rows = _safe_query(cur, """
                 SELECT COUNT(*),
                        COUNT(*) FILTER (WHERE wikidata_qid IS NOT NULL)
-                  FROM auto.master_manufacturers
+                  FROM anxg_auto.master_manufacturers
             """)
             if rows:
                 total, with_qid = rows[0]
@@ -175,7 +175,7 @@ def collect_bridge_quality() -> dict[str, Any]:
                 }
 
             # suppliers — QID/corp_code 보유율.
-            # bridge.corp_entity 의 supplier row 일부가 옛 schema 잔재로
+            # anxg_bridge.corp_entity 의 supplier row 일부가 옛 schema 잔재로
             # entity_id 에 'Q...' QID 가 들어있어 ::bigint cast 가 실패한다.
             # `entity_id ~ '^[0-9]+$'` regex 로 numeric 만 cast (안전성 보장).
             rows = _safe_query(cur, """
@@ -184,14 +184,14 @@ def collect_bridge_quality() -> dict[str, Any]:
                        COUNT(*) FILTER (
                          WHERE supplier_id IN (
                            SELECT entity_id::bigint
-                             FROM bridge.corp_entity
+                             FROM anxg_bridge.corp_entity
                             WHERE entity_type = 'supplier'
                               AND corp_code IS NOT NULL
                               AND reviewed_status <> 'rejected'
                               AND entity_id ~ '^[0-9]+$'
                          )
                        )
-                  FROM auto.master_suppliers
+                  FROM anxg_auto.master_suppliers
             """)
             if rows:
                 total, with_qid, with_corp = rows[0]
@@ -201,7 +201,7 @@ def collect_bridge_quality() -> dict[str, Any]:
                     "with_corp_code": int(with_corp),
                 }
 
-            # bridge.corp_entity supplier 의 entity_id 패턴 진단 (장기 마이그 안내용).
+            # anxg_bridge.corp_entity supplier 의 entity_id 패턴 진단 (장기 마이그 안내용).
             rows = _safe_query(cur, """
                 SELECT
                   COUNT(*) FILTER (WHERE entity_type='supplier' AND entity_id ~ '^[0-9]+$') AS numeric_ids,
@@ -209,7 +209,7 @@ def collect_bridge_quality() -> dict[str, Any]:
                   COUNT(*) FILTER (WHERE entity_type='supplier'
                                     AND entity_id !~ '^[0-9]+$'
                                     AND entity_id !~ '^Q[0-9]+$') AS other_ids
-                  FROM bridge.corp_entity
+                  FROM anxg_bridge.corp_entity
             """)
             if rows:
                 num_ids, qid_ids, other_ids = rows[0]
@@ -241,7 +241,7 @@ def format_summary_md(quality: dict[str, Any]) -> str:
     total = br.get("total", 0)
     high = br.get("high_confidence", 0)
     ratio = br.get("high_confidence_ratio", 0.0)
-    lines.append(f"- `bridge.corp_entity` 전체: **{total}** rows")
+    lines.append(f"- `anxg_bridge.corp_entity` 전체: **{total}** rows")
     lines.append(
         f"  - reviewed={br.get('reviewed',0)}, "
         f"candidate={br.get('candidate',0)}, "
@@ -304,7 +304,7 @@ def format_summary_md(quality: dict[str, Any]) -> str:
         numeric = patterns.get("numeric (stringified supplier_id)", 0)
         if qid_legacy:
             lines.append(
-                f"- ⚠️ bridge.corp_entity supplier entity_id 패턴: "
+                f"- ⚠️ anxg_bridge.corp_entity supplier entity_id 패턴: "
                 f"numeric={numeric}, **QID legacy={qid_legacy}** (마이그 필요), "
                 f"other={patterns.get('other', 0)}"
             )

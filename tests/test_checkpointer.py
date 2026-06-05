@@ -91,7 +91,7 @@ def test_resolve_backend_memory_returns_none_if_lg_missing(monkeypatch):
 def test_resolve_schema_default(monkeypatch):
     monkeypatch.delenv("LANGGRAPH_CHECKPOINT_SCHEMA", raising=False)
     s = checkpointer._resolve_schema()
-    assert s == "chat"
+    assert s == "anxg_chat"
 
 
 def test_resolve_schema_env_override(monkeypatch):

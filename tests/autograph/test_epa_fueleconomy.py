@@ -155,7 +155,7 @@ def test_process_row_skips_unmatched(tmp_path, monkeypatch):
     def fake_execute(sql, params=None):
         if sql.strip().startswith("SELECT v.variant_id"):
             cur._last_select = []
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchall = lambda: cur._last_select if hasattr(cur, "_last_select") else []
@@ -183,10 +183,10 @@ def test_process_row_inserts_measurements(monkeypatch):
     def fake_execute(sql, params=None):
         if sql.strip().startswith("SELECT v.variant_id"):
             cur._fetch = [(42,)]
-        elif sql.strip().startswith("DELETE FROM auto.spec_measurements"):
+        elif sql.strip().startswith("DELETE FROM anxg_auto.spec_measurements"):
             deletes.append(params)
             cur.rowcount = 0
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
 
     cur.execute = fake_execute
@@ -248,7 +248,7 @@ def test_process_row_no_useful_measurements(monkeypatch):
     def fake_execute(sql, params=None):
         if sql.strip().startswith("SELECT v.variant_id"):
             cur._fetch = [(42,)]
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchall = lambda: cur._fetch
@@ -302,7 +302,7 @@ def test_load_epa_end_to_end_with_zip(tmp_path, monkeypatch):
                 cur._fetch = [(101,)]
             else:
                 cur._fetch = []
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchall = lambda: cur._fetch
