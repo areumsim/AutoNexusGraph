@@ -19,7 +19,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 # BGE-M3 (XLM-R BPE) 의 char/token 비율은 한국어 ~2, 영어 ~4, 한영혼합 비즈니스
 # 문서 ~3 정도. 단일 휴리스틱은 한영 혼합 기준의 ``//3`` 이 가장 균형 잡힘.
 # 정확한 토큰 카운트가 필요하면 transformers.AutoTokenizer('BAAI/bge-m3') 사용.
@@ -55,7 +54,6 @@ _SENT_BREAK = re.compile(r"([\.!?。](?:\s|$)|\n\n+)")
 def _split_sentences(text: str) -> list[str]:
     """문장 단위로 자르기. 표 행 등은 그대로 한 단위."""
     parts: list[str] = []
-    buf = []
     last = 0
     for m in _SENT_BREAK.finditer(text):
         end = m.end()

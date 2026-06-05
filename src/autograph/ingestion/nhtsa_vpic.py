@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,9 +30,9 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     save_raw,
 )
+
 from ..config import get_auto_settings
 from ._common_nhtsa import nhtsa_http_get
-
 
 log = logging.getLogger(__name__)
 

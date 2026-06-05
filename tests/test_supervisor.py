@@ -102,10 +102,10 @@ def test_send_directives_empty_when_no_unblocked():
 def test_send_directives_returns_one_per_unblocked():
     """langgraph 설치돼 있는 환경에서 ready task 만큼 Send 객체."""
     try:
-        from langgraph.types import Send   # noqa: F401
+        from langgraph.types import Send  # noqa: F401
     except ImportError:
         try:
-            from langgraph.graph import Send   # type: ignore[attr-defined]  # noqa: F401
+            from langgraph.graph import Send  # type: ignore[attr-defined]  # noqa: F401
         except ImportError:
             import pytest
             pytest.skip("langgraph 미설치 — Send API 검증 skip")

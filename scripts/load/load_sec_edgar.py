@@ -16,8 +16,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
-from autonexusgraph.ingestion.sec_client import SecEdgarClient, SecFiling
-
+from autonexusgraph.ingestion.sec_client import SecEdgarClient
 
 UPSERT_FILING = """
 INSERT INTO anxg_sec.filings
@@ -82,7 +81,6 @@ def main() -> int:
         # extract via client helper
         client = SecEdgarClient.__new__(SecEdgarClient)
         # avoid __init__ — only need extract_filings
-        filings: list[SecFiling] = []
         for f in SecEdgarClient.extract_filings(client, sub):
             rows.append((
                 f.accession_no, f.cik, corp_code, company_name,

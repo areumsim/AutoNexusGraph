@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from autograph.ingestion._confidence import (
     GRADE_TO_CONFIDENCE,
     KIND_OVERRIDE,

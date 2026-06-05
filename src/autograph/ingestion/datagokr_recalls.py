@@ -33,7 +33,6 @@ from autonexusgraph.ingestion._common import (
 
 from ..config import get_auto_settings
 
-
 log = logging.getLogger(__name__)
 
 
@@ -57,7 +56,7 @@ def _fetch_page(page: int, per_page: int = 100) -> dict:
         "Accept": "application/json",
         "User-Agent": "AutoGraph-Research/0.1",
     })
-    _LIMITER.wait()
+    _LIMITER.acquire()
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))

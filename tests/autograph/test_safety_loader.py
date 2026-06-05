@@ -71,14 +71,14 @@ def test_rating_map_covers_core_ncap_fields():
 
 def test_rating_map_value_types():
     """value_type 'star' | 'pct' | 'text' 만 허용."""
-    for field, (measure_key, unit, vtype) in _RATING_MAP.items():
+    for field, (measure_key, _unit, vtype) in _RATING_MAP.items():
         assert vtype in ("star", "pct", "text"), f"{field}: {vtype}"
         # measure_key 컨벤션 — safety.* 접두사.
         assert measure_key.startswith("safety."), f"{field}: {measure_key}"
 
 
 def test_star_fields_have_star_unit():
-    for field, (measure_key, unit, vtype) in _RATING_MAP.items():
+    for field, (_measure_key, unit, vtype) in _RATING_MAP.items():
         if vtype == "star":
             assert unit == "star", f"{field}: {unit}"
         elif vtype == "pct":

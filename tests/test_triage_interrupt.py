@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from autonexusgraph.agents.interrupts import InterruptUnavailable
 from autonexusgraph.agents.nodes import triage_node
 
@@ -78,7 +76,7 @@ def test_prompt_injection_short_circuits_triage():
 def test_unique_match_no_interrupt():
     """모호 없으면 interrupt 안 부르고 그냥 1순위."""
     state = {"question": "삼성전자 매출은?", "llm_usage_usd": 0.0}
-    with patch("autonexusgraph.tools.financials.lookup_company", _unique_hits) as m_lookup, \
+    with patch("autonexusgraph.tools.financials.lookup_company", _unique_hits), \
          patch("autonexusgraph.agents.interrupts.request_interrupt") as m_req:
         triage_node(state)
     assert state["target_companies"] == ["00126380"]

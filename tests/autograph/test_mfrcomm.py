@@ -5,13 +5,9 @@ DB / 파일 시스템 모킹 — TAB 파싱 + variant 매칭 + 청크 적재 시
 
 from __future__ import annotations
 
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 
 # ── ingestion 모듈 — manual mode ──────────────────────────
@@ -136,7 +132,7 @@ def test_find_zip_priorities(tmp_path, monkeypatch):
 
 # ── _process_row — 매칭 + UPSERT ──────────────────────────
 def test_process_row_skips_no_summary():
-    from autograph.loaders.load_auto_mfrcomm import _process_row, LoadStats
+    from autograph.loaders.load_auto_mfrcomm import LoadStats, _process_row
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None
     cur.fetchone = lambda: None
@@ -152,7 +148,7 @@ def test_process_row_skips_no_summary():
 
 
 def test_process_row_skips_no_id():
-    from autograph.loaders.load_auto_mfrcomm import _process_row, LoadStats
+    from autograph.loaders.load_auto_mfrcomm import LoadStats, _process_row
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None
     cur.fetchone = lambda: None

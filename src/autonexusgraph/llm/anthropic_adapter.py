@@ -13,7 +13,6 @@ from typing import Any
 
 from .base import LLMClient, LLMError, LLMResponse, TokenUsage
 
-
 # 모델별 토큰 단가 (USD, 1M 토큰당)
 # https://www.anthropic.com/pricing
 _PRICING: dict[str, tuple[float, float]] = {
@@ -100,8 +99,7 @@ class AnthropicClient(LLMClient):
                 max_tokens=max_tokens or 4096,
                 **kwargs,
             ) as stream:
-                for text in stream.text_stream:
-                    yield text
+                yield from stream.text_stream
         except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"Anthropic stream failed: {e}") from e
 
@@ -118,7 +116,7 @@ class AnthropicClient(LLMClient):
         tool_name = schema.get("name", "structured_response")
         input_schema = schema.get("schema", schema)
         try:
-            resp = self._client.messages.create(
+            resp = self._client.messages.create(  # type: ignore[call-overload]  # anthropic SDK kwargs 동적
                 model=self.model,
                 system=system if system is not None else "",
                 messages=msgs,  # type: ignore[arg-type]

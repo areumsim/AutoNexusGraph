@@ -29,8 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from autonexusgraph.db.postgres import get_connection
-from ..config import get_auto_settings
 
+from ..config import get_auto_settings
 
 log = logging.getLogger(__name__)
 

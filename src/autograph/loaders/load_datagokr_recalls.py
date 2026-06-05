@@ -23,7 +23,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
-
 log = logging.getLogger(__name__)
 
 
@@ -210,7 +209,7 @@ def run(csv_path: Path | None = None) -> dict:
                          or item.get("recall_no") or item.get("RECALL_NO"))
             manufacturer_name = (item.get("제작자") or item.get("제작사")
                                  or item.get("manufacturer"))
-            model_name = item.get("차명") or item.get("model")
+            item.get("차명") or item.get("model")
             defect = item.get("결함내용") or item.get("defect")
             remedy = item.get("시정조치") or item.get("remedy")
             report_date = item.get("리콜개시일") or item.get("startDate")

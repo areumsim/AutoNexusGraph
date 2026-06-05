@@ -21,7 +21,6 @@ from autonexusgraph.extractors.base import (
     RunContext,
 )
 
-
 log = logging.getLogger(__name__)
 
 
@@ -80,7 +79,7 @@ class AutoRelationExtractor(BaseExtractor):
         try:
             out = client.chat_json(messages, schema=self.prompt["json_schema"],
                                     temperature=0.0, purpose=self.purpose)
-        except Exception as e:  # noqa: BLE001 — engine 의 safe_extract 가 자세히 wrap.
+        except Exception:  # noqa: BLE001 — engine 의 safe_extract 가 자세히 wrap.
             raise
 
         rels = out.get("relations") or []

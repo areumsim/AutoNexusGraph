@@ -16,7 +16,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 
 
@@ -57,7 +60,7 @@ def main() -> int:
             limiter.acquire()
             try:
                 data = fetch_with_retry(
-                    lambda: cli.search_by_applicant(name, year_from=args.year_from),
+                    lambda name=name: cli.search_by_applicant(name, year_from=args.year_from),
                     max_tries=3,
                 )
                 save_raw("kipris", f"{corp_code}/applicant_{args.year_from}.json", data)

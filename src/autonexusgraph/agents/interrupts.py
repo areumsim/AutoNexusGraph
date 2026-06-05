@@ -47,7 +47,7 @@ class InterruptPayload(TypedDict, total=False):
     thread_id: str                   # resume 시 식별용
 
 
-class InterruptUnavailable(RuntimeError):
+class InterruptUnavailable(RuntimeError):  # noqa: N818 — 제어흐름 예외(의도적 비-Error 명명)
     """langgraph interrupt API 사용 불가 — 호출부가 폴백 처리."""
 
 
@@ -57,10 +57,10 @@ def request_interrupt(payload: InterruptPayload) -> Any:
     langgraph 미설치 / fallback chain → InterruptUnavailable raise.
     """
     try:
-        from langgraph.types import interrupt   # type: ignore[import-not-found]
+        from langgraph.types import interrupt  # type: ignore[import-not-found]
     except ImportError:
         try:
-            from langgraph.graph import interrupt   # type: ignore[attr-defined]
+            from langgraph.graph import interrupt  # type: ignore[attr-defined,no-redef]
         except ImportError as exc:
             raise InterruptUnavailable("langgraph interrupt API 미사용 (폴백 환경)") from exc
     logger.info("[interrupt] kind=%s prompt=%r", payload.get("kind"),

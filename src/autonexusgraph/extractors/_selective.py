@@ -21,7 +21,6 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-
 # ─── 금융 도메인 signal token 표 ──────────────────────────────
 # named: 대문자 약어 (DRAM/SOC/M&A/CEO), 연도(2019~2029), 한글 명사+접미사 패턴
 _NAMED_SIGNAL_RE = re.compile(

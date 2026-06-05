@@ -17,7 +17,6 @@ from typing import Any
 from ..config import get_settings
 from ._common import LoadStats, iter_jsonl, parse_date
 
-
 SQL_UPSERT = """
 INSERT INTO anxg_master.companies
   (corp_code, corp_name, stock_code, market, sector, industry, listed_at, is_active, extra, updated_at)

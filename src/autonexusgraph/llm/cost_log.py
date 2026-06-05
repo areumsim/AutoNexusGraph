@@ -35,7 +35,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 log = logging.getLogger(__name__)
 
 # POSIX O_APPEND 가 64KB 미만 쓰기를 원자 보장하지만, 안전 위해 프로세스 내 Lock 도.
@@ -176,6 +175,7 @@ class LoggingLLMClient:
                     max_tokens: int | None = None,
                     purpose: str | None = None, **kw):
         import time
+
         from .cost import cost_of_call
         t0 = time.monotonic()
         chunks: list[str] = []
@@ -209,6 +209,7 @@ class LoggingLLMClient:
     def chat_json(self, messages, schema, *, temperature: float = 0.0,
                   purpose: str | None = None, **kw):
         import time
+
         from .cost import cost_of_call
         t0 = time.monotonic()
         result = self._inner.chat_json(

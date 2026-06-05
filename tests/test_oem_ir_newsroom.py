@@ -12,8 +12,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -297,8 +295,9 @@ def test_crawl_robots_check_blocks_url(monkeypatch):
 # ── _meta.jsonl 저장 + loader 통합 ─────────────────────────────
 def test_crawl_writes_meta_jsonl(monkeypatch, tmp_path):
     """fetch 성공 시 _meta.jsonl 에 row append 검증."""
-    from autograph.ingestion.oem_ir_newsroom import FetchedDocument
     import datetime as _dt
+
+    from autograph.ingestion.oem_ir_newsroom import FetchedDocument
 
     fake_doc = FetchedDocument(
         oem="hyundai",

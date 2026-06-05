@@ -31,7 +31,6 @@ from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 _SOURCE_ID = "anxg_auto.events_recalls(datagokr_kotsa)"

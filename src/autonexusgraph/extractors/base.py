@@ -55,7 +55,7 @@ class ExtractorResult:
         *,
         warnings: Sequence[str] = (),
         latency_ms: int = 0,
-    ) -> "ExtractorResult":
+    ) -> ExtractorResult:
         return cls(
             relations=(), extractor_name=name, extractor_version=version,
             latency_ms=latency_ms, warnings=tuple(warnings),

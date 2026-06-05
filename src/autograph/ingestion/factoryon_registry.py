@@ -43,7 +43,6 @@ from autonexusgraph.ingestion._common import (
 
 from ..config import get_auto_settings
 
-
 log = logging.getLogger(__name__)
 
 

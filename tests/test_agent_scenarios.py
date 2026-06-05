@@ -337,7 +337,10 @@ def test_multihop_plan_emits_spawn_template():
 def test_fanin_reducers_dedup_and_clear():
     """dedup-concat/merge reducer — 손실 0·pre-fork 중복 0·clear 마커 동작."""
     from autonexusgraph.agents.state import (
-        _ClearedDict, _ClearedList, _concat_dedup_by, _merge_dict_dedup,
+        _ClearedDict,
+        _ClearedList,
+        _concat_dedup_by,
+        _merge_dict_dedup,
     )
     concat = _concat_dedup_by("id")
     e0 = [{"id": "c0"}]

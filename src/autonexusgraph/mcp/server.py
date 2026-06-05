@@ -20,9 +20,9 @@ import os
 from typing import Any
 
 # import 실패 시 __init__.py 에서 catch.
-from mcp.server import Server                        # type: ignore[import-not-found]
-from mcp.server.stdio import stdio_server            # type: ignore[import-not-found]
-from mcp.types import TextContent, Tool              # type: ignore[import-not-found]
+from mcp.server import Server  # type: ignore[import-not-found]
+from mcp.server.stdio import stdio_server  # type: ignore[import-not-found]
+from mcp.types import TextContent, Tool  # type: ignore[import-not-found]
 
 from .discovery import ToolSpec, build_tool_manifest
 

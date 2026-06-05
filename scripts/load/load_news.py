@@ -29,7 +29,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.loaders._edge_meta import edge_meta_set_clause
 
-
 UPSERT_ARTICLE = """
 INSERT INTO anxg_news.articles
   (article_hash, source, guid, title, summary, body_text, link,

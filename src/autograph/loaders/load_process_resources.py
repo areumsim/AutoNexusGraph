@@ -25,7 +25,6 @@ from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 _SOURCE_ID = "process_resources_seed (표준 공정 지식)"

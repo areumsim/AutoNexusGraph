@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import re
 
-
 _NORM = re.compile(r"[^\w]+", re.UNICODE)
 
 

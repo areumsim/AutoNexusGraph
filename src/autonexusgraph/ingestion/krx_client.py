@@ -38,7 +38,7 @@ class KrxClient:
         import FinanceDataReader as fdr  # noqa: N813
         self._fdr = fdr
 
-    def __enter__(self) -> "KrxClient":
+    def __enter__(self) -> KrxClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:

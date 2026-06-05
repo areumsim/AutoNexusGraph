@@ -34,9 +34,9 @@ import io
 import json
 import logging
 import zipfile
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.neo4j import get_session
@@ -44,7 +44,6 @@ from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ._neo4j_helpers import run_batched
-
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +95,7 @@ def _iter_inv_rows(zip_path: Path) -> Iterator[dict[str, str]]:
                     continue
                 # 짧은 row (마지막 줄 끊김) 도 dict 으로 — 부족분은 빈 문자열.
                 values = list(row) + [""] * (len(_COLUMNS) - len(row))
-                yield dict(zip(_COLUMNS, values[: len(_COLUMNS)]))
+                yield dict(zip(_COLUMNS, values[: len(_COLUMNS)], strict=False))
 
 
 def _parse_date(s: str | None) -> str | None:

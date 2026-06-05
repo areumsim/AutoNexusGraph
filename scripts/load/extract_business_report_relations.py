@@ -100,10 +100,14 @@ def main() -> int:
 
     print(f"[P3] target corps: {len(corps)} (sample: {corps[:5]})")
 
-    from autonexusgraph.extractors.llm_relations import (
-        filter_target_chunks, estimate_p3_cost, load_prompt, extract_one, save_result,
-    )
     from autonexusgraph.config import get_settings
+    from autonexusgraph.extractors.llm_relations import (
+        estimate_p3_cost,
+        extract_one,
+        filter_target_chunks,
+        load_prompt,
+        save_result,
+    )
     settings = get_settings()
 
     # 1) 대상 청크 SELECT

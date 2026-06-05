@@ -17,8 +17,9 @@ Makefile: ``make freshness``.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import date, datetime, timezone
-from typing import Any, Sequence
+from typing import Any
 
 DEFAULT_STALE_DAYS = 90
 
@@ -42,7 +43,7 @@ def _run(sql: str, params: Sequence | None = None) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(sql, tuple(params or ()))
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
     conn.commit()
     return rows
 

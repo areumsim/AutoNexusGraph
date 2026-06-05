@@ -18,7 +18,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.loaders._edge_meta import edge_meta_set_clause
 
-
 CYPHER = f"""
 UNWIND $rows AS r
 MATCH (a:Anxg_Company {{corp_code: r.a}})

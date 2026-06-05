@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -55,9 +55,9 @@ class ChannelStatus:
         except (TypeError, ValueError):
             raw = None
         try:
-            ng = int(self.neo4j_count) if self.neo4j_count != "?" else None
+            int(self.neo4j_count) if self.neo4j_count != "?" else None
         except (TypeError, ValueError):
-            ng = None
+            pass
 
         if pg is not None and pg > 0:
             return "🟢"
@@ -129,7 +129,7 @@ def collect() -> list[ChannelStatus]:
     out.append(ChannelStatus(
         name="DART 사업보고서 production",
         raw_count=dart_zips,
-        raw_detail=f"zip files (6 OEM)",
+        raw_detail="zip files (6 OEM)",
         pg_count=dart_pg,
         pg_detail=f"capacity={dart_capa} + production={dart_prod}",
         neo4j_count=dart_edges,

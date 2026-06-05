@@ -13,19 +13,20 @@
 # ── Cypher 템플릿 자동 병합 (import 1회) ─────────────────────
 from autonexusgraph.tools.cypher_templates import (
     TEMPLATES as _FIN_TEMPLATES,
+)
+from autonexusgraph.tools.cypher_templates import (
     register_templates as _register_templates,
 )
+
 from ..cypher_templates_ip import IP_TEMPLATES as _IP_TEMPLATES
 
 _register_templates(_FIN_TEMPLATES, _IP_TEMPLATES)
 
 
-from .patents import (
-    compare_assignees_patent_volume,
-    count_patents_by_field,
-    get_patent_info,
-    list_patents_by_assignee,
-    lookup_patent,
+from .bridge import (
+    bridge_assignee_to_corp,
+    bridge_corp_to_assignee,
+    cross_query_ip,
 )
 from .graph import (
     find_co_assignees,
@@ -37,17 +38,18 @@ from .graph import (
     lookup_assignee_graph,
     most_cited_patents,
 )
+from .patents import (
+    compare_assignees_patent_volume,
+    count_patents_by_field,
+    get_patent_info,
+    list_patents_by_assignee,
+    lookup_patent,
+)
 from .retrieve import (
     get_chunk_ip,
     search_by_metadata_ip,
     search_patents,
 )
-from .bridge import (
-    bridge_assignee_to_corp,
-    bridge_corp_to_assignee,
-    cross_query_ip,
-)
-
 
 __all__ = [
     # patents

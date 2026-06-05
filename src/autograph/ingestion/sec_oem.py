@@ -37,7 +37,6 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 from pathlib import Path
 
@@ -48,7 +47,6 @@ from autonexusgraph.ingestion._common import (
     save_raw,
 )
 from autonexusgraph.ingestion.sec_client import SecEdgarClient
-
 
 log = logging.getLogger(__name__)
 
@@ -117,7 +115,7 @@ def fetch_company_facts(cik: int | str, *,
 
     save_raw(_SOURCE, f"CIK{cik10}.json", data)
     log.info("[sec_oem] CIK%s saved (%d concepts)", cik10,
-             len(((data.get("facts") or {}).get("us-gaap") or {})))
+             len((data.get("facts") or {}).get("us-gaap") or {}))
     ckpt.mark_done(key, {"cik": cik10})
     return dest
 

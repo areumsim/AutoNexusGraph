@@ -31,7 +31,6 @@ sys.path.insert(0, str(ROOT))
 # SSOT — eval.metrics.prd_dashboard.collect_dashboard() 가 14항 측정.
 from eval.metrics.prd_dashboard import collect_dashboard, format_summary_md  # noqa: E402
 
-
 log = logging.getLogger(__name__)
 
 

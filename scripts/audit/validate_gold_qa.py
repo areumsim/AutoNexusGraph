@@ -26,7 +26,6 @@ import re
 import sys
 from pathlib import Path
 
-
 REQUIRED_FIELDS = ("qid", "question", "question_type", "complexity")
 
 VALID_QUESTION_TYPE = {
@@ -109,7 +108,7 @@ def _check_row(path: Path, lineno: int, row: dict,
     # 3. multi_hop / complexity 정합.
     if row.get("complexity") == "hard":
         if not row.get("requires_multi_hop") and int(row.get("hop_count") or 0) < 2:
-            warn(f"complexity=hard 인데 requires_multi_hop=false & hop_count<2")
+            warn("complexity=hard 인데 requires_multi_hop=false & hop_count<2")
 
     # 3a. main_hop_path ↔ hop_count 정합. path 가 list 면 hop_count = len(path)-1 권장.
     mhp = row.get("main_hop_path")
@@ -173,7 +172,7 @@ def main() -> int:
     skipped = [p for p in paths if p.name.startswith("_")]
     paths   = [p for p in paths if not p.name.startswith("_")]
     if skipped:
-        print(f"[lint] skip (사용자 작업물 — `_` prefix): "
+        print("[lint] skip (사용자 작업물 — `_` prefix): "
               + ", ".join(p.name for p in skipped), file=sys.stderr)
     if not paths:
         print("[lint] 검사할 파일 없음", file=sys.stderr)

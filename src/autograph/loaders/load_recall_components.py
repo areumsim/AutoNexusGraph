@@ -31,7 +31,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ._neo4j_helpers import run_batched
 
-
 log = logging.getLogger(__name__)
 
 
@@ -123,12 +122,12 @@ def _match_one(text: str, components: list[dict]
             best_token = (c, overlap)
 
     # 의미 토큰 ≥ 2 일치 — token 매칭. 한쪽이 1 토큰이면 ≥ 1 로 완화.
-    c, n = best_token
-    if c is None or n == 0:
+    best_c, n = best_token
+    if best_c is None or n == 0:
         return None, "", 0.0
-    threshold = 1 if (len(c["tokens"]) <= 1 or len(text_tokens) <= 1) else 2
+    threshold = 1 if (len(best_c["tokens"]) <= 1 or len(text_tokens) <= 1) else 2
     if n >= threshold:
-        return c, "token", 0.65
+        return best_c, "token", 0.65
     return None, "", 0.0
 
 
@@ -179,9 +178,12 @@ def load_recall_components(*, dry_run: bool = False, batch: int = 500) -> MatchS
         if c is None:
             stats.no_match += 1
             continue
-        if kind == "exact":   stats.matched_exact += 1
-        elif kind == "alias": stats.matched_alias += 1
-        else:                 stats.matched_token += 1
+        if kind == "exact":
+            stats.matched_exact += 1
+        elif kind == "alias":
+            stats.matched_alias += 1
+        else:
+            stats.matched_token += 1
         matched_ids.append((recall_id, int(c["id"]), kind, conf))
         edges.append({
             "recall_id": recall_id, "component_id": int(c["id"]),

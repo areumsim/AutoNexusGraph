@@ -29,9 +29,9 @@ log = logging.getLogger(__name__)
 
 def _check_handler() -> dict:
     try:
-        import ipgraph    # noqa: F401
-        from ipgraph.agent_handler import IPGraphHandler, IP_GRAPH_ALLOWED
+        import ipgraph  # noqa: F401
         from autonexusgraph.agents._domain_handler import get_handler
+        from ipgraph.agent_handler import IP_GRAPH_ALLOWED, IPGraphHandler
     except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"ipgraph import 실패: {e}"}
     h = get_handler("ip")
@@ -49,7 +49,7 @@ def _check_handler() -> dict:
 
 def _check_router() -> dict:
     try:
-        from autonexusgraph.agents._domain_handler import _ROUTERS    # type: ignore[attr-defined]
+        from autonexusgraph.agents._domain_handler import _ROUTERS  # type: ignore[attr-defined]
         from ipgraph.policy import route_domain_ip
     except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"router import 실패: {e}"}
@@ -67,7 +67,7 @@ def _check_router() -> dict:
 
 def _check_ontology() -> dict:
     try:
-        from autonexusgraph.ontology import load_and_validate, OntologyValidationError
+        from autonexusgraph.ontology import OntologyValidationError, load_and_validate
     except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"ontology 모듈 import 실패: {e}"}
     out: dict = {"passed": True, "files": []}
@@ -96,9 +96,9 @@ def _check_ontology() -> dict:
 
 def _check_cypher_templates() -> dict:
     try:
-        from ipgraph.cypher_templates_ip import IP_TEMPLATES
-        from ipgraph import tools          # noqa: F401  부작용: register_templates(_IP_TEMPLATES)
         from autonexusgraph.tools.cypher_templates import TEMPLATES
+        from ipgraph import tools  # noqa: F401  부작용: register_templates(_IP_TEMPLATES)
+        from ipgraph.cypher_templates_ip import IP_TEMPLATES
     except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"cypher_templates import 실패: {e}"}
     ip_count = len(IP_TEMPLATES)

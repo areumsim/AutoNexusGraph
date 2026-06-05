@@ -29,7 +29,6 @@ from pathlib import Path
 
 from autonexusgraph.config import get_settings
 
-
 log = logging.getLogger(__name__)
 
 

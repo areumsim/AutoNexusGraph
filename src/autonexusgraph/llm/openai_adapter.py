@@ -11,7 +11,6 @@ from typing import Any
 
 from .base import LLMClient, LLMError, LLMResponse, TokenUsage
 
-
 # 모델별 토큰 단가 (USD, 1M 토큰당) — 2025-01 기준 공식 가격
 # 갱신: https://openai.com/api/pricing/
 _PRICING: dict[str, tuple[float, float]] = {
@@ -79,7 +78,7 @@ class OpenAIClient(LLMClient):
         except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"OpenAI stream failed: {e}") from e
         for chunk in stream:
-            delta = chunk.choices[0].delta.content if chunk.choices else None
+            delta = chunk.choices[0].delta.content if chunk.choices else None  # type: ignore[union-attr]  # openai Stream[ChatCompletionChunk]
             if delta:
                 yield delta
 
@@ -93,7 +92,7 @@ class OpenAIClient(LLMClient):
     ) -> dict[str, Any]:
         """Structured Outputs (response_format=json_schema)."""
         try:
-            resp = self._client.chat.completions.create(
+            resp = self._client.chat.completions.create(  # type: ignore[call-overload]  # openai SDK kwargs 동적
                 model=self.model,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=temperature,

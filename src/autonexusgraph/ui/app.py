@@ -14,9 +14,9 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
+from typing import Any
 
 # src/ 를 path 에 추가 (streamlit 진입 시)
 _ROOT = Path(__file__).resolve().parents[3]
@@ -27,18 +27,28 @@ if str(_SRC) not in sys.path:
 import streamlit as st
 
 from autonexusgraph.logging_setup import configure_logging
-from autonexusgraph.ui.storage import (
-    get_or_create_thread_id, reset_thread,
-    load_history, persist_turn, list_recent_threads,
-    set_conversation_title, generate_title_from_question,
-)
 from autonexusgraph.ui.components import (
-    render_citations, render_grounding_warning, render_agent_trace,
-    render_cost_badge, render_provider_info, render_sample_questions,
-    render_feedback_buttons, render_progress_chip, node_label,
-    render_clarification, render_cost_approval,
+    node_label,
+    render_agent_trace,
+    render_citations,
+    render_clarification,
+    render_cost_approval,
+    render_cost_badge,
+    render_feedback_buttons,
+    render_grounding_warning,
+    render_progress_chip,
+    render_provider_info,
+    render_sample_questions,
 )
-
+from autonexusgraph.ui.storage import (
+    generate_title_from_question,
+    get_or_create_thread_id,
+    list_recent_threads,
+    load_history,
+    persist_turn,
+    reset_thread,
+    set_conversation_title,
+)
 
 configure_logging()   # app INFO 로그(history/worker) 표면화 — settings.log_level
 
@@ -140,7 +150,7 @@ if user_input:
     # agent run — 노드별 진행 표시 (PRD §7.6.5) + HITL interrupt (PRD §7.5.6)
     with st.chat_message("assistant"):
         try:
-            from autonexusgraph.agents import run_agent_stream, run_agent_resume_stream
+            from autonexusgraph.agents import run_agent_resume_stream, run_agent_stream
             with st.status("분석 중…", expanded=True) as status:
                 last_state = None
                 interrupted_payload = None
@@ -175,12 +185,12 @@ if user_input:
             if interrupted_payload:
                 kind = interrupted_payload.get("kind")
                 key_prefix = f"{thread_id}_{len(st.session_state.messages)}"
-                resume_value: any = None
+                resume_value: Any = None
                 if kind == "company_clarification":
-                    idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
-                    if idx is None:
+                    clar_idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
+                    if clar_idx is None:
                         st.stop()
-                    resume_value = {"index": idx}
+                    resume_value = {"index": clar_idx}
                 elif kind == "cost_approval":
                     approved = render_cost_approval(interrupted_payload, key_prefix=key_prefix)
                     if approved is None:

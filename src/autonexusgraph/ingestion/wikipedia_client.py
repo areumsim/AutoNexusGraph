@@ -16,10 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
 
 import httpx
-
 
 WIKI_BASE_KO = "https://ko.wikipedia.org"
 WIKI_BASE_EN = "https://en.wikipedia.org"
@@ -56,7 +54,7 @@ class WikipediaClient:
             follow_redirects=True,
         )
 
-    def __enter__(self) -> "WikipediaClient":
+    def __enter__(self) -> WikipediaClient:
         return self
 
     def __exit__(self, *_: Any) -> None:
@@ -142,7 +140,7 @@ class WikipediaClient:
     # ── search fallback ──────────────────────────────────────
     def search(self, query: str, limit: int = 5) -> list[dict]:
         url = f"{self.base}/w/api.php"
-        params = {
+        params: dict[str, Any] = {
             "action": "query", "list": "search", "srsearch": query,
             "srlimit": limit, "format": "json",
         }
@@ -172,7 +170,7 @@ class WikipediaClient:
 
 
 # ── Infobox 파서 ────────────────────────────────────────────
-import re
+import re  # noqa: E402 — 파서 섹션 지역 배치(의도적)
 
 _INFOBOX_HEAD = re.compile(r"\{\{\s*(Infobox|정보상자)\b", re.IGNORECASE)
 

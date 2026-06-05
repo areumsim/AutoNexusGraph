@@ -19,7 +19,7 @@ from .discovery import (
 )
 
 try:
-    from .server import build_mcp_server, run_stdio_server   # type: ignore[attr-defined]
+    from .server import build_mcp_server, run_stdio_server  # type: ignore[attr-defined]
     _HAS_SERVER = True
 except ImportError:
     _HAS_SERVER = False

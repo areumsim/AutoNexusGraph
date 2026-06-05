@@ -28,7 +28,6 @@ from autonexusgraph.ingestion._common import RateLimiter, save_raw
 
 from ..config import get_auto_settings
 
-
 log = logging.getLogger(__name__)
 
 
@@ -66,7 +65,7 @@ def _fetch_endpoint(token: str, endpoint: str, params: dict) -> dict[str, Any]:
         "Authorization": f"Bearer {token}",
         "Accept":        "application/json",
     })
-    _LIMITER.wait()
+    _LIMITER.acquire()
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))

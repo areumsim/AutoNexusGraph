@@ -5,13 +5,9 @@ DB / Neo4j / HTTP 모두 mock — 파서·매핑·zip iteration·SQL 호출 시�
 
 from __future__ import annotations
 
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 
 # ── ingestion 모듈 ─────────────────────────────────────────
@@ -152,7 +148,6 @@ def test_iter_inv_rows_no_file(tmp_path):
 def _make_cur_with_resolve(variant=None, model=None, mfr=None):
     """resolve 가 (mfr, model, variant) 반환하고 INSERT...RETURNING 도 mock."""
     cur = MagicMock()
-    state = {"step": 0}
 
     def fake_execute(sql, params=None):
         if "FROM anxg_auto.master_manufacturers" in sql and "SELECT mm.manufacturer_id" in sql:
@@ -170,7 +165,8 @@ def _make_cur_with_resolve(variant=None, model=None, mfr=None):
 
 def test_upsert_pg_matched_variant():
     from autograph.loaders.load_auto_investigations import (
-        _upsert_pg, LoadStats,
+        LoadStats,
+        _upsert_pg,
     )
     stats = LoadStats()
     cur = _make_cur_with_resolve(variant=42, model=7, mfr=1)
@@ -197,7 +193,7 @@ def test_upsert_pg_matched_variant():
 
 
 def test_upsert_pg_no_action_number_skips():
-    from autograph.loaders.load_auto_investigations import _upsert_pg, LoadStats
+    from autograph.loaders.load_auto_investigations import LoadStats, _upsert_pg
     stats = LoadStats()
     cur = _make_cur_with_resolve()
     out = _upsert_pg(cur, {"NHTSA_ACTION_NUMBER": ""}, stats)
@@ -206,7 +202,7 @@ def test_upsert_pg_no_action_number_skips():
 
 def test_upsert_pg_unmatched_counts():
     """variant + model 둘 다 매칭 안 되면 rows_unmatched 증가."""
-    from autograph.loaders.load_auto_investigations import _upsert_pg, LoadStats
+    from autograph.loaders.load_auto_investigations import LoadStats, _upsert_pg
     stats = LoadStats()
     cur = _make_cur_with_resolve(variant=None, model=None, mfr=None)
     out = _upsert_pg(cur, {
@@ -223,7 +219,7 @@ def test_upsert_pg_unmatched_counts():
 
 def test_upsert_pg_year_9999_treated_as_unknown():
     """YEAR='9999' → year=None → variant 매칭 skip."""
-    from autograph.loaders.load_auto_investigations import _upsert_pg, LoadStats
+    from autograph.loaders.load_auto_investigations import LoadStats, _upsert_pg
     stats = LoadStats()
     cur = _make_cur_with_resolve(variant=None, model=5, mfr=2)
     out = _upsert_pg(cur, {
@@ -280,8 +276,8 @@ def test_planner_vehicle_recall_includes_investigations():
 # ── tool 함수 import ──────────────────────────────────────
 def test_tool_functions_exposed():
     from autograph.tools import (
-        list_investigations_affecting,
         get_investigation_recall_chain,
+        list_investigations_affecting,
     )
     assert callable(list_investigations_affecting)
     assert callable(get_investigation_recall_chain)
@@ -289,7 +285,7 @@ def test_tool_functions_exposed():
 
 # ── ontology 등록 ────────────────────────────────────────
 def test_ontology_has_investigation_entity():
-    from autograph.ontology import load_entities, entity_key_property
+    from autograph.ontology import entity_key_property, load_entities
     entities = load_entities()
     assert "Investigation" in entities
     assert entity_key_property("Investigation") == "id"

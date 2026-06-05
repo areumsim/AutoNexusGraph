@@ -15,12 +15,10 @@ import argparse
 import json
 import logging
 import sys
-from pathlib import Path
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
-
 
 log = logging.getLogger(__name__)
 
@@ -73,8 +71,7 @@ def _iter_csv_rows(csv_path):
                 if "검사" in head:
                     log.info("[load:inspections] %s encoding=%s",
                              csv_path.name, enc)
-                    for row in _csv.DictReader(f):
-                        yield row
+                    yield from _csv.DictReader(f)
                     return
         except UnicodeDecodeError:
             continue

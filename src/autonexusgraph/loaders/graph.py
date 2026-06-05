@@ -29,7 +29,6 @@ from ..config import get_settings
 from ._common import LoadStats
 from ._edge_meta import edge_meta_set_clause
 
-
 # 회사 + 시장 — UNWIND 배치, MERGE 기반 멱등.
 # 엣지 메타 7키 (PRD §6.7): edge_meta_set_clause 헬퍼가 coalesce 절 생성.
 CYPHER_COMPANIES = f"""

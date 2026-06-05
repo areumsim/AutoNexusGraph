@@ -26,10 +26,13 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, RateLimiter, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    RateLimiter,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.wikidata_client import WikidataClient
-
 
 SELECT_TICKERS = """
 SELECT em.id_value as ticker, em.corp_code, c.corp_name
@@ -57,7 +60,7 @@ def step_a(force: bool = False) -> dict[str, str]:
 
     # SPARQL 호출 (없거나 force 면)
     if candidates_path.exists() and not force:
-        print(f"[step-a] candidates.json 존재 — skip (force 로 재수집)")
+        print("[step-a] candidates.json 존재 — skip (force 로 재수집)")
         with candidates_path.open(encoding="utf-8") as f:
             raw_candidates = json.load(f)
     else:
@@ -78,6 +81,7 @@ def step_a(force: bool = False) -> dict[str, str]:
     # (4) label_en 정규화 (0.75)
     # 한 corp_code 에 더 강한 매칭이 있으면 약한 것 덮어쓰기 안 함.
     import re
+
     from autonexusgraph.ingestion._common import normalize_corp_name
 
     name_to_corp = {}
@@ -176,8 +180,8 @@ def step_b(corp_to_qid: dict[str, str] | None = None, limit: int | None = None,
             limiter.acquire()
             try:
                 entity = fetch_with_retry(
-                    lambda: wd.fetch_entity(qid),
-                    on_retry=lambda a, e: print(f"  retry#{a} {qid}: {e}"),
+                    lambda qid=qid: wd.fetch_entity(qid),
+                    on_retry=lambda a, e, qid=qid: print(f"  retry#{a} {qid}: {e}"),
                 )
                 if entity is None:
                     ckpt.mark_failed(qid, "not_found")

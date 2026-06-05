@@ -22,7 +22,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ..loaders._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 

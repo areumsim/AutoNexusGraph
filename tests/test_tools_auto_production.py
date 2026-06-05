@@ -208,8 +208,8 @@ def test_tools_callable_from_package_level():
     import autograph.tools
     importlib.reload(autograph.tools)
     from autograph.tools import (
-        get_plant_capacity,
         get_oem_production,
+        get_plant_capacity,
         list_plants_by_oem,
         search_processes,
     )

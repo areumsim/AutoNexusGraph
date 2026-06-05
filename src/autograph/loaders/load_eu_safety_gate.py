@@ -43,12 +43,12 @@ import argparse
 import json
 import logging
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
-
 
 log = logging.getLogger(__name__)
 
@@ -180,8 +180,8 @@ def _iter_motor_notifications(xml_path: Path) -> Iterator[dict[str, Any]]:
 
 _ALIAS_LOWER = {k.lower(): v for k, v in _EU_BRAND_ALIAS.items()}
 
-import html as _html
-import re as _re
+import html as _html  # noqa: E402 — 별칭 상수 정의 후 지역 배치(의도적)
+import re as _re  # noqa: E402 — 별칭 상수 정의 후 지역 배치(의도적)
 
 
 def _candidate_brands(brand: str) -> list[str]:

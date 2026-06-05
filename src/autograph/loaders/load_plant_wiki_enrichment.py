@@ -51,7 +51,7 @@ def _build_rows() -> list[dict]:
               FROM anxg_vec.chunks
              WHERE source='wikipedia_auto' AND metadata->>'kind'='plants'
         """)
-        for lang, title, fullurl, qid, ext_len, text, meta in cur.fetchall():
+        for lang, title, fullurl, _qid, ext_len, text, meta in cur.fetchall():
             # plant code 는 metadata->>'uniq' 의 끝부분
             # uniq = 'wikipedia_auto::ko::plants::HYU_ULSAN'
             uniq = (meta or {}).get("uniq", "")

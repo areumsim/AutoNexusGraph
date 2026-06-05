@@ -24,7 +24,6 @@ import os
 
 from autonexusgraph.db.postgres import get_connection
 
-
 log = logging.getLogger(__name__)
 
 _RAW_GLOB = "data/raw/datagokr/*15089213*"   # KAMP 제조AI
@@ -40,7 +39,7 @@ def _find_csv(csv_arg: str | None) -> str | None:
 
 def run(*, csv_path: str | None = None) -> dict:
     """KAMP CSV → anxg_auto.process_metrics UPSERT. 데이터 부재 시 graceful skip."""
-    stats = {"inserted": 0, "updated": 0, "skipped": 0, "csv": None}
+    stats: dict = {"inserted": 0, "updated": 0, "skipped": 0, "csv": None}
 
     src = _find_csv(csv_path)
     if src is None:

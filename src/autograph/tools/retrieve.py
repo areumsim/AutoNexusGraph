@@ -129,7 +129,7 @@ def search_by_metadata_auto(*,
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
 
 def get_chunk_auto(chunk_id: int) -> dict | None:
@@ -147,7 +147,7 @@ def get_chunk_auto(chunk_id: int) -> dict | None:
         if not row:
             return None
         cols = [d.name for d in cur.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))
 
 
 __all__ = [

@@ -29,7 +29,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.wikipedia_client import WikipediaClient
 
@@ -93,7 +96,7 @@ def main() -> int:
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
-    s = get_settings()
+    get_settings()
     targets = _select_targets(args.lang)
     if args.limit:
         targets = targets[: args.limit]
@@ -115,7 +118,7 @@ def main() -> int:
             limiter.acquire()
             try:
                 page = fetch_with_retry(
-                    lambda: wp.fetch(title, with_html=True, with_infobox=True),
+                    lambda title=title: wp.fetch(title, with_html=True, with_infobox=True),
                     max_tries=3,
                 )
                 if page is None and not t["wiki_title"]:
@@ -126,7 +129,7 @@ def main() -> int:
                         if "회사" in h.get("snippet", "") or "기업" in h.get("snippet", ""):
                             limiter.acquire()
                             page = fetch_with_retry(
-                                lambda: wp.fetch(h["title"], with_html=True, with_infobox=True),
+                                lambda h=h: wp.fetch(h["title"], with_html=True, with_infobox=True),
                                 max_tries=3,
                             )
                             if page:

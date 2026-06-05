@@ -5,7 +5,7 @@ system→공정 카테고리 매핑 + candidate 등급 + 외주부품 기본 의
 
 from __future__ import annotations
 
-from autograph.loaders.load_produced_by import _proc_for, _build_rows
+from autograph.loaders.load_produced_by import _build_rows, _proc_for
 
 
 def test_body_to_press():

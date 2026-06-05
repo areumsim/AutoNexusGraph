@@ -22,11 +22,10 @@ from __future__ import annotations
 import argparse
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from ._text_utils import norm_text as _norm
-
 
 log = logging.getLogger(__name__)
 

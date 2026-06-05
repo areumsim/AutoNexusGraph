@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 from autonexusgraph.extractors.base import RunContext
 from autonexusgraph.extractors.engine import ExtractorEngine
@@ -36,7 +36,6 @@ from .chunk_selector import (
     select_auto_chunks,
 )
 from .staging_writer import upsert_staging
-
 
 log = logging.getLogger(__name__)
 

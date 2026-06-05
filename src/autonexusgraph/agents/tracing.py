@@ -25,8 +25,9 @@ import contextlib
 import logging
 import os
 import uuid
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any
 
 from ..llm.cost_tracker import (
     BudgetExceeded,
@@ -86,7 +87,7 @@ def _get_langfuse_client() -> Any | None:
         logger.debug("LANGFUSE_PUBLIC_KEY/SECRET_KEY 미설정 — langfuse 비활성")
         return None
     try:
-        from langfuse import Langfuse   # type: ignore[import-not-found]
+        from langfuse import Langfuse  # type: ignore[import-not-found]
     except ImportError:
         logger.debug("langfuse SDK 미설치 — 비활성")
         return None
@@ -132,7 +133,7 @@ def describe_backend() -> str:
         proj = os.getenv("LANGSMITH_PROJECT") or "autonexusgraph"
         # langchain 미설치 환경에서는 LangSmith 자동 송신도 작동 안 함.
         try:
-            import langchain   # noqa: F401
+            import langchain  # noqa: F401
             extra = ""
         except ImportError:
             extra = " langchain=MISSING (자동 송신 비활성)"
@@ -152,7 +153,7 @@ def tags_for_domain(domain: str | None) -> list[str]:
     return base
 
 
-def metadata_for_state(state: dict) -> dict:
+def metadata_for_state(state: Mapping[str, Any]) -> dict:
     """turn START 시점 metadata — 비-PII 식별자 / 카운트."""
     if not isinstance(state, dict):
         return {"domain": "finance"}
@@ -184,7 +185,7 @@ class TurnContext:
 
 
 @contextlib.contextmanager
-def start_turn_context(thread_id: str, state: dict, *,
+def start_turn_context(thread_id: str, state: Mapping[str, Any], *,
                        caller: str = "agent_chat") -> Iterator[TurnContext]:
     """Turn 단위 lifecycle context manager — PRD §10 DoD #17 (b) 핵심.
 
@@ -272,6 +273,7 @@ def start_turn_context(thread_id: str, state: dict, *,
         if question_kind:
             extra["question_kind"] = question_kind
         # E-3 (DoD §10.13): per-turn cypher hop 수 + tool 호출 sequence 기록.
+        hop: dict | None = None
         try:
             hop = trace_hop_summary(turn.state)
             extra["hop_count"] = hop["hop_count"]

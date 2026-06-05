@@ -10,7 +10,7 @@ conn.commit()`` 7회 반복 패턴을 단일 helper 로 통합.
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
 
 from autonexusgraph.db.postgres import get_connection
 
@@ -21,7 +21,7 @@ def query_dicts(sql: str, params: Sequence | dict | None = None) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(sql, params or ())
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
     conn.commit()
     return rows
 
@@ -37,7 +37,7 @@ def query_one_dict(sql: str, params: Sequence | dict | None = None) -> dict | No
             return None
         cols = [d.name for d in cur.description]
     conn.commit()
-    return dict(zip(cols, r))
+    return dict(zip(cols, r, strict=False))
 
 
 __all__ = ["query_dicts", "query_one_dict"]

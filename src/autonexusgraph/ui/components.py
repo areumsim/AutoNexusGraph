@@ -82,6 +82,7 @@ def render_cost_badge(cumulative_usd: float, turn_usd: float = 0.0) -> None:
 def render_provider_info() -> None:
     """사이드바 — 현재 LLM provider / model 표시."""
     import streamlit as st
+
     from ..config import get_settings
     s = get_settings()
     st.caption(f"LLM: `{s.llm_provider}` / `{s.llm_model}`")
@@ -191,6 +192,7 @@ def render_feedback_buttons(message_id: int | None, *, key_prefix: str) -> None:
     record_feedback 호출은 storage.record_feedback 로 위임 (DB 실패 fail-soft).
     """
     import streamlit as st
+
     from .storage import record_feedback
 
     if not message_id:

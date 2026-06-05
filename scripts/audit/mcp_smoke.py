@@ -24,14 +24,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from autonexusgraph.mcp import build_tool_manifest   # noqa: E402
+from autonexusgraph.mcp import build_tool_manifest  # noqa: E402
 
 log = logging.getLogger(__name__)
 
 
 def _check_mcp_sdk() -> bool:
     try:
-        import mcp   # noqa: F401
+        import mcp  # noqa: F401
         return True
     except ImportError:
         return False
@@ -53,7 +53,8 @@ def _check_server_boot() -> dict:
     list_tools_count = -1
     try:
         import asyncio
-        from mcp.types import ListToolsRequest   # type: ignore[import-not-found]
+
+        from mcp.types import ListToolsRequest  # type: ignore[import-not-found]
         handler = server.request_handlers.get(ListToolsRequest)
         if handler is not None:
             result = asyncio.run(

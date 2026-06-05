@@ -29,7 +29,7 @@ class TokenUsage:
     cost_usd: float = 0.0
     model: str = ""
 
-    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+    def __add__(self, other: TokenUsage) -> TokenUsage:
         """집계 — 동일 모델만 합산을 권장. 다른 모델 혼합 시 model='mixed'.
 
         cost tracking 의 model 별 정확도를 위해 호출자가 가능하면 모델별로
@@ -214,7 +214,7 @@ def get_llm_client(
     from .cost_tracker import get_session_tracker
     caller_name = role or "anon"
     tracker = get_session_tracker(caller=caller_name, model=final_model)
-    return LoggingLLMClient(BudgetAwareLLMClient(inner, tracker), caller=caller_name)
+    return LoggingLLMClient(BudgetAwareLLMClient(inner, tracker), caller=caller_name)  # type: ignore[return-value]  # 위임 래퍼 — LLMClient 인터페이스 충족
 
 
 def _resolve_model(settings: Any, role: str | None) -> str:

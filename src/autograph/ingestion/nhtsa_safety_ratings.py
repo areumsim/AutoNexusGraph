@@ -40,9 +40,10 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     save_raw,
 )
-from ..config import get_auto_settings
-from ._common_nhtsa import models_from_vpic as _models_from_vpic, nhtsa_http_get
 
+from ..config import get_auto_settings
+from ._common_nhtsa import models_from_vpic as _models_from_vpic
+from ._common_nhtsa import nhtsa_http_get
 
 log = logging.getLogger(__name__)
 
