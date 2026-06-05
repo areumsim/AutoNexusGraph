@@ -170,7 +170,7 @@ def sup_send_directives(state: AgentState):
         from langgraph.types import Send  # type: ignore[import-not-found]
     except ImportError:
         try:
-            from langgraph.graph import Send  # type: ignore[attr-defined]
+            from langgraph.graph import Send  # type: ignore[attr-defined,no-redef]
         except ImportError:
             return []
 

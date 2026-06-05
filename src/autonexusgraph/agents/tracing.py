@@ -153,7 +153,7 @@ def tags_for_domain(domain: str | None) -> list[str]:
     return base
 
 
-def metadata_for_state(state: dict) -> dict:
+def metadata_for_state(state: Mapping[str, Any]) -> dict:
     """turn START 시점 metadata — 비-PII 식별자 / 카운트."""
     if not isinstance(state, dict):
         return {"domain": "finance"}

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -42,7 +43,7 @@ log = logging.getLogger(__name__)
 app = FastAPI(title="AutoNexusGraph Agent API", version="0.1")
 
 
-def _hop_fields(state: dict) -> dict:
+def _hop_fields(state: Mapping[str, Any]) -> dict:
     """E-3 — per-turn trace 에 hop_count / tool_sequence 부착 (fail-soft)."""
     try:
         h = trace_hop_summary(state)

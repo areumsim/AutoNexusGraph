@@ -51,7 +51,7 @@ class GleifClient:
         page = 1
         while True:
             url = f"{GLEIF_BASE}/lei-records"
-            params = {
+            params: dict[str, Any] = {
                 "filter[entity.jurisdiction]": "KR",
                 "page[number]": page,
                 "page[size]": page_size,

@@ -60,7 +60,7 @@ def request_interrupt(payload: InterruptPayload) -> Any:
         from langgraph.types import interrupt  # type: ignore[import-not-found]
     except ImportError:
         try:
-            from langgraph.graph import interrupt  # type: ignore[attr-defined]
+            from langgraph.graph import interrupt  # type: ignore[attr-defined,no-redef]
         except ImportError as exc:
             raise InterruptUnavailable("langgraph interrupt API 미사용 (폴백 환경)") from exc
     logger.info("[interrupt] kind=%s prompt=%r", payload.get("kind"),

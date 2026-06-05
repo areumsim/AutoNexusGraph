@@ -53,7 +53,7 @@ class KiprisClient:
         endpoint 와 파라미터는 KIPRIS API spec 변경 가능 — 첫 호출 시 검증 필요.
         """
         url = f"{KIPRIS_BASE}/CorporationSearchService/getCorporationSearch"
-        params = {
+        params: dict[str, Any] = {
             "applicant": applicant_name,
             "startYear": year_from,
             "pageNo": page,

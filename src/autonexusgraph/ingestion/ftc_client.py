@@ -77,7 +77,7 @@ class FtcClient:
                 "또는 수동: https://www.ftc.go.kr → 대규모기업집단 → 지정현황 CSV/HWP 다운"
             )
         url = f"{self.base_url}{self.endpoint}"
-        params = {
+        params: dict[str, Any] = {
             "serviceKey": self.api_key,
             "page": page,
             "perPage": per_page,

@@ -140,7 +140,7 @@ class WikipediaClient:
     # ── search fallback ──────────────────────────────────────
     def search(self, query: str, limit: int = 5) -> list[dict]:
         url = f"{self.base}/w/api.php"
-        params = {
+        params: dict[str, Any] = {
             "action": "query", "list": "search", "srsearch": query,
             "srlimit": limit, "format": "json",
         }
