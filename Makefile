@@ -574,6 +574,7 @@ load-auto-all: neo4j-init-auto load-auto-pg load-auto-specs load-auto-neo4j \
                load-kama-macro \
                load-dart-production \
                build-chunks-auto
+	$(PYTHON) scripts/migrate/dedupe_suppliers_by_name_norm.py   # B10 — name_norm 중복 정규화 (멱등)
 	@echo "[autograph] load-auto-all done."
 
 # ── P3 LLM 추출 + P4 검증 (LLM 호출 비용 발생 — 명시적으로만 실행).
