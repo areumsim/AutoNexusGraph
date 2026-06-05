@@ -25,7 +25,7 @@ import contextlib
 import logging
 import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -185,7 +185,7 @@ class TurnContext:
 
 
 @contextlib.contextmanager
-def start_turn_context(thread_id: str, state: dict, *,
+def start_turn_context(thread_id: str, state: Mapping[str, Any], *,
                        caller: str = "agent_chat") -> Iterator[TurnContext]:
     """Turn 단위 lifecycle context manager — PRD §10 DoD #17 (b) 핵심.
 

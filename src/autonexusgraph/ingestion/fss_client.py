@@ -25,6 +25,15 @@ USER_AGENT = (
 )
 
 
+def _as_str(v: object) -> str:
+    """bs4 ``Tag.get()`` 반환(str | AttributeValueList(list) | None) → 단일 str."""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        return str(v[0]) if v else ""
+    return ""
+
+
 @dataclass(frozen=True)
 class FssArticle:
     """FSS 보도자료 1건."""
@@ -72,7 +81,7 @@ class FssClient:
         from bs4 import BeautifulSoup
 
         url = f"{self.base_url}/fss/main/list.do"
-        params = {
+        params: dict[str, Any] = {
             "bbsId": bbs_id, "cmsCd": cms_cd, "pageIndex": page,
             "pageUnit": size,
         }
@@ -92,7 +101,7 @@ class FssClient:
             a = row.find("a")
             if not a:
                 continue
-            href = a.get("href", "")
+            href = _as_str(a.get("href"))
             title = a.get_text(strip=True)
             # 날짜 — td 또는 span 안
             date_el = row.select_one("td.date, .date, .reg-date")
@@ -130,7 +139,7 @@ class FssClient:
         # 첨부 파일 링크
         attachments = []
         for a in soup.select("a[href*='download'], a[href*='atch']"):
-            href = a.get("href", "")
+            href = _as_str(a.get("href"))
             if href:
                 full = self.base_url + href if href.startswith("/") else href
                 attachments.append(full)

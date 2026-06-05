@@ -18,7 +18,7 @@ PRD §7.6.5: Streaming — UI node-by-node 진행 표시
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
@@ -185,7 +185,7 @@ def _get_langgraph_app():
     return _LG_APP
 
 
-def _make_run_config(thread_id: str, *, state: dict | None = None) -> dict:
+def _make_run_config(thread_id: str, *, state: Mapping[str, Any] | None = None) -> dict:
     """LangGraph app.invoke 에 넘길 config — checkpoint + LangSmith 태그.
 
     Langfuse 4.x 는 OTEL native ─ start_turn_context 의 ``start_as_current_observation``

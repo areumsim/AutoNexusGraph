@@ -85,8 +85,8 @@ class GeminiClient(LLMClient):
         try:
             resp = self._client.models.generate_content(
                 model=self.model,
-                contents=contents,
-                config=cfg,
+                contents=contents,  # type: ignore[arg-type]  # google-genai dict/list 입력 허용(stub 엄격)
+                config=cfg,  # type: ignore[arg-type]  # google-genai ConfigDict 입력 허용
                 **kwargs,
             )
         except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
@@ -113,8 +113,8 @@ class GeminiClient(LLMClient):
         try:
             stream = self._client.models.generate_content_stream(
                 model=self.model,
-                contents=contents,
-                config=cfg,
+                contents=contents,  # type: ignore[arg-type]  # google-genai dict/list 입력 허용(stub 엄격)
+                config=cfg,  # type: ignore[arg-type]  # google-genai ConfigDict 입력 허용
                 **kwargs,
             )
             for chunk in stream:
@@ -150,8 +150,8 @@ class GeminiClient(LLMClient):
         try:
             resp = self._client.models.generate_content(
                 model=self.model,
-                contents=contents,
-                config=cfg,
+                contents=contents,  # type: ignore[arg-type]  # google-genai dict/list 입력 허용(stub 엄격)
+                config=cfg,  # type: ignore[arg-type]  # google-genai ConfigDict 입력 허용
                 **kwargs,
             )
         except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
