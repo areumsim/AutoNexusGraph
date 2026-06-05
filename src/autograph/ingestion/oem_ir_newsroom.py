@@ -128,7 +128,7 @@ def _fetch_text(url: str, *, user_agent: str, timeout: float = 20.0
             log.warning("[oem_ir] 429 — Retry-After %.0fs", wait)
             time.sleep(min(wait, 300.0))
         return None
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [oem_ir_newsroom] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[oem_ir] %s 실패: %s", url, e)
         return None
 

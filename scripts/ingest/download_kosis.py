@@ -84,7 +84,7 @@ def main() -> int:
                 save_raw("kosis", f"{tbl}/{s_p}-{e_p}.json", rows)
                 ckpt.mark_done(entity_id, {"rows": len(rows) if isinstance(rows, list) else 0})
                 print(f"   rows: {len(rows) if isinstance(rows, list) else '?'}")
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — [download_kosis] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(entity_id, str(e))
                 print(f"   failed: {e}")
 

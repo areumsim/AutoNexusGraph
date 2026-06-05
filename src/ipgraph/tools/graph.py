@@ -32,7 +32,7 @@ def _run(cypher: str, **params: Any) -> list[dict]:
     try:
         from autonexusgraph.safety.cypher_guard import assert_read_only
         from autonexusgraph.db.neo4j import get_session
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → [] 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [graph] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.graph._run] core import 실패: %s", e)
         return []
     try:
@@ -41,7 +41,7 @@ def _run(cypher: str, **params: Any) -> list[dict]:
         with get_session() as session:
             result = session.run(cypher, **params)
             return [dict(r) for r in result]
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → [] 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [graph] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.graph._run] cypher 실행 실패 (fail-soft): %s", e)
         return []
 

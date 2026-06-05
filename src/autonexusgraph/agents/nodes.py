@@ -210,7 +210,7 @@ def _llm_planner_enabled(state: AgentState | None = None) -> bool:
     try:
         from ..config import get_settings
         return bool(getattr(get_settings(), "agent_llm_planner", False))
-    except Exception:   # noqa: BLE001 — fail-soft 흡수 → False 반환
+    except Exception:   # noqa: BLE001 — [nodes] fail-soft 흡수 → False 반환
         return False
 
 
@@ -606,7 +606,7 @@ def _attempt_fallback_recovery(state: AgentState) -> bool:
     _maybe_inject_rerank(state, fb_fn, fb_args)
     try:
         fb_out = fb_fn(**fb_args)
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → False 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [nodes] fail-soft 흡수 → False 반환 (log 동반)
         log.warning("[recovery] fallback %s failed: %s", fb_tool, e)
         return False
     if not fb_out:

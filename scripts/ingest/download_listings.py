@@ -84,7 +84,7 @@ def main() -> int:
                 path = out_dir / f"all_{market.lower()}.csv"
                 df.to_csv(path, index=False, encoding="utf-8-sig")
                 print(f"[OK] {path} ({len(df):,} rows)")
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — [download_listings] fail-soft 흡수 → 0 반환 (log 동반)
                 print(f"[WARN] {market} 전체 실패: {e}", file=sys.stderr)
 
     return 0

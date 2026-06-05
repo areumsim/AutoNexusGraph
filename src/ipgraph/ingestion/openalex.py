@@ -131,7 +131,7 @@ def lookup_institution_by_qid(qid: str, *,
             body = _http_get(f"{_OA_BASE}/institutions/ror:{ror}", params={})
             if body and body.get("id"):
                 return body
-        except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
+        except Exception as exc:   # noqa: BLE001 — [openalex] fail-soft 흡수 → None 반환 (log 동반)
             log.debug("[openalex] ror:%s lookup failed: %s", ror, exc)
     return None
 
@@ -143,7 +143,7 @@ def _wikidata_qid_to_ror(qid: str) -> str | None:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
-    except Exception as exc:   # noqa: BLE001 — fail-soft 흡수 → None 반환 (log 동반)
+    except Exception as exc:   # noqa: BLE001 — [openalex] fail-soft 흡수 → None 반환 (log 동반)
         log.debug("[openalex] wikidata fetch %s failed: %s", qid, exc)
         return None
     ent = (data.get("entities") or {}).get(qid) or {}
@@ -235,7 +235,7 @@ def _reconstruct_abstract(inverted: dict | None) -> str | None:
                 if 0 <= p < len(tokens):
                     tokens[p] = term
         return " ".join(t for t in tokens if t)
-    except Exception:   # noqa: BLE001 — fail-soft 흡수 → None 반환
+    except Exception:   # noqa: BLE001 — [openalex] fail-soft 흡수 → None 반환
         return None
 
 

@@ -117,7 +117,7 @@ def main() -> int:
             try:
                 total += _download_for_corp(client, cc, args.start, args.end, out_root,
                                             download_documents=args.download_documents)
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — [download_business_reports] fail-soft 흡수 → 0 반환 (log 동반)
                 print(f"[WARN] {cc} 실패: {e}", file=sys.stderr)
     print(f"[DONE] total filings: {total:,}")
     return 0

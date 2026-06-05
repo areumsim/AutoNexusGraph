@@ -156,7 +156,7 @@ def main() -> int:
                 if i % 20 == 0:
                     print(f"  [{i}/{len(targets)}] done={ckpt.stats.done} "
                           f"failed={ckpt.stats.failed}")
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — [download_wikipedia] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(corp_code, str(e))
 
     print(f"\n[wikipedia] done={ckpt.stats.done} failed={ckpt.stats.failed}")

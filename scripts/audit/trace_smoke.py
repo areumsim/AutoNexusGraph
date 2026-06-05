@@ -82,7 +82,7 @@ def _pg_available() -> bool:
             cur.execute("SELECT 1")
             cur.fetchone()
         return True
-    except Exception:   # noqa: BLE001 — fail-soft 흡수 → False 반환
+    except Exception:   # noqa: BLE001 — [trace_smoke] fail-soft 흡수 → False 반환
         return False
 
 

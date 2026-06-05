@@ -87,7 +87,7 @@ def _read_body_text(html_path: str, *, body_allowed: bool) -> str | None:
         return None
     try:
         html = p.read_text(encoding="utf-8", errors="replace")
-    except Exception:   # noqa: BLE001 — fail-soft 흡수 → None 반환
+    except Exception:   # noqa: BLE001 — [load_oem_ir_news] fail-soft 흡수 → None 반환
         return None
     # 텍스트 추출은 ingestion 측에서 이미 했지만 here 도 재 추출 가능.
     from autograph.ingestion.oem_ir_newsroom import _extract_text

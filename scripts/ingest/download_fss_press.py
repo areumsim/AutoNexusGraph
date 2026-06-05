@@ -118,7 +118,7 @@ def main() -> int:
                 ckpt_body.mark_done(meta["article_id"])
                 if i % 20 == 0:
                     print(f"  [{i}/{len(body_targets)}] done={ckpt_body.stats.done}")
-            except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 0 반환 (log 동반)
+            except Exception as e:   # noqa: BLE001 — [download_fss_press] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt_body.mark_failed(meta["article_id"], str(e))
 
     print(f"\n[fss_press] done={ckpt_body.stats.done} failed={ckpt_body.stats.failed}")

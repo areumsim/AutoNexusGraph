@@ -88,7 +88,7 @@ def _fetch(endpoint: str, params: dict) -> dict:
     except urllib.error.HTTPError as e:
         log.error("[factoryon] %s HTTP %s: %s", endpoint, e.code, e.reason)
         return {}
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → {} 반환 (log 동반)
+    except Exception as e:   # noqa: BLE001 — [factoryon_registry] fail-soft 흡수 → {} 반환 (log 동반)
         log.error("[factoryon] %s 실패: %s", endpoint, e)
         return {}
     return _parse_xml(raw, endpoint)

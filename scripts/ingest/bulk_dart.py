@@ -130,7 +130,7 @@ def _fetch_company(
         return True
     try:
         data = client.get_company_info(corp_code)
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → False 반환
+    except Exception as e:   # noqa: BLE001 — [bulk_dart] fail-soft 흡수 → False 반환
         _append_failed(root, corp_code, "company", str(e))
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -149,7 +149,7 @@ def _fetch_filings(
         filings = list(client.iter_filings(
             corp_code=corp_code, bgn_de=bgn_de, end_de=end_de, pblntf_ty="A",
         ))
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → False 반환
+    except Exception as e:   # noqa: BLE001 — [bulk_dart] fail-soft 흡수 → False 반환
         _append_failed(root, corp_code, "filings", str(e))
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -170,7 +170,7 @@ def _fetch_financials(
             corp_code=corp_code, bsns_year=str(year),
             reprt_code="11011", fs_div="CFS",
         )
-    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → False 반환
+    except Exception as e:   # noqa: BLE001 — [bulk_dart] fail-soft 흡수 → False 반환
         _append_failed(root, corp_code, f"financials_{year}", str(e))
         return False
     if not rows:

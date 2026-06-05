@@ -49,7 +49,7 @@ def _hop_fields(state: dict) -> dict:
         return {"hop_count": h["hop_count"],
                 "max_hop_depth": h["max_hop_depth"],
                 "tool_sequence": h["tool_sequence"]}
-    except Exception:   # noqa: BLE001 — fail-soft 흡수 → {} 반환
+    except Exception:   # noqa: BLE001 — [main] fail-soft 흡수 → {} 반환
         return {}
 
 
