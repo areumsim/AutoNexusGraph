@@ -42,7 +42,6 @@ from autonexusgraph.ingestion._common import (
 )
 from autonexusgraph.ingestion.wikipedia_client import WikipediaClient
 
-
 log = logging.getLogger(__name__)
 
 

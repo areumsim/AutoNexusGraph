@@ -35,9 +35,9 @@ import time
 import urllib.parse
 import urllib.request
 import urllib.robotparser
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._common import RateLimiter, save_raw
@@ -46,7 +46,6 @@ from autonexusgraph.ingestion._license import (
     is_url_allowed,
     newsroom_policy,
 )
-
 
 log = logging.getLogger(__name__)
 

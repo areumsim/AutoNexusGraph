@@ -21,9 +21,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion.wikidata_client import (
-    claim_qid_values, claim_string_values, claim_values,
+    claim_qid_values,
+    claim_string_values,
+    claim_values,
 )
-
 
 UPSERT_EM = """
 INSERT INTO anxg_master.entity_map

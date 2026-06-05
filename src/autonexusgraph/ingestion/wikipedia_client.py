@@ -20,7 +20,6 @@ from urllib.parse import quote
 
 import httpx
 
-
 WIKI_BASE_KO = "https://ko.wikipedia.org"
 WIKI_BASE_EN = "https://en.wikipedia.org"
 
@@ -56,7 +55,7 @@ class WikipediaClient:
             follow_redirects=True,
         )
 
-    def __enter__(self) -> "WikipediaClient":
+    def __enter__(self) -> WikipediaClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

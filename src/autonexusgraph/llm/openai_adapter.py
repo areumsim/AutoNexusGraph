@@ -11,7 +11,6 @@ from typing import Any
 
 from .base import LLMClient, LLMError, LLMResponse, TokenUsage
 
-
 # 모델별 토큰 단가 (USD, 1M 토큰당) — 2025-01 기준 공식 가격
 # 갱신: https://openai.com/api/pricing/
 _PRICING: dict[str, tuple[float, float]] = {

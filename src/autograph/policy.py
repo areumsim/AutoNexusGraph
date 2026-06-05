@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-
 AutoQuestionKind = Literal[
     "vehicle_spec",        # 차종 제원 (SQL)
     "vehicle_recall",      # 리콜 관계 (Graph) + 텍스트 (Vector)

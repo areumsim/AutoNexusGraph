@@ -24,15 +24,16 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 from xml.etree import ElementTree as ET
 
 # DART XML 은 종종 unescaped ``&`` ('S&P(미국)') 같은 잘못된 토큰을 포함한다.
 # 표준 xml.etree 는 strict parser 라 첫 violation 에서 전체 파싱 실패.
 # lxml.html (또는 bs4 의 html.parser) 의 lenient 모드로 우회.
 try:
-    from lxml import html as _lxml_html, etree as _lxml_etree
+    from lxml import etree as _lxml_etree
+    from lxml import html as _lxml_html
     _HAS_LXML = True
 except ImportError:
     _HAS_LXML = False

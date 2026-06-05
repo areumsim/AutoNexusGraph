@@ -51,14 +51,13 @@ import io
 import json
 import logging
 import zipfile
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Iterator
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
-
 
 log = logging.getLogger(__name__)
 

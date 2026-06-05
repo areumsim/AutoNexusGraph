@@ -10,10 +10,10 @@ finance 의 corp_code 필터와 분리한 별도 SELECT.
 from __future__ import annotations
 
 import logging
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from autonexusgraph.db.postgres import get_pool
-
 
 log = logging.getLogger(__name__)
 

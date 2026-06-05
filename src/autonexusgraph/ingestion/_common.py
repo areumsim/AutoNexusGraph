@@ -35,12 +35,10 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, TypeVar
 
-
 log = logging.getLogger(__name__)
 
 from ..config import get_settings
 from ._license import LICENSE_POLICY, allow_body
-
 
 _WARNED_UNKNOWN_SOURCES: set[str] = set()
 
@@ -122,7 +120,7 @@ def make_http_client(
     user_agent: str | None = None,
     headers: dict[str, str] | None = None,
     **httpx_kwargs: Any,
-) -> "httpx.Client":  # type: ignore[name-defined]
+) -> httpx.Client:  # type: ignore[name-defined]
     """공유 httpx.Client 팩토리.
 
     Args:

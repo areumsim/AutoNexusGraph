@@ -22,11 +22,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
-)
 import httpx
 
+from autonexusgraph.ingestion._common import (
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
+)
 
 PRESS_BASE = "https://www.cgs.or.kr/news/press_list.jsp"
 PRESS_VIEW = "https://www.cgs.or.kr/news/press_view.jsp"

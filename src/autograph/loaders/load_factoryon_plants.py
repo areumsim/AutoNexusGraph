@@ -31,7 +31,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 _SOURCE_ID = "anxg_auto.factoryon_registry"

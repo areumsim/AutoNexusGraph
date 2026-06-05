@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO = Path(__file__).resolve().parents[1]
 ALIGN = REPO / "ontology" / "auto" / "evo_alignment.yaml"
 ENTITIES = REPO / "ontology" / "auto" / "entities.yaml"

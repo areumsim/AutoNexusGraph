@@ -20,7 +20,6 @@ import httpx
 
 from .config import get_settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,7 +63,7 @@ class EmbeddingClient:
         self.dim = s.embedding_dim
         self._client = httpx.Client(timeout=timeout)
 
-    def __enter__(self) -> "EmbeddingClient":
+    def __enter__(self) -> EmbeddingClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:

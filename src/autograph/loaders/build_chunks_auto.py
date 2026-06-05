@@ -30,7 +30,6 @@ from pathlib import Path
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 
-
 log = logging.getLogger(__name__)
 
 
@@ -377,7 +376,7 @@ def build_from_dart_narrative(*, context_chars: int = 600) -> int:
                         _upsert_chunk(
                             cur,
                             source="dart_narrative",
-                            section=f"dart.생산설비",
+                            section="dart.생산설비",
                             text=ctx,
                             metadata={
                                 "uniq": uniq,

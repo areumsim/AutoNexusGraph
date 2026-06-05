@@ -18,7 +18,6 @@ Neo4j Community Edition은 multi-database 미지원 → 단일 DB `neo4j` 안에
 
 from __future__ import annotations
 
-
 # 라벨 → 도메인 리스트 (SSOT)
 _DOMAIN_MAP: dict[str, list[str]] = {
     # ── AutoGraph (자동차) ────────────────────────────────────────

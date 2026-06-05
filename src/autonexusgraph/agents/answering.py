@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 # ─── 관계명 한국어 ─────────────────────────────────────────
 # ontology/relations.yaml 의 관계 타입 → 사람 읽기 좋은 한국어
 _REL_KOR: dict[str, str] = {

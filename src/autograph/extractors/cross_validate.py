@@ -27,7 +27,6 @@ from autonexusgraph.db.postgres import get_connection
 
 from ..loaders._neo4j_helpers import run_batched
 
-
 log = logging.getLogger(__name__)
 
 

@@ -32,7 +32,6 @@ from dataclasses import dataclass, field
 
 from autonexusgraph.db.neo4j import get_session
 
-
 log = logging.getLogger(__name__)
 
 

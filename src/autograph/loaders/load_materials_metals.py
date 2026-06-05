@@ -41,7 +41,6 @@ from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import default_schema_version as _default_schema_version
 
-
 log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]

@@ -21,7 +21,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from .base import LLMClient, LLMResponse
-from .cost_tracker import CostTracker, BudgetExceeded, get_tracker
+from .cost_tracker import BudgetExceeded, CostTracker, get_tracker
 
 
 class BudgetAwareLLMClient(LLMClient):

@@ -25,8 +25,9 @@ import contextlib
 import logging
 import os
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any
 
 from ..llm.cost_tracker import (
     BudgetExceeded,
@@ -86,7 +87,7 @@ def _get_langfuse_client() -> Any | None:
         logger.debug("LANGFUSE_PUBLIC_KEY/SECRET_KEY 미설정 — langfuse 비활성")
         return None
     try:
-        from langfuse import Langfuse   # type: ignore[import-not-found]
+        from langfuse import Langfuse  # type: ignore[import-not-found]
     except ImportError:
         logger.debug("langfuse SDK 미설치 — 비활성")
         return None
@@ -132,7 +133,7 @@ def describe_backend() -> str:
         proj = os.getenv("LANGSMITH_PROJECT") or "autonexusgraph"
         # langchain 미설치 환경에서는 LangSmith 자동 송신도 작동 안 함.
         try:
-            import langchain   # noqa: F401
+            import langchain  # noqa: F401
             extra = ""
         except ImportError:
             extra = " langchain=MISSING (자동 송신 비활성)"

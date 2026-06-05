@@ -23,7 +23,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 
-
 SQL_DELETE_PREV = """
 DELETE FROM anxg_vec.chunks
  WHERE corp_code = %s AND section = %s AND rcept_no IS NULL

@@ -27,7 +27,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 
-
 UPSERT_PERSON = """
 INSERT INTO anxg_master.persons (canonical_name, birth_year, aliases)
 VALUES (%s, %s, %s)
@@ -176,7 +175,7 @@ def main() -> int:
 
     print(f"\n[persons] anxg_master.persons rows: {n_p:,}")
     print(f"[persons] person_executive_history rows: {n_h:,}")
-    print(f"[persons] top roles:")
+    print("[persons] top roles:")
     for r, c in roles:
         print(f"  {r:30s} {c:>7,}")
     return 0

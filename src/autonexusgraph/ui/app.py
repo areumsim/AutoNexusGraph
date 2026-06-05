@@ -26,18 +26,28 @@ if str(_SRC) not in sys.path:
 
 import streamlit as st
 
-from autonexusgraph.ui.storage import (
-    get_or_create_thread_id, reset_thread,
-    load_history, persist_turn, list_recent_threads,
-    set_conversation_title, generate_title_from_question,
-)
 from autonexusgraph.ui.components import (
-    render_citations, render_grounding_warning, render_agent_trace,
-    render_cost_badge, render_provider_info, render_sample_questions,
-    render_feedback_buttons, render_progress_chip, node_label,
-    render_clarification, render_cost_approval,
+    node_label,
+    render_agent_trace,
+    render_citations,
+    render_clarification,
+    render_cost_approval,
+    render_cost_badge,
+    render_feedback_buttons,
+    render_grounding_warning,
+    render_progress_chip,
+    render_provider_info,
+    render_sample_questions,
 )
-
+from autonexusgraph.ui.storage import (
+    generate_title_from_question,
+    get_or_create_thread_id,
+    list_recent_threads,
+    load_history,
+    persist_turn,
+    reset_thread,
+    set_conversation_title,
+)
 
 st.set_page_config(page_title="AutoNexusGraph", layout="wide")
 
@@ -137,7 +147,7 @@ if user_input:
     # agent run — 노드별 진행 표시 (PRD §7.6.5) + HITL interrupt (PRD §7.5.6)
     with st.chat_message("assistant"):
         try:
-            from autonexusgraph.agents import run_agent_stream, run_agent_resume_stream
+            from autonexusgraph.agents import run_agent_resume_stream, run_agent_stream
             with st.status("분석 중…", expanded=True) as status:
                 last_state = None
                 interrupted_payload = None

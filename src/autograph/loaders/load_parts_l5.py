@@ -37,7 +37,6 @@ from autonexusgraph.db.postgres import get_connection
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 

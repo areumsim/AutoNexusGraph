@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 IPQuestionKind = Literal[
     "patent_lookup",       # 특정 특허 식별 (lookup_patent)
     "assignee_patents",    # assignee 의 특허 목록·집계

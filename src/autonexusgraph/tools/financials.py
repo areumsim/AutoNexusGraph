@@ -15,7 +15,6 @@ from typing import Any
 
 from ..db.postgres import get_connection
 
-
 # ── 회사 식별 ────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)

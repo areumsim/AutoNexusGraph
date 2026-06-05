@@ -56,7 +56,7 @@ class NewsRssClient:
             "User-Agent": "AutoNexusGraph/0.1 (research)",
         })
 
-    def __enter__(self) -> "NewsRssClient":
+    def __enter__(self) -> NewsRssClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:

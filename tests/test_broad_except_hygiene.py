@@ -24,7 +24,6 @@ import tokenize
 from io import BytesIO
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = (REPO / "src", REPO / "scripts", REPO / "tests")
 

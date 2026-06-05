@@ -105,7 +105,7 @@ def test_server_module_failsoft_on_sdk_missing():
     """mcp SDK 가 없을 때 ``autonexusgraph.mcp.build_mcp_server`` 는 None."""
     from autonexusgraph import mcp as mcp_pkg
     try:
-        import mcp   # noqa: F401
+        import mcp  # noqa: F401
     except ImportError:
         # SDK 미설치 — fail-soft 검증.
         assert mcp_pkg.build_mcp_server is None

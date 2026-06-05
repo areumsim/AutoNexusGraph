@@ -11,7 +11,7 @@ state 가 dict 만 받기 때문에 graph object 는 안 만든다). 의존성·
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def make_task(

@@ -21,7 +21,6 @@ from autonexusgraph.db.neo4j import get_session
 
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 _SOURCE_ID = "Module.system_code → 공정 추론"

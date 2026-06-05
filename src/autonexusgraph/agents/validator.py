@@ -23,8 +23,14 @@ import logging
 
 from ._number_patterns import (
     BIG_NUMBER_RE as _BIG_NUMBER_RE,
+)
+from ._number_patterns import (
     collect_numbers_from_state,
+)
+from ._number_patterns import (
     extract_big_numbers as _extract_big_numbers,
+)
+from ._number_patterns import (
     numbers_from_tool_results as _numbers_from_tool_results,
 )
 from .grounding import verify_answer_grounding

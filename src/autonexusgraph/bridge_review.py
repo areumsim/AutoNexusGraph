@@ -24,7 +24,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 log = logging.getLogger(__name__)
 

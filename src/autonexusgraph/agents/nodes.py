@@ -23,8 +23,7 @@ from . import session
 from ._domain_handler import call_handler_method, get_handler
 from .policy import classify_question, select_tools, turn_budget_exceeded
 from .state import AgentState
-from .temporal import normalize_temporal_terms, extract_year_hint
-
+from .temporal import extract_year_hint, normalize_temporal_terms
 
 log = logging.getLogger(__name__)
 
@@ -32,9 +31,8 @@ log = logging.getLogger(__name__)
 # ── Triage ──────────────────────────────────────────────────
 def triage_node(state: AgentState) -> AgentState:
     """질문 유형 분류 + 1차 회사 식별 + 상대 시간 정규화."""
-    from ..tools.financials import lookup_company as lookup_pg
-
     from ..safety import is_high_risk_injection, sanitize_user_input
+    from ..tools.financials import lookup_company as lookup_pg
     from .rewriter import rewrite_query
 
     raw_q = state.get("question", "")
@@ -236,7 +234,7 @@ def _replan_escalate_kind(kind: str, hint: dict) -> str:
     return _ESCALATE.get(kind, "narrative")
 
 
-def _apply_replan_widen(state: "AgentState") -> None:
+def _apply_replan_widen(state: AgentState) -> None:
     """replan 시 retrieval 폭 확대 — research task 의 top_k 를 배수 증가(상한 20).
 
     replan 횟수 n 이 클수록 더 넓게 검색. handler/finance 양 경로의 산출 tasks 에
@@ -268,7 +266,6 @@ def planner_node(state: AgentState) -> AgentState:
     여전히 ``state["plan"]`` (flat list) 도 채워서 executor 폴백 호환.
     """
     from .dag import make_spawn_task, make_task
-
     from .state import _ClearedDict, _ClearedList
 
     # 축6: 누적 채널 per-turn 리셋 — 마커로 reducer 에 교체 지시. checkpointer 다중턴
@@ -466,7 +463,7 @@ def planner_node(state: AgentState) -> AgentState:
     return _planner_cost_gate(state, kind, targets, len(tasks))
 
 
-def _handle_cost_resume(state: "AgentState") -> bool:
+def _handle_cost_resume(state: AgentState) -> bool:
     """이미 보낸 cost_approval 의 사용자 응답을 처리.
 
     Returns:
@@ -493,7 +490,7 @@ def _handle_cost_resume(state: "AgentState") -> bool:
     return True
 
 
-def _request_cost_approval(state: "AgentState", kind: str, targets: list,
+def _request_cost_approval(state: AgentState, kind: str, targets: list,
                             n_tasks: int, domain: str) -> None:
     """새로운 cost approval 요청 — replan 첫 turn 일 때만."""
     from .cost_estimator import needs_cost_approval
@@ -536,8 +533,8 @@ def _request_cost_approval(state: "AgentState", kind: str, targets: list,
                     est.estimated_cost_usd)
 
 
-def _planner_cost_gate(state: "AgentState", kind: str, targets: list,
-                       n_tasks: int) -> "AgentState":
+def _planner_cost_gate(state: AgentState, kind: str, targets: list,
+                       n_tasks: int) -> AgentState:
     """planner 의 cost-approval 게이트 — finance/auto/cross_domain 모두 공통.
 
     PRD §7.5.6 HITL. replan 중이거나 이미 승인된 turn 은 skip.
@@ -743,10 +740,10 @@ def synthesizer_node(state: AgentState,
         "llm_called": False, "fallback_used": None,
     }
     try:
+        from ..config import turn_budget_for_domain
         from ..llm.base import get_llm_client
         from ..llm.budget_aware import budget_aware_client
         from ..llm.cost_tracker import BudgetExceeded
-        from ..config import turn_budget_for_domain
 
         domain = state.get("domain")
         hard_limit = turn_budget_for_domain(domain)

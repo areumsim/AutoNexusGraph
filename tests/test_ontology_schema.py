@@ -25,7 +25,6 @@ from autonexusgraph.ontology import (
     validate_dict,
 )
 
-
 # ── 정상 (실제 SSOT) ──────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[1]
 

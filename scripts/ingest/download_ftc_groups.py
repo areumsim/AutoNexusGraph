@@ -28,7 +28,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._common import save_raw
 from autonexusgraph.ingestion.ftc_client import FtcClient
 
-
 MANUAL_GUIDE = """
 [수동 다운로드 가이드 — FTC 기업집단]
 

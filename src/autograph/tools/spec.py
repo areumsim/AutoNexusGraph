@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from ._db import query_dicts, query_one_dict
 
-
 DEFAULT_LIMIT = 10
 HARD_LIMIT = 200
 

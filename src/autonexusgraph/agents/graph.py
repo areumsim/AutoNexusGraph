@@ -18,15 +18,16 @@ PRD §7.6.5: Streaming — UI node-by-node 진행 표시
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
 from .state import AgentState
 from .supervisor import (
     mid_execution_reflect,
+    sup_send_directives,
     supervisor_done,
     supervisor_node,
-    sup_send_directives,
 )
 from .tracing import start_turn_context
 from .validator import MAX_REPLANS, mark_replan, should_replan, validator_node
@@ -48,7 +49,7 @@ except ImportError:
     _HAS_LANGGRAPH = False
 
 try:
-    from langgraph.types import Command   # type: ignore[import-not-found]
+    from langgraph.types import Command  # type: ignore[import-not-found]
     _HAS_COMMAND = True
 except ImportError:
     _HAS_COMMAND = False

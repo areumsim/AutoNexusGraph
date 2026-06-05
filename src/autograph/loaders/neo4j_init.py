@@ -20,7 +20,6 @@ from autonexusgraph.db.neo4j import get_session
 
 from ..ontology import entity_key_property, entity_labels
 
-
 log = logging.getLogger(__name__)
 
 

@@ -26,7 +26,6 @@ from autonexusgraph.db.postgres import get_connection
 
 from ._text_utils import norm_text as _norm
 
-
 log = logging.getLogger(__name__)
 
 

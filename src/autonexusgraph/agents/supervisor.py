@@ -168,10 +168,10 @@ def sup_send_directives(state: AgentState):
     빈 리스트면 langgraph 가 conditional edge 의 'done' 경로로 이동한다.
     """
     try:
-        from langgraph.types import Send   # type: ignore[import-not-found]
+        from langgraph.types import Send  # type: ignore[import-not-found]
     except ImportError:
         try:
-            from langgraph.graph import Send   # type: ignore[attr-defined]
+            from langgraph.graph import Send  # type: ignore[attr-defined]
         except ImportError:
             return []
 

@@ -104,7 +104,9 @@ addopts = "-m 'not integration' -ra"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+# requires-python = ">=3.10" 와 정합 — ruff target 은 최소 지원 버전이어야 한다.
+# (py311 은 3.10 런타임에 없는 idiom — 예: UP017 datetime.UTC — 을 제안해 깨짐)
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N"]

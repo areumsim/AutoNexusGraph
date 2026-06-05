@@ -37,7 +37,6 @@ from autonexusgraph.db.neo4j import get_session
 from ..ontology import load_performed_at_seed
 from ._neo4j_helpers import edge_meta_cypher, run_batched
 
-
 log = logging.getLogger(__name__)
 
 _DEFAULT_CONFIDENCE = 0.85

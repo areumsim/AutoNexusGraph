@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -43,8 +42,8 @@ def test_neo4j_label_uses_capitalized_namespace_prefix():
 
 
 def test_qdrant_collection_default_and_derived():
-    from autonexusgraph.db.qdrant import collection_name
     from autonexusgraph.config import get_settings
+    from autonexusgraph.db.qdrant import collection_name
     s = get_settings()
     # base="chunks" 는 config qdrant_collection 직접 반환 (env override 가능).
     assert collection_name("chunks") == s.qdrant_collection
@@ -129,8 +128,8 @@ def test_relabel_node_labels_derived_from_domain_registry():
     회귀 가드: 과거 hardcoded NODE_LABELS 가 _DOMAIN_MAP 과 drift 하면서
     Component/FailureMode/Product 등 누락 사고 발생. 본 테스트가 동기 보장.
     """
-    from scripts.migrate.relabel_neo4j_namespace import NODE_LABELS, _TEMPLATE_ONLY_LABELS
     from autonexusgraph.ontology.domain import _DOMAIN_MAP
+    from scripts.migrate.relabel_neo4j_namespace import _TEMPLATE_ONLY_LABELS, NODE_LABELS
 
     expected = (set(_DOMAIN_MAP) | _TEMPLATE_ONLY_LABELS) - {"Sector"}
     assert set(NODE_LABELS) == expected, \

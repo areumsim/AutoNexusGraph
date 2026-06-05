@@ -20,11 +20,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from ..db.neo4j import get_session
-
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +137,7 @@ def validate_relations(
                 "review" if conf >= review_threshold else "discard"
             )
             res = ValidationResult(rel=rel, decision=decision,
-                                    reason=f"PRODUCES conf-only", final_confidence=conf)
+                                    reason="PRODUCES conf-only", final_confidence=conf)
             (accept if decision == "accept" else
              review if decision == "review" else discard).append(res)
             continue

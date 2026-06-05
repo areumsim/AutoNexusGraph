@@ -15,7 +15,6 @@ from typing import Any
 
 import httpx
 
-
 GLEIF_BASE = "https://api.gleif.org/api/v1"
 
 
@@ -41,7 +40,7 @@ class GleifClient:
             },
         )
 
-    def __enter__(self) -> "GleifClient":
+    def __enter__(self) -> GleifClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

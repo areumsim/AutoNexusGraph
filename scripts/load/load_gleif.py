@@ -21,7 +21,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import normalize_corp_name
 
-
 UPSERT_LEI = """
 INSERT INTO anxg_sec.lei
   (lei, corp_code, legal_name, legal_jurisdiction, entity_status,

@@ -12,8 +12,8 @@ import pytest
 
 from autograph.loaders.load_sandang_processes import (
     _find_csv,
-    _open_csv,
     _normalize_process_name,
+    _open_csv,
     run,
 )
 

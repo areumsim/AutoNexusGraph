@@ -118,8 +118,8 @@ def _platt_fit(X: list[float], y: list[int]) -> dict[str, Any]:
         return {"fitted": False,
                 "reason": f"정답 클래스 단일 ({set(y)}) — calibration 무의미"}
     try:
-        from sklearn.linear_model import LogisticRegression   # type: ignore[import-not-found]
         import numpy as np
+        from sklearn.linear_model import LogisticRegression  # type: ignore[import-not-found]
     except ImportError as e:
         return {"fitted": False,
                 "reason": f"sklearn / numpy 미설치: {e} — `pip install scikit-learn`"}
@@ -191,7 +191,7 @@ def _save_diagram(bins: list[dict], platt: dict, out_png: Path,
             label="perfect calibration (y=x)")
     sizes = [max(50, n * 10) for n in ns]
     ax.scatter(xs, ys, s=sizes, c="steelblue", alpha=0.7,
-                edgecolors="navy", label=f"bins (size ∝ n)")
+                edgecolors="navy", label="bins (size ∝ n)")
     ax.plot(xs, ys, "-", color="steelblue", alpha=0.5)
     if platt.get("fitted"):
         import numpy as np

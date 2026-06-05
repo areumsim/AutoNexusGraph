@@ -129,7 +129,7 @@ def collect() -> list[ChannelStatus]:
     out.append(ChannelStatus(
         name="DART 사업보고서 production",
         raw_count=dart_zips,
-        raw_detail=f"zip files (6 OEM)",
+        raw_detail="zip files (6 OEM)",
         pg_count=dart_pg,
         pg_detail=f"capacity={dart_capa} + production={dart_prod}",
         neo4j_count=dart_edges,

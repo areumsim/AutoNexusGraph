@@ -20,7 +20,8 @@ Makefile: ``make persons-collision``.
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 DEFAULT_MIN_CORP = 5      # exec_history distinct corp ≥ 이 값이면 병합 의심 검토 후보
 

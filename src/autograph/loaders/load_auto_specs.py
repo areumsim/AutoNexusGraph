@@ -44,7 +44,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
 
-
 log = logging.getLogger(__name__)
 
 

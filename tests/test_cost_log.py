@@ -184,8 +184,8 @@ def test_all_providers_wrapped_with_logging(monkeypatch, tmp_path):
 
 def test_cost_history_summarize(monkeypatch, tmp_path):
     log_path = _patch_path(monkeypatch, tmp_path)
-    from autonexusgraph.llm.cost_log import append, iter_entries
     from autonexusgraph.llm.cost_history import summarize
+    from autonexusgraph.llm.cost_log import append, iter_entries
 
     for e in [
         {"caller": "synth",  "model": "gpt-4o",           "input_tokens": 1000, "output_tokens": 500, "cost_usd": 0.0075},
@@ -219,8 +219,8 @@ def test_cost_history_date_filter(monkeypatch, tmp_path):
     ]
     log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    from autonexusgraph.llm.cost_log import iter_entries
     from autonexusgraph.llm.cost_history import summarize
+    from autonexusgraph.llm.cost_log import iter_entries
 
     s = summarize(
         iter_entries(log_path),

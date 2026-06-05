@@ -25,7 +25,6 @@ from ..config import get_settings
 from ._common import LoadStats
 from ._edge_meta import edge_meta_set_clause
 
-
 # ── 자회사 / 관계회사 ─────────────────────────────────────────────
 # DART API 응답 키 (otrCprInvstmntSttus):
 #   inv_prm                 : 출자대상 회사명

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, TypedDict
 
-
 QuestionKind = Literal["factual", "narrative", "structural", "multi_hop", "unknown"]
 
 # PRD §7.5.2 / §7.5.3 — Supervisor 가 라우팅하는 worker agent 타입.

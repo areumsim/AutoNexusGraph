@@ -18,7 +18,6 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion.sec_client import SecEdgarClient, SecFiling
 
-
 UPSERT_FILING = """
 INSERT INTO anxg_sec.filings
   (accession_no, cik, corp_code, company_name, form_type,

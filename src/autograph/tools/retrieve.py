@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
-
+from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK
+from common.retrieve_base import cap_topk as _cap
 
 # 자동차 청크의 source 컨벤션 (build_chunks_auto 와 일치).
 # 2026-06-01 확장: oem_ir (IR/뉴스룸 본문) + dart_narrative (supplier OEM DART)

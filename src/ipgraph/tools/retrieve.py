@@ -10,9 +10,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.embeddings import EmbeddingError, get_embedding_client
+from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK
+from common.retrieve_base import cap_topk as _cap
 
 log = logging.getLogger(__name__)
 

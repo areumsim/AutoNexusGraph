@@ -240,10 +240,10 @@ def test_identify_auto_targets_swallows_db_error(monkeypatch):
 
 def test_triage_node_populates_auto_targets_in_auto_domain(monkeypatch):
     """domain=auto 인 triage_node 가 identify_auto_targets 를 호출하는지."""
-    from autonexusgraph.agents import nodes as N
-    from autonexusgraph.tools import financials as fin
     from autograph.tools import spec
+    from autonexusgraph.agents import nodes as N
     from autonexusgraph.agents import session
+    from autonexusgraph.tools import financials as fin
 
     # finance lookup_company — 무관, 빈 결과 반환.
     monkeypatch.setattr(fin, "lookup_company", lambda *a, **kw: [])
@@ -277,10 +277,10 @@ def test_triage_node_populates_auto_targets_in_auto_domain(monkeypatch):
 
 def test_triage_finance_domain_skips_auto_lookup(monkeypatch):
     """domain=finance 일 때 identify_auto_targets 가 호출되지 않아야."""
-    from autonexusgraph.agents import nodes as N
-    from autonexusgraph.tools import financials as fin
     from autograph import policy as p
+    from autonexusgraph.agents import nodes as N
     from autonexusgraph.agents import session
+    from autonexusgraph.tools import financials as fin
 
     monkeypatch.setattr(fin, "lookup_company", lambda *a, **kw: [])
 
@@ -303,10 +303,10 @@ def test_triage_finance_domain_skips_auto_lookup(monkeypatch):
 
 def test_triage_then_planner_auto_recall_produces_graph_tasks(monkeypatch):
     """triage 가 target_vehicles 채운 뒤 planner 가 list_recalls_affecting task 생성."""
-    from autonexusgraph.agents import nodes as N
-    from autonexusgraph.tools import financials as fin
     from autograph.tools import spec
+    from autonexusgraph.agents import nodes as N
     from autonexusgraph.agents import session
+    from autonexusgraph.tools import financials as fin
 
     monkeypatch.setattr(fin, "lookup_company", lambda *a, **kw: [])
     monkeypatch.setattr(spec, "lookup_vehicle",
@@ -364,10 +364,10 @@ def test_triage_multi_turn_carries_over_auto_targets(monkeypatch):
     Note: rewriter 가 "그 차" → "현대 그랜저" 로 해소하면 carry-over 가 발화하지
     않아 본 테스트의 의도(carry-over 검증)가 무력화된다. rewriter 격리.
     """
-    from autonexusgraph.agents import nodes as N
-    from autonexusgraph.tools import financials as fin
     from autograph.tools import spec
+    from autonexusgraph.agents import nodes as N
     from autonexusgraph.agents import session
+    from autonexusgraph.tools import financials as fin
 
     # rewriter 격리 — carry-over 메커니즘 단독 검증.
     monkeypatch.setenv("FINGRAPH_QUERY_REWRITE_ENABLED", "false")
@@ -423,10 +423,10 @@ def test_triage_multi_turn_carries_over_auto_targets(monkeypatch):
 
 def test_triage_carryover_skipped_when_current_turn_has_targets(monkeypatch):
     """B18 — 2 turn 에서도 매칭이 있으면 carry-over 안 함 (새 값 우선)."""
-    from autonexusgraph.agents import nodes as N
-    from autonexusgraph.tools import financials as fin
     from autograph.tools import spec
+    from autonexusgraph.agents import nodes as N
     from autonexusgraph.agents import session
+    from autonexusgraph.tools import financials as fin
 
     monkeypatch.setattr(fin, "lookup_company", lambda *a, **kw: [])
 
@@ -559,8 +559,9 @@ def test_cross_query_supplier_type(monkeypatch):
 
 
 def test_cross_query_invalid_entity_type():
-    from autograph.tools import bridge as br
     import pytest as _pt
+
+    from autograph.tools import bridge as br
     with _pt.raises(ValueError):
         br.cross_query(corp_code="X", entity_type="invalid_type")
 

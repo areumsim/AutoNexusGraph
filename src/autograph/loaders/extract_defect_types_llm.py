@@ -21,7 +21,6 @@ from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
 
-
 log = logging.getLogger(__name__)
 
 

@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -92,6 +91,7 @@ def test_parse_pct_basic():
 def test_utilization_table_function_exists():
     """가동률 표 파서 함수 시그니처 보존."""
     import inspect
+
     from autograph.extractors.dart_production_parser import _parse_utilization_table
     sig = inspect.signature(_parse_utilization_table)
     assert "data_rows" in sig.parameters

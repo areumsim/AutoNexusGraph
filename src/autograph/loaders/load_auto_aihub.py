@@ -45,7 +45,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ..ontology import canonical_system_code
 
-
 log = logging.getLogger(__name__)
 
 

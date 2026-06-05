@@ -17,7 +17,8 @@ Makefile: ``make embed-status``.
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 # ── DB 실행기 (테스트 monkeypatch 지점) ──────────────────────────────

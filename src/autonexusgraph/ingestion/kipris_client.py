@@ -15,7 +15,6 @@ from typing import Any
 
 import httpx
 
-
 KIPRIS_BASE = "http://plus.kipris.or.kr/openapi/rest"
 
 
@@ -43,7 +42,7 @@ class KiprisClient:
         from ._common import make_http_client
         self._client = make_http_client(timeout=timeout)
 
-    def __enter__(self) -> "KiprisClient":
+    def __enter__(self) -> KiprisClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

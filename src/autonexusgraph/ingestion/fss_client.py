@@ -18,7 +18,6 @@ from typing import Any
 
 import httpx
 
-
 FSS_BASE = "https://www.fss.or.kr"
 
 USER_AGENT = (
@@ -48,7 +47,7 @@ class FssClient:
         self.base_url = base_url.rstrip("/")
         self._client = httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT})
 
-    def __enter__(self) -> "FssClient":
+    def __enter__(self) -> FssClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:

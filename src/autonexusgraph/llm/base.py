@@ -29,7 +29,7 @@ class TokenUsage:
     cost_usd: float = 0.0
     model: str = ""
 
-    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+    def __add__(self, other: TokenUsage) -> TokenUsage:
         """집계 — 동일 모델만 합산을 권장. 다른 모델 혼합 시 model='mixed'.
 
         cost tracking 의 model 별 정확도를 위해 호출자가 가능하면 모델별로

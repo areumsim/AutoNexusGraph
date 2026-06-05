@@ -31,7 +31,6 @@ from autonexusgraph.ingestion._common import normalize_corp_name
 
 from ._neo4j_helpers import run_batched
 
-
 log = logging.getLogger(__name__)
 
 

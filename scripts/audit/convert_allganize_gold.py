@@ -59,8 +59,9 @@ import argparse
 import csv
 import json
 import logging
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -207,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
     rows = convert(args.src, domain=args.domain,
                     qid_prefix=qid_prefix, limit=args.limit)
     if not rows:
-        print(f"[convert-allganize] WARN — 변환된 row 0 (src 미존재 / 빈 / parse 실패)")
+        print("[convert-allganize] WARN — 변환된 row 0 (src 미존재 / 빈 / parse 실패)")
         return 0
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

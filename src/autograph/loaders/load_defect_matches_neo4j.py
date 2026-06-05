@@ -27,7 +27,6 @@ from autonexusgraph.ontology.domain import domain_for
 
 from ._neo4j_helpers import run_batched
 
-
 log = logging.getLogger(__name__)
 
 

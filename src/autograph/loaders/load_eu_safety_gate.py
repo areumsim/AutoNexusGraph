@@ -43,12 +43,12 @@ import argparse
 import json
 import logging
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from autonexusgraph.db.postgres import get_connection
-
 
 log = logging.getLogger(__name__)
 

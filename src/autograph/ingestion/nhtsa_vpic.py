@@ -31,9 +31,9 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     save_raw,
 )
+
 from ..config import get_auto_settings
 from ._common_nhtsa import nhtsa_http_get
-
 
 log = logging.getLogger(__name__)
 

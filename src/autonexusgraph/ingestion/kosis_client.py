@@ -17,7 +17,6 @@ from typing import Any
 
 import httpx
 
-
 KOSIS_BASE = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 
 
@@ -44,7 +43,7 @@ class KosisClient:
         from ._common import make_http_client
         self._client = make_http_client(timeout=timeout)
 
-    def __enter__(self) -> "KosisClient":
+    def __enter__(self) -> KosisClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

@@ -61,7 +61,7 @@ def test_dart_parse_corp_codes():
         "    <modify_date>20240101</modify_date>\n"
         "  </list>\n"
         "</result>\n"
-    ).encode("utf-8")
+    ).encode()
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("CORPCODE.xml", xml)

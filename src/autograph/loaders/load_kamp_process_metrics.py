@@ -24,7 +24,6 @@ import os
 
 from autonexusgraph.db.postgres import get_connection
 
-
 log = logging.getLogger(__name__)
 
 _RAW_GLOB = "data/raw/datagokr/*15089213*"   # KAMP 제조AI

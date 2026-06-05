@@ -14,7 +14,6 @@ import re
 import unicodedata
 from typing import Any
 
-
 # 한국어 paraphrase 흡수 — 너무 빡빡하면 false-fail. v2 의 _MIN_* 와 동일 출발선.
 _MIN_ANSWER_LENGTH = 10
 _MIN_SIGNIFICANT_TOKENS = 5      # 답변 토큰 수가 너무 적으면 overlap 비율 무의미

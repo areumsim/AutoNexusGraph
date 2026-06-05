@@ -23,7 +23,6 @@ from pathlib import Path
 from ..config import get_settings
 from ._common import LoadStats, chunked, iter_jsonl, parse_amount, parse_int
 
-
 SQL_UPSERT = """
 INSERT INTO anxg_fin.financials
   (corp_code, bsns_year, reprt_code, fs_div, sj_div, account_id, account_nm,

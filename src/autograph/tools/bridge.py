@@ -16,7 +16,6 @@ from typing import Any
 
 from ._db import query_dicts
 
-
 VALID_ENTITY_TYPES = ("manufacturer", "supplier", "vehicle_model", "variant")
 
 

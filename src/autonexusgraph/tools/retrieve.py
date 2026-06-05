@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
+from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK
+from common.retrieve_base import cap_topk as _cap
+
 from ..db.postgres import get_pool
 from ..embeddings import EmbeddingError, get_embedding_client
 

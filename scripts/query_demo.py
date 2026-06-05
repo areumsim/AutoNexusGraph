@@ -17,8 +17,12 @@ _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "src"))
 
 from autonexusgraph.tools import (  # noqa: E402
-    compare_companies, get_company_info, get_operating_income, get_revenue,
-    list_companies_by_market, lookup_company,
+    compare_companies,
+    get_company_info,
+    get_operating_income,
+    get_revenue,
+    list_companies_by_market,
+    lookup_company,
 )
 
 

@@ -20,7 +20,6 @@ from ..config import get_settings
 from ..extraction import chunk_text, parse_dart_zip
 from ._common import LoadStats, chunked
 
-
 SQL_INSERT_CHUNK = """
 INSERT INTO anxg_vec.chunks
   (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata,

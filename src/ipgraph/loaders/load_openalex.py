@@ -58,8 +58,8 @@ def _dsn_from_env() -> str:
 def load_neo4j() -> dict:
     """anxg_ip.institution / anxg_ip.works / anxg_ip.work_institution → Neo4j MERGE."""
     logging.getLogger("neo4j.notifications").setLevel(logging.WARNING)
-    from neo4j import GraphDatabase
     import psycopg2
+    from neo4j import GraphDatabase
 
     pg = psycopg2.connect(os.environ.get("POSTGRES_DSN") or _dsn_from_env())
     drv = GraphDatabase.driver(os.environ["NEO4J_URI"],

@@ -35,9 +35,10 @@ from autonexusgraph.ingestion._license import (
     LICENSE_POLICY,
     OEM_NEWSROOM_POLICY,
     allow_body,
+)
+from autonexusgraph.ingestion._license import (
     policy as license_policy,
 )
-
 
 log = logging.getLogger(__name__)
 

@@ -31,7 +31,6 @@ from autonexusgraph.ingestion._common import (
     fetch_with_retry,
 )
 
-
 log = logging.getLogger(__name__)
 
 

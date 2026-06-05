@@ -19,9 +19,8 @@ from collections.abc import Sequence
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 
-from .base import BaseExtractor, ExtractorResult, RunContext
 from ..llm.cost_tracker import BudgetExceeded
-
+from .base import BaseExtractor, ExtractorResult, RunContext
 
 log = logging.getLogger(__name__)
 

@@ -17,8 +17,14 @@ from __future__ import annotations
 # 공용 LIMIT/YEAR 상수는 core SSOT (autonexusgraph.tools.cypher_templates) 에서 import.
 from autonexusgraph.tools.cypher_templates import (
     LIMIT_50 as _LIMIT_50,
+)
+from autonexusgraph.tools.cypher_templates import (
     LIMIT_100 as _LIMIT_100,
+)
+from autonexusgraph.tools.cypher_templates import (
     LIMIT_500 as _LIMIT_500,
+)
+from autonexusgraph.tools.cypher_templates import (
     YEAR_RANGE as _YEAR,
 )
 

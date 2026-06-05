@@ -24,7 +24,6 @@ sys.path.insert(0, str(_ROOT / "src"))
 from autonexusgraph.config import get_settings  # noqa: E402
 from autonexusgraph.ingestion.dart_client import DartClient  # noqa: E402
 
-
 REPRT_CODES = {
     "annual": "11011",       # 사업보고서 (Q4 누적)
     "Q3": "11014",
