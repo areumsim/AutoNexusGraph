@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from autograph.loaders.load_process_resources import _EQUIPMENT, _build_equipment_rows
+from autograph.loaders.process.load_process_resources import _EQUIPMENT, _build_equipment_rows
 
 
 def test_every_process_has_equipment():

@@ -488,70 +488,70 @@ neo4j-init-auto:
 	$(PYTHON) -m autograph.loaders.neo4j_init
 
 load-auto-pg:
-	$(PYTHON) -m autograph.loaders.load_auto_pg --source all
+	$(PYTHON) -m autograph.loaders.master.load_auto_pg --source all
 
 load-auto-neo4j:
-	$(PYTHON) -m autograph.loaders.load_auto_neo4j
+	$(PYTHON) -m autograph.loaders.master.load_auto_neo4j
 
 load-auto-bridge:
-	$(PYTHON) -m autograph.loaders.load_bridge
+	$(PYTHON) -m autograph.loaders.master.load_bridge
 
 build-chunks-auto:
-	$(PYTHON) -m autograph.loaders.build_chunks_auto --source all
+	$(PYTHON) -m autograph.loaders.chunks.build_chunks_auto --source all
 
 # BOM 계층 + 공급망 / 표준 / 공장 / 컴플레인 / 리콜→부품 매칭 (P2 deterministic 추가 패스).
 load-auto-nhtsa-taxonomy:
-	$(PYTHON) -m autograph.loaders.load_nhtsa_component_taxonomy
+	$(PYTHON) -m autograph.loaders.recall.load_nhtsa_component_taxonomy
 
 load-auto-recall-components:
-	$(PYTHON) -m autograph.loaders.load_recall_components
+	$(PYTHON) -m autograph.loaders.recall.load_recall_components
 
 load-auto-complaint-components:
-	$(PYTHON) -m autograph.loaders.load_complaint_components
+	$(PYTHON) -m autograph.loaders.recall.load_complaint_components
 
 load-auto-supplier-edges:
-	$(PYTHON) -m autograph.loaders.load_supplier_edges
+	$(PYTHON) -m autograph.loaders.master.load_supplier_edges
 
 load-auto-seed-standards-plants:
-	$(PYTHON) -m autograph.loaders.load_seed_standards_plants
+	$(PYTHON) -m autograph.loaders.process.load_seed_standards_plants
 
 load-auto-complaints-neo4j:
-	$(PYTHON) -m autograph.loaders.load_complaints_neo4j
+	$(PYTHON) -m autograph.loaders.recall.load_complaints_neo4j
 
 load-auto-aihub:
-	$(PYTHON) -m autograph.loaders.load_auto_aihub --dataset all
+	$(PYTHON) -m autograph.loaders.master.load_auto_aihub --dataset all
 
 load-auto-specs:
-	$(PYTHON) -m autograph.loaders.load_auto_specs
+	$(PYTHON) -m autograph.loaders.master.load_auto_specs
 
 load-auto-safety:
-	$(PYTHON) -m autograph.loaders.load_auto_safety
+	$(PYTHON) -m autograph.loaders.recall.load_auto_safety
 
 # EPA fueleconomy.gov CSV → spec_measurements. variant 매칭 후 멱등 적재.
 load-auto-epa:
-	$(PYTHON) -m autograph.loaders.load_auto_epa
+	$(PYTHON) -m autograph.loaders.master.load_auto_epa
 
 # NHTSA ODI Investigations → auto.events_investigations + Neo4j INVESTIGATED_BY.
 load-auto-investigations:
-	$(PYTHON) -m autograph.loaders.load_auto_investigations
+	$(PYTHON) -m autograph.loaders.recall.load_auto_investigations
 
 # SEC EDGAR OEM facts → auto.oem_financials_sec + bridge.corp_entity (sec_cik).
 load-auto-oem-sec:
-	$(PYTHON) -m autograph.loaders.load_auto_oem_sec
+	$(PYTHON) -m autograph.loaders.master.load_auto_oem_sec
 
 # NHTSA TSB / Manufacturer Communications → vec.chunks (source='nhtsa_tsb').
 # zip 이 raw 디렉토리에 없으면 안내만 출력. (URL 자동 다운 불가 — manual mode.)
 load-auto-mfrcomm:
-	$(PYTHON) -m autograph.loaders.load_auto_mfrcomm
+	$(PYTHON) -m autograph.loaders.master.load_auto_mfrcomm
 
 # (VehicleModel)-[:CONTAINS_SYSTEM]->(System) — derived after CONTAINS_COMPONENT 적재.
 derive-auto-contains-system:
-	$(PYTHON) -m autograph.loaders.derive_contains_system
+	$(PYTHON) -m autograph.loaders.master.derive_contains_system
 
 # Wikidata P176 (manufactured by) — 부품↔공급사 staging seed (B 등급 0.80).
 # 이후 validate-auto-p4 가 Neo4j SUPPLIED_BY 로 promote.
 load-wikidata-part-supplies:
-	$(PYTHON) -m autograph.loaders.load_wikidata_part_supplies
+	$(PYTHON) -m autograph.loaders.master.load_wikidata_part_supplies
 
 # 전체 P2 적재 — 의존 순서를 명시.
 #   neo4j-init → master → standards seed → safety/epa → 계층/공급/컴플 → derive → wikidata staging
@@ -691,30 +691,30 @@ convert-allganize:
 # ── 제조 데이터 끝까지 (M-11~M-14) — 정형, LLM 0% ─────────────
 load-factoryon:
 	# 팩토리온 raw json → auto.factoryon_registry PG (data.go.kr 15087611).
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_factoryon
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.process.load_factoryon
 
 load-factoryon-dry:
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_factoryon --dry-run
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.process.load_factoryon --dry-run
 
 load-kosis:
 	# KOSIS raw json → macro.kosis_series PG.
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_kosis_industry
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.process.load_kosis_industry
 
 load-kosis-dry:
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_kosis_industry --dry-run
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.process.load_kosis_industry --dry-run
 
 load-kamp-process-metrics:
 	# KAMP 제조AI(15089213) CSV → anxg_auto.process_metrics 적재 (4단계 익명, grade B).
 	# raw 미존재 시 graceful skip (DATA_GO_KR_API_KEY 수집 후 재시도). BACKLOG D-4.
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_kamp_process_metrics
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.process.load_kamp_process_metrics
 
 load-materials-metals:
 	# materials_metals_seed.yaml → Neo4j :Anxg_Material (metal_alloy) + MADE_OF 엣지.
 	# Module 매칭 0건이면 graceful (Module 미적재 환경). BACKLOG L6-2.
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_materials_metals
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.materials.load_materials_metals
 
 load-materials-metals-dry:
-	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.load_materials_metals --dry-run
+	PYTHONPATH=src:. $(PYTHON) -m autograph.loaders.materials.load_materials_metals --dry-run
 
 ingest-wikidata-cell-chem:
 	# Wikidata 배터리 셀 chem (cathode) 메타 수집 — CC0, 무인증.
@@ -754,69 +754,69 @@ ingest-kncap:
 	$(PYTHON) -m autograph.ingestion.kncap
 
 load-datagokr-recalls:
-	$(PYTHON) -m autograph.loaders.load_datagokr_recalls
+	$(PYTHON) -m autograph.loaders.recall.load_datagokr_recalls
 
 load-datagokr-inspections:
-	$(PYTHON) -m autograph.loaders.load_datagokr_inspections
+	$(PYTHON) -m autograph.loaders.recall.load_datagokr_inspections
 
 load-kncap:
-	$(PYTHON) -m autograph.loaders.load_kncap
+	$(PYTHON) -m autograph.loaders.recall.load_kncap
 
 load-manufactured-at:
-	$(PYTHON) -m autograph.loaders.load_manufactured_at
+	$(PYTHON) -m autograph.loaders.process.load_manufactured_at
 
 # 회사 귀속 공정 — (:ProcessStep)-[:PERFORMED_AT]->(:Plant). manual_seed B등급.
 # 선행: load-auto-seed-standards-plants (:Plant code). DoD #19 (≥30 회사 귀속).
 load-performed-at:
-	$(PYTHON) -m autograph.loaders.load_performed_at
+	$(PYTHON) -m autograph.loaders.process.load_performed_at
 
 load-performed-at-dry:
-	$(PYTHON) -m autograph.loaders.load_performed_at --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_performed_at --dry-run
 
 # factoryon registry → :Plant 승격(A) + OWNS_PLANT + PERFORMED_AT 확대(candidate).
 # 선행: load-factoryon (PG auto.factoryon_registry).
 load-factoryon-plants:
-	$(PYTHON) -m autograph.loaders.load_factoryon_plants
+	$(PYTHON) -m autograph.loaders.process.load_factoryon_plants
 
 load-factoryon-plants-dry:
-	$(PYTHON) -m autograph.loaders.load_factoryon_plants --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_factoryon_plants --dry-run
 
 # 한글 리콜 결함 → 공정 (:Recall)-[:CAUSED_BY_PROCESS]->(:Process). candidate.
 # 선행: KR 리콜 적재 (auto.events_recalls source=datagokr_kotsa) + :Recall 노드.
 load-recall-process-map:
-	$(PYTHON) -m autograph.loaders.load_recall_process_map
+	$(PYTHON) -m autograph.loaders.process.load_recall_process_map
 
 load-recall-process-map-dry:
-	$(PYTHON) -m autograph.loaders.load_recall_process_map --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_recall_process_map --dry-run
 
 # 부품 → 공정 (:Part)-[:PRODUCED_BY]->(:ProcessStep). candidate (system 추론). G-2.
 load-produced-by:
-	$(PYTHON) -m autograph.loaders.load_produced_by
+	$(PYTHON) -m autograph.loaders.process.load_produced_by
 
 load-produced-by-dry:
-	$(PYTHON) -m autograph.loaders.load_produced_by --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_produced_by --dry-run
 
 # 공정 설비·소재 USES_EQUIPMENT + CONSUMES_MATERIAL (표준 공정 지식). G-3.
 load-process-resources:
-	$(PYTHON) -m autograph.loaders.load_process_resources
+	$(PYTHON) -m autograph.loaders.process.load_process_resources
 
 load-process-resources-dry:
-	$(PYTHON) -m autograph.loaders.load_process_resources --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_process_resources --dry-run
 
 # 모듈 → 공정 (:Module)-[:USES_PROCESS]->(:Process). candidate (system_code 추론). G-6.
 load-uses-process:
-	$(PYTHON) -m autograph.loaders.load_uses_process
+	$(PYTHON) -m autograph.loaders.process.load_uses_process
 
 load-uses-process-dry:
-	$(PYTHON) -m autograph.loaders.load_uses_process --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_uses_process --dry-run
 
 # ─── 제조 공정 / 생산 — 사용자 명시 P0 ─────────────────────────
 # 산단공 합성 공정데이터 (15151075) — 수동 CSV 다운로드 → :Process 사전.
 load-sandang-processes:
-	$(PYTHON) -m autograph.loaders.load_sandang_processes
+	$(PYTHON) -m autograph.loaders.process.load_sandang_processes
 
 load-sandang-processes-dry:
-	$(PYTHON) -m autograph.loaders.load_sandang_processes --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_sandang_processes --dry-run
 
 # 팩토리온 공장등록정보 (15087611) — DATA_GO_KR_API_KEY 필요, graceful skip.
 #   make ingest-factoryon-company NAME=현대자동차
@@ -831,30 +831,30 @@ ingest-factoryon-complex:
 
 # KAMA 매크로 통계 (data.go.kr 15051116/15051118) — CSV 형식, 키 불필요.
 load-kama-macro:
-	$(PYTHON) -m autograph.loaders.load_kama_macro
+	$(PYTHON) -m autograph.loaders.master.load_kama_macro
 
 load-kama-macro-dry:
-	$(PYTHON) -m autograph.loaders.load_kama_macro --dry-run
+	$(PYTHON) -m autograph.loaders.master.load_kama_macro --dry-run
 
 # USGS Mineral Commodity Summaries (MCS) — L6 핵심광물 (Li/Ni/Co/Mn/Graphite).
 # 무인증, PDF 다운 → text 파싱 → auto.master_minerals + Neo4j :Mineral/:Material/:DERIVED_FROM.
 load-usgs-minerals:
-	$(PYTHON) -m autograph.loaders.load_usgs_minerals --year 2025
+	$(PYTHON) -m autograph.loaders.materials.load_usgs_minerals --year 2025
 
 load-usgs-minerals-dry:
-	$(PYTHON) -m autograph.loaders.load_usgs_minerals --year 2025 --dry-run
+	$(PYTHON) -m autograph.loaders.materials.load_usgs_minerals --year 2025 --dry-run
 
 # DART 사업보고서 "III. 생산 및 설비" → auto.plant_capacity + plant_production
 # + (선택) Neo4j (:Manufacturer)-[:MANUFACTURED_AT]->(:Plant) 동기화.
 # 대상 6 OEM: 현대차/기아/모비스/한온/만도/위아.
 load-dart-production:
-	$(PYTHON) -m autograph.loaders.load_dart_production
+	$(PYTHON) -m autograph.loaders.process.load_dart_production
 
 load-dart-production-dry:
-	$(PYTHON) -m autograph.loaders.load_dart_production --dry-run
+	$(PYTHON) -m autograph.loaders.process.load_dart_production --dry-run
 
 load-dart-production-no-neo4j:
-	$(PYTHON) -m autograph.loaders.load_dart_production --no-neo4j
+	$(PYTHON) -m autograph.loaders.process.load_dart_production --no-neo4j
 
 # 데이터 채널 트래픽라이트 — 산단공/DART/KAMA/팩토리온/리콜 상태 한눈에.
 audit-data-channels:
@@ -873,10 +873,10 @@ ingest-oem-ir-policies:
 	$(PYTHON) -m autograph.ingestion.oem_ir_newsroom --list-policies
 
 load-oem-ir-news:
-	$(PYTHON) -m autograph.loaders.load_oem_ir_news --all
+	$(PYTHON) -m autograph.loaders.chunks.load_oem_ir_news --all
 
 load-oem-ir-news-dry:
-	$(PYTHON) -m autograph.loaders.load_oem_ir_news --all --dry-run
+	$(PYTHON) -m autograph.loaders.chunks.load_oem_ir_news --all --dry-run
 
 # LLM P3 IR 추출 — IRRelationExtractor 경유.
 # 본문 → MANUFACTURED_AT / CAPACITY_REPORTED 후보 → auto.staging_relations.
@@ -893,9 +893,9 @@ extract-ir-p3:
 
 # Plant 노드 wiki 속성 보강 — Wikipedia plant 청크 → :Plant attributes.
 load-plant-wiki-enrichment:
-	$(PYTHON) -m autograph.loaders.load_plant_wiki_enrichment
+	$(PYTHON) -m autograph.loaders.process.load_plant_wiki_enrichment
 
 # Korean OEM alias backfill — auto.master_manufacturers 의 aliases 배열에
 # 한국어 변형 + KGM/RENAULT KOREA 신규 entry.
 load-master-korean-aliases:
-	$(PYTHON) -m autograph.loaders.load_master_korean_aliases
+	$(PYTHON) -m autograph.loaders.master.load_master_korean_aliases

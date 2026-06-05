@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest import mock
 
-from autograph.loaders import load_plant_wiki_enrichment as L
+from autograph.loaders.process import load_plant_wiki_enrichment as L
 
 
 def test_build_rows_extracts_code_from_uniq():

@@ -20,7 +20,7 @@ def test_wikipedia_auto_module_importable():
 
 # ── build_chunks_auto._infobox_to_text 단위 ─────────────────
 def test_infobox_to_text_basic():
-    from autograph.loaders.build_chunks_auto import _infobox_to_text
+    from autograph.loaders.chunks.build_chunks_auto import _infobox_to_text
     txt = _infobox_to_text({"이름": "그랜저", "제조사": "현대자동차", "출시": "1986"})
     assert "이름: 그랜저" in txt
     assert "제조사: 현대자동차" in txt
@@ -28,7 +28,7 @@ def test_infobox_to_text_basic():
 
 
 def test_infobox_to_text_empty_keys():
-    from autograph.loaders.build_chunks_auto import _infobox_to_text
+    from autograph.loaders.chunks.build_chunks_auto import _infobox_to_text
     assert _infobox_to_text(None) == ""
     assert _infobox_to_text({}) == ""
     # 빈 키/값은 무시.
@@ -37,7 +37,7 @@ def test_infobox_to_text_empty_keys():
 
 # ── _strip_html 단위 ────────────────────────────────────────
 def test_strip_html_removes_tags():
-    from autograph.loaders.build_chunks_auto import _strip_html
+    from autograph.loaders.chunks.build_chunks_auto import _strip_html
     html = "<p>Hello <b>World</b></p><script>alert(1)</script>"
     txt = _strip_html(html)
     assert "Hello World" in txt
@@ -46,13 +46,13 @@ def test_strip_html_removes_tags():
 
 
 def test_strip_html_decodes_entities():
-    from autograph.loaders.build_chunks_auto import _strip_html
+    from autograph.loaders.chunks.build_chunks_auto import _strip_html
     assert "AT&T" in _strip_html("AT&amp;T")
     assert "Q: A?" in _strip_html("Q:&#160;A?")
 
 
 def test_strip_html_empty():
-    from autograph.loaders.build_chunks_auto import _strip_html
+    from autograph.loaders.chunks.build_chunks_auto import _strip_html
     assert _strip_html("") == ""
     assert _strip_html(None) == ""
 
@@ -66,7 +66,7 @@ def _write_wiki_raw(root: Path, lang: str, kind: str, eid: int, payload: dict):
 
 
 def test_build_from_wikipedia_iterates_files(tmp_path, monkeypatch):
-    from autograph.loaders import build_chunks_auto as B
+    from autograph.loaders.chunks import build_chunks_auto as B
 
     # raw 디렉토리 mock — _wikipedia_root 가 tmp 가리키게.
     monkeypatch.setattr(B, "_wikipedia_root", lambda: tmp_path)
@@ -139,7 +139,7 @@ def test_build_from_wikipedia_iterates_files(tmp_path, monkeypatch):
 
 def test_build_from_wikipedia_skips_empty(tmp_path, monkeypatch):
     """extract/infobox/html 모두 비어있으면 청크 안 만듦."""
-    from autograph.loaders import build_chunks_auto as B
+    from autograph.loaders.chunks import build_chunks_auto as B
     monkeypatch.setattr(B, "_wikipedia_root", lambda: tmp_path)
     _write_wiki_raw(tmp_path, "ko", "models", 99, {
         "title": "", "lang": "ko",
@@ -163,7 +163,7 @@ def test_build_from_wikipedia_skips_empty(tmp_path, monkeypatch):
 
 def test_build_from_wikipedia_no_root(tmp_path, monkeypatch):
     """raw 디렉토리 없으면 graceful — 0 반환."""
-    from autograph.loaders import build_chunks_auto as B
+    from autograph.loaders.chunks import build_chunks_auto as B
     monkeypatch.setattr(B, "_wikipedia_root", lambda: tmp_path / "nope")
     n = B.build_from_wikipedia()
     assert n == 0
@@ -171,7 +171,7 @@ def test_build_from_wikipedia_no_root(tmp_path, monkeypatch):
 
 def test_build_from_wikipedia_truncates_long_html(tmp_path, monkeypatch):
     """max_html_chars 보다 긴 본문은 잘림."""
-    from autograph.loaders import build_chunks_auto as B
+    from autograph.loaders.chunks import build_chunks_auto as B
     monkeypatch.setattr(B, "_wikipedia_root", lambda: tmp_path)
     long_text = "Sentence. " * 1000   # 약 10000 자
     _write_wiki_raw(tmp_path, "en", "models", 1, {

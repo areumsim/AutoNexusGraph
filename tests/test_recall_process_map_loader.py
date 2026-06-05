@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from autograph.loaders.load_recall_process_map import _PROC, _build_rows
+from autograph.loaders.process.load_recall_process_map import _PROC, _build_rows
 
 
 def _row(rid, text):

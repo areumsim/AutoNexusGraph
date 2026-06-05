@@ -223,7 +223,7 @@ psql -d "$PG_DB" -c "SELECT COUNT(*) FROM auto.events_inspections;"   # 0 OK (�
 # CSV 다운: https://www.data.go.kr/data/15155857/fileData.do
 # → data/raw/datagokr/inspections/<year>.csv
 python -m autograph.ingestion.datagokr_inspections   # CSV → JSONL normalize
-python -m autograph.loaders.load_datagokr_inspections # JSONL → PG UPSERT
+python -m autograph.loaders.recall.load_datagokr_inspections # JSONL → PG UPSERT
 ```
 
 raw 파일 미존재 시 두 명령 모두 graceful skip — exit 0.

@@ -36,7 +36,7 @@ def test_oem_seed_structure():
 
 # ── loader 모듈 ────────────────────────────────────────────
 def test_loader_module_importable():
-    from autograph.loaders import load_auto_oem_sec as L
+    from autograph.loaders.master import load_auto_oem_sec as L
     assert callable(L.load_oem_sec)
     assert hasattr(L, "_GAAP_CONCEPTS")
     assert hasattr(L, "_DEI_CONCEPTS")
@@ -50,7 +50,7 @@ def test_loader_module_importable():
 
 # ── _iter_facts — JSON 파싱 ───────────────────────────────
 def test_iter_facts_extracts_us_gaap_revenues():
-    from autograph.loaders.load_auto_oem_sec import _iter_facts
+    from autograph.loaders.master.load_auto_oem_sec import _iter_facts
 
     facts_root = {
         "us-gaap": {
@@ -85,13 +85,13 @@ def test_iter_facts_extracts_us_gaap_revenues():
 
 
 def test_iter_facts_empty_taxonomy():
-    from autograph.loaders.load_auto_oem_sec import _iter_facts
+    from autograph.loaders.master.load_auto_oem_sec import _iter_facts
     assert list(_iter_facts({}, "us-gaap", ("Revenues",))) == []
     assert list(_iter_facts({"us-gaap": {}}, "us-gaap", ("Revenues",))) == []
 
 
 def test_iter_facts_dei_concepts():
-    from autograph.loaders.load_auto_oem_sec import _iter_facts
+    from autograph.loaders.master.load_auto_oem_sec import _iter_facts
     facts_root = {
         "dei": {
             "EntityCommonStockSharesOutstanding": {
@@ -114,7 +114,7 @@ def test_iter_facts_dei_concepts():
 # ── _resolve_manufacturer_id — entity_name 매칭 ───────────
 def test_resolve_manufacturer_id_via_bridge_sec_cik():
     """bridge 에 이미 sec_cik 매핑이 있으면 즉시 반환."""
-    from autograph.loaders.load_auto_oem_sec import _resolve_manufacturer_id
+    from autograph.loaders.master.load_auto_oem_sec import _resolve_manufacturer_id
 
     cur = MagicMock()
     def fake_execute(sql, params=None):
@@ -131,7 +131,7 @@ def test_resolve_manufacturer_id_via_bridge_sec_cik():
 
 def test_resolve_manufacturer_id_via_name_exact():
     """bridge 매핑 없고 → entity_name name_norm 정확 매칭."""
-    from autograph.loaders.load_auto_oem_sec import _resolve_manufacturer_id
+    from autograph.loaders.master.load_auto_oem_sec import _resolve_manufacturer_id
 
     cur = MagicMock()
     state = {"q": 0}
@@ -154,7 +154,7 @@ def test_resolve_manufacturer_id_via_name_exact():
 
 def test_resolve_manufacturer_id_via_suffix_strip():
     """exact 매칭 실패 → ', Inc.' 떼고 매칭 시도."""
-    from autograph.loaders.load_auto_oem_sec import _resolve_manufacturer_id
+    from autograph.loaders.master.load_auto_oem_sec import _resolve_manufacturer_id
 
     cur = MagicMock()
     state = {"q": 0}
@@ -184,7 +184,7 @@ def test_resolve_manufacturer_id_via_suffix_strip():
 
 def test_resolve_manufacturer_id_no_match():
     """모든 매칭 실패 → None."""
-    from autograph.loaders.load_auto_oem_sec import _resolve_manufacturer_id
+    from autograph.loaders.master.load_auto_oem_sec import _resolve_manufacturer_id
 
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None
@@ -204,7 +204,7 @@ def _make_facts_file(tmp_path: Path, cik: str, payload: dict) -> Path:
 
 def test_process_cik_file_bridge_and_facts(tmp_path, monkeypatch):
     """매칭 성공 → bridge upsert + facts insert."""
-    from autograph.loaders import load_auto_oem_sec as L
+    from autograph.loaders.master import load_auto_oem_sec as L
 
     bridge_calls: list = []
     fact_calls: list = []
@@ -270,7 +270,7 @@ def test_process_cik_file_bridge_and_facts(tmp_path, monkeypatch):
 
 def test_process_cik_file_unmatched_manufacturer(tmp_path, monkeypatch):
     """manufacturer 매칭 실패 → bridge 안 만듦, facts 도 manufacturer_id=NULL."""
-    from autograph.loaders import load_auto_oem_sec as L
+    from autograph.loaders.master import load_auto_oem_sec as L
 
     fact_calls: list = []
     cur = MagicMock()
@@ -311,7 +311,7 @@ def test_process_cik_file_unmatched_manufacturer(tmp_path, monkeypatch):
 
 def test_process_cik_file_no_facts(tmp_path):
     """facts 비어있음 → with_facts 카운트 안 증가."""
-    from autograph.loaders import load_auto_oem_sec as L
+    from autograph.loaders.master import load_auto_oem_sec as L
 
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None

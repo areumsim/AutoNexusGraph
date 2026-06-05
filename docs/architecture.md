@@ -92,6 +92,12 @@ flowchart TD
 > 와 `extractors/`(LLM 엔티티·관계 추출 엔진, P3) 는 역할이 전혀 다르다. 과거 `extraction/` 이
 > `extractors/` 와 이름이 혼동되어 `chunking/` 로 개명.
 
+> **`autograph/loaders/` 관심사별 하위그룹** (48 모듈 → 5 그룹, 평탄 디렉터리 탐색성 개선):
+> `master/`(엔티티·BoM·bridge·supplier·specs) · `recall/`(리콜·불만·결함·안전 이벤트) ·
+> `process/`(BoP 공정 그래프·공장) · `materials/`(L6 소재·광물) · `chunks/`(벡터 청크·뉴스).
+> 공유 헬퍼(`_neo4j_helpers`·`_text_utils`)·`neo4j_init` 은 `loaders/` 최상위 유지. CLI 는
+> `python -m autograph.loaders.<group>.<module>`.
+
 ---
 
 ## 2.5 계층 책임·경계 (data / model / app / bridge)
@@ -105,7 +111,7 @@ flowchart TD
 | **Data** | 외부 raw 수집 → 정규화 → PG/Neo4j 멱등 적재. 스키마·제약·인덱스 정의. | `ingestion/` · `loaders/` · `infra/postgres/init/*.sql` | LLM 호출 금지(추출 Pass 제외). 답변 로직 모름 — 적재만. |
 | **Model** | 온톨로지(entities/relations/extractors yaml) + 추출 Pass(P1~P4) + 신뢰도 등급. 그래프 "의미" 정의. | `ontology/` · `extractors/` · `*/ontology.py` | 사용자 질의·UI 모름. 도메인 schema_version 의 SSOT. |
 | **App** | LangGraph multi-agent(triage→…→validator) + 도구 풀(tools) + 안전 가드 + cost. 질의→답변. | `agents/` · `tools/` · `safety/` · `llm/` | raw 적재 로직·SQL DDL 모름. 사전 정의 도구만 호출(자유 SQL/Cypher 금지). |
-| **Bridge** | 도메인 간 entity 연결 — `bridge.corp_entity`(corp↔글로벌) + `ip.assignee_corp_map`. cross-domain 진입점. | `bridge.corp_entity` 테이블 · `*/tools/bridge.py` · `loaders/load_bridge.py` | 한 도메인에 종속 안 함. confidence 임계로 false match 차단(§5.1(g)). |
+| **Bridge** | 도메인 간 entity 연결 — `bridge.corp_entity`(corp↔글로벌) + `ip.assignee_corp_map`. cross-domain 진입점. | `bridge.corp_entity` 테이블 · `*/tools/bridge.py` · `loaders/master/load_bridge.py` | 한 도메인에 종속 안 함. confidence 임계로 false match 차단(§5.1(g)). |
 
 **왜 이 4 분할인가 (대안·기각)**: (1) **계층 없이 도메인별 수직 슬라이스만** — 도메인 추가마다
 ingestion~app 전체를 복제, 공통 인프라(LLM/cost/guard) 중복. **기각**. (2) **app+model 통합**(tool 이
