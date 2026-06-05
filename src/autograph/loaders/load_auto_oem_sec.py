@@ -386,7 +386,7 @@ def _process_cik_file(cur, path: Path, stats: LoadStats) -> None:
             _upsert_bridge(cur, manufacturer_id=mfr_id,
                             sec_cik=cik10, entity_name=entity_name)
             stats.bridge_rows_upserted += 1
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — bridge UPSERT 실패 흡수 → errors 카운트 + 다음 row
             stats.errors.append(f"bridge {cik10}: {e}")
     elif cik10 in _SEC_TIER1_SUPPLIER_SEED:
         # Tier1 부품사 (예: Aptiv) — entity_type='supplier' 로 bridge.
@@ -396,7 +396,7 @@ def _process_cik_file(cur, path: Path, stats: LoadStats) -> None:
             _upsert_bridge_supplier(cur, supplier_id=sup_id,
                                      sec_cik=cik10, entity_name=entity_name)
             stats.bridge_rows_upserted += 1
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — bridge_supplier UPSERT 실패 흡수 → errors 카운트 + 다음 row
             stats.errors.append(f"bridge_supplier {cik10}: {e}")
     else:
         stats.bridge_rows_unmatched += 1
@@ -457,7 +457,7 @@ def _process_cik_file(cur, path: Path, stats: LoadStats) -> None:
                 stats.financial_rows_inserted += 1
             else:
                 stats.financial_rows_updated += 1
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — SAVEPOINT 롤백 + errors 카운트 → 다음 fact 진행 (멱등 UPSERT)
             cur.execute("ROLLBACK TO SAVEPOINT sp_sec_fact")
             stats.errors.append(
                 f"{cik10}/{f['concept']}/{f.get('fy')}/{f.get('fp')}: {e}"

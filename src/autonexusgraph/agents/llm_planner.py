@@ -65,7 +65,7 @@ def _tool_catalog(state: AgentState) -> dict[str, list[str]]:
     for kind in ("graph", "sql", "research"):
         try:
             cat[kind] = sorted(_allowed_intents(state, kind))
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — handler 미등록/실패 흡수 → 빈 intent list (LLM planner 가 빈 카탈로그 받음)
             cat[kind] = []
     cat["calculator"] = ["evaluate", "aggregate"]   # 샌드박스 — intent 자유(검증 면제)
     return cat
@@ -197,7 +197,7 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
 def _safe(fn):
     try:
         return fn() or []
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — generic safe wrapper (fn 모든 실패 흡수 → 빈 list)
         return []
 
 

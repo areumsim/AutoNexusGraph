@@ -244,7 +244,7 @@ def upsert_pg(rows: list[dict[str, Any]]) -> int:
         return 0
     try:
         conn = get_connection()
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 연결 실패 흡수 → graceful skip (db 미가동 환경)
         log.warning("[kamp.catalog] PG 미가용 — graceful skip: %s", e)
         return 0
     n = 0
@@ -259,11 +259,11 @@ def upsert_pg(rows: list[dict[str, Any]]) -> int:
                 cur.execute(_UPSERT_SQL, r)
                 n += cur.rowcount or 0
         conn.commit()
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 적재 실패 흡수 → rollback 후 log (다음 호출 시 재시도)
         log.warning("[kamp.catalog] PG 적재 실패 (fail-soft): %s", e)
         try:
             conn.rollback()
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — rollback 자체 실패 silent (이미 연결 손상 가능성)
             pass
     return n
 

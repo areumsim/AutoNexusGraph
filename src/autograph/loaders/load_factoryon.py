@@ -119,7 +119,7 @@ def collect_rows(raw_dir: Path | None = None) -> list[dict]:
     for fp, endpoint in _iter_raw_files(raw_dir):
         try:
             payload = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — file 읽기/JSON 파싱 실패 흡수 → continue (다음 raw 파일)
             log.warning("[factoryon.load] %s 파싱 실패: %s", fp, e)
             continue
         for item in _extract_items(payload):
@@ -138,7 +138,7 @@ def upsert_pg(rows: list[dict]) -> int:
         return 0
     try:
         from autonexusgraph.db.postgres import get_pool
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — postgres 모듈 미가용 (db 미설치) 흡수 → 적재 skip
         log.warning("[factoryon.load_pg] postgres 모듈 미가용: %s", e)
         return 0
     sql = """
@@ -189,7 +189,7 @@ def upsert_pg(rows: list[dict]) -> int:
                 cur.execute(sql, r)
                 n += cur.rowcount or 0
             return n
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — PG 적재 실패 흡수 → 0 반환 (fail-soft, 다음 호출 시 재시도)
         log.warning("[factoryon.load_pg] PG 적재 실패 (fail-soft): %s", e)
         return 0
 
