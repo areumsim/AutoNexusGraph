@@ -70,7 +70,7 @@ class AnthropicClient(LLMClient):
                 max_tokens=max_tokens or 4096,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — Anthropic API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"Anthropic chat failed: {e}") from e
 
         # content blocks 중 text 만 합침
@@ -102,7 +102,7 @@ class AnthropicClient(LLMClient):
             ) as stream:
                 for text in stream.text_stream:
                     yield text
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — Anthropic API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"Anthropic stream failed: {e}") from e
 
     def chat_json(
@@ -132,7 +132,7 @@ class AnthropicClient(LLMClient):
                 tool_choice={"type": "tool", "name": tool_name},
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — Anthropic API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"Anthropic json failed: {e}") from e
 
         for block in resp.content:

@@ -79,7 +79,7 @@ def _fetch_one_applicant(applicant: str, *, year: int | None,
             )
             with urllib.request.urlopen(req, timeout=20) as resp:
                 payload = resp.read().decode("utf-8")
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — KIPRIS HTTP/XML/file 실패 흡수 → log + skip
             log.warning("[kipris] fetch 실패 (%s page=%d): %s",
                         applicant, page, e)
             break
@@ -138,7 +138,7 @@ def parse_xml(xml_text: str, *, snapshot_year: int | None = None
     except ImportError:
         import xml.etree.ElementTree as etree
         root = etree.fromstring(xml_text)
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — KIPRIS HTTP/XML/file 실패 흡수 → log + skip
         log.warning("[kipris] XML parse 실패: %s", e)
         return out
 
@@ -297,7 +297,7 @@ def collect(*, applicants: list[str] | None = None,
     for fp in sorted(list(raw_dir.glob("*.xml")) + list(raw_dir.glob("*.txt"))):
         try:
             xml_text = fp.read_text(encoding="utf-8")
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — KIPRIS HTTP/XML/file 실패 흡수 → log + skip
             log.warning("[kipris] read 실패 %s: %s", fp.name, e)
             continue
         parsed = parse_xml(xml_text, snapshot_year=snapshot_year)

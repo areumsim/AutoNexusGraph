@@ -90,7 +90,7 @@ class GeminiClient(LLMClient):
                 config=cfg,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — Gemini API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"Gemini chat failed: {e}") from e
 
         content = (resp.text or "") if hasattr(resp, "text") else ""
@@ -122,7 +122,7 @@ class GeminiClient(LLMClient):
                 t = getattr(chunk, "text", "") or ""
                 if t:
                     yield t
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — Gemini API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"Gemini stream failed: {e}") from e
 
     def chat_json(
@@ -155,7 +155,7 @@ class GeminiClient(LLMClient):
                 config=cfg,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — Gemini API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"Gemini json failed: {e}") from e
 
         # Gemini 가 parsed 객체를 직접 줄 수도, text 만 줄 수도 있음 — 안전하게 둘 다 처리.

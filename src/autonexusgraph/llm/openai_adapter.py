@@ -52,7 +52,7 @@ class OpenAIClient(LLMClient):
                 max_tokens=max_tokens,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — OpenAI API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"OpenAI chat failed: {e}") from e
 
         usage = _build_usage(self.model, resp.usage)
@@ -76,7 +76,7 @@ class OpenAIClient(LLMClient):
                 stream=True,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — OpenAI API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"OpenAI stream failed: {e}") from e
         for chunk in stream:
             delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -107,7 +107,7 @@ class OpenAIClient(LLMClient):
                 },
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — OpenAI API 모든 실패 흡수 → LLMError 변환 (호출자 통일 처리)
             raise LLMError(f"OpenAI json failed: {e}") from e
 
         content = resp.choices[0].message.content or "{}"

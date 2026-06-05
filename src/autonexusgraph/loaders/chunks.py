@@ -93,7 +93,7 @@ def _build_rows(
     """
     try:
         sections = parse_dart_zip(zip_path)
-    except Exception:
+    except Exception:   # noqa: BLE001 — DART zip 손상/파싱 실패 흡수 → 빈 iter (다음 zip 으로)
         # 손상 zip, 파싱 실패 → 다음 zip 으로
         return iter([])
 
@@ -184,7 +184,7 @@ def load_chunks(
                     cur.executemany(SQL_INSERT_CHUNK, batch)
                     stats.inserted += len(batch)
                     stats.batches += 1
-                except Exception:
+                except Exception:   # noqa: BLE001 — PG batch insert 실패 흡수 → 카운트 + re-raise (호출자가 트랜잭션 처리)
                     stats.failed += len(batch)
                     raise
     return stats
@@ -245,7 +245,7 @@ def embed_chunks(
         texts = [r[1] for r in rows]
         try:
             vectors = client.embed(texts)
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — embed 호출 모든 실패 흡수 → 카운트 + EmbeddingError 변환
             stats.failed += len(rows)
             raise EmbeddingError(f"embed batch failed: {e}") from e
 
