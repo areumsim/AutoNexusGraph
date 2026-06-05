@@ -57,6 +57,17 @@ flowchart TB
 
 > **라벨 컨벤션 (문서 전체):** *(라벨 없음, 수치만)* = 구현 완료 + SSOT 측정값 · **⊘ 측정 대기** = 구현 완료, LLM 키 등 외부 의존 · **(scaffold)/(wired)** = 코드 있음, 데이터·키 부재 · **(예정)** = 미구현 + 최종 필수 · **(부분 적재)** = 일부 데이터 있음, 본격 진입 전 · **(예정, 보조)** = 보조축, 후순위 · **(비전)** = 우선순위 강등.
 
+> **온톨로지 범위 — 무엇을 뜻하고 무엇이 비목표인가 (정직):** 본 시스템의 "온톨로지" =
+> **schema-as-code** (`ontology/<domain>/*.yaml` + pydantic v2 strict `extra='forbid'` +
+> cypher↔yaml cross-check, `src/autonexusgraph/ontology/schema.py`). 사람이 작성한 yaml 이
+> Neo4j(LPG) 적재를 **제약·검증**하고, 모든 엣지에 7키 메타(provenance/confidence/…)를 강제한다.
+> **비목표 명시**: (1) 그래프에서 온톨로지를 *자동 유도/학습*하지 않는다 (ontology induction 아님 —
+> taxonomy 는 사람이 yaml 로 작성). (2) RDF/OWL/SHACL triple store 가 아니다 (LPG 모델에
+> conceptual mismatch + 무거운 dep 회피, §10.17). 즉 방향은 "graph→ontology 변환"이 아니라
+> "ontology(yaml)가 graph 적재를 governs". 연구 기여로서의 핵심은 *ontology 변환* 이 아니라
+> **confidence-calibrated, schema-governed multi-domain KG construction + store-aware hybrid
+> routing** 이다 (측정 thesis 는 [docs/research/thesis_hybrid_routing.md](./docs/research/thesis_hybrid_routing.md)).
+
 ## 5분 진입점
 
 | 무엇 | 왜 | 어떻게 (코드 진입점) |
