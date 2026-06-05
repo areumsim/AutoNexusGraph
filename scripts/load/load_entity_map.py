@@ -58,7 +58,6 @@ def main() -> int:
 
     pool = get_pool()
     em_count = 0
-    alias_count = 0
     rows: list[tuple] = []
 
     with pool.connection() as conn, conn.cursor() as cur:
@@ -111,7 +110,7 @@ def main() -> int:
         cur.executemany(UPSERT_ENTITY_MAP, em_batch)
         em_count = len(em_batch)
         cur.executemany(UPSERT_ALIAS, alias_batch)
-        alias_count = len(alias_batch)
+        len(alias_batch)
 
     # 적재 결과 검증
     with pool.connection() as conn, conn.cursor() as cur:

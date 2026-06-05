@@ -54,7 +54,6 @@ _SENT_BREAK = re.compile(r"([\.!?。](?:\s|$)|\n\n+)")
 def _split_sentences(text: str) -> list[str]:
     """문장 단위로 자르기. 표 행 등은 그대로 한 단위."""
     parts: list[str] = []
-    buf = []
     last = 0
     for m in _SENT_BREAK.finditer(text):
         end = m.end()

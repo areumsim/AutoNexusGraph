@@ -149,7 +149,6 @@ def test_iter_inv_rows_no_file(tmp_path):
 def _make_cur_with_resolve(variant=None, model=None, mfr=None):
     """resolve 가 (mfr, model, variant) 반환하고 INSERT...RETURNING 도 mock."""
     cur = MagicMock()
-    state = {"step": 0}
 
     def fake_execute(sql, params=None):
         if "FROM anxg_auto.master_manufacturers" in sql and "SELECT mm.manufacturer_id" in sql:

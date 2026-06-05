@@ -81,7 +81,6 @@ def main() -> int:
         # extract via client helper
         client = SecEdgarClient.__new__(SecEdgarClient)
         # avoid __init__ — only need extract_filings
-        filings: list[SecFiling] = []
         for f in SecEdgarClient.extract_filings(client, sub):
             rows.append((
                 f.accession_no, f.cik, corp_code, company_name,

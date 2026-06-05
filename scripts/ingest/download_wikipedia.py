@@ -96,7 +96,7 @@ def main() -> int:
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
-    s = get_settings()
+    get_settings()
     targets = _select_targets(args.lang)
     if args.limit:
         targets = targets[: args.limit]

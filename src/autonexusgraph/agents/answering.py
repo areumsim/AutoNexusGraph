@@ -142,7 +142,7 @@ def build_deterministic_brief(state: dict) -> str:
     Synthesizer 의 LLM 호출 실패 / 비용 초과 / Budget Exceeded 시 fallback.
     state 는 AgentState dict.
     """
-    q = state.get("question") or ""
+    state.get("question") or ""
     kind = state.get("question_kind") or "unknown"
     targets = state.get("target_companies") or []
 

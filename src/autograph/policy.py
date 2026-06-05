@@ -127,9 +127,9 @@ def plan_auto_tasks(*, question: str,
             _next_id("sql_"), "sql", "lookup_vehicle",
             {"query": question, "limit": 5},
         ))
-        lookup_id = tasks[-1]["id"]
+        tasks[-1]["id"]
     else:
-        lookup_id = None
+        pass
 
     if kind == "vehicle_spec":
         for vid in target_vehicles:

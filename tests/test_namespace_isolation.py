@@ -171,7 +171,7 @@ def test_pg_rename_script_covers_all_create_schemas():
             created.add(m.group(1))
 
     missing = created - rename_schemas
-    extra = rename_schemas - created
+    rename_schemas - created
     assert not missing, f"rename SQL 에서 누락된 스키마 (init 에는 있음): {missing}"
     # rename 에만 있는 건 OK — 과거 스키마 호환용일 수 있음. 경고만.
 
@@ -395,7 +395,7 @@ def test_transaction_invalidates_cache_on_rollback_failure(monkeypatch):
     monkeypatch.setattr(pg, "_open_connection", lambda: fake)
     # cache_clear 호출 검증용 카운터.
     cleared = {"n": 0}
-    orig_clear = type(pg._open_connection).cache_clear if hasattr(pg._open_connection, "cache_clear") else None
+    type(pg._open_connection).cache_clear if hasattr(pg._open_connection, "cache_clear") else None
     # monkeypatch 후 _open_connection 은 plain 함수라 cache_clear 속성 없음 — 대체 mock.
     pg._open_connection.cache_clear = lambda: cleared.__setitem__("n", cleared["n"] + 1)  # type: ignore[attr-defined]
 

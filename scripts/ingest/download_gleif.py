@@ -22,7 +22,7 @@ from autonexusgraph.ingestion.gleif_client import GleifClient
 
 
 def main() -> int:
-    limiter = get_rate_limiter("gleif")
+    get_rate_limiter("gleif")
     ckpt = CheckpointStore("gleif_kr")
 
     all_records: list[dict] = []

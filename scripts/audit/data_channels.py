@@ -55,9 +55,9 @@ class ChannelStatus:
         except (TypeError, ValueError):
             raw = None
         try:
-            ng = int(self.neo4j_count) if self.neo4j_count != "?" else None
+            int(self.neo4j_count) if self.neo4j_count != "?" else None
         except (TypeError, ValueError):
-            ng = None
+            pass
 
         if pg is not None and pg > 0:
             return "🟢"

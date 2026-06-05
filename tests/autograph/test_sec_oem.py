@@ -210,7 +210,6 @@ def test_process_cik_file_bridge_and_facts(tmp_path, monkeypatch):
     fact_calls: list = []
 
     cur = MagicMock()
-    state = {"step": 0}
 
     def fake_execute(sql, params=None):
         # 1) bridge sec_cik lookup → 없음.
