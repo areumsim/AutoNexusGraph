@@ -194,6 +194,7 @@ def sup_send_directives(state: AgentState):
         "calculator": "worker_calculator",
     }
     sends = []
+    dispatched: list[str] = []   # 병렬 가시화용 — (node, task_id) 쌍
     for t in ready:
         agent = str(t.get("agent"))
         if agent == "_spawn":
@@ -207,6 +208,10 @@ def sup_send_directives(state: AgentState):
         t["status"] = "running"
         # 각 Send 는 child invocation 의 입력 state — task 와 전체 state 모두 전달
         sends.append(Send(node, {**state, "_current_task": t}))
+        dispatched.append(f"{node}#{t.get('id')}")
+    if sends:
+        log.info("[supervisor] dispatch %d parallel workers (Send API): %s",
+                 len(sends), dispatched)
     return sends
 
 

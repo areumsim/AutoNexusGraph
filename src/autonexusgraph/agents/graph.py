@@ -100,8 +100,12 @@ def _worker_wrap(worker_fn):
         if task is None:
             return state
         # _current_task 은 Send 한정 — 결과 누적 후 제거
+        tid = task.get("id") if isinstance(task, dict) else None
+        log.info("[worker] %s start task=%s (thread=%s)",
+                 worker_fn.__name__, tid, state.get("thread_id"))
         out_state = worker_fn(state, task)
         out_state.pop("_current_task", None)
+        log.info("[worker] %s done  task=%s", worker_fn.__name__, tid)
         return out_state
     _wrapped.__name__ = f"wrap_{worker_fn.__name__}"
     return _wrapped

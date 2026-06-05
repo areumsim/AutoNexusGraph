@@ -7,8 +7,11 @@ session_state 기반 thread_id 관리.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 def get_or_create_thread_id() -> str:
@@ -55,7 +58,10 @@ def load_history(thread_id: str, limit: int = 20) -> list[dict]:
                     "created_at": created.isoformat() if created else None,
                 })
     except Exception:   # noqa: BLE001 — PG 조회 실패 흡수 → 빈 history (UI 표시 우선)
+        log.warning("[history] thread=%s load 실패 → 빈 history", thread_id)
         return []
+    log.info("[history] thread=%s loaded=%d msgs (src=PG anxg_chat.messages, limit=%d)",
+             thread_id, len(out), limit)
     return list(reversed(out))
 
 
