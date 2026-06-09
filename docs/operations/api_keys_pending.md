@@ -199,11 +199,11 @@
 `.env` 의 LLM 키 교체 후 즉시 검증. 셋 중 1개만 통과해도 OK.
 
 ```bash
-# OPENAI
+# 키 검증 — model + 실 chat() 1-shot (provider 속성은 LLMClient 에 없음 → model 로 확인).
 PYTHONPATH=src python3 -c "
 from autonexusgraph.llm.base import get_llm_client
 c = get_llm_client(role='synthesizer')
-print('provider:', c.provider, 'model:', c.model)
+print('model:', c.model)
 print(c.chat([{'role':'user','content':'say OK'}], max_tokens=5).content)
 "
 # 기대: 'OK' 또는 'OK.' (HTTP 200)
@@ -255,8 +255,9 @@ export LANGFUSE_PUBLIC_KEY=pk-lf-...
 export LANGFUSE_SECRET_KEY=sk-lf-...
 export LANGFUSE_HOST=https://cloud.langfuse.com   # 또는 self-host
 
-make audit-trace --full
-# → Langfuse dashboard 에 turn별 token/cost/replan 송신 검증
+make audit-trace-full
+# → 실 agent run + Langfuse dashboard 에 turn별 token/cost/replan 송신 검증
+# (키 없이 PG 적재만 PASS 확인하려면: make audit-trace)
 ```
 
 ### Step 4 — DoD 20항 트래픽라이트 재측정 (5 분)
