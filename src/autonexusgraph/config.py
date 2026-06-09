@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     llm_model_fast: str = "gemini-2.5-flash"     # triage/research/sql 등 가벼운 호출
     llm_model_smart: str = "gemini-2.5-pro"      # planner/synthesizer 등 추론·생성
 
+    # Provider fallback — 1차 provider 호출이 LLMError(auth/quota/429/5xx/timeout) 로
+    # 실패하면 자동 전환할 보조 provider. 빈 값 = 비활성(단일 provider, 기존 동작).
+    # get_llm_client 가 [primary, fallback] 를 FallbackLLMClient 로 묶어
+    # BudgetAware/Logging 안쪽(innermost)에 둔다 → 비용 가드·기록은 어느 쪽이 응답해도 1회.
+    # llm_fallback_model 비우면 fallback provider 의 기본 FAST 모델 사용(base._DEFAULT_FAST_MODEL).
+    llm_fallback_provider: Literal["", "openai", "anthropic", "google", "local"] = ""
+    llm_fallback_model: str = ""
+
     # 개별 role override — 비워두면 tier 기본값 자동 적용 (model_validator 가 보강).
     llm_model_triage: str = ""
     llm_model_planner: str = ""
