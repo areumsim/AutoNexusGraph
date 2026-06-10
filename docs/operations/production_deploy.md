@@ -114,7 +114,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=1
 
 ## 4. 마이그레이션 (스키마)
 
-PG init SQL (`infra/postgres/init/*.sql`, 현재 25개) 은 **빈 볼륨 첫 기동 시 자동 적용**. 기존 볼륨에 신규 SQL 적용은 **멱등 hot-apply** — 상세 [docs/operations/migrations.md](migrations.md).
+PG init SQL (`infra/postgres/init/*.sql`, 현재 31개) 은 **빈 볼륨 첫 기동 시 자동 적용**. 기존 볼륨에 신규 SQL 적용은 **멱등 hot-apply** — 상세 [docs/operations/migrations.md](migrations.md).
 
 ```bash
 # 신규 init SQL 을 기동 중 인스턴스에 hot-apply (멱등 — 변경 0 이면 무동작)
@@ -219,7 +219,7 @@ stringData:
   ANTHROPIC_API_KEY: "<...>"
 ```
 
-> PG/Neo4j 는 k8s 안에 띄우기보다 **관리형 DB (RDS/AuraDB) 또는 StatefulSet + PVC** 권장 — 본 앱은 stateless (체크포인트는 PG `chat` 스키마에 위임).
+> PG/Neo4j 는 k8s 안에 띄우기보다 **관리형 DB (RDS/AuraDB) 또는 StatefulSet + PVC** 권장 — 본 앱은 stateless (체크포인트는 PG `anxg_chat` 스키마에 위임).
 
 ---
 

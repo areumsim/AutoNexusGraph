@@ -192,7 +192,7 @@ idempotent (UPSERT) — 여러 번 실행 안전.
 | 1 | **NEO4J_PLUGINS = `["apoc"]` 만** — GDS (Graph Data Science) 미포함 | learning_guide §11.1.3 HippoRAG PageRank (`gds.pageRank`) / community detection 같은 알고리즘 적용 불가. enterprise 라이선스 별도 필요 | (a) 현재 본 시스템은 GDS 미사용 — 한계 아님. (b) 적용 검토 시 docker-compose.yml 의 NEO4J_PLUGINS 에 `"graph-data-science"` 추가 + 라이선스 |
 | 2 | Neo4j memory: heap_max=2g + pagecache=1g = 3g + JVM overhead → **약 4g RAM 권장** | dev 환경 RAM 4GB 미만 시 OOMKilled | docker stats 확인. 부족 시 docker-compose.yml 의 `NEO4J_dbms_memory_heap_max__size` 줄임 (`512m` ~ `1g`) |
 | 3 | **`DB_DATA_ROOT` 기본값 `/home/user/arsim/DB_FG`** — 하드코딩된 사용자명 `user` | macOS / Windows / 다른 사용자명 환경 fail | `.env` 에 `DB_DATA_ROOT=~/your/path` 명시 (compose 가 변수 치환). 또는 export ENV |
-| 4 | **첫 부팅 init SQL 25개 적용 시간** — healthcheck timeout 100초 (10s × 10) 안에 안 끝날 가능성 | `make health` 가 일시 fail | 첫 부팅 5분 대기 후 재시도. `docker compose logs postgres` 로 init 진행 확인 |
+| 4 | **첫 부팅 init SQL 31개 적용 시간** — healthcheck timeout 100초 (10s × 10) 안에 안 끝날 가능성 | `make health` 가 일시 fail | 첫 부팅 5분 대기 후 재시도. `docker compose logs postgres` 로 init 진행 확인 |
 | 5 | **앱 컨테이너 (api/web/ingestion-worker) 모두 주석** — compose 로는 DB 2개만 활성 | 직접 실행 모드만 — `make serve-api` / `make serve-ui` (31020/31021 포트). 컨테이너화는 후속 | OK (의도된 설계 — dev container 환경 가정) |
 | 6 | **GPU 임베딩 (BGE-M3/Reranker) 도 주석** — 옵션 2 (dev container 직접 실행) 채택 | `scripts/serve_embeddings.py` 가 호스트/dev container 안에서 직접. compose 통합 안 됨 | OK (의도) — GPU 분리 시 옵션 1 (TEI) 활성화 |
 | 7 | **Qdrant / Redis 옵션** 모두 주석 | 청크 ≥ 100만 시 Qdrant 분리 필요, 분산 worker 시 Redis 필요 | 현재 청크 750K 이내 → pgvector 단독. Redis 미필요 — 단일 worker |

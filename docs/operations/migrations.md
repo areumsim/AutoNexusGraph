@@ -4,7 +4,9 @@
 때만 자동 적용된다. 데이터가 이미 존재하는 환경에서는 새 `.sql` 파일을 추가해도 자동으로
 실행되지 않으므로 **수동 hot-apply 절차** 가 필요하다.
 
-## 0. 전체 마이그레이션 목록 (총 30개 — 01~29 + 12a/12b 별도)
+## 0. 전체 마이그레이션 목록 (총 31개 — 01~30 + 12a/12b 별도)
+
+> ⚠️ **스키마 규약**: 아래 목록 주석과 본문 psql 예시는 약식 스키마명(`auto.` 등)을 쓰나, **실 DB 스키마는 `anxg_` 프리픽스** (`anxg_auto`/`anxg_bridge`/`anxg_ip`/`anxg_vec`/`anxg_chat` — `01_schema.sql`). namespace rename 절차는 §아래 (`rename_pg_schemas_namespace.sql`).
 
 ```text
 01_schema.sql                       # core 기본 메타·스키마 (master / fin / wiki / vec / news / sec / esg)
@@ -36,7 +38,8 @@
 26_bridge_review.sql                # bridge candidate 검토 SOP 컬럼 (reviewed_status 등)
 27_auto_kamp_catalog.sql            # KAMP 카탈로그 (BoP)
 28_auto_defect_matches.sql          # auto.defect_matches (Recall ↔ DefectType 유사도)
-29_auto_failure_modes.sql           # auto.failure_modes + SUBJECT_TO / MANIFESTS_AS
+29_auto_failure_modes.sql           # anxg_auto.failure_modes + SUBJECT_TO / MANIFESTS_AS
+30_chat_feedback_updated_at.sql     # anxg_chat.feedback.updated_at 컬럼 추가
 ```
 
 본 가이드는 **개별 파일의 hot-apply 절차** 와 그 중 backfill 이 필요한 ALTER 마이그레이션 (10번) 의 안전 순서를 다룬다.

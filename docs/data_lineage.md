@@ -1,5 +1,7 @@
 # Data Lineage — 채널별 end-to-end 추적 SSOT
 
+> ⚠️ **경로·스키마 규약**: 본 문서의 loader 모듈 경로는 일부 하위그룹 segment 를 생략한다 — 실제는 `src/autograph/loaders/{master,recall,process,materials,chunks}/<module>.py` (예: `load_supplier_edges.py` → `loaders/master/...`, `load_performed_at.py` → `loaders/process/...`). PG 스키마는 `anxg_` 프리픽스 (`anxg_master` 등).
+>
 > **본 문서의 위치**: 각 데이터 채널의 **raw URL → ingestion → PG/Neo4j 적재 → 7키 메타 → tool → 답변 시나리오 → 알려진 한계** 의 1 페이지 추적. 신규 합류자 / 외부 평가자 / 본인 회고가 한 채널을 이해할 때 다른 문서 점프 없이 끝낼 수 있도록.
 >
 > [docs/data_sources.md](data_sources.md) (수집 후보 카탈로그) + [docs/data_inventory.md](data_inventory.md) (실측 row 수) + [docs/autograph.md](autograph.md) + [docs/ipgraph.md](ipgraph.md) 의 정보를 **채널 단위로 통합**. (2026-06-02 — 기존 `data_catalog.md` 흡수 후 폐기 — 9 항목 운영 가이드 + raw 보존 정책 + 트래픽라이트 + 더 필요한 데이터 P0~P2 모두 본 문서 §1~§5.4 흡수.)
@@ -67,13 +69,13 @@
 | **Loader 코드** | `src/autonexusgraph/loaders/load_companies.py` + `load_filings.py` + `load_financials.py` + `load_graph_structural.py` |
 | **raw 저장** | `data/raw/dart/{corp_codes, filings, financials, structural}/` |
 | **PG 테이블** | `master.companies` (295 row) / `fin.filings` (4,584 row) / `fin.financials` (184,199 row XBRL) |
-| **Neo4j 노드·엣지** | `:Company` (12,914) / `:Person` (14,536) / `SUBSIDIARY_OF` (8,661) / `EXECUTIVE_OF` (33,064) / `MAJOR_SHAREHOLDER_OF` (12,548) |
+| **Neo4j 노드·엣지** | `:Company` (12,914) / `:Person` (14,536) / `SUBSIDIARY_OF` (8,661) / `EXECUTIVE_OF` (36,399) / `MAJOR_SHAREHOLDER_OF` (16,725) (6/1 재측정, README §1) |
 | **vec.chunks** | `section='dart_business'` / `'dart_audit'` 등 — `corp_code` + `fiscal_year` 메타 |
 | **7키 메타** | `source_type='dart_xbrl' / 'dart_business_report'`, `source_id=rcept_no`, `extraction_method='deterministic'` (P1), `confidence_score=0.95` (A 등급), `validated_status='validated'`, `snapshot_year=fiscal_year`, `schema_version="v2.2"` |
 | **추출 Pass** | P1 (deterministic, LLM 0%) — XBRL 직매핑. P2 (deterministic) — 정형 지배구조 |
 | **Tool 진입점** | `tools/financials.py`: `lookup_company / get_revenue / get_operating_income / get_balance_sheet_item / compare_companies`. `tools/graph.py`: `list_subsidiaries / get_executives / get_major_shareholders` |
 | **답변 시나리오** | "삼성전자 2023년 매출은?" → `lookup_company('삼성전자')` → corp_code=00126380 → `get_revenue('00126380', 2023)` → PG fin.financials 조회 → **6.5분 latency 추정** (README §10.14 미실측) |
-| **알려진 한계** | (a) **재무제표 IFRS 별도/연결 혼동** — 같은 회사 동일 항목이 보고 기준에 따라 다른 값. gold QA 에서 명시 필요. (b) 분기·반기 보고서는 fiscal_year 가 아닌 보고 시점 기준 — 적재 시 정규화 필요. (c) **사업보고서 본문 P3 LLM 추출** (COMPETES_WITH 등) 은 wired-but-disabled (`ontology/relations.yaml:226`) — 비용/환각 위험 |
+| **알려진 한계** | (a) **재무제표 IFRS 별도/연결 혼동** — 같은 회사 동일 항목이 보고 기준에 따라 다른 값. gold QA 에서 명시 필요. (b) 분기·반기 보고서는 fiscal_year 가 아닌 보고 시점 기준 — 적재 시 정규화 필요. (c) **사업보고서 본문 P3 LLM 추출** (COMPETES_WITH 등) 은 wired-but-disabled (finance `ontology/relations.yaml:147`) — 비용/환각 위험 |
 
 ---
 
@@ -212,7 +214,7 @@
 |---|---|
 | **출처 URL** | `https://vpic.nhtsa.dot.gov/api/vehicles/` |
 | **인증** | 불필요 |
-| **라이선스** | 공공 (US Gov) — `_license.py['nhtsa_vpic']` |
+| **라이선스** | 공공 (US Gov) — `_license.py` 의 `LICENSE_POLICY` 에 nhtsa 키 미등록 (NHTSA 공개데이터, 정책 dict 미커버) |
 | **수집 의도** | 차량 마스터 (manufacturer / model / variant) — BOM Level 0~2 |
 | **Ingestion** | `src/autograph/ingestion/nhtsa_vpic.py` (RateLimiter) |
 | **Loader** | `src/autograph/loaders/load_auto_pg.py` + `load_auto_neo4j.py` |
@@ -514,7 +516,7 @@
 | **매칭 우선순위** | `wikidata_qid > LEI > sec_cik > business_no > name fuzzy > manual` |
 | **PG 테이블** | `bridge.corp_entity` — 4,806 row (manufacturer cand 1 + reviewed 11 + supplier cand 4,790 + reviewed 4) |
 | **strong_match** | 15/15 = 100% (confidence ≥ 0.9) |
-| **`match_method` enum** | `qid_exact | lei_exact | business_no_exact | corp_code_exact | fuzzy_name | manual` (6종) |
+| **`match_method` 값** | `wikidata_qid | name_exact | lei | business_no` (`load_bridge.py` 가 적재. `08_bridge.sql` 은 VARCHAR(20), CHECK enum 없음) |
 | **별개 컬럼** | `sec_cik` (글로벌 OEM 진입점, `bridge_sec_cik_to_entity` 함수 별도) |
 | **Loader** | `src/autograph/loaders/load_bridge.py` |
 | **Tool** | `bridge_corp_to_entity / bridge_entity_to_corp / bridge_sec_cik_to_entity / bridge_entity_to_sec_cik / cross_query` |

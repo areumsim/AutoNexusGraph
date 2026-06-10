@@ -89,6 +89,8 @@
 
 ## 2. Tier A — 키 불필요, 코드 추가만 필요
 
+> ⚠️ **상태 갱신 (2026-06-10)**: 본 Tier A 의 **A1 (NHTSA Investigations)·A4 (EPA fueleconomy)·A7 (SEC EDGAR OEM)** 은 이미 **통합·적재 완료** (각각 `events_investigations` 154 / EPA 1,426 / SEC facts 3,199 — `docs/data_inventory.md`, README §1). 아래 "신규 테이블 필요 / ~LOC 작업량" 서술은 **2026-05-28 카탈로그 시점 기준 (이제 to-do 아님)**.
+
 ### A1. **NHTSA Investigations API** (별도 endpoint 확인 필요)
 - **URL 후보**: `data.transportation.gov/Automobiles/...` 의 Socrata SODA + `crashviewer.nhtsa.dot.gov/CrashAPI`
 - **무엇**: 리콜 전단계 **결함 조사** history (NHTSA ODI 가 개시·종료한 조사) — recall 보다 깊은 결함 패턴
@@ -370,7 +372,7 @@
 
 ### 📊 평가 데이터
 - **Cross-Domain QA L1~L4 층화 라벨**: gold dataset 에 분류 라벨 미포함 — 사람 라벨링 필요.
-- **multi-hop 비율**: PRD 목표 검증용 표본 수 부족 (gold 13건 → 50건+ 필요).
+- **multi-hop 비율**: gold 총 165건 (finance 30/auto 56/cross 49/ip 30) 적재됐으나, multi-hop·cross-domain 변별 셀은 여전히 보강 필요 (`docs/research/thesis_hybrid_routing.md` §4).
 
 ---
 

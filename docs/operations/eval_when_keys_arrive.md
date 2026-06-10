@@ -18,7 +18,8 @@
 
 빠른 점검 (키 유효성 — LLM 1콜):
 ```bash
-make llm-smoke        # 또는: python -c "from autonexusgraph.llm.base import get_llm_client; print(get_llm_client(role='synthesizer').chat([{'role':'user','content':'ping'}], max_tokens=5).content)"
+# LLM 키 동작 확인 (전용 make 타겟 없음):
+python -c "from autonexusgraph.llm.base import get_llm_client; print(get_llm_client(role='synthesizer').chat([{'role':'user','content':'ping'}], max_tokens=5).content)"
 ```
 
 ## 1. 핵심 한 줄 — 평가 매트릭스 full (10 cells)

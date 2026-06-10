@@ -78,7 +78,7 @@ print('등록된 핸들러:', sorted(_HANDLERS.keys()))
 
 ### Q2.3 세션 hard limit 도달 — 후속 turn 차단
 
-**증상**: `data/cost_log.jsonl` 누적이 `LLM_SESSION_HARD_LIMIT_USD` (기본 $10) 초과 → 차단.
+**증상**: `data/cost_log.jsonl` 누적이 `LLM_SESSION_HARD_LIMIT_USD` (기본 $5) 초과 → 차단.
 
 **해결**: 세션 재시작 (`cost_log.jsonl` 은 누적이라 재시작해도 누적값 유지 — 운영 환경에서는 일·주별 rotate 필요, §11.2 운영 보안 P1).
 
