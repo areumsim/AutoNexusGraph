@@ -23,8 +23,14 @@ import httpx
 # data.go.kr — 공정거래위원회 기업집단 (상호출자제한 + 공시대상)
 # 무료 키 발급 후 ?serviceKey=... 로 호출
 DATA_GO_KR_BASE = "https://api.odcloud.kr/api"
-# 기본 endpoint — '공시대상기업집단 일반현황' (UDDI 는 매년 갱신될 수 있음)
-DEFAULT_ENDPOINT = "/15083033/v1/uddi:8a7e1f59-..."  # 실제 UDDI 는 data.go.kr 확인
+# ⚠️ 아래 odcloud `/15083033/...` 은 **오설정**: dataset 15083033 은 실제로
+#   '소상공인 상가(상권)정보' 이고 기업집단이 아니다 (2026-06-10 확인, plus UDDI 도 플레이스홀더).
+# 올바른 소스(2026-06-10 data.go.kr 확인): '공정거래위원회_지정된 대규모기업집단 조회 서비스'
+#   dataset 15091886, endpoint = https://apis.data.go.kr/1130000/appnGroupSttusList/appnGroupSttusListApi
+#   (계열: 15091898 임원현황 / 15091902 참여업종). odcloud 가 아니라 apis.data.go.kr/1130000/ 포맷이라
+#   파라미터·응답 파서가 다르다 → 구현 TODO (BACKLOG). + 해당 dataset 별 활용신청 필요
+#   (현 DATA_GO_KR_API_KEY 는 1130000 서비스 미등록 → 403 Forbidden).
+DEFAULT_ENDPOINT = "/15083033/v1/uddi:8a7e1f59-..."  # FIXME: 위 15091886 로 교체(키 등록 후)
 
 
 @dataclass(frozen=True)
