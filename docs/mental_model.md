@@ -260,7 +260,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
   - **P4 — Cross-validate**: P3 산출 vs P2 SSOT 비교. 일치하면 `validated`, 충돌하면 `rejected` (deterministic 우선), 결정 없음 + 0.80↑ 면 `candidate`, 0.65↑ 면 `needs_review`. Neo4j MERGE 시 `validated_status` 플래그.
 - **위치**: `src/autonexusgraph/extractors/` (finance), `src/autograph/extractors/` (auto).
 - [확정] Deterministic-first 원칙. 정형은 LLM 안 거침.
-- [잠정] auto P3 의 활성 관계는 현재 2종 (`SUPPLIED_BY`, `RECALL_OF`). 4종은 `enabled:false` (`docs/autograph.md §7.6`, `ontology/auto/relations.yaml`).
+- [잠정] auto P3 의 활성 관계는 현재 2종 (`SUPPLIED_BY`, `CAUSED_BY_PROCESS`). `COMPETES_WITH` 는 `enabled:false` (P3 정의 3종 중 1종 비활성). `RECALL_OF` 는 P3 아닌 **P2 deterministic** (`ontology/auto/relations.yaml`, `docs/autograph.md §7.6`).
 
 #### 2.2.6 도메인 라우팅 — `route_domain`
 
@@ -463,8 +463,8 @@ Response (answer + citations + cost + visualizations)
   - `FIN_RESEARCH_INTENTS` (3종): search_documents, search_by_metadata, get_chunk
 
 - auto 화이트리스트 — handler 가 보유 (`autograph/agent_handler.py:42-61`):
-  - `AUTO_GRAPH_ALLOWED` (9종): lookup_vehicle_graph, lookup_supplier, list_components, list_systems_of_model, list_models_with_system, list_recalls_affecting, list_investigations_affecting, get_investigation_recall_chain, get_suppliers_of_component, get_vehicles_using_component, find_vehicle_component_paths
-  - `AUTO_SQL_ALLOWED` (10종): lookup_vehicle, get_vehicle_info, get_spec, compare_vehicles, get_safety_rating, bridge_corp_to_entity, bridge_entity_to_corp, bridge_sec_cik_to_entity, bridge_entity_to_sec_cik, get_oem_financials_sec, cross_query
+  - `AUTO_GRAPH_ALLOWED` (11종): lookup_vehicle_graph, lookup_supplier, list_components, list_systems_of_model, list_models_with_system, list_recalls_affecting, list_investigations_affecting, get_investigation_recall_chain, get_suppliers_of_component, get_vehicles_using_component, find_vehicle_component_paths
+  - `AUTO_SQL_ALLOWED` (17종): lookup_vehicle, get_vehicle_info, get_spec, compare_vehicles, get_safety_rating, get_plant_capacity, get_oem_production, list_plants_by_oem, search_processes, get_macro_industry, get_macro_production, bridge_corp_to_entity, bridge_entity_to_corp, bridge_sec_cik_to_entity, bridge_entity_to_sec_cik, get_oem_financials_sec, cross_query
   - `AUTO_RESEARCH_INTENTS` (3종): search_documents_auto, search_by_metadata_auto, get_chunk_auto
 
 - cross_domain — fin ∪ auto (CrossDomainHandler 가 `super().allowed_intents() | fin` 으로 합집합, `agent_handler.py:139-148`).
@@ -508,7 +508,7 @@ Response (answer + citations + cost + visualizations)
 #### 3.4.3 pgvector (`vec.chunks`)
 
 - 청크 메타: `chunk_id`, `source`, `corp_code` (finance), `manufacturer_id`/`model_id`/`variant_id` (auto), `fiscal_year`, `section`, `embedding (vector(1024))`.
-- finance 청크 ~748K (`README §1.1`); auto 청크 16,242 (모두 embedded — `README §1.2`).
+- finance 청크 ~748K (`README §1.1`); auto 청크 16,435 (모두 embedded — `README §1.2`).
 - BGE-M3 1024d cosine 으로 backfill (`make embed-chunks`).
 
 [잠정] `vec.chunks.corp_code` NOT NULL → nullable 로 완화 (auto 청크 추가 시) — `docs/autograph.md §6`. 영구성 [의도 확인 필요].
@@ -833,7 +833,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 ### 5.7 평가셋의 자기충족 위험
 
-- gold QA 30+42+30 행 — 작성자가 시스템에 익숙해서 "잡힐 만한" 질문만 골랐을 가능성.
+- gold QA 30+56+49+30 행 (= 165; finance/auto/cross/ip) — 작성자가 시스템에 익숙해서 "잡힐 만한" 질문만 골랐을 가능성.
 - **[위험]** Multi-hop 정답률 측정의 ground truth 가 시스템 그래프에 의존. 그래프에 없는 관계는 질문도 못 만듦.
 - **[열린 질문]** Vector RAG 비교 매트릭스가 의미가 있으려면, gold QA 가 "Vector 도 풀 수 있는 질문" 을 포함해야 함. 그렇지 않으면 비교가 불공평.
 - **[미정]** 외부 작성 gold QA (블라인드 큐레이터) 도입 여부.
@@ -849,7 +849,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 - `register_handler` 가 import 시점 부작용 (`autograph/__init__.py:23`).
 - **[위험]** 테스트에서 `import autograph` 하면 다른 테스트의 핸들러 레지스트리 오염. `unregister_handler` 함수는 있음 (`_domain_handler.py:97`) 이지만 자동 사용 안 됨.
-- **[열린 질문]** 코어 단독 테스트 (`tests/autonexusgraph/`) 가 `import autograph` 없이 통과하는가? README §6 의 310 unit 테스트가 어떻게 격리되는가?
+- **[열린 질문]** 코어 단독 테스트 (`tests/autonexusgraph/`) 가 `import autograph` 없이 통과하는가? 코어 unit 테스트 스위트가 어떻게 격리되는가? (총 테스트 수는 변동 — `pytest -q` 로 확인)
 - **[열린 질문]** `agents/nodes.py:34` 가 `from ..tools.financials import lookup_company as lookup_pg` — 이게 도메인 무지 위반인지 (finance 가 코어 안에 있으니 무관인지) 의 경계가 모호.
 
 ### 5.10 `[의도 확인 필요]` 리스트 (코드만으론 안 풀림)

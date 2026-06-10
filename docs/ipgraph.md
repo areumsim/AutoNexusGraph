@@ -10,7 +10,7 @@
 > 으로 추가하여 **§10.12 "코어 변경 < 5%"** 를 보존 (실측 현재 default baseline `414bc1b` 기준 코어 변경 **0/15,396 LOC = 0.00%**, `make audit-dod` 2026-06-01. 누적 reset 이력은 [eval/reports/core_diff_baseline_ledger.md](../eval/reports/core_diff_baseline_ledger.md)).
 >
 > **현재 구현 상태 (2026-06-01)**
-> - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**25 Cypher 템플릿**, `cypher_templates_ip.py:30` dict top-level) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 25 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 8 (research/sql + bridge 2 + cross_query_ip) + research 3 = **19 intents** (`agent_handler.py:26-42`).
+> - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**25 Cypher 템플릿**, `cypher_templates_ip.py:36` dict top-level) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 25 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 8 (research/sql + bridge 2 + cross_query_ip) + research 3 = **19 intents** (`agent_handler.py:26-42`).
 > - **데이터**: 부분 적재 — `ip.cpc_scheme` **10,695 row** + `ip.works` (OpenAlex) **629 row** + `ip.institution` 38 + `ip.work_institution` 638 + Neo4j `:CPCCode` **10,695 노드**. PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) **적용 완료 (2026-06-01)** — `ip.patents / ip.assignees / ip.inventors / ip.patent_assignees / ip.patent_inventors / ip.patent_cpc / ip.citations / ip.assignee_corp_map` 8 테이블 생성됨 (row=0). 후속: KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset → `ingestion/{kipris,uspto_odp}.py` 실행 + assignee → corp_entity 매핑.
 >
 > **선택 근거:** OpenAlex / **USPTO ODP (data.uspto.gov, PatentsView 후속 — 2026-03-20 이관 완료, REST 종료 → bulk dataset)** / CPC bulk 완전 무료, KIPRIS 로 한국 특허 커버, 거의 전부 정형이라 LLM 예산 거의 무소비.
@@ -194,11 +194,11 @@ CREATE TABLE ip.assignee_corp_map (
 
 기존 supplier candidate 4,792 row 운영 SOP (검토 승급/거부) 와 **동일 흐름 재사용**.
 
-### Cypher 템플릿 — 23 (M-11)
+### Cypher 템플릿 — 25 (M-11)
 
-`naming = ip_*`. lookup / assignee / cpc / citation / cross 카테고리 (실측 23 top-level keys, `cypher_templates_ip.py:30`).
+`naming = ip_*`. lookup / assignee / cpc / citation / cross 카테고리 (실측 25 top-level keys, `cypher_templates_ip.py:36`).
 예: `ip_lookup_patent`, `ip_assignee_patents_by_cpc`, `ip_cpc_descendants(code, max_depth=4)` (M-6), `ip_citation_network_d1` / `ip_citation_network_d2` (M-7).
-`src/autograph/tools/__init__.py:20-22` 의 `register_templates(_FIN_TEMPLATES, _AUTO_TEMPLATES)` 에 `_IP_TEMPLATES` 추가.
+`src/ipgraph/tools/__init__.py:23` 의 `register_templates(_FIN_TEMPLATES, _IP_TEMPLATES)` 가 import 시점에 IP_TEMPLATES 를 finance `TEMPLATES` 에 병합 (autograph `__init__` 은 AUTO 만 등록 — 도메인별 독립 호출).
 
 ---
 
@@ -240,7 +240,7 @@ CREATE TABLE ip.assignee_corp_map (
 ## 7. 라우팅 / 비용 / 평가
 
 - **라우팅:** `route_domain_ip` 등록 (M-2). corp + 특허 + (부품|리콜) 동시 → `cross_domain`.
-- **비용 (M-12):** `turn_budget_for_domain("ip")` 기본 **$0.05** (finance $0.50 / auto $0.30 의 1/10 — 정형 위주). ENV `LLM_TURN_BUDGET_IP_USD` override.
+- **비용 (M-12):** `turn_budget_for_domain("ip")` 기본 **$0.20** — `agent_turn_budget_ip_usd` 필드 기본 0.0 → 공통 기본 `agent_turn_budget_usd=0.20` 상속 (`config.py`, `turn_budget_for_domain` 우선순위 1단계). ip 한도 override 는 `.env` `AGENT_TURN_BUDGET_IP_USD` (Settings 필드 경유). 정형 위주라 실제 소비도 낮음.
 - **평가 (M-13):** 4 어댑터 × 저비용 LLM 1종 (Sonnet 4.6 / GPT-4o-mini / Gemini Flash). headline = thesis(§10.7) 만, judge 는 cheap tier. seed ip 30 + CD-L3 4 + CD-L4 4. rerank on/off ablation 1줄.
 - **DoD:** 추가 후 `make audit-dod` 코어 변경량 재측정. **(M-15) baseline reset 정책을 README §10.12 본문으로 승격** — `make audit-dod` 출력에 baseline commit + 누적 reset 이력.
 

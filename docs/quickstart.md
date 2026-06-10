@@ -164,7 +164,7 @@ make serve-ui                                 # Streamlit :31021 채팅 UI (st.s
 | `DART_API_KEY` | (필수) | finance 핵심 데이터 소스 |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` | (선택) | LLM provider — 한 개 이상 필요. 없으면 FAKE LLM |
 | `LLM_PROVIDER` | (자동 detect) | `openai` / `anthropic` / `google` / `local` |
-| `LLM_SESSION_HARD_LIMIT_USD` | `5.00` | 세션 총 LLM 비용 한도 (`llm/cost.py:141` 기본값 + `.env.example:74`) |
+| `LLM_SESSION_HARD_LIMIT_USD` | `5.00` | 세션 총 LLM 비용 한도 (`llm/cost.py:140 get_session_limit_usd` 기본값 + `.env.example:81`) |
 | `LLM_COST_AUTO_APPROVE_USD` | `0.50` | turn 추정 비용이 이를 초과하면 HITL 승인 |
 | `FINGRAPH_MIN_KOREAN_RATIO` | `0.30` | language_guard 한국어 비율 임계 |
 | `TRACE_BACKEND` | (none) | `langfuse` / `langsmith` — tracing 활성 시 |

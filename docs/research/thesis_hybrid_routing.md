@@ -23,6 +23,16 @@
 
 **귀무가설 H0**: hybrid EM − vector EM ≤ 0 (또는 +30%p 미달). 반증 가능 = 연구로 성립.
 
+> **측정 현황 — H1(a) 반증 신호 [있음]** (1차 실측 2026-06-05, Anthropic 10 cells × 30 finance,
+> $0.60 · BACKLOG S-4 · 결과 SSOT = [README §10.7](../../README.md#10-dod-definition-of-done--20-항)):
+> hits@k **vector 0.967 > sql_vec 0.900 > hybrid 0.433 > graph 0.300** — H1(a) 가정과 **정반대**
+> (−53.4%p). EM 은 gold scorable < 5 로 `insufficient_gold` (측정 artifact 회피 → hits 로 1차 판정).
+> 즉 **현 데이터·gold 에서 H0 미기각** (store-aware hybrid 가치 입증 미달). 원인 가설(검증 대기):
+> (a) multi-hop gold answer 1/16 → 측정 편향, (b) Neo4j 적재 sparse → graph reasoner 무력화,
+> (c) router 가 vector-우세 question 에 graph 합성을 섞어 손실. **결론 보류, 폐기 아님** — §4 gold
+> 보강 + Neo4j 적재 + multi-provider `--full` 재측정 후 재판정. 최신 셀 결과는
+> `data/reports/audit_eval_matrix_<ISO>.json`.
+
 ---
 
 ## 2. Baselines & 비교군 (어댑터)  **[있음]**
@@ -74,14 +84,16 @@
 | 단계 | 명령/파일 | 현 상태 |
 |---|---|---|
 | 셀 enumeration 인프라 | `run_matrix_smoke.py` (simulation 기본, LLM 비용 0) | **[있음]** PASS (`make audit-eval-matrix`) |
-| **실측 실행** | `run_matrix_smoke.py --full` → cell 마다 `run_qa_eval` 실제 호출 | **[제안]** LLM 키 + DB 적재 필요 (`docs/operations/api_keys_pending.md` One-Shot Runbook) |
+| **실측 실행** | `run_matrix_smoke.py --full` → cell 마다 `run_qa_eval` 실제 호출 | **[부분 있음]** 1차 실측 완료 (2026-06-05, Anthropic single-provider, §1 측정 현황 = H1(a) 반증 신호). multi-provider full + gold/Neo4j 보강 후 재측정 **[제안]** (`docs/operations/api_keys_pending.md` One-Shot Runbook) |
 | numeric/grounding metric 추가 | §3 [제안] 2종 metric 구현 | **[제안]** |
 | golden set 보강 | §4 [제안] 4종 셀 | **[제안]** |
 | 결과 산출물 | `data/reports/audit_eval_matrix_<ISO>.json` (cell 별 + thesis headline) | **[있음]** 포맷 존재 |
 
-**한 줄**: 인프라(어댑터·ablation·헤드라인·gold 스키마)는 이미 깔려 있다. "측정 게이트만 깔린
-상태" 를 "결과" 로 바꾸는 일 = **(1) --full 실측 (키+DB), (2) numeric/grounding metric 2종 추가,
-(3) multi-hop·cross-domain·numeric gold 셀 보강.** 그러면 H1 을 ±%p 로 보고할 수 있다.
+**한 줄**: 인프라(어댑터·ablation·헤드라인·gold 스키마)는 이미 깔려 있고 **1차 실측도 나왔다 — 결과는
+H1(a) 반증 신호**(§1, vector > hybrid). 남은 일은 "결과 없음 → 측정" 이 아니라 **"약한 1차 반증 →
+견고한 재판정"** = **(1) gold 보강(multi-hop·cross-domain·numeric 각 ≥30), (2) Neo4j 적재 보강,
+(3) numeric/grounding metric 2종 추가, (4) multi-provider `--full` 재측정.** 그래야 H0 기각/미기각을
+편향 없이 ±%p 로 확정한다.
 
 ---
 
