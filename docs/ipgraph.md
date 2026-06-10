@@ -240,7 +240,7 @@ CREATE TABLE ip.assignee_corp_map (
 ## 7. 라우팅 / 비용 / 평가
 
 - **라우팅:** `route_domain_ip` 등록 (M-2). corp + 특허 + (부품|리콜) 동시 → `cross_domain`.
-- **비용 (M-12):** `turn_budget_for_domain("ip")` 기본 **$0.20** — ip 전용 budget 필드 미선언이라 공통 기본 `agent_turn_budget_usd=0.20` 상속 (`config.py:187`). 도메인별 override 는 ENV `AGENT_TURN_BUDGET_IP_USD` (`config.py:285 turn_budget_for_domain` 동적 조회). ⚠️ `.env.example:15` 의 `LLM_TURN_BUDGET_IP_USD` 는 코드가 읽지 않는 dead var (정형 위주라 실제 소비도 낮음).
+- **비용 (M-12):** `turn_budget_for_domain("ip")` 기본 **$0.20** — `agent_turn_budget_ip_usd` 필드 기본 0.0 → 공통 기본 `agent_turn_budget_usd=0.20` 상속 (`config.py`, `turn_budget_for_domain` 우선순위 1단계). ip 한도 override 는 `.env` `AGENT_TURN_BUDGET_IP_USD` (Settings 필드 경유). 정형 위주라 실제 소비도 낮음.
 - **평가 (M-13):** 4 어댑터 × 저비용 LLM 1종 (Sonnet 4.6 / GPT-4o-mini / Gemini Flash). headline = thesis(§10.7) 만, judge 는 cheap tier. seed ip 30 + CD-L3 4 + CD-L4 4. rerank on/off ablation 1줄.
 - **DoD:** 추가 후 `make audit-dod` 코어 변경량 재측정. **(M-15) baseline reset 정책을 README §10.12 본문으로 승격** — `make audit-dod` 출력에 baseline commit + 누적 reset 이력.
 
