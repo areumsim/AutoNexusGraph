@@ -190,6 +190,7 @@ class Settings(BaseSettings):
     agent_turn_budget_finance_usd: float = 0.0
     agent_turn_budget_auto_usd: float = 0.0
     agent_turn_budget_cross_domain_usd: float = 0.0
+    agent_turn_budget_ip_usd: float = 0.0        # ip 보조축 — 정형 위주라 낮은 한도 권장 (.env: AGENT_TURN_BUDGET_IP_USD)
     # 임의 도메인 (legal/safety 등) 의 turn 한도는 env 로 직접 지정:
     #   AGENT_TURN_BUDGET_<DOMAIN>_USD=0.30
     # → turn_budget_for_domain("legal") 가 동적으로 그것을 읽음.
