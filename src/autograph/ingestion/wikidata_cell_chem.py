@@ -33,18 +33,24 @@ log = logging.getLogger(__name__)
 
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 
-# Cathode chemistry families — 배터리 cell 의 Wikidata Q-ID seed.
-# **STALE / UNVERIFIED** (2026-06-02 실측):
-#   - Q899037 → "Toboliu" (루마니아 마을, NOT Lithium-ion battery)
-#   - Q900614 → "carbochemistry" (NOT NCM cathode)
-#   - Q1126478 → "Külsővat" (헝가리 마을, NOT NCA)
-# Wikidata QID 들은 시간 경과로 재할당되거나, 초기 시드가 잘못 추정된 것으로 보임.
-#
-# **SSOT 는 `ontology/auto/materials_seed.yaml`** — manual chemistry 정의 + minerals 매핑.
-# Wikidata 자동 보강은 manual QID 큐레이션이 선행되어야 의미 있음. 그때까지 본 dict 는
-# 빈 채 유지 (collect() 가 0 row 반환 + materials_seed 폴백을 그대로 사용).
-# 큐레이션 SOP: docs/autograph.md §2.5.4.
-CATHODE_QIDS: dict[str, str] = {}
+# Cathode chemistry families — 배터리 cell 의 Wikidata Q-ID seed (code → QID).
+# **큐레이션 완료 (2026-06-10)** — wbsearchentities 검색 + SPARQL 실재·라벨·formula 검증:
+#   NCM811 Q121086674 "lithium nickel manganese cobalt oxide 811"
+#   NCM622 Q121086348 "...622" / NCM523 Q121086662 "...532"(5:2:3≈5:3:2 동일 chem)
+#   NCA    Q86728773  "lithium nickel cobalt aluminium oxides"(group)
+#   LFP    Q3042400   "lithium iron phosphate" (formula FeLiO₄P, battery cathode material)
+#   GRAPHITE_ANODE Q5309 "graphite" (formula C, allotrope/mineral)
+# (과거 Q899037/Q900614/Q1126478 은 마을·무관 엔티티 — 재할당/오추정이라 폐기됨.)
+# SSOT 는 여전히 `ontology/auto/materials_seed.yaml`; 본 dict 는 자동 보강(formula/QID
+# back-fill)용. 큐레이션 SOP: docs/autograph.md §2.5.4.
+CATHODE_QIDS: dict[str, str] = {
+    "NCM811": "Q121086674",
+    "NCM622": "Q121086348",
+    "NCM523": "Q121086662",   # Wikidata "532" — 5:2:3 ≈ 5:3:2 동일 chemistry family
+    "NCA":    "Q86728773",
+    "LFP":    "Q3042400",
+    "GRAPHITE_ANODE": "Q5309",
+}
 
 # SPARQL — cathode chemistry meta + 셀 제조사 매핑 (sparse).
 # 본 쿼리는 manufacturer 직접 매칭이 약함 (Wikidata 의 P176/manufacturer 부재).
