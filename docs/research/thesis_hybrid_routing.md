@@ -26,8 +26,9 @@
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
 > BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
 > [README §10.7](../../README.md#10-dod-definition-of-done--20-항)):
-> hits@k **vector 0.875 > hybrid 0.5 = −37.5%p** — H1(a) 가정(+30%p)과 **정반대** (target_met=false).
-> EM 은 gold scorable 2/30 로 `insufficient_gold` (gold curation 부족 지속). #14 latency internal 100% ✅.
+> hits@k **vector 0.875 > hybrid 0.4375 = −43.75%p** — H1(a) 가정(+30%p)과 **정반대** (target_met=false).
+> **EM 측정 가능** (multi-hop gold scorable 5 충족 → `em_status=ok`): vector EM 0.40 = hybrid EM 0.40
+> (+0.0%p, hybrid 우위 없음). #13 메인홉 효율 0.375 ≤ 0.7 ✅, #14 latency internal 100% ✅.
 > 즉 **현 데이터·gold 에서 H0 미기각** (store-aware hybrid 가치 입증 미달). (직전 1차 실측 2026-06-05
 > Anthropic: vector 0.967 > hybrid 0.433 = −53.4%p — 방향 일치; 본 정식 실측서 hybrid 0.5 로 기능 확인,
 > 무효 0.0 아님.) 원인 가설(검증 대기): (a) multi-hop gold answer 1/16 → 측정 편향, (b) Neo4j 적재
