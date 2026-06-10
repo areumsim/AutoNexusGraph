@@ -113,7 +113,7 @@ flowchart TD
 | **Data** | 외부 raw 수집 → 정규화 → PG/Neo4j 멱등 적재. 스키마·제약·인덱스 정의. | `ingestion/` · `loaders/` · `infra/postgres/init/*.sql` | LLM 호출 금지(추출 Pass 제외). 답변 로직 모름 — 적재만. |
 | **Model** | 온톨로지(entities/relations/extractors yaml) + 추출 Pass(P1~P4) + 신뢰도 등급. 그래프 "의미" 정의. | `ontology/` · `extractors/` · `*/ontology.py` | 사용자 질의·UI 모름. 도메인 schema_version 의 SSOT. |
 | **App** | LangGraph multi-agent(triage→…→validator) + 도구 풀(tools) + 안전 가드 + cost. 질의→답변. | `agents/` · `tools/` · `safety/` · `llm/` | raw 적재 로직·SQL DDL 모름. 사전 정의 도구만 호출(자유 SQL/Cypher 금지). |
-| **Bridge** | 도메인 간 entity 연결 — `bridge.corp_entity`(corp↔글로벌) + `ip.assignee_corp_map`. cross-domain 진입점. | `bridge.corp_entity` 테이블 · `*/tools/bridge.py` · `loaders/master/load_bridge.py` | 한 도메인에 종속 안 함. confidence 임계로 false match 차단(§5.1(g)). |
+| **Bridge** | 도메인 간 entity 연결 — `anxg_bridge.corp_entity`(corp↔글로벌) + `anxg_ip.assignee_corp_map`. cross-domain 진입점. | `anxg_bridge.corp_entity` 테이블 · `*/tools/bridge.py` · `loaders/master/load_bridge.py` | 한 도메인에 종속 안 함. confidence 임계로 false match 차단(§5.1(g)). |
 
 **왜 이 4 분할인가 (대안·기각)**: (1) **계층 없이 도메인별 수직 슬라이스만** — 도메인 추가마다
 ingestion~app 전체를 복제, 공통 인프라(LLM/cost/guard) 중복. **기각**. (2) **app+model 통합**(tool 이
@@ -222,12 +222,12 @@ flowchart LR
 | 12a | `12a_autograph_inspections.sql` | auto | KOTSA 수리검사 (data.go.kr 15155857) |
 | 12b | `12b_autograph_investigations.sql` | auto | NHTSA ODI 조사 |
 | 13 | `13_autograph_oem_sec.sql` | auto | 글로벌 OEM SEC EDGAR |
-| 14 | `14_master_entities.sql` | core | master.entities 다형 ER |
+| 14 | `14_master_entities.sql` | core | anxg_master.entities 다형 ER |
 | 15 | `15_autograph_production.sql` | auto | DART 사업보고서 생산·설비 |
 | 16 | `16_autograph_kama_macro.sql` | auto | KAMA 매크로 통계 |
 | 17 | `17_autograph_oem_news.sql` | auto | OEM IR/뉴스룸 본문 |
 | 18 | `18_ipgraph.sql` | ip | IPGraph 핵심 스키마 |
-| 19 | `19_ipgraph_bridge.sql` | ip-bridge | `ip.assignee_corp_map` |
+| 19 | `19_ipgraph_bridge.sql` | ip-bridge | `anxg_ip.assignee_corp_map` |
 | 20 | `20_auto_minerals.sql` | auto-L6 | USGS MCS 결정적 SSOT |
 | 21 | `21_auto_ev_chargers.sql` | auto | EV 충전 인프라 |
 | 22 | `22_ip_works.sql` | ip | OpenAlex Work/Institution 슬롯 |

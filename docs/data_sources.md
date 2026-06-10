@@ -26,7 +26,7 @@
 - **URL**: `https://vpic.nhtsa.dot.gov/api/`
 - **무엇**: 차량 제조사·모델·연식·트림 마스터 + Canadian Vehicle Specs (제원)
 - **포맷**: JSON REST · 키 불필요 · User-Agent 권장
-- **채우는 곳**: `auto.master_manufacturers`, `auto.master_vehicle_models`, `auto.master_vehicle_variants`, `auto.spec_measurements` (dim/weight)
+- **채우는 곳**: `anxg_auto.master_manufacturers`, `anxg_auto.master_vehicle_models`, `anxg_auto.master_vehicle_variants`, `anxg_auto.spec_measurements` (dim/weight)
 - **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_vpic` + `loaders.load_auto_pg.load_vpic` + `loaders.load_auto_specs`
 - **갱신**: NHTSA 가 모델년도 단위 갱신 (연 1회)
@@ -36,7 +36,7 @@
 - **URL**: `https://api.nhtsa.gov/recalls/recallsByVehicle?make=&model=&modelYear=`
 - **무엇**: 차종별 NHTSA 리콜 캠페인
 - **포맷**: JSON · 키 불필요
-- **채우는 곳**: `auto.events_recalls`, Neo4j `(VehicleVariant)-[:AFFECTED_BY]->(:Recall)`
+- **채우는 곳**: `anxg_auto.events_recalls`, Neo4j `(VehicleVariant)-[:AFFECTED_BY]->(:Recall)`
 - **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_recalls` + `loaders.load_auto_pg.load_recalls`
 - **누락**: US 시장만. 한국 리콜은 §B2 (data.go.kr).
@@ -45,7 +45,7 @@
 - **URL**: `https://api.nhtsa.gov/complaints/complaintsByVehicle?make=&model=&modelYear=`
 - **무엇**: 결함 신고 (소비자 불만)
 - **포맷**: JSON · 키 불필요
-- **채우는 곳**: `auto.events_complaints`, `vec.chunks` (`source='nhtsa_complaint'`), Neo4j `:Complaint`
+- **채우는 곳**: `anxg_auto.events_complaints`, `anxg_vec.chunks` (`source='nhtsa_complaint'`), Neo4j `:Complaint`
 - **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_complaints` + `loaders.load_auto_pg.load_complaints` + `build_chunks_auto`
 
@@ -53,7 +53,7 @@
 - **URL**: `https://api.nhtsa.gov/SafetyRatings/modelyear/{Y}/make/{M}/model/{Mod}`
 - **무엇**: NCAP 5-star 전체·정면·측면·전복·폴 등급 + ESC/FCW/LDW 기능 유무
 - **포맷**: JSON · 키 불필요
-- **채우는 곳**: `auto.spec_measurements.safety.ncap.*`, Neo4j `(VehicleVariant)-[:SAFETY_RATED_BY]->(:Standard {code:'NCAP_US'})`
+- **채우는 곳**: `anxg_auto.spec_measurements.safety.ncap.*`, Neo4j `(VehicleVariant)-[:SAFETY_RATED_BY]->(:Standard {code:'NCAP_US'})`
 - **README §4.0 등급**: **A** (0.95)
 - **모듈**: `autograph.ingestion.nhtsa_safety_ratings` + `loaders.load_auto_safety`
 - **누락**: NHTSA NCAP 만 (US). KNCAP/EuroNCAP 별도 필요 (§C2, §C4).
@@ -62,7 +62,7 @@
 - **URL**: `https://query.wikidata.org/sparql`
 - **무엇**: 제조사 / 모델 / 공급사 마스터 + QID (글로벌 ID) + LEI (P1278) + 한국 사업자번호 (P3320) + 부품→공급사 P176
 - **포맷**: SPARQL · 키 불필요 · User-Agent 필수
-- **채우는 곳**: `auto.master_manufacturers/wikidata_qid`, `bridge.corp_entity`, `auto.master_suppliers`, `auto.staging_relations` (SUPPLIED_BY)
+- **채우는 곳**: `anxg_auto.master_manufacturers/wikidata_qid`, `anxg_bridge.corp_entity`, `anxg_auto.master_suppliers`, `anxg_auto.staging_relations` (SUPPLIED_BY)
 - **README §4.0 등급**: **B** (0.80)
 - **모듈**: `autograph.ingestion.wikidata_auto` + `loaders.load_bridge` + `loaders.load_wikidata_part_supplies` (P4 완료)
 - **누락**: Wikidata 자동차 부품 P176 sparse — 큰 OEM 의 메이저 부품 외엔 거의 없음. LLM P3 가 보완.
@@ -71,7 +71,7 @@
 - **URL**: `https://{lang}.wikipedia.org/w/api.php?action=query&prop=extracts|info|pageprops` + `action=parse`
 - **무엇**: 자동차 모델/제조사 본문 + Infobox 구조 데이터
 - **포맷**: JSON · 키 불필요 · CC BY-SA 4.0
-- **채우는 곳**: `vec.chunks` (`source='wikipedia_auto'`), narrative QA 검색
+- **채우는 곳**: `anxg_vec.chunks` (`source='wikipedia_auto'`), narrative QA 검색
 - **README §4.0 등급**: **B~C** (0.70)
 - **모듈**: `autograph.ingestion.wikipedia_auto` + `loaders.build_chunks_auto.build_from_wikipedia`
 - **누락**: 한국어판은 모델 detail 적음 → 영어판 fallback + (옵션) 나무위키 보강 (§C5).
@@ -81,7 +81,7 @@
 - **데이터셋**: 71347 (자율주행 고장진단), 578 (부품 품질 검사 영상)
 - **무엇**: 모터-감속기 / 배터리 / 도어 / 범퍼 등 부품×결함 라벨
 - **포맷**: TL/VL JSON in zip/tar · **AI Hub API 키 필요** (회원가입 무료)
-- **채우는 곳**: `auto.components` (Module), `vec.chunks` (`source='aihub_71347|578'`), Neo4j `:Module + CONTAINS_COMPONENT`
+- **채우는 곳**: `anxg_auto.components` (Module), `anxg_vec.chunks` (`source='aihub_71347|578'`), Neo4j `:Module + CONTAINS_COMPONENT`
 - **모듈**: `autograph.ingestion.aihub` + `loaders.load_auto_aihub`
 - **누락**: Tier S 분류로 두지만, 키 발급은 사용자 회원가입 필요. 다운로드 승인 별도.
 
@@ -95,7 +95,7 @@
 - **URL 후보**: `data.transportation.gov/Automobiles/...` 의 Socrata SODA + `crashviewer.nhtsa.dot.gov/CrashAPI`
 - **무엇**: 리콜 전단계 **결함 조사** history (NHTSA ODI 가 개시·종료한 조사) — recall 보다 깊은 결함 패턴
 - **포맷**: SODA REST (Socrata) · 키 불필요 (rate-limit 있음, app token 권장)
-- **채우는 곳**: `auto.events_investigations` (신규 테이블 필요) 또는 events_recalls 확장
+- **채우는 곳**: `anxg_auto.events_investigations` (신규 테이블 필요) 또는 events_recalls 확장
 - **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~120 LOC (recalls 패턴 복제)
 - **누락 보강**: 진행 중 조사 → 향후 리콜 예측 신호
@@ -105,7 +105,7 @@
 - **무엇**: OEM 가 NHTSA 에 제출한 TSB (서비스 통신문) — 결함 패턴·수리 가이드
 - **포맷**: ZIP CSV (`FLAT_TSBS.zip`) · 키 불필요
 - **갱신**: 일 단위
-- **채우는 곳**: `vec.chunks` (신규 source='nhtsa_tsb') — narrative 검색
+- **채우는 곳**: `anxg_vec.chunks` (신규 source='nhtsa_tsb') — narrative 검색
 - **README §4.0 등급**: **A** (0.90)
 - **작업량**: ~100 LOC (CSV downloader + chunker)
 
@@ -123,7 +123,7 @@
 - **파일**: `vehicles.csv.zip` (1984~현재) + `emissions.csv.zip`
 - **무엇**: US 차량 MPG (city/highway/combined), 엔진·변속기 spec, 배출가스 등급, GHG score, SmartWay
 - **포맷**: CSV/XML · 키 불필요
-- **채우는 곳**: `auto.spec_measurements.spec.efficiency.*`, `spec.emissions.*`, `spec.engine.*`
+- **채우는 곳**: `anxg_auto.spec_measurements.spec.efficiency.*`, `spec.emissions.*`, `spec.engine.*`
 - **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~150 LOC (CSV downloader + variant 매칭)
 - **누락 보강**: README §10.9 "제원 수치 EM 95%+" 직접 기여
@@ -132,7 +132,7 @@
 - **URL**: `https://www.epa.gov/compliance-and-fuel-economy-data/annual-certification-data-vehicles-engines-and-equipment`
 - **무엇**: 차량/엔진 제조사 인증 자료 — Tier 3 emissions, Federal/CARB 인증
 - **포맷**: XLSX (CSV 변환 필요) · 키 불필요
-- **채우는 곳**: `auto.spec_measurements.spec.emissions.tier3_*`, Standard 노드 enrichment
+- **채우는 곳**: `anxg_auto.spec_measurements.spec.emissions.tier3_*`, Standard 노드 enrichment
 - **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~120 LOC
 
@@ -150,7 +150,7 @@
 - **무엇**: Tesla / Ford / GM / Toyota ADR / Honda ADR / 등 글로벌 상장 OEM 의 XBRL 정제 데이터 (매출·생산·리콜 charge·R&D 등)
 - **포맷**: JSON · 키 불필요 · User-Agent 필수 (`"App Name email@..."`)
 - **Rate**: 10 req/s SEC 전체
-- **채우는 곳**: `master.financial_*` (finance), `bridge.corp_entity` 강화 — cross_domain QA 의 핵심
+- **채우는 곳**: `master.financial_*` (finance), `anxg_bridge.corp_entity` 강화 — cross_domain QA 의 핵심
 - **README §4.0 등급**: **A** (0.95)
 - **작업량**: ~80 LOC (finance `sec_client.py` 가 이미 있어 OEM CIK 리스트만 추가)
 - **누락 보강**: 한국 OEM 은 KOSDAQ/KOSPI → DART 측 finance 모듈이 처리. 글로벌 OEM 만 SEC.
@@ -180,7 +180,7 @@
 - **URL**: `https://www.data.go.kr/data/3048950/fileData.do`  (구 오픈API `15089863` 은 **폐기** → CSV 파일데이터로 대체)
 - **무엇**: **국내 차량 리콜현황** (제작자·차명·생산기간·리콜개시일·리콜사유) — NHTSA 가 못 보는 한국 시장
 - **포맷**: **CSV 파일데이터 (cp949)** · **키 불필요** · 수동 다운로드 (로그인 불필요)
-- **채우는 곳**: `auto.events_recalls` (source='datagokr_kotsa') — **941 row 적재 완료** (85% 제조사 매핑)
+- **채우는 곳**: `anxg_auto.events_recalls` (source='datagokr_kotsa') — **941 row 적재 완료** (85% 제조사 매핑)
 - **README §4.0 등급**: **A** (0.95)
 - **모듈**: `loaders.load_datagokr_recalls --csv <path>` (`_iter_csv_items` cp949, 리콜번호 부재 → sha1 합성키)
 - **누락**: 2023-12-31 스냅샷(실시간성 없음) · 미해석 15% 는 상용·이륜 브랜드(승용 OEM 마스터 외)
@@ -238,7 +238,7 @@
 - **URL**: `https://www.euroncap.com/en/results/`
 - **무엇**: 유럽 차량 안전 등급 — 정면·측면·아이·보행자·SA(Safety Assist) 별점
 - **포맷**: HTML · robots.txt 허용 · 스크래핑 가능 (rate-limit 보수)
-- **채우는 곳**: `auto.spec_measurements.safety.euroncap.*`, Neo4j SAFETY_RATED_BY (Standard='EURO_NCAP')
+- **채우는 곳**: `anxg_auto.spec_measurements.safety.euroncap.*`, Neo4j SAFETY_RATED_BY (Standard='EURO_NCAP')
 - **README §4.0 등급**: **A** (0.95) — 공식 기관
 - **작업량**: ~150 LOC (BeautifulSoup + 페이지 구조 변경 대응)
 - **대안 API**: `regcheck.org.uk/api/bespokeapi.asmx` SOAP — 회원가입 무료 무비용 (UK)
@@ -292,7 +292,7 @@
 | **L1 VehicleModel** | 모델 | NHTSA vPIC, Wikidata, Wikipedia, DBpedia | ✅ |
 | **L2 Trim/Year (Variant)** | 트림·연식 | NHTSA vPIC GetModelsForMakeYear, Canadian Specs | ✅ |
 | **L3 System** | 시스템 (powertrain, brake, body…) | ontology system_taxonomy.yaml (SSOT) | ✅ (derived `CONTAINS_SYSTEM` 완료) |
-| **L4 Module** | 모듈 (Motor-Reducer, Battery Pack, Door…) | NHTSA component taxonomy 176 + AI-Hub 578 22 + manual supplier seed 18 + AI-Hub 71347 4 = **`auto.components` 220 row 전부 L4** | ⚠️ 부분 — L4 coverage **63.7%** (60% 목표 over). Wikidata P176 staging 은 rate-limit (429) 로 0 row |
+| **L4 Module** | 모듈 (Motor-Reducer, Battery Pack, Door…) | NHTSA component taxonomy 176 + AI-Hub 578 22 + manual supplier seed 18 + AI-Hub 71347 4 = **`anxg_auto.components` 220 row 전부 L4** | ⚠️ 부분 — L4 coverage **63.7%** (60% 목표 over). Wikidata P176 staging 은 rate-limit (429) 로 0 row |
 | **L5 Part** | 부품 (셀·센서·인플레이터) | 리콜 본문 LLM 추출만 (P3 RECALL_OF) | ❌ 매우 sparse — Neo4j `:Part` 노드 **0**. 리콜·LLM 출처에서만 자연 발생 |
 | **L6 Material/Process** | 소재·공법 | (부분 적재 — 곁가지) USGS MCS + materials_seed manual | ⚠️ 부분 — `:Material` 6 / `:Mineral` 5 / `DERIVED_FROM` 17 / `MADE_OF` 8 (`autograph.md §2.5.4`). Wikidata 자동 보강은 비활성 (BACKLOG L6-1) |
 
@@ -319,7 +319,7 @@
 | **arXiv 2504.01248** — *Automated Factual Benchmarking for In-Car Conversational Systems using LLMs* | 차량 대화형 시스템의 factual benchmarking 자동화. | gold QA 생성 자동화 참고 |
 | **arXiv 2012.02558** — *Pre-trained language models as knowledge bases for Automotive Complaint Analysis* | NHTSA ODI complaints 로 PLM 도메인 적응. | 우리 P3 추출의 baseline |
 | **arXiv 2107.10609** — *Data Considerations in Graph Representation Learning for Supply Chain Networks* | Marklines 데이터로 글로벌 자동차 공급망 그래프 representation learning. SOTA on link prediction. | 우리 SUPPLIED_BY 평가의 reference |
-| **arXiv 2305.08506** — *A Knowledge Graph Perspective on Supply Chain Resilience* | KG 기반 공급망 회복력 분석 framework. | bridge.corp_entity 확장 방향 |
+| **arXiv 2305.08506** — *A Knowledge Graph Perspective on Supply Chain Resilience* | KG 기반 공급망 회복력 분석 framework. | anxg_bridge.corp_entity 확장 방향 |
 | **MDPI Electronics 2025** — *Document GraphRAG for Manufacturing* | 제조 도메인 GraphRAG. KG + RAG 결합으로 retrieval robustness. | Hybrid adapter 의 baseline |
 | **arXiv 2409.20010** — *Customized Domain-centric KG Construction with LLMs* (자동차 전기 시스템) | 자동차 전기 시스템 도메인 KG 자동 구축. GraphGPT/REBEL 대비 우수. | 우리 LLM P3 추출의 직접 reference |
 | **ACM AIAA 2024** — *NER of New Energy Vehicle Parts via LLM* | LFRC (LLM+Fine-tune+Reflective CoT) — 신에너지차 부품 NER | EV 부품 추출 strategy |
@@ -413,7 +413,7 @@
 | 라이선스 | 공공 |
 | 인증 | 불필요 |
 | 등급 | **A** (0.95) — 정식 분류 계층 (section A~H+Y → class → subclass → maingroup → subgroup, depth ≥ 4) |
-| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `ip.cpc_scheme` + Neo4j `CPCCode/SUBCLASS_OF` |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `anxg_ip.cpc_scheme` + Neo4j `CPCCode/SUBCLASS_OF` |
 | 작업 상태 | (예정) — 무인증 즉시 가능, 작업 순서 1번 |
 | 미수집 사유 | `src/ipgraph/*` 실제 코드 미머지 |
 
@@ -425,7 +425,7 @@
 | 라이선스 | 공공 (US Gov) |
 | 인증 | 무인증 (bulk dataset) |
 | 등급 | **A** (0.95) — 공식 특허청. 미국 특허 + 인용 + assignee 정규화 |
-| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `ip.patents` (US) + `ip.citations` + `ip.assignee_corp_map` (strong 매칭) |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `anxg_ip.patents` (US) + `anxg_ip.citations` + `anxg_ip.assignee_corp_map` (strong 매칭) |
 | 작업 상태 | (예정) — REST 가정 코드 모두 폐기, bulk dataset 기반 ingestion |
 | 미수집 사유 | REST 종료로 인한 ingestion 전략 전환 필요. 작업 순서 2번 |
 
@@ -437,7 +437,7 @@
 | 라이선스 | CC0 |
 | 인증 | 불필요 (mailto 헤더 권장, rate limit) |
 | 등급 | **A** (0.95) — 글로벌·연구 확장. 특허는 부분 커버 |
-| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) 옵션 — `ip.works` (R&D ↔ 특허 cross-reference 보강) |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) 옵션 — `anxg_ip.works` (R&D ↔ 특허 cross-reference 보강) |
 | 작업 상태 | (예정, 옵션) |
 | 미수집 사유 | 핵심 ingestion (CPC + USPTO ODP + KIPRIS) 후 보강 |
 
@@ -449,7 +449,7 @@
 | 라이선스 | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원 / 일부 비공개**) |
 | 인증 | `KIPRIS_API_KEY` (공공데이터포털 발급) |
 | 등급 | **A** (0.95) — 한국 특허·출원 |
-| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `ip.patents` (KR) + assignee→corp_code 매칭 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) |
+| 채울 README 항목 | README §10.15~17 + §11.1 Phase C (ip 보조축) — `anxg_ip.patents` (KR) + assignee→corp_code 매칭 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) |
 | 작업 상태 | (예정) — 키 발급 + `src/autonexusgraph/ingestion/_license.py` 에 KIPRIS 게이트 추가 (commit `b70527a` IR/뉴스룸 license-gate 패턴 재사용) |
 | 미수집 사유 | 키 발급 + 라이선스 게이트 |
 

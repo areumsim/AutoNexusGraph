@@ -2,7 +2,7 @@
 
 > **인용 규약**: 본 문서의 `PRD §6.5` 등 인용은 **구 PRD 표기** — README v3.0 통합 후 README §3.6 (4-Pass + Bridge Pass) / §4 (데이터 소스) 가 새 SSOT.
 >
-> ⚠️ **스키마 규약**: 본 문서의 psql 예시 일부는 약식 스키마명(`auto.` / `bridge.` / `ip.` / `vec.` / `chat.` 등)을 쓰지만, **실 DB 스키마는 `anxg_` 프리픽스** (`anxg_auto` / `anxg_bridge` / `anxg_ip` / `anxg_vec` / `anxg_chat` — `infra/postgres/init/01_schema.sql`, `config.pg_schema()`). 복사 실행 시 `anxg_` 를 붙일 것.
+> **스키마 규약**: 본 문서의 psql 예시는 **실 DB 스키마 `anxg_` 프리픽스** (`anxg_auto` / `anxg_bridge` / `anxg_ip` / `anxg_vec` / `anxg_chat` — `infra/postgres/init/01_schema.sql`, `config.pg_schema()`) 를 그대로 사용한다 (복사 실행 가능).
 
 본 문서는 AutoNexusGraph 의 raw → processed → DB 3-tier 멱등 파이프라인을 단계별로 안내한다.
 각 단계는 앞 단계의 raw 가 있다면 언제든 재실행 가능 (멱등). 도중 끊겨도 `state/` 의 done/failed
@@ -56,7 +56,7 @@ cross-validate.
 
 | Pass | 명령 | 입력 | 산출 | LLM |
 |---|---|---|---|---|
-| P1 | `make load-financials` | DART XBRL JSONL | `fin.financials` | 0% |
+| P1 | `make load-financials` | DART XBRL JSONL | `anxg_fin.financials` | 0% |
 | P2 | `make load-graph-structural` | DART 지배구조 JSON | Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF | 0% |
 | P3 | `make p3-extract-dry` → `make p3-extract` | 사업보고서 본문 청크 | `data/processed/extracted/<corp>/<rcept>.jsonl` | 100% (selective 53%↓) |
 | P4 | `make p4-load` | P3 JSONL | Neo4j PARTNER_OF / COMPETES_WITH / INVESTED_IN / PRODUCES (source=`p3_llm`) | 보조 (검증) |
@@ -70,7 +70,7 @@ cross-validate.
 **P4 검증 분기 (`validator.py`):**
 - `confidence >= 0.70` + P2 충돌 없음 → Neo4j MERGE
 - `0.50 <= confidence < 0.70` → `data/reports/review_queue_<date>.jsonl` (사람 검토)
-- `< 0.50` 또는 P2 와 충돌 → 폐기 (`ops.quality_checks` audit trail)
+- `< 0.50` 또는 P2 와 충돌 → 폐기 (`anxg_ops.quality_checks` audit trail)
 
 ## LangGraph 활성화 — 에이전트 계층
 
@@ -84,8 +84,8 @@ make serve-api          # FastAPI :31020 — POST /chat (blocking) + /chat/strea
 make serve-ui           # Streamlit :31021 — st.status 노드 진행 표시
 ```
 
-체크포인트 테이블은 자동 생성 (`chat.checkpoints`, `chat.checkpoint_writes`,
-`chat.checkpoint_blobs`, `chat.checkpoint_migrations`). 스키마 위치는
+체크포인트 테이블은 자동 생성 (`anxg_chat.checkpoints`, `anxg_chat.checkpoint_writes`,
+`anxg_chat.checkpoint_blobs`, `anxg_chat.checkpoint_migrations`). 스키마 위치는
 `.env` 의 `LANGGRAPH_CHECKPOINT_SCHEMA` 로 변경 가능 (기본 `chat`).
 
 ## 적재 순서 — 의존성 (DAG)
@@ -119,29 +119,29 @@ neo4j-init-auto                         # CONSTRAINT/INDEX 멱등
    ↓
 pg                                      # NHTSA vPIC + Recalls + Complaints → auto.master_* / events_*
    ↓
-specs                                   # NHTSA NCAP + EPA + Canadian → auto.spec_measurements
+specs                                   # NHTSA NCAP + EPA + Canadian → anxg_auto.spec_measurements
    ↓
 neo4j                                   # PG → Neo4j MERGE (Manufacturer/Model/Variant/Recall)
    ↓
-bridge                                  # bridge.corp_entity 매칭 (QID > LEI > sec_cik > business_no > name)
+bridge                                  # anxg_bridge.corp_entity 매칭 (QID > LEI > sec_cik > business_no > name)
    ↓
 standards / plants                      # standards.yaml + plants.yaml seed
    ↓
 safety / epa                            # SAFETY_RATED_BY 엣지 + EPA spec 보강
    ↓
-aihub                                   # AI Hub 71347 + 578 → auto.components (L4 부분)
+aihub                                   # AI Hub 71347 + 578 → anxg_auto.components (L4 부분)
    ↓
 nhtsa-taxonomy                          # NHTSA recall taxonomy 178 raw → 176 normalized module
    ↓
 supplier-edges                          # supplier_seed.yaml 19 공급사 46 매핑 → SUPPLIED_BY 30 distinct edges
    ↓ (이 순서가 강제 — aihub 선행 없으면 component foreign key 위반)
-complaints-neo4j                        # auto.events_complaints → Neo4j REPORTED_IN
+complaints-neo4j                        # anxg_auto.events_complaints → Neo4j REPORTED_IN
    ↓
 recall-components / complaint-components  # component 매칭 → RECALL_OF 601 edges
    ↓
 investigations                          # NHTSA ODI 154 → INVESTIGATED_BY
    ↓
-oem-sec                                 # SEC EDGAR 글로벌 OEM XBRL → auto.oem_financials_sec
+oem-sec                                 # SEC EDGAR 글로벌 OEM XBRL → anxg_auto.oem_financials_sec
    ↓
 derive-contains-system                  # System taxonomy 19 → CONTAINS_SYSTEM
    ↓
@@ -149,7 +149,7 @@ wikidata-part-supplies                  # Wikidata P176 staging (rate-limit 로 
    ↓
 manufactured-at                         # plants_seed + DART 사업보고서 → MANUFACTURED_AT 99 edges
    ↓
-build-chunks-auto                       # NHTSA complaint/recall/tsb + Wikipedia → vec.chunks (manufacturer/model/variant 메타)
+build-chunks-auto                       # NHTSA complaint/recall/tsb + Wikipedia → anxg_vec.chunks (manufacturer/model/variant 메타)
 ```
 
 ### IP 도메인 (실제 Makefile 타깃 — `ip` prefix 없음 정정 2026-06-02)
@@ -184,7 +184,7 @@ make load-companies load-entity-map
 
 # 임베딩 (장시간)
 make serve-embeddings &       # 별도 프로세스 권장
-make embed-chunks             # vec.chunks NULL embedding backfill
+make embed-chunks             # anxg_vec.chunks NULL embedding backfill
 
 # 품질 검증
 make validate-quality         # → data/reports/quality_<date>.md
@@ -196,7 +196,7 @@ make validate-quality         # → data/reports/quality_<date>.md
 ```bash
 # 청크 메타만 갱신 — raw 는 그대로
 rm -rf data/processed/chunks
-psql $POSTGRES_DSN -c "TRUNCATE vec.chunks RESTART IDENTITY"
+psql $POSTGRES_DSN -c "TRUNCATE anxg_vec.chunks RESTART IDENTITY"
 make build-chunks build-wiki-chunks
 make embed-chunks
 ```
@@ -204,7 +204,7 @@ make embed-chunks
 ### 2) 임베딩 모델 교체 (BGE-M3 → 다른 모델)
 ```bash
 # embedding 만 NULL 화. text/메타는 유지
-psql $POSTGRES_DSN -c "UPDATE vec.chunks SET embedding = NULL"
+psql $POSTGRES_DSN -c "UPDATE anxg_vec.chunks SET embedding = NULL"
 # 새 모델 가동 후
 make embed-chunks
 ```
@@ -275,28 +275,28 @@ NHTSA 에 등재되어 있어 KNCAP 의존도 낮음.
 
 ```sql
 -- PG 적재량 한눈에 (3 도메인 통합)
-SELECT 'master.companies'        tbl, count(*) FROM master.companies UNION ALL
-SELECT 'master.entity_map',           count(*) FROM master.entity_map UNION ALL
-SELECT 'master.persons',              count(*) FROM master.persons UNION ALL
-SELECT 'fin.financials',              count(*) FROM fin.financials UNION ALL
-SELECT 'fin.filings',                 count(*) FROM fin.filings UNION ALL
-SELECT 'auto.master_manufacturers',   count(*) FROM auto.master_manufacturers UNION ALL
-SELECT 'auto.master_vehicle_models',  count(*) FROM auto.master_vehicle_models UNION ALL
-SELECT 'auto.events_recalls',         count(*) FROM auto.events_recalls UNION ALL
-SELECT 'auto.events_complaints',      count(*) FROM auto.events_complaints UNION ALL
-SELECT 'auto.components',             count(*) FROM auto.components UNION ALL
-SELECT 'bridge.corp_entity',          count(*) FROM bridge.corp_entity UNION ALL
-SELECT 'ip.cpc_scheme',               count(*) FROM ip.cpc_scheme UNION ALL
-SELECT 'ip.works',                    count(*) FROM ip.works UNION ALL
-SELECT 'vec.chunks',                  count(*) FROM vec.chunks UNION ALL
-SELECT 'vec.chunks (embedded)',       count(*) FROM vec.chunks WHERE embedding IS NOT NULL;
+SELECT 'anxg_master.companies'        tbl, count(*) FROM anxg_master.companies UNION ALL
+SELECT 'anxg_master.entity_map',           count(*) FROM anxg_master.entity_map UNION ALL
+SELECT 'anxg_master.persons',              count(*) FROM anxg_master.persons UNION ALL
+SELECT 'anxg_fin.financials',              count(*) FROM anxg_fin.financials UNION ALL
+SELECT 'anxg_fin.filings',                 count(*) FROM anxg_fin.filings UNION ALL
+SELECT 'anxg_auto.master_manufacturers',   count(*) FROM anxg_auto.master_manufacturers UNION ALL
+SELECT 'anxg_auto.master_vehicle_models',  count(*) FROM anxg_auto.master_vehicle_models UNION ALL
+SELECT 'anxg_auto.events_recalls',         count(*) FROM anxg_auto.events_recalls UNION ALL
+SELECT 'anxg_auto.events_complaints',      count(*) FROM anxg_auto.events_complaints UNION ALL
+SELECT 'anxg_auto.components',             count(*) FROM anxg_auto.components UNION ALL
+SELECT 'anxg_bridge.corp_entity',          count(*) FROM anxg_bridge.corp_entity UNION ALL
+SELECT 'anxg_ip.cpc_scheme',               count(*) FROM anxg_ip.cpc_scheme UNION ALL
+SELECT 'anxg_ip.works',                    count(*) FROM anxg_ip.works UNION ALL
+SELECT 'anxg_vec.chunks',                  count(*) FROM anxg_vec.chunks UNION ALL
+SELECT 'anxg_vec.chunks (embedded)',       count(*) FROM anxg_vec.chunks WHERE embedding IS NOT NULL;
 
 -- ID 커버리지 (finance entity_map)
-SELECT id_type, count(*) FROM master.entity_map GROUP BY 1 ORDER BY 2 DESC;
+SELECT id_type, count(*) FROM anxg_master.entity_map GROUP BY 1 ORDER BY 2 DESC;
 
 -- bridge 매칭 분포
 SELECT entity_type, reviewed_status, count(*)
-  FROM bridge.corp_entity GROUP BY 1, 2 ORDER BY 1, 2;
+  FROM anxg_bridge.corp_entity GROUP BY 1, 2 ORDER BY 1, 2;
 ```
 
 ```cypher

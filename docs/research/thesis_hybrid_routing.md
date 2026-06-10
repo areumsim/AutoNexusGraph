@@ -71,7 +71,7 @@
   store 별·hop 별 분할 집계가 바로 가능.
 - **[제안] — thesis 측정에 부족한 셀 보강**:
   1. **multi-hop ≥2 hop** 비중 확대 (현재 다수가 `hop_count` 1). H1(a) 변별력은 깊은 홉에서 나옴.
-  2. **cross-domain** 질문 셀 (finance×auto via `bridge.corp_entity`) — 단일 store 가 구조적으로
+  2. **cross-domain** 질문 셀 (finance×auto via `anxg_bridge.corp_entity`) — 단일 store 가 구조적으로
      못 푸는 케이스 = hybrid 우위의 가장 강한 증거.
   3. **numeric** 질문 셀 (정확 재무 수치 요구) — `required_stores=[SQL]` + 오답 시 hallucination
      판정 가능한 gold 수치 동반. H1(b) 측정용.

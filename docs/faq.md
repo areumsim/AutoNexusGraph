@@ -112,11 +112,11 @@ neo4j-init → pg → specs → neo4j → bridge → standards/plants → safety
 
 ### Q3.2 Wikidata P176 (manufactured by) staging 이 0 row
 
-**원인**: Wikidata SPARQL endpoint 의 rate-limit (1 req/min, 429 응답). `auto.staging_relations` 미적재가 정상 상태 — `docs/data_inventory.md §3 B-issue` 추적 중.
+**원인**: Wikidata SPARQL endpoint 의 rate-limit (1 req/min, 429 응답). `anxg_auto.staging_relations` 미적재가 정상 상태 — `docs/data_inventory.md §3 B-issue` 추적 중.
 
 **해결**: `supplier_seed.yaml` 19 공급사 × 46 매핑 (Neo4j `SUPPLIED_BY` 30 distinct edges) 으로 대체. P3 LLM 추출은 후속.
 
-### Q3.3 `:Supplier` Neo4j 9,642 vs PG `auto.master_suppliers` 4,812 — 2배 중복?
+### Q3.3 `:Supplier` Neo4j 9,642 vs PG `anxg_auto.master_suppliers` 4,812 — 2배 중복?
 
 **원인**: 미해결 이슈 (`data_inventory.md §3 B10`). `supplier_seed.yaml` + `auto.suppliers_edges` loader 의 중복 적재 의심. 진단 routine 미구현.
 
@@ -133,7 +133,7 @@ SELECT
     COUNT(*) AS total,
     SUM(CASE WHEN embedding IS NULL THEN 1 ELSE 0 END) AS missing,
     ROUND(100.0 * SUM(CASE WHEN embedding IS NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS missing_pct
-FROM vec.chunks
+FROM anxg_vec.chunks
 GROUP BY section
 ORDER BY total DESC;
 ```
@@ -171,7 +171,7 @@ ORDER BY total DESC;
 - `all_low` → hard fail → replan 트리거 (max 2회)
 - `some_low` → soft warning → 답변에 "후보 정보" 명시
 
-**해결**: 출처 등급 (`docs/data_lineage.md` 채널별 §7키 메타 항목의 `confidence_score`) 확인 후 더 높은 등급 (A/B) 의 데이터로 보강. 또는 `bridge.corp_entity` 의 supplier candidate 검토 SOP 적용 (4,790 row 영속 누적 — 운영 미설계, README §11.4 P1).
+**해결**: 출처 등급 (`docs/data_lineage.md` 채널별 §7키 메타 항목의 `confidence_score`) 확인 후 더 높은 등급 (A/B) 의 데이터로 보강. 또는 `anxg_bridge.corp_entity` 의 supplier candidate 검토 SOP 적용 (4,790 row 영속 누적 — 운영 미설계, README §11.4 P1).
 
 ### Q4.3 multi-hop 쿼리가 폭발 (timeout)
 

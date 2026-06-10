@@ -12,7 +12,7 @@
 
 ## 0. trace 표 읽는 법
 
-> **worker 종류 (사실 정정 2026-06-02)**: 실제 4 worker = `research_worker` / `graph_worker` / `sql_worker` / `calculator_worker` (`agents/workers.py`). **bridge tool 은 별도 worker 가 아니라 `sql_worker` 가 PG `bridge.corp_entity` 테이블을 SQL 로 조회**. 즉 `bridge_corp_to_entity` / `bridge_sec_cik_to_entity` / `bridge_corp_to_assignee` 모두 `sql_worker` intent.
+> **worker 종류 (사실 정정 2026-06-02)**: 실제 4 worker = `research_worker` / `graph_worker` / `sql_worker` / `calculator_worker` (`agents/workers.py`). **bridge tool 은 별도 worker 가 아니라 `sql_worker` 가 PG `anxg_bridge.corp_entity` 테이블을 SQL 로 조회**. 즉 `bridge_corp_to_entity` / `bridge_sec_cik_to_entity` / `bridge_corp_to_assignee` 모두 `sql_worker` intent.
 
 각 trace 는 다음 항목으로 구성:
 - **질문** — 사용자 발화
@@ -91,7 +91,7 @@
 | supervisor round 1~3 | sequential (t2 → t3 모두 N×에 호출 fan-out) |
 | cost | ~$0.015 |
 | latency | ~8~10초 — multi-hop graph traversal + N 차종별 recall 조회 |
-| 실패 지점 | (a) **`SUPPLIED_BY` 30 distinct edges 가 manual seed** — 현대모비스가 supplier_seed.yaml 에 등록된 부품만 추적 (`autograph.md §5.1` 정직 표시). 즉 답변 cover 가 yaml 의존. (b) `bridge.corp_entity` 의 supplier 매핑 정확도 — name match candidate 의 false-positive 위험 (mental_model §5.3). (c) latency 8초 임계 근처 — 차종 N>10 이면 timeout 가능 |
+| 실패 지점 | (a) **`SUPPLIED_BY` 30 distinct edges 가 manual seed** — 현대모비스가 supplier_seed.yaml 에 등록된 부품만 추적 (`autograph.md §5.1` 정직 표시). 즉 답변 cover 가 yaml 의존. (b) `anxg_bridge.corp_entity` 의 supplier 매핑 정확도 — name match candidate 의 false-positive 위험 (mental_model §5.3). (c) latency 8초 임계 근처 — 차종 N>10 이면 timeout 가능 |
 | gold QA | `gold_qa_auto_v0.jsonl` AUTO-L3 |
 
 ---
@@ -125,7 +125,7 @@
 | supervisor round 1~4 | 의존성 chain — 순차 4 round |
 | cost | ~$0.025 |
 | latency | ~10초 — 4 round + N OEM 별 corp 역매핑 + 영업이익 N 호출 |
-| 실패 지점 | (a) LG엔솔 entity 가 `bridge.corp_entity` 의 supplier candidate 인 경우 — `include_candidate=True` 기본 (`bridge_corp_to_entity`) 이므로 동작. 단 confidence < 0.9 면 답변 "후보 정보" 명시. (b) `get_vehicles_using_component` 가 `:Component` (Module / Part) 단위인데 supplier↔module 매핑은 manual seed 의존 (§4 참조) — coverage 한계. (c) 각 manufacturer 의 corp_code 가 한국 (DART) 가 아닌 글로벌 (SEC) 인 경우 — `bridge_sec_cik_to_entity` 거꾸로 호출 필요 — 현재 planner 가 자동 분기 안 함 → **실패 가능 지점** |
+| 실패 지점 | (a) LG엔솔 entity 가 `anxg_bridge.corp_entity` 의 supplier candidate 인 경우 — `include_candidate=True` 기본 (`bridge_corp_to_entity`) 이므로 동작. 단 confidence < 0.9 면 답변 "후보 정보" 명시. (b) `get_vehicles_using_component` 가 `:Component` (Module / Part) 단위인데 supplier↔module 매핑은 manual seed 의존 (§4 참조) — coverage 한계. (c) 각 manufacturer 의 corp_code 가 한국 (DART) 가 아닌 글로벌 (SEC) 인 경우 — `bridge_sec_cik_to_entity` 거꾸로 호출 필요 — 현재 planner 가 자동 분기 안 함 → **실패 가능 지점** |
 | gold QA | `gold_qa_cross_v0.jsonl` CD-L3 12 row |
 
 ---
@@ -144,7 +144,7 @@
 | supervisor round 4 | t5 |
 | cost | ~$0.040 |
 | latency | ~12초 (README §10.14 Cross 12초 임계 한계) |
-| 실패 지점 | (a) **`ip.patents` 0 row** — KIPRIS/USPTO 미적재 → `list_patents_in_cpc` 빈 결과 → "정보 부족" 응답. **현재 본 시나리오는 wire-up 만 완료**. (b) bridge_corp_to_assignee 의 `ip.assignee_corp_map` 도 0 row — assignee 적재 후 매핑. (c) 4 단계 의존 chain — 1 단계 실패 시 전체 실패. (d) latency 12초 임계 — N 차종 별 recall 조회가 N>5 면 timeout |
+| 실패 지점 | (a) **`anxg_ip.patents` 0 row** — KIPRIS/USPTO 미적재 → `list_patents_in_cpc` 빈 결과 → "정보 부족" 응답. **현재 본 시나리오는 wire-up 만 완료**. (b) bridge_corp_to_assignee 의 `anxg_ip.assignee_corp_map` 도 0 row — assignee 적재 후 매핑. (c) 4 단계 의존 chain — 1 단계 실패 시 전체 실패. (d) latency 12초 임계 — N 차종 별 recall 조회가 N>5 면 timeout |
 | gold QA | `gold_qa_cross_v0.jsonl` CD-L3-IP / CD-L4-IP 6 row (IP 결합 변형) |
 
 > **현재 본 시나리오는 README §10.16 의 wire-up 완료 + 측정 대기 상태**. KIPRIS/USPTO 적재 후 실측 → 본 trace 갱신.
@@ -163,7 +163,7 @@
 | supervisor round 2 | t2 |
 | cost | ~$0.003 |
 | latency | ~3초 |
-| 실패 지점 | (a) **`ip.patents` 0 row** — 현재 적재 안 됨 → "정보 부족" 응답. (b) 삼성전자 → `ip.assignee_corp_map` 매핑 부재 (assignee 적재 후) → bridge 실패 |
+| 실패 지점 | (a) **`anxg_ip.patents` 0 row** — 현재 적재 안 됨 → "정보 부족" 응답. (b) 삼성전자 → `anxg_ip.assignee_corp_map` 매핑 부재 (assignee 적재 후) → bridge 실패 |
 | gold QA | `gold_qa_ip_v0.jsonl` IP-L1 — **현재 gold_answer 비어있음** (KIPRIS/USPTO 적재 후 채움) |
 
 ---
@@ -176,7 +176,7 @@
 |---|---|
 | 라우팅 | `finance` (KW_FIN "매출") |
 | planner | `[t1: lookup_company] → [t2: get_revenue('00126380', 2050)]` |
-| t2 결과 | `null` (fin.financials 에 2050 row 없음) |
+| t2 결과 | `null` (anxg_fin.financials 에 2050 row 없음) |
 | synthesizer | tool_results 가 empty/null — LLM 이 "정보 부족" 응답 생성 (number_guard 화이트리스트에 2050 없음 — 환각 차단) |
 | validator | answer 가 "정보 부족" 형태면 `validation_status='passed'` (self-report bypass) — **refusal precision** 측정 대상 |
 | 예상 정답 | "2050년 매출 데이터 부족" — `gold_qa_v0.jsonl` 의 `is_answerable=false` row 와 매칭 |
