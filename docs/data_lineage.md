@@ -141,7 +141,7 @@
 | **라이선스** | 공공 (US Gov) |
 | **수집 의도** | (a) 한국 ADR (Korea ADRs) CIK 매핑 → entity_map 보강, (b) **글로벌 OEM (Tesla/Ford/GM/Stellantis/Toyota/Honda) XBRL** → auto 도메인 cross-domain |
 | **Ingestion** | `src/autonexusgraph/ingestion/sec_client.py` + `scripts/ingest/download_sec_edgar.py` (한국 ADR) + `src/autograph/ingestion/sec_oem.py` (글로벌 OEM) |
-| **Loader** | `loaders/load_sec.py` + `autograph/loaders/load_oem_sec.py` |
+| **Loader** | finance SEC 수집 `autonexusgraph/ingestion/sec_client.py` + auto OEM SEC `src/autograph/loaders/master/load_auto_oem_sec.py` |
 | **PG 테이블** | `anxg_sec.filings` (1,857 row) / `anxg_auto.oem_financials_sec` (3,199 row) |
 | **bridge 영향** | `anxg_bridge.corp_entity.sec_cik` 9 매핑 (한국 OEM CIK 부재 시 글로벌 OEM 진입점) |
 | **Tool** | `bridge_sec_cik_to_entity('0001318605')` → Tesla manufacturer entity_id |
@@ -217,7 +217,7 @@
 | **라이선스** | 공공 (US Gov) — `_license.py` 의 `LICENSE_POLICY` 에 nhtsa 키 미등록 (NHTSA 공개데이터, 정책 dict 미커버) |
 | **수집 의도** | 차량 마스터 (manufacturer / model / variant) — BOM Level 0~2 |
 | **Ingestion** | `src/autograph/ingestion/nhtsa_vpic.py` (RateLimiter) |
-| **Loader** | `src/autograph/loaders/load_auto_pg.py` + `load_auto_neo4j.py` |
+| **Loader** | `src/autograph/loaders/master/load_auto_pg.py` + `load_auto_neo4j.py` |
 | **raw** | `data/raw/auto/nhtsa/vpic/` |
 | **PG** | `anxg_auto.master_manufacturers` (22,145) / `master_vehicle_models` (6,770) / `master_vehicle_variants` (428) |
 | **Neo4j** | `:Manufacturer` 22,145 / `:VehicleModel` 6,770 / `:VehicleVariant` 428 / `MANUFACTURES` / `HAS_VARIANT` |
@@ -392,7 +392,7 @@
 | **라이선스** | 공공 (중기부/KAMP), 사용조건 "콘텐츠 변경허용" 50/50 |
 | **수집 의도** | KAMP 포털(kamp-ai.kr) 본체 50종 데이터셋의 **메타·링크 인덱스** + 산단공 `:Process` 정규화 사전 (37 unique 적용공정) — Layer 1 회사무관 공정 지식 진입점 |
 | **Ingestion** | 무인증 1회 `curl` (`docs/operations/api_keys_pending.md §기타` 참고) |
-| **Loader 코드** | `src/autograph/loaders/load_kamp_catalog.py` (EUC-KR/UTF-8 자동, 산단공 정규화 inline `_PROCESS_NORM` dict) |
+| **Loader 코드** | `src/autograph/loaders/process/load_kamp_catalog.py` (EUC-KR/UTF-8 자동, 산단공 정규화 inline `_PROCESS_NORM` dict) |
 | **raw 저장** | `data/raw/kamp/catalog/_catalog_15089213.csv` (EUC-KR 원본) + `.utf8.csv` (변환본) |
 | **PG 테이블** | `anxg_auto.kamp_catalog` (50 row, 33 process_name_norm, 13 industry, 11 process_category 다이캐스팅/프레스/용접/열처리/도금/CNC/사출/단조/용해 등) — 회사 비귀속 (corp_code 없음) |
 | **Neo4j 노드·엣지** | (현재 미러링 보류 — 카탈로그는 인덱스로만 사용. 본체 KAMP 데이터셋이 들어오면 그때 :Process 매핑 정규화 적용) |
@@ -435,7 +435,7 @@
 | **수집 의도** | Layer 2 회사귀속 자동차 리콜 — **세번째 지역 커버** (US NHTSA + KR KOTSA + EU). EU 시장 OEM(VW/Stellantis/BMW/Mercedes/Renault/Hyundai-EU/Kia-EU)의 cross-jurisdictional 결함 신호 |
 | **REPORT_ID 매핑** | 약 +52/yr, 일부 missing. 2020 w38 = `10000012` / 2024 w19 = `10000200` / 2026 w14 = `10000300`. 2024-01부터 다운 = ID 10000185~10000315 (131개 weekly) |
 | **Ingestion** | weekly XML 131 다운 (5 병렬 curl) → `<category>Motor vehicles</category>` 필터 (다른 카테고리 = 장난감/전자/화장품 제외) |
-| **Loader 코드** | `src/autograph/loaders/load_eu_safety_gate.py` (XML 파싱 + brand 정규화 `_candidate_brands` 함수: case-insensitive + multi-brand split `/`,`,`,`and`,`&` + HTML entity decode + `.` strip) |
+| **Loader 코드** | `src/autograph/loaders/recall/load_eu_safety_gate.py` (XML 파싱 + brand 정규화 `_candidate_brands` 함수: case-insensitive + multi-brand split `/`,`,`,`and`,`&` + HTML entity decode + `.` strip) |
 | **raw 저장** | `data/raw/eu_safety_gate/xml/weekly_<REPORT_ID>.xml` (122/131 정상, 9개 400 누락) — 총 21 MB |
 | **PG 테이블** | `anxg_auto.events_recalls` (source='eu_safety_gate', **972 row** 2024-2026, with_danger 100%, brand 매핑률 **86.7%** = 843/972) |
 | **anxg_vec.chunks** | `source='eu_recall'` (972 청크, BGE-M3 임베딩 100%, section='auto.recall') |
@@ -518,7 +518,7 @@
 | **strong_match** | 15/15 = 100% (confidence ≥ 0.9) |
 | **`match_method` 값** | `wikidata_qid | name_exact | lei | business_no` (`load_bridge.py` 가 적재. `08_bridge.sql` 은 VARCHAR(20), CHECK enum 없음) |
 | **별개 컬럼** | `sec_cik` (글로벌 OEM 진입점, `bridge_sec_cik_to_entity` 함수 별도) |
-| **Loader** | `src/autograph/loaders/load_bridge.py` |
+| **Loader** | `src/autograph/loaders/master/load_bridge.py` |
 | **Tool** | `bridge_corp_to_entity / bridge_entity_to_corp / bridge_sec_cik_to_entity / bridge_entity_to_sec_cik / cross_query` |
 | **ipgraph mirror** | 신규 join 테이블 `anxg_ip.assignee_corp_map` (anxg_bridge.corp_entity 직접 변경 회피) |
 | **답변 시나리오** | "현대모비스 매출 + 모비스가 공급하는 차종" → `bridge_corp_to_entity('00164788', entity_type='manufacturer')` → entity_id → `get_suppliers_of_component` → vehicles → `list_recalls_affecting` |
@@ -537,7 +537,7 @@
 | **DEFECT_MATCHES** | `(:Recall)─[DEFECT_MATCHES {cos_sim, confidence, match_method}]→(:DefectType)`. 두 경로: **cosine_topk** 7,218 (BGE-M3 top-3, cos>=0.40) + **llm_assign** 199 (sample 200건 Agent 직접 분류). 정제 SOP: 교집합 → validated, cos>=0.85 → validated, cos<0.55 → rejected — 결과 **590 validated** / 85 rejected / 6,742 candidate |
 | **MANIFESTS_AS** | `(:FailureMode)─[MANIFESTS_AS]→(:DefectType)`. cosine 평균 0.538 약함 → llm_assign 36 추가 (평균 conf 0.642) → 정제 결과 **14 validated** / 29 candidate / 29 rejected |
 | **SUBJECT_TO** | `(:Equipment)─[SUBJECT_TO]→(:FailureMode)` 18 deterministic (PG → Neo4j MERGE) |
-| **Loader 코드** | `src/autograph/loaders/extract_defect_types_llm.py` (LLM/Agent 추출 + DB upsert) / `load_defect_matches_neo4j.py` (PG → Neo4j 미러링 + Recall 보충) |
+| **Loader 코드** | `src/autograph/loaders/recall/extract_defect_types_llm.py` (LLM/Agent 추출 + DB upsert) / `load_defect_matches_neo4j.py` (PG → Neo4j 미러링 + Recall 보충) |
 | **7키 메타** | DEFECT_MATCHES: `source='bridge_defect_matches'`, `source_type='bge_m3_cosine' | 'llm_label'`, `confidence_score=cos_sim` 또는 0.700 (LLM), `extraction_method='cosine_topk' | 'llm'`, `schema_version='defect_matches_v1'`. MANIFESTS_AS 동일 패턴 `schema_version='manifestations_v1'` |
 | **Tool 진입점** | `(rc:Recall)-[:DEFECT_MATCHES]->(dt:DefectType)<-[:MANIFESTS_AS]-(fm:FailureMode)<-[:SUBJECT_TO]-(e:Equipment)` 4-홉 경로 — "이 자동차 리콜의 추정 공정 메커니즘은?" 질의 |
 | **답변 시나리오** | KOTSA "고전압 배터리 제조 결함" 리콜 (DM cos=0.99) → :DefectType "배터리 셀 내부 단락" → :FailureMode "충방전 사이클 용량 감소"(llm 0.72) / "전해액 분해 저항 상승"(0.70) / "전극 전하전달 저항 상승"(0.70) → :Equipment "battery" |
