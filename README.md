@@ -531,7 +531,7 @@ conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
 
 **SSOT 분리**:
 - 정적 등급: `src/autograph/ingestion/_confidence.py::SOURCE_TO_GRADE` (변경 없음)
-- 동적 격상: `src/autograph/extractors/process_confidence.py` (P0-B 시그니처 + P3-B 구현)
+- 동적 격상: `src/autograph/extractors/process_confidence.py` — `compute()` 수식/clip/grade **구현 완료 + tested** (운영 wire-up 은 BACKLOG PG-3)
 - staging: `auto.staging_process_signals` (`infra/postgres/init/16_process_signals.sql`)
 - 운영: `scripts/upgrade_processes_confidence.py` (1회 풀런 ≤ $2 + GPU 1분, idempotent)
 

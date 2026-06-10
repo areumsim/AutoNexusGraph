@@ -1,12 +1,9 @@
-"""P0-B 시그니처 잠금 검증 (구현은 PR-P3-B).
+"""process_confidence.compute() 구현 검증 (PRD §3.5.1).
 
-PRD §3.5.1 의 helper 가 import 가능 + 가중 W 합이 이론 max boost 와 일치 +
-compute() 가 호출 시 NotImplementedError 로 즉시 fail (P3-B 미구현 명확화).
+ProcessSignals import + 가중 W 합 + compute 의 수식/clip/grade 동작.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from autograph.extractors.process_confidence import ProcessSignals, W, compute
 
@@ -30,12 +27,58 @@ def test_weights_match_prd_3_5_1() -> None:
     assert abs(sum(W.values()) - 0.70) < 1e-9
 
 
-def test_compute_signature_locked_not_implemented() -> None:
-    """compute() 는 P0-B 에서 시그니처만 — 호출 시 PR-P3-B 안내 메시지로 즉시 fail.
+def test_compute_no_signals_is_base_grade_c() -> None:
+    """시그널 0 → 기준선 0.50, grade C, 모든 boost 0."""
+    conf, grade, boosts = compute(ProcessSignals())
+    assert conf == 0.50
+    assert grade == "C"
+    assert all(v == 0.0 for v in boosts.values())
+    assert set(boosts) == set(W)
 
-    이 가드가 있어야 P3-B 실수로 본문 누락 시 import 만 PASS 하고 runtime 에 silent
-    0.0 / 빈 dict 반환하는 일이 안 생김.
-    """
-    sig = ProcessSignals(nhtsa_module=1.0, dart_cos=0.8)
-    with pytest.raises(NotImplementedError, match="P3-B"):
-        compute(sig)
+
+def test_compute_all_max_signals_is_a_candidate() -> None:
+    """모든 시그널 최대 → 0.50 + 0.70 = 1.20 → clip 1.00 → A_candidate."""
+    sig = ProcessSignals(
+        nhtsa_module=1.0, dart_cos=1.0, oem_ir_hits=10, ksic_match=True,
+        dart_product=1.0, recall_p4=1.0, standard_match=True,
+    )
+    conf, grade, boosts = compute(sig)
+    assert conf == 1.00
+    assert grade == "A_candidate"
+    assert abs(sum(boosts.values()) - 0.70) < 1e-9
+
+
+def test_compute_conflicts_penalty() -> None:
+    """충돌 1건당 −0.20. 강신호 2개(0.50+0.30=0.80) − 0.20 = 0.60 → needs_review 아래(C)."""
+    base = ProcessSignals(nhtsa_module=1.0, dart_cos=1.0)        # boost 0.30
+    conf0, grade0, _ = compute(base)
+    assert abs(conf0 - 0.80) < 1e-9 and grade0 == "B"
+    conf1, grade1, _ = compute(ProcessSignals(nhtsa_module=1.0, dart_cos=1.0, conflicts=["C1"]))
+    assert abs(conf1 - 0.60) < 1e-9 and grade1 == "C"
+
+
+def test_compute_grade_thresholds() -> None:
+    """B(≥0.80) / needs_review(≥0.65) 경계."""
+    # 0.50 + M1·0.15 + M2·0.15 + M5·0.10 = 0.50 + 0.40·... 조정해 0.65 만들기
+    # M1=1,M2=1 → 0.80 (B), M1=1,M5=1 → 0.50+0.15+0.10=0.75 (needs_review)
+    _, g_b, _ = compute(ProcessSignals(nhtsa_module=1.0, dart_cos=1.0))
+    assert g_b == "B"
+    _, g_nr, _ = compute(ProcessSignals(nhtsa_module=1.0, dart_product=1.0))
+    assert g_nr == "needs_review"
+
+
+def test_compute_clip_floor() -> None:
+    """충돌 다수로 0.30 floor clip."""
+    conf, grade, _ = compute(ProcessSignals(conflicts=["a", "b", "c"]))   # 0.50 − 0.60 = −0.10
+    assert conf == 0.30
+    assert grade == "C"
+
+
+def test_m3_saturation_and_clip() -> None:
+    """M3 int 빈도: 3회 이상 → 강도 1.0(saturation), 음수 float 신호는 0 clip."""
+    _, _, b_full = compute(ProcessSignals(oem_ir_hits=3))
+    _, _, b_over = compute(ProcessSignals(oem_ir_hits=100))
+    assert abs(b_full["M3"] - W["M3"]) < 1e-9          # 3회 = 만점 boost
+    assert b_full["M3"] == b_over["M3"]                # saturation
+    _, _, b_neg = compute(ProcessSignals(dart_cos=-0.5))
+    assert b_neg["M2"] == 0.0                          # 음수 clip
