@@ -52,7 +52,7 @@ def count_agent_state_fields() -> int:
     return count
 
 
-def count_py_per_domain() -> "OrderedDict[str, int]":
+def count_py_per_domain() -> OrderedDict[str, int]:
     """도메인별 .py 카운트."""
     out: OrderedDict[str, int] = OrderedDict()
     for d in ["autonexusgraph", "autograph", "ipgraph", "common"]:
@@ -64,7 +64,7 @@ def count_py_per_domain() -> "OrderedDict[str, int]":
     return out
 
 
-def count_gold_rows() -> "OrderedDict[str, int]":
+def count_gold_rows() -> OrderedDict[str, int]:
     """gold QA row 카운트 (example 제외)."""
     out: OrderedDict[str, int] = OrderedDict()
     gold_dir = ROOT / "eval" / "qa_gold"
@@ -77,7 +77,7 @@ def count_gold_rows() -> "OrderedDict[str, int]":
     return out
 
 
-def count_prd_refs() -> "OrderedDict[str, int]":
+def count_prd_refs() -> OrderedDict[str, int]:
     """`PRD §X.Y` 잔재 카운트 (src/ / docs/ 별도)."""
     out: OrderedDict[str, int] = OrderedDict()
     pat = re.compile(r"PRD §")
@@ -212,16 +212,6 @@ def main() -> int:
     args = ap.parse_args()
 
     measured = gather_measurements()
-    # OrderedDict → dict for JSON
-    measured_serializable = {
-        "agent_state_fields": measured["agent_state_fields"],
-        "py_per_domain": dict(measured["py_per_domain"]),
-        "gold_rows": {**dict(measured["gold_rows"]),
-                       "total": sum(measured["gold_rows"].values())},
-        "prd_refs": dict(measured["prd_refs"]),
-        "mcp_tools": measured["mcp_tools"],
-    }
-
     # baseline 은 raw row 만 저장 (total 미포함 — has_drift 가 계산)
     measured_for_baseline = {
         "agent_state_fields": measured["agent_state_fields"],
