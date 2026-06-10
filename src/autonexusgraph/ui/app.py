@@ -163,10 +163,10 @@ if user_input:
                 ):
                     last_state = state
                     if node == "__final__":
-                        status.update(label="✅ 완료", state="complete")
+                        status.update(label="완료", state="complete")
                         break
                     if node == "__error__":
-                        status.update(label="❌ 오류", state="error")
+                        status.update(label="오류", state="error")
                         break
                     if node == "__interrupt__":
                         interrupted_payload = state.get("pending_interrupt")
@@ -204,10 +204,10 @@ if user_input:
                     for node, state in run_agent_resume_stream(thread_id, resume_value):
                         last_state = state
                         if node == "__final__":
-                            status.update(label="✅ 완료", state="complete")
+                            status.update(label="완료", state="complete")
                             break
                         if node == "__error__":
-                            status.update(label="❌ resume 실패", state="error")
+                            status.update(label="resume 실패", state="error")
                             break
                         partial = {
                             "question_kind": state.get("question_kind"),
@@ -234,7 +234,7 @@ if user_input:
                 "validation_issues": state.get("validation_issues"),
             }
         except Exception as e:   # noqa: BLE001 — agent 실행 실패 흡수 → UI 에 에러 메시지 표시 (앱 크래시 방지)
-            answer = f"❌ 에이전트 실행 실패: {type(e).__name__}: {e}"
+            answer = f"[실패] 에이전트 실행 실패: {type(e).__name__}: {e}"
             citations = []
             turn_cost = 0.0
             grounding = {}

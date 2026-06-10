@@ -391,6 +391,9 @@ serve-api:                                           # FastAPI /chat 엔드포�
 serve-ui:                                            # Streamlit 채팅 UI
 	streamlit run src/autonexusgraph/ui/app.py --server.port 31021 --server.address 0.0.0.0
 
+serve-dashboard:                                     # Streamlit 현황 대시보드 (DB 적재/DoD/thesis)
+	streamlit run src/autonexusgraph/ui/dashboard.py --server.port 31022 --server.address 0.0.0.0
+
 # ── 평가 ────────────────────────────────────────────────────────────────────
 eval-smoke:                                          # 3 row 빠른 검증
 	$(PYTHON) -m eval.runners.run_qa_eval \
