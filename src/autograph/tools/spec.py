@@ -26,7 +26,11 @@ def lookup_vehicle(query: str, *,
                    limit: int = 5) -> list[dict]:
     """차종 식별 — manufacturer + model + variant (year 옵션).
 
-    매칭 우선순위: model.name 정확 > prefix > substr. year 가 있으면 variant 까지 필터.
+    매칭 우선순위: model.name 정확(100) > prefix(80) > **모델 KO alias**(m.aliases, 70) >
+    model.name substr(60) > mfr.name substr(40) > **제조사 KO alias**(mm.aliases, 30).
+    한국어 질의("코나"/"현대") 는 alias 단계에서 영문(variant·recall 보유) 행으로 해소
+    (m.aliases 는 load_korean_model_aliases, mm.aliases 는 load_master_korean_aliases 가 적재).
+    year 가 있으면 variant 까지 필터.
     """
     q = (query or "").strip()
     if not q:

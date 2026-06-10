@@ -28,7 +28,7 @@
         load-auto-recall-components load-auto-supplier-edges \
         load-auto-seed-standards-plants load-auto-complaints-neo4j \
         load-auto-aihub load-auto-specs load-auto-safety load-auto-epa \
-        load-korean-model-aliases \
+        load-korean-model-aliases load-master-korean-aliases \
         load-auto-investigations load-auto-oem-sec load-auto-mfrcomm \
         derive-auto-contains-system load-wikidata-part-supplies \
         extract-auto-p3 extract-auto-p3-cost validate-auto-p4 extract-validate-auto \
@@ -568,7 +568,9 @@ load-wikidata-part-supplies:
 # load-auto-epa 는 variant 마스터 적재 이후 (matching 대상).
 # derive-auto-contains-system 은 aihub (CONTAINS_COMPONENT) 이후.
 # load-wikidata-part-supplies 는 wikidata raw 적재 이후 — staging 만 채움 (Neo4j 는 P4).
-load-auto-all: neo4j-init-auto load-auto-pg load-auto-specs load-auto-neo4j \
+load-auto-all: neo4j-init-auto load-auto-pg load-auto-specs \
+               load-master-korean-aliases load-korean-model-aliases \
+               load-auto-neo4j \
                load-auto-bridge load-auto-seed-standards-plants \
                load-auto-safety load-auto-epa load-auto-aihub \
                load-auto-nhtsa-taxonomy \
