@@ -91,14 +91,17 @@ def collect(*, limit: int | None = None, dry_run: bool = False) -> dict:
     raw_dir = RAW_DIR
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    qids = list(CATHODE_QIDS.keys())[: limit] if limit else list(CATHODE_QIDS.keys())
-    if not qids:
+    # CATHODE_QIDS 는 code→QID. SPARQL VALUES 에는 **QID(values)** 를 넣어야 한다
+    # (과거 keys() 사용 → wd:NCM811 무효 엔티티 쿼리 버그. dict 빈 채라 미발현했음).
+    items = list(CATHODE_QIDS.items())[: limit] if limit else list(CATHODE_QIDS.items())
+    if not items:
         log.warning("[wikidata_cell_chem] CATHODE_QIDS 빈 dict — manual 큐레이션 대기 "
                      "(상단 주석 참조). materials_seed.yaml 폴백 사용 권장.")
         return {"n_rows": 0, "source": "wikidata", "skipped": True,
                 "note": "CATHODE_QIDS 미큐레이션 — Wikidata 자동 보강 비활성"}
 
-    qid_values = " ".join(f"wd:{q}" for q in qids)
+    qid_to_code = {qid: code for code, qid in items}
+    qid_values = " ".join(f"wd:{qid}" for _, qid in items)
     query = _CATHODE_QUERY_TEMPLATE.format(qid_values=qid_values)
 
     result = _sparql(query)
@@ -111,8 +114,10 @@ def collect(*, limit: int | None = None, dry_run: bool = False) -> dict:
     snapshot_year = datetime.now(timezone.utc).year
     rows: list[dict] = []
     for b in bindings:
+        qid = b.get("wikidata_qid", {}).get("value")
         rows.append({
-            "wikidata_qid":  b.get("wikidata_qid", {}).get("value"),
+            "code":          qid_to_code.get(qid),   # 본 시스템 material code (NCM811 등)
+            "wikidata_qid":  qid,
             "name":          b.get("chemLabel", {}).get("value"),
             "description":   b.get("chemDesc", {}).get("value"),
             "formula":       b.get("formula", {}).get("value"),
