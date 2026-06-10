@@ -754,7 +754,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 
 ### 현재 측정 결과 (§10 DoD **20 항** v3.0, 2026-05-29 측정 + 2026-06-02 ProcessGraph 추가)
 
-`make audit-dod` 의 출력 (2026-06-02 baseline `831e72d` reset 후) — §10.12 코어 변경 **0% ✅**. **§10.7 실측 완료 (2026-06-10, ❌ 반증)** + §10.14 internal ✅. §10.13(메인홉 효율)은 gold correct 답 부족으로 측정 불가(⊘). §10.8~10.10 은 gold 확장·LLM 키 후 재측정. 정확한 트래픽라이트는 `make audit-dod` 실행 결과 참조. (20 항 구성 이력 — §16 의사결정 로그.)
+`make audit-dod` 의 출력 (2026-06-02 baseline `831e72d` reset 후) — §10.12 코어 변경 **0% ✅**. **§10.7 실측 완료 (2026-06-10, ❌ 반증, EM 측정 가능 `em_status=ok`)** + §10.13 ✅(0.375) + §10.14 internal ✅ — gold multi-hop scorable 5 확보 후 EM·메인홉 효율 측정 가능해짐. §10.8~10.10 은 gold 추가 확장·cross-domain 측정 후. 정확한 트래픽라이트는 `make audit-dod` 실행 결과 참조. (20 항 구성 이력 — §16 의사결정 로그.)
 
 | ID | 기준 | 상태 | 상세 |
 |---|---|:---:|---|
@@ -763,11 +763,11 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | §10.6 | anxg_bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+ | ✅ | strong_match **15/15 = 100%** (manufacturer reviewed 11 + supplier reviewed 4, 모두 conf≥0.9) — 2026-06-01 재측정 |
 | §10.11 | SUPPLIED_BY 엣지 confidence/provenance/snapshot_year 100% | ✅ | **30 edges** 모두 `source_type='manual_supplier_seed'` + 100% meta (yaml 46 매핑 vs Neo4j 30 = customer 다중 dedupe 정상) |
 | §10.12 | 코어 코드 변경 < 5% | ✅ | **baseline reset 3회**: `4049caf` (Phase B) → `bab9411` (도메인3 직전, 12.22%) → `414bc1b` (ipgraph 인프라, +1,877 LOC=13.32%) → **`831e72d`** (상용화 P0/P1 일괄: O-1/Q-1/Q-4/E-3, **inflection +1,583 LOC=10.28% → reset 후 0% from 831e72d**). 정직 표기 — inflection·reset 두 숫자 같이 인용: [`eval/reports/core_diff_baseline_ledger.md`](./eval/reports/core_diff_baseline_ledger.md#정직-review--코어-변경--5-가-정말-의미-있는가-p1-5) |
-| §10.7 | Hybrid vs Vector Multi-hop +30%p | ❌ **반증** | **2026-06-10 정식 실측** (10 cells × 30 finance, GPT-4o, BGE-M3+리랭커, ~$1.25): hits@k **vector 0.875 > hybrid 0.5 = −37.5%p** (목표 +30%p 정반대). EM `insufficient_gold`(2/30). store-aware hybrid 가치 미입증 → thesis 재정의 후보. 상세 [docs/research/thesis_hybrid_routing.md](./docs/research/thesis_hybrid_routing.md) |
+| §10.7 | Hybrid vs Vector Multi-hop +30%p | ❌ **반증** | **2026-06-10 정식 실측** (10 cells × 30 finance, GPT-4o, BGE-M3+리랭커): hits@k **vector 0.875 > hybrid 0.4375 = −43.75%p** (목표 +30%p 정반대). **EM 측정 가능** (gold multi-hop scorable 5 충족 → `em_status=ok`): vector 0.40 = hybrid 0.40 (+0.0%p, hybrid 우위 없음). store-aware hybrid 가치 미입증. 상세 [docs/research/thesis_hybrid_routing.md](./docs/research/thesis_hybrid_routing.md) |
 | §10.8 | Cross-Domain QA CD-L1~L4 | ⊘ | LLM 키 필요 |
 | §10.9 | 제원 수치 EM 95%+ | ⊘ | LLM 키 필요 |
 | §10.10 | Faithfulness 90%+ | ⊘ | LLM 키 필요 |
-| §10.13 | 메인 홉 효율 −30% | ⊘ | 운영 trace 필요 — `eval/runners` 에서 latency·hop 수집 |
+| §10.13 | 메인 홉 효율 −30% | ✅ | **2026-06-10 실측** hybrid/vector evidence 비 = 3.0/8.0 = **0.375 ≤ 0.7** (gold correct 답 확보 후 측정 가능해짐). |
 | §10.14 | latency 도메인내 <8s / Cross <12s | ✅ (internal) | **2026-06-10 실측** internal pass-rate **100%** (target 90%). Cross 는 finance-only run 이라 미측정(n/a) |
 | §10.1~3 | docker compose / Streamlit toggle / LLM provider 전환 | · | 외부 측정 (docker / git / ENV) |
 | **§10.15** | **ip 도메인 추가 후 코어 변경 < 5% 재측정 (baseline reset)** | (wired) | `src/ipgraph/` 신규 패키지 + plug-in 자동 등록 (`ENV AUTONEXUSGRAPH_DOMAIN_PLUGINS=autograph,ipgraph`). `make audit-ipgraph` 가 handler/router/ontology/cypher templates(25)/gold(ip=30+cross_ip=8) 5종 wire-up 검증 → DoD dashboard 자동 반영. **core diff ratio** 측정은 baseline reset 후속 — `make audit-dod` 재실행 |
@@ -775,7 +775,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 | **§10.17 (a)** | **MCP 래퍼** | (wired) | `src/autonexusgraph/mcp/` — typed tool pool (78 tools: finance 21 + auto 38 + ip 19) 위 얇은 MCP server. `inspect.signature` + type hint → JSON Schema 자동 변환 (사용자 schema 작성 불요). stdio transport (`python -m autonexusgraph.mcp`). `make audit-mcp` 가 SDK 미설치 시 SKIPPED + tool discovery 검증, 설치 시 server boot + `ListToolsRequest` 핸들러 in-process round-trip 으로 78 tools 응답 실측 PASS (SDK 설치). **SDK 설치 = `pip install -e ".[mcp]"`** (이제 `[all]` extras 에도 포함) |
 | **§10.17 (b)** | **Langfuse 실측 ON (turn별 token/cost/replan)** | (wired) | Langfuse 4.x OTEL + ContextVar 격리 + `meta JSONB` 적재. `make audit-trace` 로 실측 검증 — `data/reports/audit_trace_*.json` 의 최신 리포트가 dashboard 에 자동 반영 |
 | **§10.17 (c)** | **온톨로지 SHACL·pydantic 검증** | (wired) | pydantic v2 strict-validate (`src/autonexusgraph/ontology/schema.py`). `extra='forbid'` 미지정 키 reject + cardinality/class/provenance/pass enum 정합 + relation.from/to ↔ entities cross-check + edge_required_meta 7키 SoT 강제. `schema_version` yaml 헤더. `make audit-ontology` = 핵심 6 yaml(auto/ip/finance) + **보조 4 yaml(Y-1: extractors×2/system_taxonomy/plants, extra='forbid')** + cypher↔yaml cross-check → DoD dashboard 자동 반영 |
-| **§10.17 (d)** | **축소 평가 매트릭스 (4 어댑터 × FAST tier 1종 + rerank ablation)** | (wired, partial) | `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + `<name>_<tier>_rerank<0\|1>` cell 라벨. `eval/runners/run_matrix_smoke.py` 가 8 cells enumerate + thesis headline 자동 계산. multi-hop EM 은 span-aware (gold⊆답변) + gold 보유 row 한정 평균이며, gold scorable < 5 면 primary 를 entity-level hits 로 전환 (`em_status=insufficient_gold`) 해 측정 artifact 오판을 막는다 (`eval/metrics/em_f1.py::exact_match_contains`). `make audit-eval-matrix` simulation 모드 (LLM 비용 0) 기본 / `--full` 실 LLM. Allganize 외부 벤치 stub (`eval/qa_gold/gold_qa_allganize_v0.jsonl`). **실측**: (2026-06-05 Anthropic 10×30 $0.60) + **2026-06-10 정식 (GPT-4o, BGE-M3+리랭커, planner fix PR#52, $1.25)** — thesis ❌ hits@k **vector 0.875 > hybrid 0.5 = −37.5%p**, §10.14 internal 100% ✅, EM insufficient_gold(2/30), LLM-planner ablation 은 EM 변별 불가(gold 부족). gold 확장·Neo4j 보강·multi-provider 는 후속 |
+| **§10.17 (d)** | **축소 평가 매트릭스 (4 어댑터 × FAST tier 1종 + rerank ablation)** | (wired, partial) | `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + `<name>_<tier>_rerank<0\|1>` cell 라벨. `eval/runners/run_matrix_smoke.py` 가 8 cells enumerate + thesis headline 자동 계산. multi-hop EM 은 span-aware (gold⊆답변) + gold 보유 row 한정 평균이며, gold scorable < 5 면 primary 를 entity-level hits 로 전환 (`em_status=insufficient_gold`) 해 측정 artifact 오판을 막는다 (`eval/metrics/em_f1.py::exact_match_contains`). `make audit-eval-matrix` simulation 모드 (LLM 비용 0) 기본 / `--full` 실 LLM. Allganize 외부 벤치 stub (`eval/qa_gold/gold_qa_allganize_v0.jsonl`). **실측**: (2026-06-05 Anthropic 10×30) + **2026-06-10 정식 (GPT-4o, BGE-M3+리랭커, planner fix PR#52)** — thesis ❌ hits@k **vector 0.875 > hybrid 0.4375 = −43.75%p**. gold multi-hop 큐레이션으로 scorable 5 충족 → **EM 측정 가능(`em_status=ok`)**: vector EM 0.40 = hybrid 0.40 (hybrid 우위 없음). §10.13 메인홉 0.375 ✅, §10.14 internal 100% ✅. **planner ablation 측정**: 룰 EM 0.40 > LLM 0.20 (−20%p — LLM planner 가 룰보다 나쁨). cross-domain·multi-provider 는 후속 |
 
 → **남은 측정의 부족분은 §12 보완 개발 백로그 참조. 정량 게이트 본문 SSOT 는 §10 DoD 20항.**
 
@@ -912,7 +912,7 @@ make audit-dod            # 17항 (v2.2) 트래픽라이트 종합 리포트 →
 4. ✅ **MVP 범위** OEM 5~8 × 모델 30~50 × 2022~2024 데이터 3저장소 적재 — 실측 OEM=5 / models=102 / years=(2020, 2024) over-spec
 5. ✅ **BOM Level 0~3 안정, Level 4 coverage ≥ 60%** — L0~L3 stable, L4=63.7%. Level 5~6 은 부분 진입 — 배터리·소재 §11.2
 6. ✅ **`anxg_bridge.corp_entity` 자동 생성** — Wikidata QID + LEI 매칭 confidence ≥ 0.9 비율 80%+ — strong_match **15/15 = 100%** (manufacturer reviewed 11 + supplier reviewed 4) 2026-06-01 재측정
-7. ❌ **Hybrid vs Vector Multi-hop +30%p** — **반증** (2026-06-10 정식 실측: hits@k vector 0.875 > hybrid 0.5 = −37.5%p, 목표 정반대). store-aware hybrid 가치 미입증 → thesis 재정의 후보, gold 보강 후 재측정 ([docs/research/thesis_hybrid_routing.md](./docs/research/thesis_hybrid_routing.md))
+7. ❌ **Hybrid vs Vector Multi-hop +30%p** — **반증** (2026-06-10 정식 실측: hits@k vector 0.875 > hybrid 0.4375 = −43.75%p, 목표 정반대. EM 측정 가능 `em_status=ok`: vector 0.40 = hybrid 0.40, hybrid 우위 없음). store-aware hybrid 가치 미입증 ([docs/research/thesis_hybrid_routing.md](./docs/research/thesis_hybrid_routing.md))
 8. ⊘ **Cross-Domain QA 4단계 층화** (CD-L1 80%+ / L2 70%+ / L3 50%+ / L4 40%+)
 9. ⊘ **제원·재무 수치 Exact Match 95%+**
 10. ⊘ **Faithfulness (Ragas) 90%+**
