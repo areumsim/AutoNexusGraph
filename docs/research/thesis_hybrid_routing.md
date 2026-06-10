@@ -23,15 +23,16 @@
 
 **귀무가설 H0**: hybrid EM − vector EM ≤ 0 (또는 +30%p 미달). 반증 가능 = 연구로 성립.
 
-> **측정 현황 — H1(a) 반증 신호 [있음]** (1차 실측 2026-06-05, Anthropic 10 cells × 30 finance,
-> $0.60 · BACKLOG S-4 · 결과 SSOT = [README §10.7](../../README.md#10-dod-definition-of-done--20-항)):
-> hits@k **vector 0.967 > sql_vec 0.900 > hybrid 0.433 > graph 0.300** — H1(a) 가정과 **정반대**
-> (−53.4%p). EM 은 gold scorable < 5 로 `insufficient_gold` (측정 artifact 회피 → hits 로 1차 판정).
-> 즉 **현 데이터·gold 에서 H0 미기각** (store-aware hybrid 가치 입증 미달). 원인 가설(검증 대기):
-> (a) multi-hop gold answer 1/16 → 측정 편향, (b) Neo4j 적재 sparse → graph reasoner 무력화,
-> (c) router 가 vector-우세 question 에 graph 합성을 섞어 손실. **결론 보류, 폐기 아님** — §4 gold
-> 보강 + Neo4j 적재 + multi-provider `--full` 재측정 후 재판정. 최신 셀 결과는
-> `data/reports/audit_eval_matrix_<ISO>.json`.
+> **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
+> BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
+> [README §10.7](../../README.md#10-dod-definition-of-done--20-항)):
+> hits@k **vector 0.875 > hybrid 0.5 = −37.5%p** — H1(a) 가정(+30%p)과 **정반대** (target_met=false).
+> EM 은 gold scorable 2/30 로 `insufficient_gold` (gold curation 부족 지속). #14 latency internal 100% ✅.
+> 즉 **현 데이터·gold 에서 H0 미기각** (store-aware hybrid 가치 입증 미달). (직전 1차 실측 2026-06-05
+> Anthropic: vector 0.967 > hybrid 0.433 = −53.4%p — 방향 일치; 본 정식 실측서 hybrid 0.5 로 기능 확인,
+> 무효 0.0 아님.) 원인 가설(검증 대기): (a) multi-hop gold answer 1/16 → 측정 편향, (b) Neo4j 적재
+> sparse → graph reasoner 무력화, (c) router 가 vector-우세 question 에 graph 합성을 섞어 손실.
+> **결론 보류, 폐기 아님** — §4 gold 보강 + Neo4j 적재 후 재판정. 셀 결과 `data/reports/audit_eval_matrix_<ISO>.json`.
 
 ---
 
