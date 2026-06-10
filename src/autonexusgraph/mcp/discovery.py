@@ -1,7 +1,7 @@
 """Tool 자동 discovery + type hint → JSON Schema 변환.
 
 PRD §10 DoD #17 (a) — 외부 MCP 클라이언트에 typed tool pool 자동 노출
-(finance 21 + auto 38 = 59 tools, BACKLOG S-1 SSOT; ``__all__`` 기준 자동 산정).
+(finance 21 + auto 38 + ip 19 = 78 tools, BACKLOG S-1 SSOT; ``__all__`` 기준 자동 산정).
 
 핵심:
 - ``build_tool_manifest(domain)`` — 도메인별 tool 함수 list
@@ -28,7 +28,7 @@ class ToolSpec:
     name: str
     description: str
     fn: Callable[..., Any]
-    domain: str           # 'auto' | 'finance' | 'cross'
+    domain: str           # 'auto' | 'finance' | 'ip' | 'other'
     input_schema: dict[str, Any] = field(default_factory=dict)
 
 
@@ -36,7 +36,8 @@ class ToolSpec:
 _DOMAIN_MODULES: dict[str, tuple[str, ...]] = {
     "finance": ("autonexusgraph.tools",),
     "auto":    ("autograph.tools",),
-    # 'all' 은 두 도메인 합집합.
+    "ip":      ("ipgraph.tools",),
+    # 'all' 은 세 도메인 합집합.
 }
 
 
@@ -58,6 +59,8 @@ def tool_function(fn: Callable[..., Any], *,
     mod = getattr(fn, "__module__", "") or ""
     if mod.startswith("autograph"):
         domain = "auto"
+    elif mod.startswith("ipgraph"):
+        domain = "ip"
     elif mod.startswith("autonexusgraph"):
         domain = "finance"
     else:
@@ -67,18 +70,20 @@ def tool_function(fn: Callable[..., Any], *,
 
 
 def build_tool_manifest(domain: str = "all") -> list[ToolSpec]:
-    """domain ('auto' | 'finance' | 'all') 별 ToolSpec 목록.
+    """domain ('auto' | 'finance' | 'ip' | 'all') 별 ToolSpec 목록.
 
     각 모듈의 ``__all__`` 을 우선 적용. 없으면 module dict 의 non-underscore
     public callable 만.
     """
     domain = (domain or "all").lower()
     if domain == "all":
-        modules = _DOMAIN_MODULES["finance"] + _DOMAIN_MODULES["auto"]
+        modules = (_DOMAIN_MODULES["finance"]
+                   + _DOMAIN_MODULES["auto"]
+                   + _DOMAIN_MODULES["ip"])
     elif domain in _DOMAIN_MODULES:
         modules = _DOMAIN_MODULES[domain]
     else:
-        raise ValueError(f"unknown domain: {domain!r} (auto|finance|all)")
+        raise ValueError(f"unknown domain: {domain!r} (auto|finance|ip|all)")
 
     specs: list[ToolSpec] = []
     seen_names: set[str] = set()

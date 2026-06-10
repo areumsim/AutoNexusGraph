@@ -23,6 +23,18 @@
 
 **귀무가설 H0**: hybrid EM − vector EM ≤ 0 (또는 +30%p 미달). 반증 가능 = 연구로 성립.
 
+> **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
+> BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
+> [README §10.7](../../README.md#10-dod-definition-of-done--20-항)):
+> hits@k **vector 0.875 > hybrid 0.4375 = −43.75%p** — H1(a) 가정(+30%p)과 **정반대** (target_met=false).
+> **EM 측정 가능** (multi-hop gold scorable 5 충족 → `em_status=ok`): vector EM 0.40 = hybrid EM 0.40
+> (+0.0%p, hybrid 우위 없음). #13 메인홉 효율 0.375 ≤ 0.7 ✅, #14 latency internal 100% ✅.
+> 즉 **현 데이터·gold 에서 H0 미기각** (store-aware hybrid 가치 입증 미달). (직전 1차 실측 2026-06-05
+> Anthropic: vector 0.967 > hybrid 0.433 = −53.4%p — 방향 일치; 본 정식 실측서 hybrid 0.5 로 기능 확인,
+> 무효 0.0 아님.) 원인 가설(검증 대기): (a) multi-hop gold answer 1/16 → 측정 편향, (b) Neo4j 적재
+> sparse → graph reasoner 무력화, (c) router 가 vector-우세 question 에 graph 합성을 섞어 손실.
+> **결론 보류, 폐기 아님** — §4 gold 보강 + Neo4j 적재 후 재판정. 셀 결과 `data/reports/audit_eval_matrix_<ISO>.json`.
+
 ---
 
 ## 2. Baselines & 비교군 (어댑터)  **[있음]**
@@ -61,7 +73,7 @@
   store 별·hop 별 분할 집계가 바로 가능.
 - **[제안] — thesis 측정에 부족한 셀 보강**:
   1. **multi-hop ≥2 hop** 비중 확대 (현재 다수가 `hop_count` 1). H1(a) 변별력은 깊은 홉에서 나옴.
-  2. **cross-domain** 질문 셀 (finance×auto via `bridge.corp_entity`) — 단일 store 가 구조적으로
+  2. **cross-domain** 질문 셀 (finance×auto via `anxg_bridge.corp_entity`) — 단일 store 가 구조적으로
      못 푸는 케이스 = hybrid 우위의 가장 강한 증거.
   3. **numeric** 질문 셀 (정확 재무 수치 요구) — `required_stores=[SQL]` + 오답 시 hallucination
      판정 가능한 gold 수치 동반. H1(b) 측정용.
@@ -74,14 +86,16 @@
 | 단계 | 명령/파일 | 현 상태 |
 |---|---|---|
 | 셀 enumeration 인프라 | `run_matrix_smoke.py` (simulation 기본, LLM 비용 0) | **[있음]** PASS (`make audit-eval-matrix`) |
-| **실측 실행** | `run_matrix_smoke.py --full` → cell 마다 `run_qa_eval` 실제 호출 | **[제안]** LLM 키 + DB 적재 필요 (`docs/operations/api_keys_pending.md` One-Shot Runbook) |
+| **실측 실행** | `run_matrix_smoke.py --full` → cell 마다 `run_qa_eval` 실제 호출 | **[부분 있음]** 1차 실측 완료 (2026-06-05, Anthropic single-provider, §1 측정 현황 = H1(a) 반증 신호). multi-provider full + gold/Neo4j 보강 후 재측정 **[제안]** (`docs/operations/api_keys_pending.md` One-Shot Runbook) |
 | numeric/grounding metric 추가 | §3 [제안] 2종 metric 구현 | **[제안]** |
 | golden set 보강 | §4 [제안] 4종 셀 | **[제안]** |
 | 결과 산출물 | `data/reports/audit_eval_matrix_<ISO>.json` (cell 별 + thesis headline) | **[있음]** 포맷 존재 |
 
-**한 줄**: 인프라(어댑터·ablation·헤드라인·gold 스키마)는 이미 깔려 있다. "측정 게이트만 깔린
-상태" 를 "결과" 로 바꾸는 일 = **(1) --full 실측 (키+DB), (2) numeric/grounding metric 2종 추가,
-(3) multi-hop·cross-domain·numeric gold 셀 보강.** 그러면 H1 을 ±%p 로 보고할 수 있다.
+**한 줄**: 인프라(어댑터·ablation·헤드라인·gold 스키마)는 이미 깔려 있고 **1차 실측도 나왔다 — 결과는
+H1(a) 반증 신호**(§1, vector > hybrid). 남은 일은 "결과 없음 → 측정" 이 아니라 **"약한 1차 반증 →
+견고한 재판정"** = **(1) gold 보강(multi-hop·cross-domain·numeric 각 ≥30), (2) Neo4j 적재 보강,
+(3) numeric/grounding metric 2종 추가, (4) multi-provider `--full` 재측정.** 그래야 H0 기각/미기각을
+편향 없이 ±%p 로 확정한다.
 
 ---
 

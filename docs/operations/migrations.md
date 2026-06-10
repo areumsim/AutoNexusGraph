@@ -4,39 +4,42 @@
 때만 자동 적용된다. 데이터가 이미 존재하는 환경에서는 새 `.sql` 파일을 추가해도 자동으로
 실행되지 않으므로 **수동 hot-apply 절차** 가 필요하다.
 
-## 0. 전체 마이그레이션 목록 (총 30개 — 01~29 + 12a/12b 별도)
+## 0. 전체 마이그레이션 목록 (총 31개 — 01~30 + 12a/12b 별도)
+
+> **스키마 규약**: 아래 목록 주석과 본문 psql 예시는 **실 DB 스키마 `anxg_` 프리픽스** (`anxg_auto`/`anxg_bridge`/`anxg_ip`/`anxg_vec`/`anxg_chat` — `01_schema.sql`) 를 사용한다. namespace rename 절차는 §아래 (`rename_pg_schemas_namespace.sql`).
 
 ```text
 01_schema.sql                       # core 기본 메타·스키마 (master / fin / wiki / vec / news / sec / esg)
-02_entity_resolution.sql            # master.entities 다형 ER (entity_id + entity_type)
+02_entity_resolution.sql            # anxg_master.entities 다형 ER (entity_id + entity_type)
 03_news_articles.sql                # 뉴스·보도자료
 04_external_data.sql                # ESG / KOSIS / 특허 슬롯 / 운영 메트릭
-05_vec_chunks_meta.sql              # vec.chunks 메타 (corp_code / fiscal_year / source)
-06_llm_usage.sql                    # ops.llm_usage (turn별 token/cost/replan)
+05_vec_chunks_meta.sql              # anxg_vec.chunks 메타 (corp_code / fiscal_year / source)
+06_llm_usage.sql                    # anxg_ops.llm_usage (turn별 token/cost/replan)
 07_autograph.sql                    # auto.* 핵심 스키마 (manufacturers / models / variants)
-08_bridge.sql                       # bridge.corp_entity (finance ↔ auto)
-09_vec_chunks_auto_meta.sql         # vec.chunks 에 manufacturer_id / model_id / variant_id
-10_autograph_bom.sql                # auto.components 에 level / parent_component_id / snapshot_year
-11_autograph_staging.sql            # auto.master_suppliers + auto.staging_relations (P3 LLM staging)
-12a_autograph_inspections.sql       # auto.events_inspections (data.go.kr 15155857 KOTSA)
-12b_autograph_investigations.sql    # auto.events_investigations (NHTSA ODI)
-13_autograph_oem_sec.sql            # auto.oem_financials_sec (글로벌 OEM SEC XBRL)
-14_master_entities.sql              # master.entities 보강 (auto 도메인 통합)
-15_autograph_production.sql         # auto.plant_capacity / plant_production / plant_utilization (DART)
-16_autograph_kama_macro.sql         # auto.macro_production_yearly / macro_industry_monthly (KAMA)
-17_autograph_oem_news.sql           # auto.events_oem_news (IR / 뉴스룸 sitemap crawler)
-18_ipgraph.sql                      # ip.patents / assignees / inventors / citations / cpc_scheme / 등 12 테이블
-19_ipgraph_bridge.sql               # ip.assignee_corp_map (bridge.corp_entity 직접 변경 없이 join)
-20_auto_minerals.sql                # auto.master_minerals (USGS MCS L6 소재)
-21_auto_ev_chargers.sql             # auto.ev_chargers + ev_charger_usage (data.go.kr B552584/B553530)
-22_ip_works.sql                     # ip.works / institution / work_institution (OpenAlex)
-23_ip_cpc.sql                       # ip.cpc_scheme (CPC bulk 10,695)
-24_auto_factoryon.sql               # auto.factoryon_registry (DATA_GO_KR_API_KEY 발급 후)
+08_bridge.sql                       # anxg_bridge.corp_entity (finance ↔ auto)
+09_vec_chunks_auto_meta.sql         # anxg_vec.chunks 에 manufacturer_id / model_id / variant_id
+10_autograph_bom.sql                # anxg_auto.components 에 level / parent_component_id / snapshot_year
+11_autograph_staging.sql            # anxg_auto.master_suppliers + anxg_auto.staging_relations (P3 LLM staging)
+12a_autograph_inspections.sql       # anxg_auto.events_inspections (data.go.kr 15155857 KOTSA)
+12b_autograph_investigations.sql    # anxg_auto.events_investigations (NHTSA ODI)
+13_autograph_oem_sec.sql            # anxg_auto.oem_financials_sec (글로벌 OEM SEC XBRL)
+14_master_entities.sql              # anxg_master.entities 보강 (auto 도메인 통합)
+15_autograph_production.sql         # anxg_auto.plant_capacity / plant_production / plant_utilization (DART)
+16_autograph_kama_macro.sql         # anxg_auto.macro_production_yearly / macro_industry_monthly (KAMA)
+17_autograph_oem_news.sql           # anxg_auto.events_oem_news (IR / 뉴스룸 sitemap crawler)
+18_ipgraph.sql                      # anxg_ip.patents / assignees / inventors / citations / cpc_scheme / 등 12 테이블
+19_ipgraph_bridge.sql               # anxg_ip.assignee_corp_map (anxg_bridge.corp_entity 직접 변경 없이 join)
+20_auto_minerals.sql                # anxg_auto.master_minerals (USGS MCS L6 소재)
+21_auto_ev_chargers.sql             # anxg_auto.ev_chargers + ev_charger_usage (data.go.kr B552584/B553530)
+22_ip_works.sql                     # anxg_ip.works / institution / work_institution (OpenAlex)
+23_ip_cpc.sql                       # anxg_ip.cpc_scheme (CPC bulk 10,695)
+24_auto_factoryon.sql               # anxg_auto.factoryon_registry (DATA_GO_KR_API_KEY 발급 후)
 25_auto_process_metrics.sql         # auto.* KAMP 공정 metrics 슬롯 (BoP)
 26_bridge_review.sql                # bridge candidate 검토 SOP 컬럼 (reviewed_status 등)
 27_auto_kamp_catalog.sql            # KAMP 카탈로그 (BoP)
-28_auto_defect_matches.sql          # auto.defect_matches (Recall ↔ DefectType 유사도)
-29_auto_failure_modes.sql           # auto.failure_modes + SUBJECT_TO / MANIFESTS_AS
+28_auto_defect_matches.sql          # anxg_auto.defect_matches (Recall ↔ DefectType 유사도)
+29_auto_failure_modes.sql           # anxg_auto.failure_modes + SUBJECT_TO / MANIFESTS_AS
+30_chat_feedback_updated_at.sql     # anxg_chat.feedback.updated_at 컬럼 추가
 ```
 
 본 가이드는 **개별 파일의 hot-apply 절차** 와 그 중 backfill 이 필요한 ALTER 마이그레이션 (10번) 의 안전 순서를 다룬다.
@@ -72,12 +75,12 @@ psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -c "\dt bridge.*"
 ```
 
 기대 결과:
-- `auto.components` 테이블이 이미 존재해야 함 (07_autograph.sql 가 만들었음).
-- `auto.master_suppliers` 가 **없으면** 11 번 마이그레이션이 미적용 상태.
-- `auto.components` 에 `level` 컬럼이 **없으면** 10 번 마이그레이션이 미적용 상태.
+- `anxg_auto.components` 테이블이 이미 존재해야 함 (07_autograph.sql 가 만들었음).
+- `anxg_auto.master_suppliers` 가 **없으면** 11 번 마이그레이션이 미적용 상태.
+- `anxg_auto.components` 에 `level` 컬럼이 **없으면** 10 번 마이그레이션이 미적용 상태.
 
 ```bash
-psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -c "\d+ auto.components" | grep -E "level|parent_component_id|snapshot_year"
+psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -c "\d+ anxg_auto.components" | grep -E "level|parent_component_id|snapshot_year"
 ```
 
 ---
@@ -89,7 +92,7 @@ psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -c "\d+ auto.componen
 ```bash
 # 컴포넌트 테이블만 가볍게 dump — 수십 row 라서 비용 없음.
 pg_dump -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
-        -t auto.components \
+        -t anxg_auto.components \
         > /tmp/auto_components_$(date +%Y%m%d_%H%M%S).sql
 ```
 
@@ -101,13 +104,13 @@ psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
 ```
 
 `ALTER COLUMN level SET NOT NULL` 단계가 실패하면 backfill 이 누락된 row 가 있다는 뜻 —
-직전 `UPDATE auto.components SET level = 4 WHERE level IS NULL` 가 모든 row 를 채우지
+직전 `UPDATE anxg_auto.components SET level = 4 WHERE level IS NULL` 가 모든 row 를 채우지
 못한 케이스. 이 경우 NOT NULL 만 실패하고 컬럼 자체는 추가됨. 수동 backfill 후 재실행:
 
 ```bash
-psql -d "$PG_DB" -c "UPDATE auto.components SET level = 4 WHERE level IS NULL;"
-psql -d "$PG_DB" -c "ALTER TABLE auto.components ALTER COLUMN level SET NOT NULL;"
-psql -d "$PG_DB" -c "ALTER TABLE auto.components
+psql -d "$PG_DB" -c "UPDATE anxg_auto.components SET level = 4 WHERE level IS NULL;"
+psql -d "$PG_DB" -c "ALTER TABLE anxg_auto.components ALTER COLUMN level SET NOT NULL;"
+psql -d "$PG_DB" -c "ALTER TABLE anxg_auto.components
                        ADD CONSTRAINT chk_auto_comp_level CHECK (level BETWEEN 3 AND 5);"
 ```
 
@@ -115,9 +118,9 @@ psql -d "$PG_DB" -c "ALTER TABLE auto.components
 
 ```bash
 psql -d "$PG_DB" <<'SQL'
-SELECT level, count(*) FROM auto.components GROUP BY level;
-SELECT count(*) FROM auto.components WHERE snapshot_year IS NULL;  -- 0 이어야
-\d+ auto.components
+SELECT level, count(*) FROM anxg_auto.components GROUP BY level;
+SELECT count(*) FROM anxg_auto.components WHERE snapshot_year IS NULL;  -- 0 이어야
+\d+ anxg_auto.components
 SQL
 ```
 
@@ -136,28 +139,28 @@ psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
 
 ```bash
 psql -d "$PG_DB" <<'SQL'
-\d+ auto.master_suppliers
-\d+ auto.staging_relations
+\d+ anxg_auto.master_suppliers
+\d+ anxg_auto.staging_relations
 SELECT pg_get_indexdef(indexrelid)
   FROM pg_index
- WHERE indrelid = 'auto.staging_relations'::regclass;
+ WHERE indrelid = 'anxg_auto.staging_relations'::regclass;
 SQL
 ```
 
 `uq_auto_staging_merge_key` 부분 unique index 가 보여야 함. 없으면 ON CONFLICT 가 동작하지
 않아 P3 staging upsert 가 중복 row 를 만들 수 있음.
 
-### 3.3 기존 bridge.corp_entity 의 supplier 행 재정렬
+### 3.3 기존 anxg_bridge.corp_entity 의 supplier 행 재정렬
 
-`bridge.corp_entity.entity_id` 의 의미는 entity_type 무관하게 **stringified PK** (manufacturer 는
-`auto.master_manufacturers.manufacturer_id`, supplier 는 `auto.master_suppliers.supplier_id`)
+`anxg_bridge.corp_entity.entity_id` 의 의미는 entity_type 무관하게 **stringified PK** (manufacturer 는
+`anxg_auto.master_manufacturers.manufacturer_id`, supplier 는 `anxg_auto.master_suppliers.supplier_id`)
 로 통일된다. 과거 supplier 행이 Wikidata QID 를 entity_id 로 쓴 환경이라면 다음 스크립트로
 일괄 재배치:
 
 ```bash
 psql -d "$PG_DB" <<'SQL'
 -- 1) 기존 supplier 행을 master_suppliers 로 옮긴다 (멱등).
-INSERT INTO auto.master_suppliers (name, name_norm, wikidata_qid, source, source_ref,
+INSERT INTO anxg_auto.master_suppliers (name, name_norm, wikidata_qid, source, source_ref,
                                     confidence, validated_status)
 SELECT be.name,
        lower(regexp_replace(coalesce(be.name, ''), '\(주\)|㈜|주식회사', '', 'g')),
@@ -167,15 +170,15 @@ SELECT be.name,
        coalesce(be.confidence_score, 0.80),
        CASE WHEN coalesce(be.confidence_score, 0) >= 0.95 THEN 'validated'
             ELSE 'candidate' END
-  FROM bridge.corp_entity be
+  FROM anxg_bridge.corp_entity be
  WHERE be.entity_type = 'supplier'
    AND be.wikidata_qid IS NOT NULL
 ON CONFLICT (wikidata_qid) DO NOTHING;
 
 -- 2) bridge.entity_id 를 stringified supplier_id 로 갱신.
-UPDATE bridge.corp_entity AS be
+UPDATE anxg_bridge.corp_entity AS be
    SET entity_id = ms.supplier_id::text
-  FROM auto.master_suppliers ms
+  FROM anxg_auto.master_suppliers ms
  WHERE be.entity_type = 'supplier'
    AND be.wikidata_qid IS NOT NULL
    AND be.wikidata_qid = ms.wikidata_qid
@@ -183,7 +186,7 @@ UPDATE bridge.corp_entity AS be
 
 -- 3) 검증 — supplier 행의 entity_id 가 모두 정수 문자열인가.
 SELECT entity_id, count(*)
-  FROM bridge.corp_entity
+  FROM anxg_bridge.corp_entity
  WHERE entity_type = 'supplier'
    AND entity_id !~ '^[0-9]+$'
  GROUP BY entity_id
@@ -213,8 +216,8 @@ psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" \
 ### 3.5.2 검증
 
 ```bash
-psql -d "$PG_DB" -c "\d+ auto.events_inspections"
-psql -d "$PG_DB" -c "SELECT COUNT(*) FROM auto.events_inspections;"   # 0 OK (아직 적재 전)
+psql -d "$PG_DB" -c "\d+ anxg_auto.events_inspections"
+psql -d "$PG_DB" -c "SELECT COUNT(*) FROM anxg_auto.events_inspections;"   # 0 OK (아직 적재 전)
 ```
 
 ### 3.5.3 데이터 적재
@@ -265,10 +268,10 @@ echo "SHOW CONSTRAINTS YIELD name, labelsOrTypes, properties
 
 ```bash
 psql -d "$PG_DB" <<'SQL'
-ALTER TABLE auto.components DROP CONSTRAINT IF EXISTS chk_auto_comp_level;
-ALTER TABLE auto.components DROP COLUMN IF EXISTS level;
-ALTER TABLE auto.components DROP COLUMN IF EXISTS parent_component_id;
-ALTER TABLE auto.components DROP COLUMN IF EXISTS snapshot_year;
+ALTER TABLE anxg_auto.components DROP CONSTRAINT IF EXISTS chk_auto_comp_level;
+ALTER TABLE anxg_auto.components DROP COLUMN IF EXISTS level;
+ALTER TABLE anxg_auto.components DROP COLUMN IF EXISTS parent_component_id;
+ALTER TABLE anxg_auto.components DROP COLUMN IF EXISTS snapshot_year;
 DROP INDEX IF EXISTS auto.idx_auto_comp_level;
 DROP INDEX IF EXISTS auto.idx_auto_comp_parent;
 DROP INDEX IF EXISTS auto.idx_auto_rec_comp;
@@ -281,8 +284,8 @@ SQL
 `11_autograph_staging.sql` 는 신규 테이블 — `DROP TABLE`:
 
 ```bash
-psql -d "$PG_DB" -c "DROP TABLE IF EXISTS auto.staging_relations;"
-psql -d "$PG_DB" -c "DROP TABLE IF EXISTS auto.master_suppliers;"
+psql -d "$PG_DB" -c "DROP TABLE IF EXISTS anxg_auto.staging_relations;"
+psql -d "$PG_DB" -c "DROP TABLE IF EXISTS anxg_auto.master_suppliers;"
 # Neo4j Supplier 노드의 entity_id 가 가리키는 PK 가 사라지므로 :Supplier 노드도 정리:
 echo "MATCH (s:Supplier) DETACH DELETE s" | cypher-shell
 ```

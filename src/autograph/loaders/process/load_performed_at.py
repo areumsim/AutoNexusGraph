@@ -2,7 +2,7 @@
 
 source: ``ontology/auto/performed_at_seed.yaml`` — 한국 OEM 완성차/파워트레인
 공장의 4 대 핵심공정(프레스/차체/도장/의장) + 파워트레인 매핑. 공개 자료 기반
-PRD §3.5 **B 등급** (deterministic) → confidence 0.85 + validated.
+PRD §3.5 **B 등급** (deterministic) → confidence 0.80 + validated.
 
 ProcessGraph DoD #19 (회사 귀속 인스턴스 ≥ 30) 의 **source allowlist hard-check**
 실현. 산단공(synthetic·익명) :ProcessStep 550 은 회사 귀속 금지 — 본 로더는 별도의
@@ -38,7 +38,7 @@ from autonexusgraph.db.neo4j import get_session
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_CONFIDENCE = 0.85
+_DEFAULT_CONFIDENCE = 0.80   # PRD §3.5 B 등급 표준값 (yaml relations.yaml confidence_default 와 정합)
 _SOURCE_ID = "ontology/auto/performed_at_seed.yaml"
 _SNAPSHOT_YEAR = 2026
 

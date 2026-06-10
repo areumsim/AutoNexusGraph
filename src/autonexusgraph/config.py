@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     llm_model_fast: str = "gemini-2.5-flash"     # triage/research/sql 등 가벼운 호출
     llm_model_smart: str = "gemini-2.5-pro"      # planner/synthesizer 등 추론·생성
 
+    # Provider fallback — 1차 provider 호출이 LLMError(auth/quota/429/5xx/timeout) 로
+    # 실패하면 자동 전환할 보조 provider. 빈 값 = 비활성(단일 provider, 기존 동작).
+    # get_llm_client 가 [primary, fallback] 를 FallbackLLMClient 로 묶어
+    # BudgetAware/Logging 안쪽(innermost)에 둔다 → 비용 가드·기록은 어느 쪽이 응답해도 1회.
+    # llm_fallback_model 비우면 fallback provider 의 기본 FAST 모델 사용(base._DEFAULT_FAST_MODEL).
+    llm_fallback_provider: Literal["", "openai", "anthropic", "google", "local"] = ""
+    llm_fallback_model: str = ""
+
     # 개별 role override — 비워두면 tier 기본값 자동 적용 (model_validator 가 보강).
     llm_model_triage: str = ""
     llm_model_planner: str = ""
@@ -167,6 +175,11 @@ class Settings(BaseSettings):
     agent_max_replan: int = 2
     agent_query_budget_sec: int = 40
     agent_max_answer_len: int = 5000
+    # 대화형 interrupt(HITL) 허용 여부. True=API/UI(clarification·cost 승인 가능).
+    # False=batch/eval/cron(재개 불가) → request_interrupt 가 InterruptUnavailable 로
+    # 다운그레이드 → 호출부가 1순위 자동선택 등 폴백. (eval 에서 모호 회사명 질문이
+    # langgraph interrupt 로 멈춰 빈 답 나가던 버그 차단 — AGENT_ALLOW_INTERRUPTS=false.)
+    agent_allow_interrupts: bool = True
     # 축2: LLM 자율 planner (plan-and-execute). True 면 planner 가 LLM 으로 task DAG 를
     # 제안하고 화이트리스트 검증 후 사용 — 실패/빈결과 시 기존 룰·handler 로 폴백.
     # 기본 False (opt-in) — 룰 planner 가 검증된 안전 기본값.
@@ -177,6 +190,7 @@ class Settings(BaseSettings):
     agent_turn_budget_finance_usd: float = 0.0
     agent_turn_budget_auto_usd: float = 0.0
     agent_turn_budget_cross_domain_usd: float = 0.0
+    agent_turn_budget_ip_usd: float = 0.0        # ip 보조축 — 정형 위주라 낮은 한도 권장 (.env: AGENT_TURN_BUDGET_IP_USD)
     # 임의 도메인 (legal/safety 등) 의 turn 한도는 env 로 직접 지정:
     #   AGENT_TURN_BUDGET_<DOMAIN>_USD=0.30
     # → turn_budget_for_domain("legal") 가 동적으로 그것을 읽음.

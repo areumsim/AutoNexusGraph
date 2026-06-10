@@ -13,10 +13,13 @@ PRD §5 (LLM 추상화 전략) 참조.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -142,6 +145,69 @@ def _select_api_key(settings: Any, provider: str) -> str:
     return by_provider.get(provider, "")
 
 
+# fallback provider 의 모델 미지정 시 기본 FAST 모델 (llm_fallback_model 비었을 때만).
+_DEFAULT_FAST_MODEL: dict[str, str] = {
+    "openai":    "gpt-4o-mini",
+    "anthropic": "claude-haiku-4-5-20251001",
+    "google":    "gemini-2.5-flash",
+}
+
+
+def _build_adapter(provider: str, model: str, settings: Any) -> LLMClient:
+    """provider+model → 구체 LLMClient adapter (auto-wrap 이전 raw). 키는 settings 에서 선택.
+
+    primary 와 fallback 양쪽이 동일 경로로 생성되도록 switch 를 한 곳에 모은다.
+    """
+    key = _select_api_key(settings, provider)
+    timeout = settings.llm_timeout
+    if provider == "openai":
+        from .openai_adapter import OpenAIClient
+        return OpenAIClient(model=model, api_key=key, timeout=timeout)
+    if provider == "anthropic":
+        from .anthropic_adapter import AnthropicClient
+        return AnthropicClient(model=model, api_key=key, timeout=timeout)
+    if provider == "google":
+        from .gemini_adapter import GeminiClient
+        return GeminiClient(model=model, api_key=key, timeout=timeout)
+    if provider == "local":
+        from .local_adapter import LocalLLMClient
+        return LocalLLMClient(
+            model=model,
+            base_url=settings.local_llm_base_url,
+            api_key=key or "EMPTY",
+            timeout=timeout,
+        )
+    raise LLMError(f"unknown LLM provider: {provider!r} (model={model!r})")
+
+
+def _maybe_wrap_fallback(inner: LLMClient, primary_provider: str, settings: Any) -> LLMClient:
+    """llm_fallback_provider 설정 시 [primary, fallback] 를 FallbackLLMClient 로 묶음.
+
+    비활성/키 부재/동일 provider 면 inner 를 그대로 반환(기존 단일-provider 동작 보존).
+    """
+    fb_provider = (getattr(settings, "llm_fallback_provider", "") or "").strip()
+    if not fb_provider or fb_provider == primary_provider:
+        return inner
+    # 키 부재(local 제외) → 조용히 비활성 (graceful skip).
+    if fb_provider != "local" and not _select_api_key(settings, fb_provider):
+        logger.debug("fallback provider %s 키 미설정 — fallback 비활성", fb_provider)
+        return inner
+    fb_model = (getattr(settings, "llm_fallback_model", "") or "").strip() \
+        or _DEFAULT_FAST_MODEL.get(fb_provider, "")
+    if not fb_model:
+        logger.debug("fallback provider %s 기본 모델 없음 — fallback 비활성", fb_provider)
+        return inner
+    try:
+        fb_inner = _build_adapter(fb_provider, fb_model, settings)
+    except LLMError as exc:
+        logger.debug("fallback adapter 생성 실패 (skip): %s", exc)
+        return inner
+    from .fallback import FallbackLLMClient
+    logger.debug("provider fallback 활성: %s → %s(%s)",
+                 inner.model, fb_provider, fb_model)
+    return FallbackLLMClient([inner, fb_inner])
+
+
 def get_llm_client(
     role: str | None = None,
     *,
@@ -180,29 +246,10 @@ def get_llm_client(
     else:
         final_provider = detect_provider(final_model)
 
-    key = _select_api_key(s, final_provider)
-
-    if final_provider == "openai":
-        from .openai_adapter import OpenAIClient
-        inner: LLMClient = OpenAIClient(model=final_model, api_key=key, timeout=s.llm_timeout)
-    elif final_provider == "anthropic":
-        from .anthropic_adapter import AnthropicClient
-        inner = AnthropicClient(model=final_model, api_key=key, timeout=s.llm_timeout)
-    elif final_provider == "google":
-        from .gemini_adapter import GeminiClient
-        inner = GeminiClient(model=final_model, api_key=key, timeout=s.llm_timeout)
-    elif final_provider == "local":
-        from .local_adapter import LocalLLMClient
-        inner = LocalLLMClient(
-            model=final_model,
-            base_url=s.local_llm_base_url,
-            api_key=key or "EMPTY",
-            timeout=s.llm_timeout,
-        )
-    else:
-        raise LLMError(
-            f"unknown LLM provider: {final_provider!r} (model={final_model!r})"
-        )
+    inner: LLMClient = _build_adapter(final_provider, final_model, s)
+    # Provider fallback (옵션) — 1차 LLMError 시 보조 provider 로 자동 전환.
+    # innermost 에 두어 BudgetAware 의 가드/기록이 실제 응답 adapter 기준 1회만 발생.
+    inner = _maybe_wrap_fallback(inner, final_provider, s)
 
     # Auto-wrap — 모든 client 가 항상 비용 가드 + 영속 로그를 거치게 한다.
     #   inner(adapter) → BudgetAwareLLMClient(호출 전 guard, 후 record)

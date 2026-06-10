@@ -8,11 +8,11 @@
 
 | 저장소 | 내용 | 백업 수단 |
 |---|---|---|
-| PostgreSQL (`ar-postgres`) | DART XBRL 184K · filings · **vec.chunks 748K (임베딩 포함)** · master.* · bridge.* · chat.* · auto.* · ip.* | `pg_dump -Fc` (custom format, 압축) |
+| PostgreSQL (`ar-postgres`) | DART XBRL 184K · filings · **anxg_vec.chunks 748K (임베딩 포함)** · master.* · bridge.* · chat.* · auto.* · ip.* | `pg_dump -Fc` (custom format, 압축) |
 | Neo4j (`ar-neo4j`, **community**) | Company/Person/지배구조 · auto BOM/공정 그래프 · ip 그래프 | `neo4j-admin database dump` (community = **online backup 불가**) |
 | raw 데이터 | `data/raw/**` (DART zip 등) | host 파일시스템 스냅샷 (gitignore, DB_DATA_ROOT) |
 
-> **핵심**: `vec.chunks.embedding` 은 PG dump 에 **포함**된다 → 정상 복원 시 임베딩 재생성 불필요. 재생성(수 시간)은 dump 마저 잃은 **재앙 시나리오**에서만 (§4).
+> **핵심**: `anxg_vec.chunks.embedding` 은 PG dump 에 **포함**된다 → 정상 복원 시 임베딩 재생성 불필요. 재생성(수 시간)은 dump 마저 잃은 **재앙 시나리오**에서만 (§4).
 
 ---
 

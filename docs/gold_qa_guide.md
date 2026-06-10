@@ -19,7 +19,7 @@
 | `eval/qa_gold/gold_qa_allganize_v0.example.jsonl` | finance (외부 벤치) | 1 (stub) | TBD | ❌ 미적재 | ❌ **외부 큐레이터 30% 정책 슬롯** — Allganize RAG-Evaluation-Dataset-KO 흡수 대기 |
 | `eval/qa_gold/gold_qa_v0.example.jsonl` | finance (테스트 픽스처) | 3 | — | 픽스처 | 패키지 동작 검증용, 데이터 의미 없음 |
 
-**총 적재 가능 row = 30 + 46 + 44 = 120 (finance + auto + cross)**. ip 30 은 wire-up 완료, 측정 대기.
+**총 적재 가능 row = 30 + 56 + 49 = 135 (finance + auto + cross)**. ip 30 은 wire-up 완료, 측정 대기 (전체 4 도메인 = 165).
 
 ---
 
@@ -30,7 +30,7 @@
 1. **DB 에서 정답 추출** — `psql` / `cypher-shell` 로 직접 조회 후 적음. **LLM 으로 정답 생성 금지** (self-bias 차단).
 2. **paraphrase 3개 이상** — `gold_answer_text` 는 한국어 수기 작성 paraphrase 3개+. EM/F1 의 max 매칭.
 3. **출처 명시** — `evidence_corp_codes` / `evidence_doc_ids` 가 정답을 직접 뒷받침하는 ID. 추적 가능해야 함.
-4. **`is_answerable=false` 10% 포함** — DB 에 없는 사실 의도적 작성 → **refusal precision** 측정 (시스템이 모를 때 "정보 부족" 답하는가). **현재 실측 (2026-06-02)**: finance 3.3% (1/30) / auto 4.3% (2/46) / cross 9.1% (4/44) / ip 0% (0/30) — **평균 5.3%, 정책 10% 미달**. P0 보강 후보.
+4. **`is_answerable=false` 10% 포함** — DB 에 없는 사실 의도적 작성 → **refusal precision** 측정 (시스템이 모를 때 "정보 부족" 답하는가). **현재 실측 (2026-06-10 재계산)**: finance 3.3% (1/30) / auto 10.7% (6/56) / cross 14.3% (7/49) / ip 0% (0/30) — **전체 평균 8.5% (14/165)**. auto·cross 는 정책 10% 충족, finance·ip 는 미달 → finance/ip refusal row 보강 후보.
 5. **외부 큐레이터 30%** — 시스템 작성자가 아닌 외부인 (또는 별도 팀) 이 만든 row 30% 이상 — **자기충족 위험 완화** (mental_model §5.7). **현재 비율 = 0%** — Allganize 외부 벤치 흡수 P0 권장.
 
 ### 2.2 자기충족성 위험 — 왜 외부 큐레이터가 필요한가
@@ -69,7 +69,7 @@
 # 1. 정답을 DB 에서 직접 조회
 psql -h localhost -p 31011 -U autonexusgraph -d autonexusgraph -c "
   SELECT corp_code, fiscal_year, value_won
-    FROM fin.financials
+    FROM anxg_fin.financials
    WHERE corp_code='00164742' AND fiscal_year=2024
      AND item_name LIKE '%매출%';
 "
@@ -148,7 +148,7 @@ make eval-full
 }
 ```
 
-**검증 방법**: `psql ... SELECT value_won FROM fin.financials WHERE corp_code='00126380' AND fiscal_year=2023 AND item_name='영업이익';`
+**검증 방법**: `psql ... SELECT value_won FROM anxg_fin.financials WHERE corp_code='00126380' AND fiscal_year=2023 AND item_name='영업이익';`
 
 #### B. Auto — NHTSA 리콜 (campaign_id 영구)
 
@@ -188,7 +188,7 @@ make eval-full
   "required_stores": ["AutoGraph.Graph", "Bridge", "AutoNexusGraph.SQL"],
   "main_hop_path": ["Manufacturer", "VehicleModel", "Recall", "Company", "Financials"],
   "is_answerable": true,
-  "notes": "Bridge: corp_code 00164742 ↔ manufacturer_id N (bridge.corp_entity reviewed)"
+  "notes": "Bridge: corp_code 00164742 ↔ manufacturer_id N (anxg_bridge.corp_entity reviewed)"
 }
 ```
 
@@ -206,7 +206,7 @@ make eval-full
   "required_stores": ["IPGraph.SQL"],
   "main_hop_path": ["Assignee", "Patent"],
   "is_answerable": true,
-  "notes": "WAITING: KIPRIS_API_KEY 발급 후 ip.patents 적재 → count_patents_by_field 실측 후 gold_answer_text 채움"
+  "notes": "WAITING: KIPRIS_API_KEY 발급 후 anxg_ip.patents 적재 → count_patents_by_field 실측 후 gold_answer_text 채움"
 }
 ```
 
@@ -335,7 +335,7 @@ gold_qa_v0.jsonl (finance 30)
    ├─→ hybrid_adapter      → predictions_hybrid.jsonl     → 점수 H
    └─→ sql_vec_adapter     → predictions_sql_vec.jsonl    → 점수 S
 
-README §10.7 = "Hybrid > Vector +30%p (multi-hop subset)" 가 thesis headline
+README §10.7 = "Hybrid > Vector +30%p (multi-hop subset)" 가 thesis headline (⚠️ 단 1차 실측서 **반증** — vector > hybrid, README §10.7 / `docs/research/thesis_hybrid_routing.md` §1 참조. gold 보강 후 재측정 대기)
 ```
 
 축소 매트릭스 (DoD #17 (d)): 4 어댑터 × FAST tier 1종 × rerank{on/off} = **8 cells**. `make audit-eval-matrix simulation` 으로 cell wire-up 확인, `--full` 로 LLM 실측 (비용 발생).
@@ -415,7 +415,7 @@ make audit-external-ratio ARGS="--strict --target 0.30"
 
 산출: `data/reports/external_curator_ratio.json` + stdout 도메인별 표.
 
-**현재 비율 (2026-06-02 실측)**: **0 / 150 = 0.0%** (모든 seed 가 시스템 작성자 작성). 도메인별 breakdown 까지 동일하게 0%. → 우선순위 작업 (`make convert-allganize` 로 Allganize 흡수 시 9~30% 로 단번에 상승).
+**현재 비율 (2026-06-02 실측)**: **0 / 165 = 0.0%** (모든 seed 가 시스템 작성자 작성). 도메인별 breakdown 까지 동일하게 0%. → 우선순위 작업 (`make convert-allganize` 로 Allganize 흡수 시 9~30% 로 단번에 상승).
 
 ---
 
@@ -423,10 +423,10 @@ make audit-external-ratio ARGS="--strict --target 0.30"
 
 ### Q1. 새 row 의 evidence_corp_codes 가 DB 에 없다고 lint fail
 
-→ `master.companies` 에 해당 corp_code 가 적재 안 됨. (a) 본 시스템 범위 (코스피200+코스닥100) 밖일 가능성, (b) corp_code 8자리 leading-0 형식 오류 (예: `"126380"` 대신 `"00126380"`). 확인:
+→ `anxg_master.companies` 에 해당 corp_code 가 적재 안 됨. (a) 본 시스템 범위 (코스피200+코스닥100) 밖일 가능성, (b) corp_code 8자리 leading-0 형식 오류 (예: `"126380"` 대신 `"00126380"`). 확인:
 
 ```sql
-SELECT * FROM master.companies WHERE corp_code = '00126380';
+SELECT * FROM anxg_master.companies WHERE corp_code = '00126380';
 ```
 
 ### Q2. ip 도메인 gold_answer_text 가 비어있는데 평가 어떻게?
@@ -435,7 +435,7 @@ SELECT * FROM master.companies WHERE corp_code = '00126380';
 
 ```bash
 # ip 적재 완료 가정
-psql ... -c "SELECT COUNT(*) FROM ip.patents WHERE jurisdiction='KR' AND filing_year=2023 AND assignee_id IN (SELECT assignee_id FROM ip.assignees WHERE name LIKE '삼성%');"
+psql ... -c "SELECT COUNT(*) FROM anxg_ip.patents WHERE jurisdiction='KR' AND filing_year=2023 AND assignee_id IN (SELECT assignee_id FROM anxg_ip.assignees WHERE name LIKE '삼성%');"
 # 결과를 IP-L1-001 의 gold_answer_text 에 채움
 ```
 

@@ -114,7 +114,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=1
 
 ## 4. 마이그레이션 (스키마)
 
-PG init SQL (`infra/postgres/init/*.sql`, 현재 25개) 은 **빈 볼륨 첫 기동 시 자동 적용**. 기존 볼륨에 신규 SQL 적용은 **멱등 hot-apply** — 상세 [docs/operations/migrations.md](migrations.md).
+PG init SQL (`infra/postgres/init/*.sql`, 현재 31개) 은 **빈 볼륨 첫 기동 시 자동 적용**. 기존 볼륨에 신규 SQL 적용은 **멱등 hot-apply** — 상세 [docs/operations/migrations.md](migrations.md).
 
 ```bash
 # 신규 init SQL 을 기동 중 인스턴스에 hot-apply (멱등 — 변경 0 이면 무동작)
@@ -219,7 +219,7 @@ stringData:
   ANTHROPIC_API_KEY: "<...>"
 ```
 
-> PG/Neo4j 는 k8s 안에 띄우기보다 **관리형 DB (RDS/AuraDB) 또는 StatefulSet + PVC** 권장 — 본 앱은 stateless (체크포인트는 PG `chat` 스키마에 위임).
+> PG/Neo4j 는 k8s 안에 띄우기보다 **관리형 DB (RDS/AuraDB) 또는 StatefulSet + PVC** 권장 — 본 앱은 stateless (체크포인트는 PG `anxg_chat` 스키마에 위임).
 
 ---
 
@@ -256,7 +256,7 @@ make restore ARGS="--pg <dump> --neo4j <dump>"       # 파괴적 복원 (FORCE=1
 # cron 예: 0 3 * * *  cd /srv/autonexusgraph && bash scripts/ops/backup.sh >> /var/log/anxg_backup.log 2>&1
 ```
 
-- `vec.chunks` 임베딩은 PG dump 에 **포함** → 정상 복원 시 재생성 불필요. RPO ≤ 24h(일일 cron) / RTO 수~수십 분(dump 보유).
+- `anxg_vec.chunks` 임베딩은 PG dump 에 **포함** → 정상 복원 시 재생성 불필요. RPO ≤ 24h(일일 cron) / RTO 수~수십 분(dump 보유).
 - Neo4j community = online backup 불가 → 대상 DB STOP→dump→START (다운타임 = dump 시간).
 - 재앙(dump 소실) 시에만 raw 재적재 + BGE-M3 재임베딩 ~수 시간. off-site 동기화 + 분기 복원 드릴 권장 — 상세 [backup_dr.md](backup_dr.md).
 

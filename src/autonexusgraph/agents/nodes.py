@@ -28,6 +28,28 @@ from .temporal import extract_year_hint, normalize_temporal_terms
 log = logging.getLogger(__name__)
 
 
+# 한국어 조사 — 회사명 lookup 전 어절 끝에서 제거 ('삼성전자의' → '삼성전자').
+# 긴 것 먼저 (그리디) — '들의' 를 '의' 보다 먼저 떼어야 한다.
+_KO_JOSA: tuple[str, ...] = (
+    "으로서", "으로써", "에서의", "에게서", "들에게", "들의", "들은", "들이", "들을",
+    "에서", "에게", "에는", "에도", "까지", "부터", "마다", "조차", "처럼", "만큼",
+    "보다", "라도", "이나", "이란", "이라", "으로",
+    "의", "은", "는", "이", "가", "을", "를", "에", "와", "과", "도", "만", "로", "들",
+)
+# substring(중간 일치) 약매치 차단 임계 — financials.lookup_company score:
+#   100 corp_code / 90 stock / 80 exact name / 60 prefix / 40 substring.
+# 공통명사('자회사'·'반도체')가 회사명 일부와 substring(40) 으로 오매치되는 것을 거른다.
+_COMPANY_MIN_SCORE = 60
+
+
+def _strip_josa(word: str) -> str:
+    """어절 끝 조사 1개 제거. 어간이 2자 미만이 되면 원형 유지(과다 절단 방지)."""
+    for j in _KO_JOSA:
+        if word.endswith(j) and len(word) - len(j) >= 2:
+            return word[: -len(j)]
+    return word
+
+
 # ── Triage ──────────────────────────────────────────────────
 def triage_node(state: AgentState) -> AgentState:
     """질문 유형 분류 + 1차 회사 식별 + 상대 시간 정규화."""
@@ -98,11 +120,24 @@ def triage_node(state: AgentState) -> AgentState:
         for word in q.split():
             if len(word) < 2:
                 continue
-            try:
-                hits = lookup_pg(word, limit=5)
-            except Exception:   # noqa: BLE001 — PG lookup 실패 흡수 → 빈 hits (다음 word 진행)
-                hits = []
+            # 원형 → 매칭 실패 시 조사 제거형 재시도 ('삼성전자의' → '삼성전자').
+            candidates = [word]
+            stripped = _strip_josa(word)
+            if stripped != word:
+                candidates.append(stripped)
+            hits = []
+            for cand in candidates:
+                try:
+                    h = lookup_pg(cand, limit=5)
+                except Exception:   # noqa: BLE001 — PG lookup 실패 흡수 → 빈 hits (다음 후보/word)
+                    h = []
+                if h:
+                    hits = h
+                    break
             if not hits:
+                continue
+            # 약매치(공통명사 substring 오선택) 차단 — 상위 hit score 가 임계 미만이면 skip.
+            if (hits[0].get("score") or 0) < _COMPANY_MIN_SCORE:
                 continue
             # 모호성 — 후보 ≥ 2 + score margin 작음
             if is_ambiguous_company(hits):

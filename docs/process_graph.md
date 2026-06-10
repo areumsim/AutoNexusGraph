@@ -38,7 +38,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 | `PRODUCED_BY` | **46** | C(candidate) | `loaders/process/load_produced_by.py` | ✅ :Part system→공정 추론 (candidate 0.50, 외주=의장) |
 | `CONSUMES_MATERIAL` / `USES_EQUIPMENT` | **6 / 16** | B / C | `loaders/process/load_process_resources.py` | ✅ 파워트레인→L6소재 6 + 공정→표준설비 16. ProcessStep→Material→Mineral L6 경로 17 |
 | `CAUSED_BY_PROCESS` | **96** | C(candidate) | `loaders/process/load_recall_process_map.py` | ✅ 한글 리콜 결함→공정 (deterministic 키워드+결함지시어, conf 0.50) |
-| `auto.process_metrics` (KAMP) | 0 rows | B | `loaders/process/load_kamp_process_metrics.py` + `init/25_*.sql` | ⏳ scaffold (corp_code 부재=익명) |
+| `anxg_auto.process_metrics` (KAMP) | 0 rows | B | `loaders/process/load_kamp_process_metrics.py` + `init/25_*.sql` | ⏳ scaffold (corp_code 부재=익명) |
 
 **기존 재사용 (회사 귀속·자원, 이미 grade 정합)**: `MANUFACTURED_AT` 99(B) + `OWNS_PLANT` 53(A)
 = 회사→공장 ; `MADE_OF` 8(B) + `DERIVED_FROM` 17(A) = Module→Material→Mineral L6 체인.
@@ -47,7 +47,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 
 | 함수 | 시그니처 | Cypher 템플릿 | 코드 |
 |---|---|---|---|
-| `lookup_process` | `(query, limit)` → name 매칭 (LIKE) | `auto_proc_lookup` | `tools/process.py:53` |
+| `lookup_process` | `(query, limit)` → name 매칭 (ILIKE) | — **raw PG SQL** (`anxg_auto.processes`, Cypher 템플릿 아님) | `tools/process.py:53` |
 | `get_process_info` | `(process_name_norm)` → 공정 정의 + 통계 속성 | `auto_proc_info` | `tools/process.py:81` |
 | `list_process_route` | `(step_id, limit)` → PRECEDES 체인 (depth `*0..10` cap) | `auto_proc_route` | `tools/process.py:89` |
 | `list_steps_of_process` | `(process_name_norm, limit)` → INSTANTIATES 역방향 | `auto_proc_steps_of_process` | `tools/process.py:96` |
@@ -98,7 +98,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
   - **ADACOR** (Leitão & Restivo, "ADACOR: A holonic architecture for agile and adaptive manufacturing control", Computers in Industry, 2006) — 분산 제조 제어 → 도구 화이트리스트 패턴
 - **자동차 제조 KG 요구사항**: Mercedes-Benz BIW assembly KG 평가 + **RAMI 4.0 기반 RGOM** ([Plattform Industrie 4.0 — RAMI 4.0](https://www.plattform-i40.de/IP/Redaktion/EN/Standardartikel/specification-rami40.html)) 참조 모델 — Industry 4.0 표준 정렬.
 - **재무 결합 사례**: **FACTLOG** ([Horizon 2020 grant 869951](https://cordis.europa.eu/project/id/869951)) cognitive twin — 자동차 OEM 생산계획·수요예측 KG. 본 시스템의 cross-domain 추론 (공정 ↔ 재무) 의 학술 baseline.
-- **데이터 소스 보강 패턴**: **MMKG** (금속재료 KG, DBpedia/Wikipedia 활용) + **FabKG** (SME 제조과학 KG, structured+unstructured 혼합) — 본 시스템의 vec.chunks 보강 패턴 (manuals + IR + recall 본문) 와 일치.
+- **데이터 소스 보강 패턴**: **MMKG** (금속재료 KG, DBpedia/Wikipedia 활용) + **FabKG** (SME 제조과학 KG, structured+unstructured 혼합) — 본 시스템의 anxg_vec.chunks 보강 패턴 (manuals + IR + recall 본문) 와 일치.
 
 > 따라서 "임의 설계" 가 아니라 **MASON/PSL/ISO 18629·13399·15531 / RAMI 4.0 RGOM** 정렬. pydantic strict + `make audit-ontology` 가 학술 정렬 invariant 강제.
 

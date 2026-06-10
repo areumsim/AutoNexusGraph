@@ -82,19 +82,27 @@ def lookup_person(name: str, birth_year: int | None = None,
 
 # ── 구조 그래프 탐색 ────────────────────────────────────────────────
 
-def list_subsidiaries(parent_corp_code: str, *,
+def list_subsidiaries(parent_corp_code: str = "", *,
+                      corp_code: str | None = None,
                       include_related: bool = False,
                       snapshot_year: int | None = None,
                       limit: int = DEFAULT_LIMIT) -> list[dict]:
-    """모회사의 자회사. include_related=True 면 관계회사도."""
+    """모회사의 자회사. include_related=True 면 관계회사도.
+
+    ``corp_code`` 는 LLM planner 가 모회사를 corp_code 로 식별해 호출하는 경우의
+    ``parent_corp_code`` 별칭 (lookup_company 와 동일 관례).
+    """
+    parent = parent_corp_code or corp_code or ""
     tmpl = "list_subsidiaries_with_related" if include_related else "list_subsidiaries"
-    return _exec(tmpl, cc=parent_corp_code, year=snapshot_year, limit=_cap(limit))
+    return _exec(tmpl, cc=parent, year=snapshot_year, limit=_cap(limit))
 
 
-def list_parents(child_corp_code_or_name: str, *,
+def list_parents(child_corp_code_or_name: str = "", *,
+                 corp_code: str | None = None,
                  limit: int = DEFAULT_LIMIT) -> list[dict]:
-    """이 회사가 자회사로 묶이는 모회사들."""
-    return _exec("list_parents", k=child_corp_code_or_name, limit=_cap(limit))
+    """이 회사가 자회사로 묶이는 모회사들. ``corp_code`` 는 planner 별칭."""
+    child = child_corp_code_or_name or corp_code or ""
+    return _exec("list_parents", k=child, limit=_cap(limit))
 
 
 def get_executives(corp_code: str, *,
