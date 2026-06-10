@@ -118,7 +118,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 #### 2.1.2 Bridge (`anxg_bridge.corp_entity`)
 
 - **정의**: 두 도메인의 ID 를 묶는 다리. `corp_code (finance) ↔ entity_id (auto)` 매칭 테이블.
-- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (README §3.5 Bridge 일반화 명세, `docs/autograph.md §3`, `src/autograph/loaders/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
+- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (README §3.5 Bridge 일반화 명세, `docs/autograph.md §3`, `src/autograph/loaders/master/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
 - **신뢰도 라벨링**: 자동 매칭은 `candidate`. 사람이 검토하면 `reviewed` / `rejected`. 신뢰도 0.95 (QID 일치 시) 부터 시작. `match_method` 6종 enum: `qid_exact | lei_exact | business_no_exact | corp_code_exact | fuzzy_name | manual` (README §3.5 SQL schema).
 - **현황** (`README §1.1`): **4,806 행** — manufacturer cand 1 + rev 11 + supplier cand 4,790 + rev 4. `strong_match` (confidence ≥ 0.9) = 15/15 = 100%.
 - [확정] Bridge 분리 테이블 도입 — 도메인 직접 FK 가 아닌 별도 테이블에 confidence·reviewed_status·source_type 보유.
