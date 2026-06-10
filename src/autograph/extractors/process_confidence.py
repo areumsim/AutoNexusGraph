@@ -1,13 +1,15 @@
 """산단공(15151075) 공정 row 단위 confidence 동적 격상 helper — PRD §3.5.1 SSOT.
 
-본 파일은 **P0-B 의 시그니처만** 정의한다. 구현 본문 (`compute` 의 수식 + 등급 판정)은
-PR-P3-B 에서 채워진다. 다른 모듈(`scripts/upgrade_processes_confidence.py`, 향후
-`extractors/cross_validate.py::_VALIDATORS["CAUSED_BY_PROCESS"]` 등) 가 본 모듈을 import
-한다는 약속만 잠근다.
+`compute()` 본문 **구현 완료** (P0-B 시그니처 잠금 → 본 구현). 운영 wire-up
+(`extractors/cross_validate.py::_VALIDATORS["CAUSED_BY_PROCESS"]`,
+`scripts/upgrade_processes_confidence.py`) 은 BACKLOG PG-3 에서 별도 연결.
 
-PRD §3.5.1 인용 — 8 시그널 → ``conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)``.
-정적 등급표 ``_confidence.py::SOURCE_TO_GRADE`` 와 ``validator.py::LOW_CONFIDENCE_THRESHOLD``
-는 무변경. 본 helper 의 결과는 ``auto.processes.confidence_score`` 컬럼에 row 단위 UPDATE.
+PRD §3.5.1 인용 — 7 시그널 → ``conf = clip(0.50 + Σ w_i · s_i − 0.20 · |conflicts|, 0.30, 1.00)``.
+각 시그널 강도 ``s_i`` 는 [0,1] 로 정규화(float 신호=그대로, bool=1.0/0.0,
+int M3=빈도 saturation). PRD 표기의 ``grade_i`` 는 ``s_i`` 강도에 흡수(신호값이 이미
+출처 강도를 인코딩). 정적 등급표 ``_confidence.py::SOURCE_TO_GRADE`` 와
+``validator.py::LOW_CONFIDENCE_THRESHOLD`` 는 무변경. 결과는
+``anxg_auto.processes.confidence_score`` 컬럼에 row 단위 UPDATE.
 """
 
 from __future__ import annotations
@@ -44,24 +46,61 @@ W: Final[dict[str, float]] = {
     "M7": 0.05,
 }
 
+# 기준선·penalty·clip 경계 (PRD §3.5.1).
+_BASE: Final[float] = 0.50
+_CONFLICT_PENALTY: Final[float] = 0.20
+_FLOOR: Final[float] = 0.30
+_CEIL: Final[float] = 1.00
+# M3(oem_ir_hits, int) saturation — N회 이상 멘션이면 강도 1.0. 설계선택(PRD 표는 빈도만 명시).
+_M3_SATURATION: Final[int] = 3
+
+# grade 임계 (내림차순).
+_GRADE_THRESHOLDS: Final[tuple[tuple[float, str], ...]] = (
+    (0.95, "A_candidate"),
+    (0.80, "B"),
+    (0.65, "needs_review"),
+    (0.00, "C"),
+)
+
+
+def _clip01(x: float) -> float:
+    return 0.0 if x < 0.0 else (1.0 if x > 1.0 else float(x))
+
 
 def compute(sig: ProcessSignals) -> tuple[float, str, dict[str, float]]:
     """시그널 누적값 → (confidence, grade, signal-별 boost 기여도).
 
-    **시그니처만 잠금 (P0-B). 본문은 PR-P3-B 에서 구현한다.**
+    ``conf = clip(0.50 + Σ w_i·s_i − 0.20·|conflicts|, 0.30, 1.00)``. 각 ``s_i`` 는
+    [0,1] 강도(float=그대로 clip, bool=1.0/0.0, int M3=빈도 saturation).
 
     Returns
     -------
     confidence : float
-        ``clip(0.50 + Σ w·s·grade − 0.20·|conflicts|, 0.30, 1.00)``.
+        ``clip(0.50 + Σ w·s − 0.20·|conflicts|, 0.30, 1.00)``.
     grade : str
         ``"A_candidate"`` (≥0.95) / ``"B"`` (≥0.80) / ``"needs_review"`` (≥0.65) / ``"C"``.
     boosts : dict[str, float]
-        시그널 ID(``"M1"``..``"M7"``) → boost 기여도. 디버깅 / staging 추적용.
+        시그널 ID(``"M1"``..``"M7"``) → boost 기여도 ``w_i·s_i``. 디버깅 / staging 추적용.
     """
-    raise NotImplementedError(
-        "process_confidence.compute() — signature locked in P0-B, implementation in PR-P3-B"
-    )
+    strengths: dict[str, float] = {
+        "M1": _clip01(sig.nhtsa_module),
+        "M2": _clip01(sig.dart_cos),
+        "M3": _clip01(sig.oem_ir_hits / _M3_SATURATION) if sig.oem_ir_hits > 0 else 0.0,
+        "M4": 1.0 if sig.ksic_match else 0.0,
+        "M5": _clip01(sig.dart_product),
+        "M6": _clip01(sig.recall_p4),
+        "M7": 1.0 if sig.standard_match else 0.0,
+    }
+    boosts: dict[str, float] = {mid: W[mid] * strengths[mid] for mid in W}
+    raw = _BASE + sum(boosts.values()) - _CONFLICT_PENALTY * len(sig.conflicts)
+    confidence = max(_FLOOR, min(_CEIL, raw))
+
+    grade = "C"
+    for threshold, label in _GRADE_THRESHOLDS:
+        if confidence >= threshold:
+            grade = label
+            break
+    return confidence, grade, boosts
 
 
 __all__ = ["ProcessSignals", "W", "compute"]

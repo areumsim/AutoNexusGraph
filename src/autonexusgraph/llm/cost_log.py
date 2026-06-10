@@ -4,7 +4,7 @@
 - **append-only**: 동시 호출에도 안전. 파일은 덮어쓰지 않음.
 - **best-effort**: 파일 쓰기 실패가 LLM 호출 자체를 절대 막지 않음.
 - **세션 무관**: 프로세스 재시작/종료 후에도 누계 보존 → 며칠 단위 추적 가능.
-- **DB 의존성 없음**: PG ops.llm_usage 가 다운돼도 로컬 파일은 항상 기록.
+- **DB 의존성 없음**: PG anxg_ops.llm_usage 가 다운돼도 로컬 파일은 항상 기록.
 
 스키마 (각 줄 1 JSON object):
     {
@@ -35,7 +35,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 log = logging.getLogger(__name__)
 
 # POSIX O_APPEND 가 64KB 미만 쓰기를 원자 보장하지만, 안전 위해 프로세스 내 Lock 도.
@@ -47,7 +46,7 @@ def _detect_provider(model: str) -> str:
     try:
         from .base import detect_provider
         return detect_provider(model)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — 호출 실패 흡수 → "?" 반환
         return "?"
 
 
@@ -73,8 +72,7 @@ def append(entry: dict[str, Any]) -> None:
         with _lock:
             with path.open("a", encoding="utf-8") as f:
                 f.write(line + "\n")
-    except Exception as exc:   # noqa: BLE001
-        # LLM 호출 흐름을 막지 않기 위해 silent.
+    except Exception as exc:   # noqa: BLE001 — [cost_log] JSONL append 실패 흡수 → debug log (LLM 호출 흐름 차단 방지)
         log.debug("[cost_log] append failed: %s", exc)
 
 
@@ -177,6 +175,7 @@ class LoggingLLMClient:
                     max_tokens: int | None = None,
                     purpose: str | None = None, **kw):
         import time
+
         from .cost import cost_of_call
         t0 = time.monotonic()
         chunks: list[str] = []
@@ -210,6 +209,7 @@ class LoggingLLMClient:
     def chat_json(self, messages, schema, *, temperature: float = 0.0,
                   purpose: str | None = None, **kw):
         import time
+
         from .cost import cost_of_call
         t0 = time.monotonic()
         result = self._inner.chat_json(

@@ -25,9 +25,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
-
 
 # 시계열 정의 — (org_id, tbl_id, period_type, label)
 SERIES = {
@@ -78,13 +80,13 @@ def main() -> int:
                 else:
                     s_p, e_p = args.start, args.end
                 rows = fetch_with_retry(
-                    lambda: cli.fetch_series(org, tbl, prd, s_p, e_p),
+                    lambda org=org, tbl=tbl, prd=prd, s_p=s_p, e_p=e_p: cli.fetch_series(org, tbl, prd, s_p, e_p),
                     max_tries=3,
                 )
                 save_raw("kosis", f"{tbl}/{s_p}-{e_p}.json", rows)
                 ckpt.mark_done(entity_id, {"rows": len(rows) if isinstance(rows, list) else 0})
                 print(f"   rows: {len(rows) if isinstance(rows, list) else '?'}")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_kosis] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(entity_id, str(e))
                 print(f"   failed: {e}")
 

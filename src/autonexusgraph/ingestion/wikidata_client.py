@@ -23,13 +23,10 @@
 
 from __future__ import annotations
 
-import time
-from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
-
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 ENTITY_ENDPOINT = "https://www.wikidata.org/wiki/Special:EntityData"
@@ -108,7 +105,7 @@ class WikidataClient:
             },
         )
 
-    def __enter__(self) -> "WikidataClient":
+    def __enter__(self) -> WikidataClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

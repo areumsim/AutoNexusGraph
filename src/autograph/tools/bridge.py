@@ -16,7 +16,6 @@ from typing import Any
 
 from ._db import query_dicts
 
-
 VALID_ENTITY_TYPES = ("manufacturer", "supplier", "vehicle_model", "variant")
 
 
@@ -34,7 +33,7 @@ def bridge_corp_to_entity(corp_code: str, *,
         SELECT entity_id, entity_type, name, wikidata_qid,
                match_method, confidence_score, reviewed_status,
                valid_from, valid_to
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          WHERE corp_code = %s
            AND (%s::text IS NULL OR entity_type = %s)
            AND confidence_score >= %s
@@ -51,7 +50,7 @@ def bridge_entity_to_corp(entity_id: str, entity_type: str,
     return query_dicts("""
         SELECT corp_code, name, match_method, confidence_score, reviewed_status,
                valid_from, valid_to
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          WHERE entity_id = %s
            AND entity_type = %s
            AND corp_code IS NOT NULL
@@ -75,7 +74,7 @@ def bridge_sec_cik_to_entity(sec_cik: str, *,
     return query_dicts("""
         SELECT entity_id, entity_type, name, wikidata_qid, sec_cik,
                corp_code, match_method, confidence_score, reviewed_status
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          WHERE sec_cik = %s
            AND (%s::text IS NULL OR entity_type = %s)
            AND reviewed_status <> 'rejected'
@@ -90,7 +89,7 @@ def bridge_entity_to_sec_cik(entity_id: str | int,
         raise ValueError(f"entity_type 허용값: {VALID_ENTITY_TYPES}")
     return query_dicts("""
         SELECT sec_cik, name, corp_code, match_method, confidence_score, reviewed_status
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
          WHERE entity_id = %s
            AND entity_type = %s
            AND sec_cik IS NOT NULL
@@ -113,7 +112,7 @@ def get_oem_financials_sec(manufacturer_id: int, *,
     return query_dicts("""
         SELECT concept, taxonomy, unit, fiscal_year, fiscal_period,
                period_end, value, form_type, accession_no, filed_at, confidence
-          FROM auto.oem_financials_sec
+          FROM anxg_auto.oem_financials_sec
          WHERE manufacturer_id = %s
            AND (%s::text IS NULL OR concept = %s)
            AND (%s::text IS NULL OR fiscal_period = %s)

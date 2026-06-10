@@ -15,25 +15,23 @@ render_template / _run / cypher_guard 파이프라인을 그대로 통과.
 # 와 동일 스키마를 따르지 않으면 import 시점에 즉시 실패 (drift 방지).
 from autonexusgraph.tools.cypher_templates import (
     TEMPLATES as _FIN_TEMPLATES,
+)
+from autonexusgraph.tools.cypher_templates import (
     register_templates as _register_templates,
 )
+
 from ..cypher_templates_auto import AUTO_TEMPLATES as _AUTO_TEMPLATES
 
 _register_templates(_FIN_TEMPLATES, _AUTO_TEMPLATES)
 
 
-from .spec import (
-    compare_vehicles,
-    get_macro_industry,
-    get_macro_production,
-    get_oem_production,
-    get_plant_capacity,
-    get_safety_rating,
-    get_spec,
-    get_vehicle_info,
-    list_plants_by_oem,
-    lookup_vehicle,
-    search_processes,
+from .bridge import (
+    bridge_corp_to_entity,
+    bridge_entity_to_corp,
+    bridge_entity_to_sec_cik,
+    bridge_sec_cik_to_entity,
+    cross_query,
+    get_oem_financials_sec,
 )
 from .graph import (
     find_vehicle_component_paths,
@@ -48,19 +46,6 @@ from .graph import (
     lookup_supplier,
 )
 from .graph import lookup_vehicle as lookup_vehicle_graph
-from .retrieve import (
-    get_chunk_auto,
-    search_by_metadata_auto,
-    search_documents_auto,
-)
-from .bridge import (
-    bridge_corp_to_entity,
-    bridge_entity_to_corp,
-    bridge_entity_to_sec_cik,
-    bridge_sec_cik_to_entity,
-    cross_query,
-    get_oem_financials_sec,
-)
 from .process import (
     get_process_info,
     get_process_metrics,
@@ -69,6 +54,24 @@ from .process import (
     list_process_route,
     list_steps_of_process,
     lookup_process,
+)
+from .retrieve import (
+    get_chunk_auto,
+    search_by_metadata_auto,
+    search_documents_auto,
+)
+from .spec import (
+    compare_vehicles,
+    get_macro_industry,
+    get_macro_production,
+    get_oem_production,
+    get_plant_capacity,
+    get_safety_rating,
+    get_spec,
+    get_vehicle_info,
+    list_plants_by_oem,
+    lookup_vehicle,
+    search_processes,
 )
 
 __all__ = [

@@ -1,0 +1,193 @@
+# AutoNexusGraph ↔ EVO (Electric Vehicle Ontology) alignment 스켈레톤
+#
+# 출처 (SSOT): arXiv:2304.04893 "Electric Vehicle Ontology" — **20 클래스 / 17 객체속성
+# / 54 데이터타입**. 본 파일은 우리 auto 도메인의 entity·relation 을 EVO 표준에 정렬
+# 하기 위한 매핑표 — 후속 SHACL shape 그래프 작성 시 IRI 로 reuse.
+#
+# 정책:
+# - **placeholder 우선**: 논문 검증된 자명한 1:1 매핑만 IRI 채움. 나머지는 `iri: null`
+#   + `note` 로 "후속 검증 대상" 표시. **추측 매핑 금지** (false IRI 가 다운스트림
+#   SPARQL 호환성 깨뜨림).
+# - **본 시드는 인프라**: alignment 파일 존재 + 회귀 가드 (우리 라벨이 entities.yaml /
+#   relations.yaml 에 실제 존재) 가 본 단계의 가치. 매핑 본격 채움은 EVO 논문
+#   re-read + ontology review board 후.
+# - **EVO 는 EV 중심**: ICE-only entity (Recall/Investigation 등 안전 기록) 는 EVO 대응
+#   불필요 — `applicable: false` 로 의도된 비매핑 표시.
+#
+# 사용 시점 (후속 트리거):
+# 1. SHACL shape 그래프 등장 시 entity 별 sh:targetClass 를 EVO IRI 로.
+# 2. RDF/Turtle export 시 owl:equivalentClass 로 매핑.
+# 3. 외부 EV 데이터셋 federation 시 SPARQL JOIN key.
+#
+# 갱신:
+# - 한 entity 의 매핑 IRI 채울 때: 출처(논문 §·페이지) `verified_by` 필드에 기록.
+# - 매핑 변경 시 ontology review board 통과 (다운스트림 SPARQL 깨질 수 있음).
+
+version: 1
+last_updated: 2026-06-05
+upstream:
+  name: "Electric Vehicle Ontology (EVO)"
+  source: "arXiv:2304.04893"
+  expected_counts:
+    classes: 20
+    object_properties: 17
+    datatype_properties: 54
+  status: "spec only — IRI 매핑은 후속 작업"
+
+
+# ── Entity → EVO Class alignment ────────────────────────────────
+# 우리 entity 라벨 ↔ EVO Class IRI. iri: null 은 후속 검증 대상.
+entities:
+
+  VehicleModel:
+    evo_class: "Vehicle (또는 sub-class)"
+    iri: null                          # TBD: EVO 의 Vehicle/ElectricVehicle 정확한 IRI
+    note: "EVO Vehicle 의 sub-class 가능성 — ICE/EV 분기는 powertrain 속성으로."
+
+  VehicleVariant:
+    evo_class: "VehicleConfiguration (추정)"
+    iri: null
+    note: "VehicleVariant ↔ EVO 의 trim/config 클래스 매핑 후속."
+
+  Manufacturer:
+    evo_class: "Manufacturer"
+    iri: null
+    note: "보통 ontology 의 Manufacturer 와 1:1 가능성 높음."
+
+  Plant:
+    evo_class: "ManufacturingFacility (추정)"
+    iri: null
+    note: "EVO 에 production site 클래스 있을 가능성."
+
+  System:
+    evo_class: "VehicleSystem (추정)"
+    iri: null
+    note: "powertrain/battery/brake 같은 차량 시스템 분류."
+
+  Module:
+    evo_class: "VehicleComponent (BoM L4)"
+    iri: null
+    note: "Component / Subsystem 후보 — BoM 계층 일치 확인 필요."
+
+  Part:
+    evo_class: "VehicleComponent (BoM L5)"
+    iri: null
+    note: "Module 과 같은 클래스 위계 (level 만 다름) 또는 별도 sub-class."
+
+  Material:
+    evo_class: "Material (배터리 chem) / Alloy (금속)"
+    iri: null
+    note: "L6 분기 — material_class 로 cathode_chem vs metal_alloy 구분."
+
+  Mineral:
+    evo_class: "RawMaterial (추정)"
+    iri: null
+    note: "USGS commodity 와 매핑. EVO 에 mineral/raw material 클래스 후속 확인."
+
+  # EVO 비매핑 — 안전/규제 기록은 EVO 범위 밖.
+  Recall:
+    evo_class: null
+    iri: null
+    applicable: false
+    note: "EV 안전 이벤트는 EVO 범위 밖. NHTSA SafetyOntology 등 별도 표준."
+
+  Complaint:
+    evo_class: null
+    iri: null
+    applicable: false
+
+  Investigation:
+    evo_class: null
+    iri: null
+    applicable: false
+
+  Standard:
+    evo_class: null
+    iri: null
+    applicable: false
+    note: "FMVSS/KNCAP 같은 안전 규격 — EVO 범위 밖."
+
+  Process:
+    evo_class: "ManufacturingProcess (추정)"
+    iri: null
+    note: "EVO 가 제조 공정 클래스 보유 시 매핑."
+
+  ProcessStep:
+    evo_class: "ProcessStep (추정)"
+    iri: null
+
+  Equipment:
+    evo_class: "ManufacturingEquipment (추정)"
+    iri: null
+
+  Supplier:
+    evo_class: "Manufacturer (sub-role)"
+    iri: null
+    note: "공급사도 Manufacturer 의 한 역할 — 별도 클래스 또는 role property."
+
+
+# ── Relation → EVO Object Property alignment ────────────────────
+# 우리 relation 타입 ↔ EVO Object Property IRI.
+relations:
+
+  MANUFACTURES:
+    evo_property: "manufactures (추정)"
+    iri: null
+    note: "Manufacturer → Vehicle 가장 자명. 후속 1순위 검증."
+
+  MANUFACTURED_AT:
+    evo_property: "producedAt (추정)"
+    iri: null
+    note: "VehicleModel → Plant. EVO 에 production location property 있을 가능성."
+
+  CONTAINS_COMPONENT:
+    evo_property: "hasComponent (추정)"
+    iri: null
+
+  CONTAINS_SYSTEM:
+    evo_property: "hasSystem (추정)"
+    iri: null
+
+  MADE_OF:
+    evo_property: "madeOf (추정)"
+    iri: null
+    note: "Module → Material. 가장 자명한 EVO 매핑 후보."
+
+  DERIVED_FROM:
+    evo_property: "derivedFrom (추정)"
+    iri: null
+    note: "Material → Mineral (raw material) 매핑."
+
+  SUPPLIED_BY:
+    evo_property: "suppliedBy (추정)"
+    iri: null
+
+  OWNS_PLANT:
+    evo_property: "owns / operates (추정)"
+    iri: null
+
+  COMPLIES_WITH:
+    evo_property: "compliesWith (추정)"
+    iri: null
+    applicable: false                  # 규제 standard 는 EVO 범위 밖일 가능성
+    note: "Standard 가 EVO 비매핑이면 본 relation 도 자연 비매핑."
+
+  PRODUCED_BY:
+    evo_property: "manufacturedBy (추정)"
+    iri: null
+    note: "Part → ProcessStep (BoP). EVO 의 제조 공정 매핑 후속."
+
+  USES_PROCESS:
+    evo_property: "usesProcess (추정)"
+    iri: null
+
+  CONSUMES_MATERIAL:
+    evo_property: "consumesMaterial (추정)"
+    iri: null
+
+
+# ── 추가 메모 ──────────────────────────────────────────────────
+# - EVO 의 54 datatype properties (전압/용량/range 등) 는 우리 Material/Module 의
+#   optional 속성에 매핑 가능 — 본 시드 범위 밖, 후속 RDF export 시점 검토.
+# - alignment 가 채워지면 SHACL shape 자동 생성 도구 (e.g., pySHACL) 와 연계 — 우리
+#   pydantic validation 과 SHACL 검증을 둘 다 통과시키는 게 목표.

@@ -9,7 +9,6 @@ from typing import ClassVar, Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -46,6 +45,14 @@ class Settings(BaseSettings):
     # 개별 LLM_MODEL_<role> 명시 시 그것이 우선.
     llm_model_fast: str = "gemini-2.5-flash"     # triage/research/sql 등 가벼운 호출
     llm_model_smart: str = "gemini-2.5-pro"      # planner/synthesizer 등 추론·생성
+
+    # Provider fallback — 1차 provider 호출이 LLMError(auth/quota/429/5xx/timeout) 로
+    # 실패하면 자동 전환할 보조 provider. 빈 값 = 비활성(단일 provider, 기존 동작).
+    # get_llm_client 가 [primary, fallback] 를 FallbackLLMClient 로 묶어
+    # BudgetAware/Logging 안쪽(innermost)에 둔다 → 비용 가드·기록은 어느 쪽이 응답해도 1회.
+    # llm_fallback_model 비우면 fallback provider 의 기본 FAST 모델 사용(base._DEFAULT_FAST_MODEL).
+    llm_fallback_provider: Literal["", "openai", "anthropic", "google", "local"] = ""
+    llm_fallback_model: str = ""
 
     # 개별 role override — 비워두면 tier 기본값 자동 적용 (model_validator 가 보강).
     llm_model_triage: str = ""
@@ -91,16 +98,41 @@ class Settings(BaseSettings):
                 return int(m.group(1))
         return 1024
 
+    # === 공유 DB 멀티테넌시 namespace ===
+    # 기존 Neo4j/Qdrant/PG 서버를 다른 프로젝트와 공유하므로, 프로젝트별 데이터가
+    # 충돌하지 않도록 namespace 를 단일 토큰에서 파생한다. PG database 명 (DSN 의
+    # `autonexusgraph`) 으로 1차 격리되지만, 그 위에 스키마/라벨/컬렉션 프리픽스로 방어.
+    # 토큰 한 곳만 바꾸면 전체 일관 — pg_schema()/neo4j_label()/qdrant_collection 헬퍼 참조.
+    app_namespace: str = "anxg"
+
     # === DB ===
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = ""
+    # Neo4j 격리 database. 빈 값 = 드라이버 기본 db (community 단일 db / 로컬 dev).
+    # 공유 서버가 Enterprise 면 `autonexusgraph` 로 두어 named-database 격리 (라벨 프리픽스와 병행).
+    neo4j_database: str = ""
 
     postgres_dsn: str = "postgresql://autonexusgraph:autonexusgraph_dev@localhost:5432/autonexusgraph"
 
     # Qdrant — minimal 스택에선 미사용 (pgvector 통합). 활성화 시 .env 에 값 채움.
     qdrant_url: str = ""
     qdrant_api_key: str = ""
+    # Qdrant 컬렉션 namespace — 공유 Qdrant 에서 프로젝트별 분리.
+    qdrant_collection: str = "anxg_chunks"
+
+    def pg_schema(self, name: str) -> str:
+        """논리 스키마명 → 물리 스키마명 (프로젝트 namespace 프리픽스).
+
+        예: pg_schema("master") → "anxg_master". 공유 PG database 안에서 타 프로젝트
+        스키마와 충돌 방지. raw SQL 은 정적 프리픽스를 직접 쓰지만, 동적 조립 지점은
+        본 헬퍼로 일관 유지.
+        """
+        return f"{self.app_namespace}_{name}"
+
+    def neo4j_label(self, label: str) -> str:
+        """논리 라벨 → namespace 프리픽스 라벨. 예: neo4j_label("Company") → "Anxg_Company"."""
+        return f"{self.app_namespace.capitalize()}_{label}"
 
     # === 데이터 소스 ===
     dart_api_key: str = ""
@@ -143,6 +175,11 @@ class Settings(BaseSettings):
     agent_max_replan: int = 2
     agent_query_budget_sec: int = 40
     agent_max_answer_len: int = 5000
+    # 대화형 interrupt(HITL) 허용 여부. True=API/UI(clarification·cost 승인 가능).
+    # False=batch/eval/cron(재개 불가) → request_interrupt 가 InterruptUnavailable 로
+    # 다운그레이드 → 호출부가 1순위 자동선택 등 폴백. (eval 에서 모호 회사명 질문이
+    # langgraph interrupt 로 멈춰 빈 답 나가던 버그 차단 — AGENT_ALLOW_INTERRUPTS=false.)
+    agent_allow_interrupts: bool = True
     # 축2: LLM 자율 planner (plan-and-execute). True 면 planner 가 LLM 으로 task DAG 를
     # 제안하고 화이트리스트 검증 후 사용 — 실패/빈결과 시 기존 룰·handler 로 폴백.
     # 기본 False (opt-in) — 룰 planner 가 검증된 안전 기본값.
@@ -153,6 +190,7 @@ class Settings(BaseSettings):
     agent_turn_budget_finance_usd: float = 0.0
     agent_turn_budget_auto_usd: float = 0.0
     agent_turn_budget_cross_domain_usd: float = 0.0
+    agent_turn_budget_ip_usd: float = 0.0        # ip 보조축 — 정형 위주라 낮은 한도 권장 (.env: AGENT_TURN_BUDGET_IP_USD)
     # 임의 도메인 (legal/safety 등) 의 turn 한도는 env 로 직접 지정:
     #   AGENT_TURN_BUDGET_<DOMAIN>_USD=0.30
     # → turn_budget_for_domain("legal") 가 동적으로 그것을 읽음.
@@ -160,7 +198,7 @@ class Settings(BaseSettings):
     # === LangGraph checkpoint (PRD §7.5.8) ===
     # auto = PG 시도 → memory 폴백, memory/in_memory = 강제 in-memory, none = 비활성
     langgraph_checkpoint_backend: Literal["auto", "memory", "in_memory", "none"] = "auto"
-    langgraph_checkpoint_schema: str = "chat"     # PG schema (search_path 주입)
+    langgraph_checkpoint_schema: str = "anxg_chat"  # PG schema (search_path 주입). namespace 프리픽스 = <app_namespace>_chat
     langgraph_checkpoint_dsn: str = ""             # 빈 값이면 postgres_dsn 사용
 
     # === LLM 비용 가드 (사용자 명시) ===
@@ -170,7 +208,7 @@ class Settings(BaseSettings):
     llm_cost_hard_limit_usd: float = 5.00    # 단일 tracker 누적 도달 시 abort
     llm_cost_auto_approve_usd: float = 0.50  # 추정 이 이하면 자동 통과, 초과면 --approve-cost 필요
     llm_cost_report_every: int = 10          # 매 N 호출마다 누적 로그
-    llm_cost_log_calls: bool = False          # True 면 ops.llm_calls 에 호출별 상세 적재
+    llm_cost_log_calls: bool = False          # True 면 anxg_ops.llm_calls 에 호출별 상세 적재
     # 영속 JSONL 로그 — 모든 LLM 호출 1줄씩 append. 누락 없는 누계 추적용.
     # cost_history CLI 가 본 파일을 읽어 일/caller/모델 별 집계.
     llm_cost_log_path: Path = Field(

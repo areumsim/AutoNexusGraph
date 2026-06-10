@@ -41,7 +41,7 @@ def render_grounding_warning(grounding: dict | None) -> None:
     if not warnings:
         return
     st.warning(
-        "⚠️ 답변 근거 검증 경고: "
+        "답변 근거 검증 경고: "
         + ", ".join(warnings)
         + f" (overlap={grounding.get('overlap_ratio', 0):.2f}, "
         f"cit={grounding.get('citation_count', 0)})"
@@ -64,7 +64,7 @@ def render_agent_trace(trace: dict[str, Any]) -> None:
     if trace.get("cost_usd") is not None:
         items.append(f"비용: `${trace['cost_usd']:.4f}`")
     if trace.get("aborted_reason"):
-        items.append(f"⚠️ aborted: `{trace['aborted_reason']}`")
+        items.append(f"aborted: `{trace['aborted_reason']}`")
     if items:
         st.caption(" · ".join(items))
 
@@ -82,6 +82,7 @@ def render_cost_badge(cumulative_usd: float, turn_usd: float = 0.0) -> None:
 def render_provider_info() -> None:
     """사이드바 — 현재 LLM provider / model 표시."""
     import streamlit as st
+
     from ..config import get_settings
     s = get_settings()
     st.caption(f"LLM: `{s.llm_provider}` / `{s.llm_model}`")
@@ -90,20 +91,20 @@ def render_provider_info() -> None:
 
 # ── 노드 진행 표시 (PRD §7.6.5) ─────────────────────────────
 _NODE_LABEL = {
-    "triage":       "🔍 Triage",
-    "planner":      "🧭 Planner",
-    "executor":     "🛠️ Executor",
-    "synthesizer":  "✍️ Synthesizer",
-    "validator":    "✅ Validator",
-    "replan":       "♻️ Replan",
-    "finalize":     "🏁 Finalize",
-    "__final__":    "🏁 완료",
-    "__error__":    "❌ 오류",
+    "triage":       "Triage",
+    "planner":      "Planner",
+    "executor":     "Executor",
+    "synthesizer":  "Synthesizer",
+    "validator":    "Validator",
+    "replan":       "Replan",
+    "finalize":     "Finalize",
+    "__final__":    "완료",
+    "__error__":    "오류",
 }
 
 
 def node_label(node: str) -> str:
-    return _NODE_LABEL.get(node, f"⚙️ {node}")
+    return _NODE_LABEL.get(node, node)
 
 
 def render_progress_chip(node: str, partial: dict | None = None) -> str:
@@ -137,17 +138,17 @@ def render_cost_approval(payload: dict, *, key_prefix: str) -> bool | None:
 
     cost = float(payload.get("estimated_cost_usd") or 0.0)
     st.warning(
-        f"💰 {payload.get('prompt') or '비용 승인 필요'}\n\n"
+        f"{payload.get('prompt') or '비용 승인 필요'}\n\n"
         f"예상 비용: **${cost:.4f}**\n\n"
         f"plan: {payload.get('plan_summary') or '-'}"
     )
     cols = st.columns([1, 1, 5])
     with cols[0]:
-        if st.button("✅ 승인", key=f"approve_{key_prefix}"):
+        if st.button("승인", key=f"approve_{key_prefix}"):
             st.session_state[state_key] = True
             return True
     with cols[1]:
-        if st.button("❌ 거절", key=f"reject_{key_prefix}"):
+        if st.button("거절", key=f"reject_{key_prefix}"):
             st.session_state[state_key] = False
             return False
     return None
@@ -167,7 +168,7 @@ def render_clarification(payload: dict, *, key_prefix: str) -> int | None:
     if st.session_state.get(state_key) is not None:
         return st.session_state[state_key]
 
-    st.warning(f"🤔 {payload.get('prompt') or '회사를 선택해주세요'}")
+    st.warning(f"{payload.get('prompt') or '회사를 선택해주세요'}")
     labels = [
         f"{c.get('name') or c.get('corp_name','')}  "
         f"(corp={c.get('corp_code')}, "
@@ -186,11 +187,12 @@ def render_clarification(payload: dict, *, key_prefix: str) -> int | None:
 
 
 def render_feedback_buttons(message_id: int | None, *, key_prefix: str) -> None:
-    """답변 아래 👍/👎/📝 — PRD §7.6.5. message_id 없으면 비활성.
+    """답변 아래 도움됨/부정확/의견 — PRD §7.6.5. message_id 없으면 비활성.
 
     record_feedback 호출은 storage.record_feedback 로 위임 (DB 실패 fail-soft).
     """
     import streamlit as st
+
     from .storage import record_feedback
 
     if not message_id:
@@ -200,25 +202,25 @@ def render_feedback_buttons(message_id: int | None, *, key_prefix: str) -> None:
     sent = st.session_state.get(state_key)
 
     with cols[0]:
-        if st.button("👍", key=f"up_{key_prefix}_{message_id}",
+        if st.button("도움됨", key=f"up_{key_prefix}_{message_id}",
                      disabled=(sent == "up")):
             if record_feedback(message_id, +1, None):
                 st.session_state[state_key] = "up"
-                st.toast("피드백 기록됨", icon="👍")
+                st.toast("피드백 기록됨")
     with cols[1]:
-        if st.button("👎", key=f"down_{key_prefix}_{message_id}",
+        if st.button("부정확", key=f"down_{key_prefix}_{message_id}",
                      disabled=(sent == "down")):
             if record_feedback(message_id, -1, None):
                 st.session_state[state_key] = "down"
-                st.toast("피드백 기록됨", icon="👎")
+                st.toast("피드백 기록됨")
     with cols[2]:
-        with st.popover("📝 의견"):
+        with st.popover("의견"):
             txt_key = f"fb_text_{key_prefix}_{message_id}"
             comment = st.text_area("의견을 남겨주세요", key=txt_key, height=80)
             if st.button("저장", key=f"fb_save_{key_prefix}_{message_id}"):
                 if comment and record_feedback(message_id, 0, comment.strip()):
                     st.session_state[state_key] = "comment"
-                    st.toast("의견 저장됨", icon="📝")
+                    st.toast("의견 저장됨")
 
 
 def render_sample_questions() -> str | None:

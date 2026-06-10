@@ -59,23 +59,23 @@ _CHECKS: list[tuple[str, str, int, str]] = [
 
     # Supplier 식별 — docs/autograph.md §7.5 #0.1.
     ("supplier_no_entity_id",
-     "MATCH (s:Supplier) WHERE s.entity_id IS NULL RETURN count(s) AS n",
+     "MATCH (s:Anxg_Supplier) WHERE s.entity_id IS NULL RETURN count(s) AS n",
      0, "Supplier.entity_id NULL (식별자 미부여)"),
 
     # Module 노드에 legacy component_id 잔재 — §7.5 #0.2.
     ("module_with_legacy_component_id",
-     "MATCH (m:Module) WHERE m.component_id IS NOT NULL RETURN count(m) AS n",
+     "MATCH (m:Anxg_Module) WHERE m.component_id IS NOT NULL RETURN count(m) AS n",
      0, "Module 노드에 legacy component_id 키 잔재"),
 
     # System 이름 — §7.5 #0.8.
     ("system_no_name",
-     "MATCH (s:System) WHERE s.name IS NULL RETURN count(s) AS n",
+     "MATCH (s:Anxg_System) WHERE s.name IS NULL RETURN count(s) AS n",
      0, "System 노드에 name 속성 없음"),
 
     # Ghost variant — §7.5 #0.3 (소프트 — model_year/trim/body_class 모두 NULL).
     ("ghost_variant",
      """
-     MATCH (v:VehicleVariant)
+     MATCH (v:Anxg_VehicleVariant)
      WHERE v.model_year IS NULL AND v.trim IS NULL AND v.body_class IS NULL
      RETURN count(v) AS n
      """, 0, "Ghost VehicleVariant (식별 정보 전무)"),
@@ -152,7 +152,7 @@ _CHECKS: list[tuple[str, str, int, str]] = [
 def _check(session, cypher: str) -> int:
     try:
         rec = list(session.run(cypher))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — boundary → RuntimeError 변환 (raise, silent 아님)
         raise RuntimeError(f"query failed: {exc}") from exc
     if not rec:
         return 0
@@ -160,10 +160,10 @@ def _check(session, cypher: str) -> int:
 
 
 def run_all() -> list[dict]:
-    from autonexusgraph.db.neo4j import get_driver
-    driver = get_driver()
+    from autonexusgraph.db.neo4j import get_session
+
     out: list[dict] = []
-    with driver.session() as session:
+    with get_session() as session:
         for name, cypher, threshold, desc in _CHECKS:
             try:
                 n = _check(session, cypher)
@@ -211,7 +211,7 @@ def main() -> int:
 
     try:
         rows = run_all()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — 호출 실패 흡수 → 2 반환
         print(f"[edge_meta_invariants] DB 연결 실패: {exc}", file=sys.stderr)
         return 2
 

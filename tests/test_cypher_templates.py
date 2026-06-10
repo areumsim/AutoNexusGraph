@@ -76,7 +76,7 @@ def test_no_write_keywords_in_any_template():
     for name, spec in TEMPLATES.items():
         try:
             assert_read_only(spec["cypher"])
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — guard 위반 boundary → pytest.fail (raise, silent 아님)
             pytest.fail(f"{name}: cypher_guard 위반 — {e}")
 
 

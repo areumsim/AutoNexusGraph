@@ -57,7 +57,7 @@ def test_get_plant_capacity_sql_uses_corp_code_filter(mock_db):
     spec.get_plant_capacity("00164742", year=2024)
     assert qd.call_count == 1
     sql, params = qd.call_args[0]
-    assert "auto.plant_capacity" in sql
+    assert "anxg_auto.plant_capacity" in sql
     assert params["cc"] == "00164742"
     assert params["year"] == 2024
     assert params["plant"] is None
@@ -208,8 +208,8 @@ def test_tools_callable_from_package_level():
     import autograph.tools
     importlib.reload(autograph.tools)
     from autograph.tools import (
-        get_plant_capacity,
         get_oem_production,
+        get_plant_capacity,
         list_plants_by_oem,
         search_processes,
     )

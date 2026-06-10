@@ -33,18 +33,24 @@ log = logging.getLogger(__name__)
 
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 
-# Cathode chemistry families — 배터리 cell 의 Wikidata Q-ID seed.
-# **STALE / UNVERIFIED** (2026-06-02 실측):
-#   - Q899037 → "Toboliu" (루마니아 마을, NOT Lithium-ion battery)
-#   - Q900614 → "carbochemistry" (NOT NCM cathode)
-#   - Q1126478 → "Külsővat" (헝가리 마을, NOT NCA)
-# Wikidata QID 들은 시간 경과로 재할당되거나, 초기 시드가 잘못 추정된 것으로 보임.
-#
-# **SSOT 는 `ontology/auto/materials_seed.yaml`** — manual chemistry 정의 + minerals 매핑.
-# Wikidata 자동 보강은 manual QID 큐레이션이 선행되어야 의미 있음. 그때까지 본 dict 는
-# 빈 채 유지 (collect() 가 0 row 반환 + materials_seed 폴백을 그대로 사용).
-# 큐레이션 SOP: docs/autograph.md §2.5.4.
-CATHODE_QIDS: dict[str, str] = {}
+# Cathode chemistry families — 배터리 cell 의 Wikidata Q-ID seed (code → QID).
+# **큐레이션 완료 (2026-06-10)** — wbsearchentities 검색 + SPARQL 실재·라벨·formula 검증:
+#   NCM811 Q121086674 "lithium nickel manganese cobalt oxide 811"
+#   NCM622 Q121086348 "...622" / NCM523 Q121086662 "...532"(5:2:3≈5:3:2 동일 chem)
+#   NCA    Q86728773  "lithium nickel cobalt aluminium oxides"(group)
+#   LFP    Q3042400   "lithium iron phosphate" (formula FeLiO₄P, battery cathode material)
+#   GRAPHITE_ANODE Q5309 "graphite" (formula C, allotrope/mineral)
+# (과거 Q899037/Q900614/Q1126478 은 마을·무관 엔티티 — 재할당/오추정이라 폐기됨.)
+# SSOT 는 여전히 `ontology/auto/materials_seed.yaml`; 본 dict 는 자동 보강(formula/QID
+# back-fill)용. 큐레이션 SOP: docs/autograph.md §2.5.4.
+CATHODE_QIDS: dict[str, str] = {
+    "NCM811": "Q121086674",
+    "NCM622": "Q121086348",
+    "NCM523": "Q121086662",   # Wikidata "532" — 5:2:3 ≈ 5:3:2 동일 chemistry family
+    "NCA":    "Q86728773",
+    "LFP":    "Q3042400",
+    "GRAPHITE_ANODE": "Q5309",
+}
 
 # SPARQL — cathode chemistry meta + 셀 제조사 매핑 (sparse).
 # 본 쿼리는 manufacturer 직접 매칭이 약함 (Wikidata 의 P176/manufacturer 부재).
@@ -71,7 +77,7 @@ def _sparql(query: str) -> dict:
         })
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — [wikidata_cell_chem] fail-soft 흡수 → {} 반환 (log 동반)
         log.warning("[wikidata_cell_chem] SPARQL 실패 (graceful skip): %s", e)
         return {}
 
@@ -85,14 +91,17 @@ def collect(*, limit: int | None = None, dry_run: bool = False) -> dict:
     raw_dir = RAW_DIR
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    qids = list(CATHODE_QIDS.keys())[: limit] if limit else list(CATHODE_QIDS.keys())
-    if not qids:
+    # CATHODE_QIDS 는 code→QID. SPARQL VALUES 에는 **QID(values)** 를 넣어야 한다
+    # (과거 keys() 사용 → wd:NCM811 무효 엔티티 쿼리 버그. dict 빈 채라 미발현했음).
+    items = list(CATHODE_QIDS.items())[: limit] if limit else list(CATHODE_QIDS.items())
+    if not items:
         log.warning("[wikidata_cell_chem] CATHODE_QIDS 빈 dict — manual 큐레이션 대기 "
                      "(상단 주석 참조). materials_seed.yaml 폴백 사용 권장.")
         return {"n_rows": 0, "source": "wikidata", "skipped": True,
                 "note": "CATHODE_QIDS 미큐레이션 — Wikidata 자동 보강 비활성"}
 
-    qid_values = " ".join(f"wd:{q}" for q in qids)
+    qid_to_code = {qid: code for code, qid in items}
+    qid_values = " ".join(f"wd:{qid}" for _, qid in items)
     query = _CATHODE_QUERY_TEMPLATE.format(qid_values=qid_values)
 
     result = _sparql(query)
@@ -105,8 +114,10 @@ def collect(*, limit: int | None = None, dry_run: bool = False) -> dict:
     snapshot_year = datetime.now(timezone.utc).year
     rows: list[dict] = []
     for b in bindings:
+        qid = b.get("wikidata_qid", {}).get("value")
         rows.append({
-            "wikidata_qid":  b.get("wikidata_qid", {}).get("value"),
+            "code":          qid_to_code.get(qid),   # 본 시스템 material code (NCM811 등)
+            "wikidata_qid":  qid,
             "name":          b.get("chemLabel", {}).get("value"),
             "description":   b.get("chemDesc", {}).get("value"),
             "formula":       b.get("formula", {}).get("value"),

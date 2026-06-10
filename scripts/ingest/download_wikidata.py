@@ -26,15 +26,18 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, RateLimiter, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    RateLimiter,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.wikidata_client import WikidataClient
 
-
 SELECT_TICKERS = """
 SELECT em.id_value as ticker, em.corp_code, c.corp_name
-  FROM master.entity_map em
-  JOIN master.companies c ON c.corp_code = em.corp_code
+  FROM anxg_master.entity_map em
+  JOIN anxg_master.companies c ON c.corp_code = em.corp_code
  WHERE em.id_type = 'ticker'
    AND c.is_active = TRUE
 """
@@ -57,7 +60,7 @@ def step_a(force: bool = False) -> dict[str, str]:
 
     # SPARQL 호출 (없거나 force 면)
     if candidates_path.exists() and not force:
-        print(f"[step-a] candidates.json 존재 — skip (force 로 재수집)")
+        print("[step-a] candidates.json 존재 — skip (force 로 재수집)")
         with candidates_path.open(encoding="utf-8") as f:
             raw_candidates = json.load(f)
     else:
@@ -78,11 +81,12 @@ def step_a(force: bool = False) -> dict[str, str]:
     # (4) label_en 정규화 (0.75)
     # 한 corp_code 에 더 강한 매칭이 있으면 약한 것 덮어쓰기 안 함.
     import re
+
     from autonexusgraph.ingestion._common import normalize_corp_name
 
     name_to_corp = {}
     with pool.connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT corp_code, corp_name FROM master.companies WHERE is_active=TRUE")
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies WHERE is_active=TRUE")
         for cc, nm in cur.fetchall():
             name_to_corp[normalize_corp_name(nm)] = (cc, nm)
 
@@ -176,8 +180,8 @@ def step_b(corp_to_qid: dict[str, str] | None = None, limit: int | None = None,
             limiter.acquire()
             try:
                 entity = fetch_with_retry(
-                    lambda: wd.fetch_entity(qid),
-                    on_retry=lambda a, e: print(f"  retry#{a} {qid}: {e}"),
+                    lambda qid=qid: wd.fetch_entity(qid),
+                    on_retry=lambda a, e, qid=qid: print(f"  retry#{a} {qid}: {e}"),
                 )
                 if entity is None:
                     ckpt.mark_failed(qid, "not_found")
@@ -187,7 +191,7 @@ def step_b(corp_to_qid: dict[str, str] | None = None, limit: int | None = None,
                 if i % 20 == 0:
                     print(f"  [{i}/{len(targets)}] done={ckpt.stats.done} "
                           f"failed={ckpt.stats.failed}")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [wikidata] QID fetch 실패 흡수 → checkpoint mark_failed + 다음 qid (부분 성공 보존)
                 ckpt.mark_failed(qid, str(e))
 
     print(f"\n[step-b] done={ckpt.stats.done} failed={ckpt.stats.failed}")

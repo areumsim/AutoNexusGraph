@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..db.neo4j import get_driver
+from ..db.neo4j import get_session, serialize_record
 from .cypher_templates import TemplateError, render_template
 
 log = logging.getLogger(__name__)
@@ -35,10 +35,10 @@ def _run(cypher: str, **params: Any) -> list[dict]:
     """READ 단일 쿼리 실행 → list[dict] (record.data())."""
     from ..safety.cypher_guard import assert_read_only
     assert_read_only(cypher)
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         result = session.run(cypher, **params)
-        return [dict(r) for r in result]
+        return [serialize_record(r) for r in result]
 
 
 def _cap(limit: int | None) -> int:
@@ -62,7 +62,7 @@ def lookup_company_node(query: str, limit: int = 5) -> list[dict]:
     """이름·종목코드·corp_code 로 Neo4j :Company 노드 찾기.
 
     SQL 동명 함수 (``tools/financials.py:lookup_company``) 와 명명 충돌 방지를
-    위해 ``_node`` 접미사. SQL 측은 master.companies 테이블 직접 조회.
+    위해 ``_node`` 접미사. SQL 측은 anxg_master.companies 테이블 직접 조회.
     """
     return _exec("lookup_company", q=query.strip(), limit=_cap(limit))
 
@@ -82,19 +82,27 @@ def lookup_person(name: str, birth_year: int | None = None,
 
 # ── 구조 그래프 탐색 ────────────────────────────────────────────────
 
-def list_subsidiaries(parent_corp_code: str, *,
+def list_subsidiaries(parent_corp_code: str = "", *,
+                      corp_code: str | None = None,
                       include_related: bool = False,
                       snapshot_year: int | None = None,
                       limit: int = DEFAULT_LIMIT) -> list[dict]:
-    """모회사의 자회사. include_related=True 면 관계회사도."""
+    """모회사의 자회사. include_related=True 면 관계회사도.
+
+    ``corp_code`` 는 LLM planner 가 모회사를 corp_code 로 식별해 호출하는 경우의
+    ``parent_corp_code`` 별칭 (lookup_company 와 동일 관례).
+    """
+    parent = parent_corp_code or corp_code or ""
     tmpl = "list_subsidiaries_with_related" if include_related else "list_subsidiaries"
-    return _exec(tmpl, cc=parent_corp_code, year=snapshot_year, limit=_cap(limit))
+    return _exec(tmpl, cc=parent, year=snapshot_year, limit=_cap(limit))
 
 
-def list_parents(child_corp_code_or_name: str, *,
+def list_parents(child_corp_code_or_name: str = "", *,
+                 corp_code: str | None = None,
                  limit: int = DEFAULT_LIMIT) -> list[dict]:
-    """이 회사가 자회사로 묶이는 모회사들."""
-    return _exec("list_parents", k=child_corp_code_or_name, limit=_cap(limit))
+    """이 회사가 자회사로 묶이는 모회사들. ``corp_code`` 는 planner 별칭."""
+    child = child_corp_code_or_name or corp_code or ""
+    return _exec("list_parents", k=child, limit=_cap(limit))
 
 
 def get_executives(corp_code: str, *,

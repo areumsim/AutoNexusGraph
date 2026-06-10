@@ -27,7 +27,6 @@ import yaml
 
 from autonexusgraph.ontology.loaders import make_domain_loaders
 
-
 # repo_root/ontology/auto/
 _ONTOLOGY_DIR = Path(__file__).resolve().parents[2] / "ontology" / "auto"
 
@@ -96,7 +95,7 @@ def load_manufactured_at_seed() -> list[dict[str, Any]]:
 def load_performed_at_seed() -> dict[str, Any]:
     """performed_at_seed.yaml → {processes:[...], mappings:[...]}.
 
-    회사 귀속 공정 시드 ((:ProcessStep)-[:PERFORMED_AT]->(:Plant)). 파일 부재 시
+    회사 귀속 공정 시드 ((:Anxg_ProcessStep)-[:PERFORMED_AT]->(:Anxg_Plant)). 파일 부재 시
     빈 구조 — loader 가 graceful 0 건으로 종료.
     """
     p = _ONTOLOGY_DIR / "performed_at_seed.yaml"

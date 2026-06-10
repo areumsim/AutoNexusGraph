@@ -37,7 +37,6 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 from pathlib import Path
 
@@ -48,7 +47,6 @@ from autonexusgraph.ingestion._common import (
     save_raw,
 )
 from autonexusgraph.ingestion.sec_client import SecEdgarClient
-
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +104,7 @@ def fetch_company_facts(cik: int | str, *,
     with SecEdgarClient(user_agent=_USER_AGENT) as client:
         try:
             data = client.get_company_facts(cik10)
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — [sec_oem] fail-soft 흡수 → None 반환 (log 동반)
             log.exception("[sec_oem] CIK%s facts fetch failed", cik10)
             ckpt.mark_failed(key, str(e))
             return None
@@ -117,7 +115,7 @@ def fetch_company_facts(cik: int | str, *,
 
     save_raw(_SOURCE, f"CIK{cik10}.json", data)
     log.info("[sec_oem] CIK%s saved (%d concepts)", cik10,
-             len(((data.get("facts") or {}).get("us-gaap") or {})))
+             len((data.get("facts") or {}).get("us-gaap") or {}))
     ckpt.mark_done(key, {"cik": cik10})
     return dest
 
@@ -140,7 +138,7 @@ def fetch_submissions(cik: int | str, *,
     with SecEdgarClient(user_agent=_USER_AGENT) as client:
         try:
             data = client.get_submissions(cik10)
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — [sec_oem] fail-soft 흡수 → None 반환 (log 동반)
             log.exception("[sec_oem] CIK%s submissions failed", cik10)
             ckpt.mark_failed(key, str(e))
             return None

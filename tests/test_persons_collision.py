@@ -1,4 +1,4 @@
-"""Q-3 master.persons 충돌 측정 테스트 — DB 없이 (_summarize + _run monkeypatch)."""
+"""Q-3 anxg_master.persons 충돌 측정 테스트 — DB 없이 (_summarize + _run monkeypatch)."""
 
 from __future__ import annotations
 
@@ -59,4 +59,4 @@ def test_format_table_renders():
                       {"dup_names": 1, "dup_rows": 2}, 0,
                       [{"canonical_name": "박민수", "birth_year": None, "n_corp": 6}])
     out = pc._format_table(r)
-    assert "master.persons 충돌" in out and "박민수" in out and "6 corps" in out
+    assert "anxg_master.persons 충돌" in out and "박민수" in out and "6 corps" in out

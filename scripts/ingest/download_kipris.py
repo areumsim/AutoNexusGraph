@@ -16,7 +16,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 
 
@@ -38,7 +41,7 @@ def main() -> int:
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT corp_code, corp_name
-              FROM master.companies
+              FROM anxg_master.companies
              WHERE is_active = TRUE
              ORDER BY corp_code
         """)
@@ -57,14 +60,14 @@ def main() -> int:
             limiter.acquire()
             try:
                 data = fetch_with_retry(
-                    lambda: cli.search_by_applicant(name, year_from=args.year_from),
+                    lambda name=name: cli.search_by_applicant(name, year_from=args.year_from),
                     max_tries=3,
                 )
                 save_raw("kipris", f"{corp_code}/applicant_{args.year_from}.json", data)
                 ckpt.mark_done(corp_code, {"name": name})
                 if i % 20 == 0:
                     print(f"  [{i}/{len(targets)}] done={ckpt.stats.done}")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_kipris] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(corp_code, str(e))
 
     print(f"\n[KIPRIS] done={ckpt.stats.done} failed={ckpt.stats.failed}")

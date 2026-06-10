@@ -50,7 +50,7 @@
   ipgraph/tools/patents.py       — ip PG: lookup_patent, get_patent_info, list_patents_by_assignee, …
   ipgraph/tools/graph.py         — ip Neo4j: list_patents_in_cpc, get_citation_network (cap 강제), …
   ipgraph/tools/retrieve.py      — pgvector + assignee/cpc/jurisdiction 메타: search_patents
-  ipgraph/tools/bridge.py        — ip↔corp: bridge_assignee_to_corp (via ip.assignee_corp_map join)
+  ipgraph/tools/bridge.py        — ip↔corp: bridge_assignee_to_corp (via anxg_ip.assignee_corp_map join)
         │
         ▼
 [저장소]
@@ -109,10 +109,10 @@ PRD v2.1 부터 단일 에이전트가 **금융 (AutoNexusGraph) + 자동차 (Au
 **Cypher 템플릿 통합**: 3 도메인의 템플릿 dict 가 `tools` import 시 **side-effect** 로 코어 `autonexusgraph.tools.cypher_templates.TEMPLATES` 에 병합.
 
 - finance: `TEMPLATES` **22** (정적 14 + 동적 `find_paths_{1..5}hops` 5 + `get_subgraph_d{1..3}` 3) — `tools/cypher_templates.py:89, list_templates()`
-- auto: `AUTO_TEMPLATES` **24** (정적 20 + 동적 `auto_find_paths_{1..4}hops` 4) — `src/autograph/cypher_templates_auto.py`
+- auto: `AUTO_TEMPLATES` **27** (정적 dict 24 + 동적 `auto_find_paths_{1..4}hops` → 런타임 27) — `src/autograph/cypher_templates_auto.py`
 - ip: `IP_TEMPLATES` **25** — `src/ipgraph/cypher_templates_ip.py`
 
-worker 는 `render_template("auto_recalls_by_variant", ...)` / `render_template("list_subsidiaries", ...)` / `render_template("ip_lookup_patent", ...)` 를 **동일 함수** 로 호출 — 같은 cypher_guard / param schema 검증 통과. 총 71 템플릿.
+worker 는 `render_template("auto_recalls_by_variant", ...)` / `render_template("list_subsidiaries", ...)` / `render_template("ip_lookup_patent", ...)` 를 **동일 함수** 로 호출 — 같은 cypher_guard / param schema 검증 통과. 총 74 템플릿 (finance 22 + auto 27 + ip 25, 런타임 레지스트리 기준).
 
 **회귀 안전성**: domain 미지정 finance gold (기존 `eval/qa_gold/gold_qa_v0.jsonl`) 는
 `route_domain` 이 키워드 부재로 `"finance"` 반환 → 기존 finance planner 동일 경로.
@@ -188,7 +188,7 @@ User Query
 [Finalize]
    replan 한도 도달 시 ⚠️ prefix + validation_issues 노출
    ↓
-PG 적재 (chat.messages + chat.checkpoints) + UI 렌더 (citations, agent_trace, grounding, feedback)
+PG 적재 (anxg_chat.messages + anxg_chat.checkpoints) + UI 렌더 (citations, agent_trace, grounding, feedback)
 ```
 
 ## 3. AgentState (`agents/state.py`)
@@ -418,7 +418,7 @@ TTL 3600s, LRU 256 (env `FINGRAPH_SESSION_TTL` / `_MAX` 로 조정).
 | 모듈 | 테스트 | 케이스 |
 |---|---|---|
 | ipgraph routing | `tests/test_ipgraph_routing.py` (또는 `test_autograph_routing.py` 의 ip 케이스) | `route_domain_ip` 키워드 (특허·patent·CPC·출원·인용·R&D) / cross_domain 조합 |
-| ipgraph handler | `tests/test_ipgraph_handler.py` | `IPGraphHandler.identify_targets / plan_tasks / toolbox_modules / allowed_intents (16 intents)` |
+| ipgraph handler | `tests/test_ipgraph.py` | `IPGraphHandler.identify_targets / plan_tasks / toolbox_modules / allowed_intents (19 intents: graph 8 + sql 8 + research 3)` |
 | ipgraph audit | `make audit-ipgraph` | handler + router + ontology + 25 Cypher + gold (ip 30 + cross_ip 8) wire-up |
 | ipgraph cypher | `tests/test_cypher_templates.py` 의 `ip_*` 케이스 | 25 template param schema (cpc enum / depth range / direction enum) |
 
@@ -432,8 +432,8 @@ make enable-langgraph
 #   ✓ checkpointer = PostgresSaver
 
 # 2) checkpoint 테이블 점검
-psql $POSTGRES_DSN -c "\dt chat.checkpoint*"
-#   chat.checkpoints / .checkpoint_writes / .checkpoint_blobs / .checkpoint_migrations
+psql $POSTGRES_DSN -c "\dt anxg_chat.checkpoint*"
+#   anxg_chat.checkpoints / .checkpoint_writes / .checkpoint_blobs / .checkpoint_migrations
 
 # 3) tracing 활성 확인 (옵션)
 make trace-on

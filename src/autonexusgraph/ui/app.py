@@ -2,7 +2,7 @@
 
 설계 메모 (이전 web/app.py 패턴 단순화):
 - 채팅형 multi-turn (st.chat_message, st.chat_input)
-- session_state thread_id (PG chat.conversations 와 1:1)
+- session_state thread_id (PG anxg_chat.conversations 와 1:1)
 - 답변에 citation expander + grounding 경고
 - 사이드바: 최근 대화 목록 + LLM 비용 누적 + provider 정보
 
@@ -14,9 +14,9 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
+from typing import Any
 
 # src/ 를 path 에 추가 (streamlit 진입 시)
 _ROOT = Path(__file__).resolve().parents[3]
@@ -26,18 +26,31 @@ if str(_SRC) not in sys.path:
 
 import streamlit as st
 
-from autonexusgraph.ui.storage import (
-    get_or_create_thread_id, reset_thread,
-    load_history, persist_turn, list_recent_threads,
-    set_conversation_title, generate_title_from_question,
-)
+from autonexusgraph.logging_setup import configure_logging
 from autonexusgraph.ui.components import (
-    render_citations, render_grounding_warning, render_agent_trace,
-    render_cost_badge, render_provider_info, render_sample_questions,
-    render_feedback_buttons, render_progress_chip, node_label,
-    render_clarification, render_cost_approval,
+    node_label,
+    render_agent_trace,
+    render_citations,
+    render_clarification,
+    render_cost_approval,
+    render_cost_badge,
+    render_feedback_buttons,
+    render_grounding_warning,
+    render_progress_chip,
+    render_provider_info,
+    render_sample_questions,
+)
+from autonexusgraph.ui.storage import (
+    generate_title_from_question,
+    get_or_create_thread_id,
+    list_recent_threads,
+    load_history,
+    persist_turn,
+    reset_thread,
+    set_conversation_title,
 )
 
+configure_logging()   # app INFO 로그(history/worker) 표면화 — settings.log_level
 
 st.set_page_config(page_title="AutoNexusGraph", layout="wide")
 
@@ -131,13 +144,13 @@ if user_input:
             title = generate_title_from_question(user_input)
             if title:
                 set_conversation_title(thread_id, title)
-        except Exception:
+        except Exception:   # noqa: BLE001 — title 생성/적재 실패 silent (nice-to-have, 메인 흐름 차단 안 함)
             pass
 
     # agent run — 노드별 진행 표시 (PRD §7.6.5) + HITL interrupt (PRD §7.5.6)
     with st.chat_message("assistant"):
         try:
-            from autonexusgraph.agents import run_agent_stream, run_agent_resume_stream
+            from autonexusgraph.agents import run_agent_resume_stream, run_agent_stream
             with st.status("분석 중…", expanded=True) as status:
                 last_state = None
                 interrupted_payload = None
@@ -150,10 +163,10 @@ if user_input:
                 ):
                     last_state = state
                     if node == "__final__":
-                        status.update(label="✅ 완료", state="complete")
+                        status.update(label="완료", state="complete")
                         break
                     if node == "__error__":
-                        status.update(label="❌ 오류", state="error")
+                        status.update(label="오류", state="error")
                         break
                     if node == "__interrupt__":
                         interrupted_payload = state.get("pending_interrupt")
@@ -172,12 +185,12 @@ if user_input:
             if interrupted_payload:
                 kind = interrupted_payload.get("kind")
                 key_prefix = f"{thread_id}_{len(st.session_state.messages)}"
-                resume_value: any = None
+                resume_value: Any = None
                 if kind == "company_clarification":
-                    idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
-                    if idx is None:
+                    clar_idx = render_clarification(interrupted_payload, key_prefix=key_prefix)
+                    if clar_idx is None:
                         st.stop()
-                    resume_value = {"index": idx}
+                    resume_value = {"index": clar_idx}
                 elif kind == "cost_approval":
                     approved = render_cost_approval(interrupted_payload, key_prefix=key_prefix)
                     if approved is None:
@@ -191,10 +204,10 @@ if user_input:
                     for node, state in run_agent_resume_stream(thread_id, resume_value):
                         last_state = state
                         if node == "__final__":
-                            status.update(label="✅ 완료", state="complete")
+                            status.update(label="완료", state="complete")
                             break
                         if node == "__error__":
-                            status.update(label="❌ resume 실패", state="error")
+                            status.update(label="resume 실패", state="error")
                             break
                         partial = {
                             "question_kind": state.get("question_kind"),
@@ -220,8 +233,8 @@ if user_input:
                 "validation_status": state.get("validation_status"),
                 "validation_issues": state.get("validation_issues"),
             }
-        except Exception as e:
-            answer = f"❌ 에이전트 실행 실패: {type(e).__name__}: {e}"
+        except Exception as e:   # noqa: BLE001 — agent 실행 실패 흡수 → UI 에 에러 메시지 표시 (앱 크래시 방지)
+            answer = f"[실패] 에이전트 실행 실패: {type(e).__name__}: {e}"
             citations = []
             turn_cost = 0.0
             grounding = {}

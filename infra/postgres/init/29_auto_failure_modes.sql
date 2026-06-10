@@ -21,13 +21,13 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
 -- ──────────────────────────────────────────────────────────────────────
 -- :FailureMode — 회사무관 고장모드 (Layer 1)
 -- ──────────────────────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS auto.failure_modes (
+CREATE TABLE IF NOT EXISTS anxg_auto.failure_modes (
     fm_id             BIGSERIAL    PRIMARY KEY,
     name              VARCHAR(120) NOT NULL,                  -- snake_case (예: 'bearing_inner_race_spalling')
     name_en           VARCHAR(160),                            -- 자연 영문
@@ -54,11 +54,11 @@ CREATE TABLE IF NOT EXISTS auto.failure_modes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_failure_modes_equipment
-    ON auto.failure_modes(equipment) WHERE equipment IS NOT NULL;
+    ON anxg_auto.failure_modes(equipment) WHERE equipment IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_failure_modes_validated
-    ON auto.failure_modes(validated_status);
+    ON anxg_auto.failure_modes(validated_status);
 
-COMMENT ON TABLE auto.failure_modes IS
+COMMENT ON TABLE anxg_auto.failure_modes IS
     '회사무관 설비 고장모드 (Layer 1). NASA PCoE readme + KAMP 추출. corp_code 없음. grade A(0.80) 공식.';
 
 
@@ -68,10 +68,10 @@ COMMENT ON TABLE auto.failure_modes IS
 -- 의미: "이 고장모드는 보통 이런 결함 유형으로 발현된다"
 -- LLM 또는 BGE-M3 코사인. validated_status='candidate' → 사람 검토 후 'reviewed'.
 
-CREATE TABLE IF NOT EXISTS auto.failure_mode_manifestations (
+CREATE TABLE IF NOT EXISTS anxg_auto.failure_mode_manifestations (
     manif_id          BIGSERIAL    PRIMARY KEY,
-    fm_id             BIGINT       NOT NULL REFERENCES auto.failure_modes(fm_id),
-    defect_type_id    BIGINT       NOT NULL REFERENCES auto.defect_types(defect_type_id),
+    fm_id             BIGINT       NOT NULL REFERENCES anxg_auto.failure_modes(fm_id),
+    defect_type_id    BIGINT       NOT NULL REFERENCES anxg_auto.defect_types(defect_type_id),
     cos_sim           NUMERIC(5,4),                            -- NULL for llm_assign
     match_method      VARCHAR(20)  NOT NULL,                   -- 'llm_assign' | 'cosine_topk'
     rank              SMALLINT,
@@ -90,11 +90,11 @@ CREATE TABLE IF NOT EXISTS auto.failure_mode_manifestations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_manifestations_fm
-    ON auto.failure_mode_manifestations(fm_id);
+    ON anxg_auto.failure_mode_manifestations(fm_id);
 CREATE INDEX IF NOT EXISTS idx_manifestations_dt
-    ON auto.failure_mode_manifestations(defect_type_id);
+    ON anxg_auto.failure_mode_manifestations(defect_type_id);
 CREATE INDEX IF NOT EXISTS idx_manifestations_topk
-    ON auto.failure_mode_manifestations(fm_id, rank) WHERE rank IS NOT NULL;
+    ON anxg_auto.failure_mode_manifestations(fm_id, rank) WHERE rank IS NOT NULL;
 
-COMMENT ON TABLE auto.failure_mode_manifestations IS
+COMMENT ON TABLE anxg_auto.failure_mode_manifestations IS
     'Bridge — :FailureMode(설비 고장모드) ↔ :DefectType(결함 유형). LLM 라벨 + BGE-M3 코사인 두 경로.';

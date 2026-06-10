@@ -12,8 +12,6 @@ from __future__ import annotations
 from eval.adapters import ADAPTER_REGISTRY, get_adapter
 from eval.runners.run_matrix_smoke import (
     DEFAULT_ADAPTERS,
-    DEFAULT_RERANK,
-    DEFAULT_TIERS,
     compute_thesis_headline,
     enumerate_cells,
 )
@@ -139,6 +137,7 @@ def test_thesis_available_in_full_mode():
     """full 모드 시 hybrid_rerank1 vs vector_rerank0 multi-hop EM 차이 계산."""
     cells = enumerate_cells()
     # hybrid_fast_rerank1 = 0.85, vector_fast_rerank0 = 0.40 → +45%p (target met)
+    # scorable_n ≥ MIN_EM_SCORABLE 이어야 EM 이 primary 로 신뢰됨.
     results = []
     for c in cells:
         em = None
@@ -146,9 +145,11 @@ def test_thesis_available_in_full_mode():
             em = 0.85
         elif c["label"] == "vector_fast_rerank0":
             em = 0.40
-        results.append({**c, "multi_hop_em": em})
+        results.append({**c, "multi_hop_em": em, "multi_hop_em_scorable_n": 10})
     thesis = compute_thesis_headline(results)
     assert thesis["available"] is True
+    assert thesis["primary"] == "em"
+    assert thesis["em_status"] == "ok"
     assert thesis["hybrid_em"] == 0.85
     assert thesis["vector_em"] == 0.40
     assert thesis["diff_pp"] == 45.0
@@ -165,10 +166,37 @@ def test_thesis_target_not_met():
             em = 0.55
         elif c["label"] == "vector_fast_rerank0":
             em = 0.50
-        results.append({**c, "multi_hop_em": em})
+        results.append({**c, "multi_hop_em": em, "multi_hop_em_scorable_n": 10})
     thesis = compute_thesis_headline(results)
     assert thesis["available"] is True
+    assert thesis["primary"] == "em"
     assert thesis["diff_pp"] == 5.0
+    assert thesis["target_met"] is False
+
+
+def test_thesis_falls_back_to_hits_when_em_gold_insufficient():
+    """gold_answer_text 표본 부족(<MIN_EM_SCORABLE) 시 primary=hits + insufficient_gold.
+
+    EM 이 prose-vs-short-string artifact 로 0 으로 깔리는 상황을 'thesis EM +0%p'
+    로 오판하지 않도록 — primary 를 entity-level hits 로 전환하고 EM 은 보류 표시.
+    """
+    cells = enumerate_cells()
+    results = []
+    for c in cells:
+        em = hits = None
+        n = 1   # 표본 1 < MIN_EM_SCORABLE
+        if c["label"] == "hybrid_fast_rerank1":
+            em, hits = 0.0, 0.31
+        elif c["label"] == "vector_fast_rerank0":
+            em, hits = 0.0, 1.0
+        results.append({**c, "multi_hop_em": em,
+                        "multi_hop_em_scorable_n": n, "multi_hop_hits": hits})
+    thesis = compute_thesis_headline(results)
+    assert thesis["available"] is True
+    assert thesis["primary"] == "hits"
+    assert thesis["em_status"] == "insufficient_gold"
+    # 진짜 신호 = hits 격차 (hybrid 가 vector 대비 열위) 가 보존됨.
+    assert thesis["hits_diff_pp"] < 0
     assert thesis["target_met"] is False
 
 
@@ -184,6 +212,7 @@ def test_thesis_unavailable_when_missing_cells():
 def test_search_documents_accepts_rerank_kwarg():
     """retrieve.search_documents 가 rerank 인자 수용 — C2 회귀 방지."""
     import inspect
+
     from autonexusgraph.tools.retrieve import search_documents
     sig = inspect.signature(search_documents)
     assert "rerank" in sig.parameters
@@ -193,6 +222,7 @@ def test_search_documents_accepts_rerank_kwarg():
 def test_search_documents_auto_accepts_rerank_kwarg():
     """autograph retrieve.search_documents_auto 도 rerank 수용."""
     import inspect
+
     from autograph.tools.retrieve import search_documents_auto
     sig = inspect.signature(search_documents_auto)
     assert "rerank" in sig.parameters
@@ -235,7 +265,7 @@ def test_sql_vec_adapter_passes_rerank_flag(monkeypatch):
     # 단 search_documents 호출 자체는 try-except 안에서 일어나므로 captured 됨.
     try:
         a.query("삼성전자 2024 매출은?", domain="finance")
-    except Exception:
+    except Exception:   # noqa: BLE001 — adapter 내부 실패 무시 (본 테스트는 search_documents 호출 captured 만 확인)
         pass
     # mock 이 호출됐다면 rerank=False 가 들어와야.
     if "rerank" in captured:
@@ -255,7 +285,8 @@ def test_thesis_full_mode_with_manifest_metrics():
         elif c["label"] == "vector_fast_rerank0":
             em_mh = 0.42
         results.append({**c, "ran": True, "mode": "full",
-                        "multi_hop_em": em_mh, "em": em_mh, "f1": em_mh,
+                        "multi_hop_em": em_mh, "multi_hop_em_scorable_n": 30,
+                        "em": em_mh, "f1": em_mh,
                         "cost_usd": 0.05, "n_questions": 30})
     thesis = compute_thesis_headline(results)
     assert thesis["available"] is True
@@ -268,7 +299,7 @@ def test_thesis_full_mode_with_manifest_metrics():
 # ── C1 회귀 — env / CLI 매트릭스 변수 ─────────────────────────────
 def test_run_qa_eval_module_imports():
     """run_qa_eval 모듈이 매트릭스 변수 import 후 에러 없이 로드."""
-    import importlib
+
     import eval.runners.run_qa_eval as m
     assert hasattr(m, "main")
     # ENV 변수 처리 코드가 main 안에 있어야 함 — import 시점은 부수효과 없음.

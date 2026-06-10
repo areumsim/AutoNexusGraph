@@ -104,13 +104,29 @@ addopts = "-m 'not integration' -ra"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+# requires-python = ">=3.10" 와 정합 — ruff target 은 최소 지원 버전이어야 한다.
+# (py311 은 3.10 런타임에 없는 idiom — 예: UP017 datetime.UTC — 을 제안해 깨짐)
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# 스크립트는 sys.path 부트스트랩(src/ 주입) 후 프로젝트 모듈을 import — E402 는
+# 구조상 불가피하고 의도적. + 지역 상수(BATCH 등) UPPER / numpy X(feature matrix) 관례.
+"scripts/**" = ["E402", "N806", "N803"]
+# 테스트는 대상 모듈을 대문자 alias 로 import 하는 관례(N812) + 한국어 서술형 테스트
+# 함수명(N802: test_..._완성차) + mock/stub 메서드 first-arg(N805) 의도적.
+"tests/**" = ["N812", "N802", "N805"]
+# tools 패키지는 import 시점에 Cypher 템플릿을 eager 병합(register_templates)한 뒤
+# 도구를 노출 — 코드 후 import(E402) 가 구조상 의도적 (drift 즉시 검출).
+"src/*/tools/__init__.py" = ["E402"]
+# streamlit 진입점 — sys.path(src/) 부트스트랩 후 프로젝트 모듈 import (scripts 와 동일).
+"src/autonexusgraph/ui/app.py" = ["E402"]
+
 [tool.mypy]
-python_version = "3.11"
+# requires-python ">=3.10" + ruff target-version py310 와 정합 (최소 지원 버전).
+python_version = "3.10"
 strict = false
 ignore_missing_imports = true

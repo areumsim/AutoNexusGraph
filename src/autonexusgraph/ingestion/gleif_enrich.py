@@ -1,10 +1,10 @@
 """GLEIF KR LEI 보강 — `entity.registeredAs` (사업자번호) 추출 + corp_code 매칭.
 
-기존 `sec.lei` 2,700 row 는 LEI + legalName 만 보유, `corp_code` 113 row 만 매칭됨.
+기존 `anxg_sec.lei` 2,700 row 는 LEI + legalName 만 보유, `corp_code` 113 row 만 매칭됨.
 GLEIF Public API (https://api.gleif.org/api/v1/lei-records) 의 ``filter[entity.jurisdiction]=KR``
 페이지네이션으로 2,704 KR LEI 의 ``entity.registeredAs`` (= KR 사업자등록번호) 를 가져와
-``master.entity_map`` 의 business_no SSOT 와 매칭 후 ``sec.lei.corp_code`` /
-``master.entity_map(id_type='lei')`` / ``bridge.corp_entity.lei`` 를 멱등 UPSERT.
+``anxg_master.entity_map`` 의 business_no SSOT 와 매칭 후 ``anxg_sec.lei.corp_code`` /
+``anxg_master.entity_map(id_type='lei')`` / ``anxg_bridge.corp_entity.lei`` 를 멱등 UPSERT.
 
 라이선스: GLEIF Level 1/2 data = CC0. 무인증.
 OpenCorporates ID-to-LEI 매핑 파일은 GLEIF 사이트에서 form-gated — 본 모듈은
@@ -32,7 +32,6 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ def _http_get_json(url: str, *, retries: int = 3) -> dict:
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read())
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — boundary → RuntimeError 변환 (raise, silent 아님)
             last_exc = exc
             log.warning("[gleif] fetch fail (attempt %d/%d): %s", i + 1, retries, exc)
             time.sleep(1.5 ** i)
@@ -153,12 +152,12 @@ def _normalize_jurir_no(raw: str | None) -> str | None:
 # ── 2. PG UPSERT ────────────────────────────────────────────────
 
 def _build_corp_lookup(cur) -> dict[str, str]:
-    """master.entity_map 에서 (business_no | jurir_no) → corp_code 매핑 dict.
+    """anxg_master.entity_map 에서 (business_no | jurir_no) → corp_code 매핑 dict.
 
     Key 는 digits-only 정규화 후 길이 10 (business_no) 또는 13 (jurir_no).
     """
     cur.execute("""
-        SELECT id_type, id_value, corp_code FROM master.entity_map
+        SELECT id_type, id_value, corp_code FROM anxg_master.entity_map
         WHERE id_type IN ('business_no','jurir_no') AND id_value IS NOT NULL
     """)
     out: dict[str, str] = {}
@@ -175,11 +174,11 @@ def _measure_baseline(cur) -> dict[str, int]:
         SELECT
           COUNT(*) FILTER (WHERE id_type='lei') AS em_lei,
           COUNT(*) FILTER (WHERE id_type='business_no') AS em_biz
-        FROM master.entity_map
+        FROM anxg_master.entity_map
     """)
     em_lei, em_biz = cur.fetchone()
 
-    cur.execute("SELECT count(*) FROM sec.lei WHERE corp_code IS NOT NULL AND corp_code <> ''")
+    cur.execute("SELECT count(*) FROM anxg_sec.lei WHERE corp_code IS NOT NULL AND corp_code <> ''")
     sec_with_corp = cur.fetchone()[0]
 
     cur.execute("""
@@ -189,7 +188,7 @@ def _measure_baseline(cur) -> dict[str, int]:
           COUNT(*) FILTER (WHERE entity_type='supplier'     AND match_method IN ('lei','wikidata_qid','business_no','sec_cik')) AS sup_strong,
           COUNT(*) FILTER (WHERE entity_type='supplier') AS sup_total,
           COUNT(*) FILTER (WHERE lei IS NOT NULL AND lei <> '') AS rows_with_lei
-        FROM bridge.corp_entity
+        FROM anxg_bridge.corp_entity
     """)
     mfr_s, mfr_t, sup_s, sup_t, rows_lei = cur.fetchone()
     return {
@@ -208,7 +207,7 @@ def enrich(*, rows: list[dict] | None = None,
            max_pages: int | None = None,
            raw_dir: Path | None = None,
            dry_run: bool = False) -> dict:
-    """KR LEI fetch + PG UPSERT (sec.lei, master.entity_map, bridge.corp_entity)."""
+    """KR LEI fetch + PG UPSERT (anxg_sec.lei, anxg_master.entity_map, anxg_bridge.corp_entity)."""
     if raw_dir is None:
         raw_dir = Path("data/raw/gleif/kr")
 
@@ -251,24 +250,24 @@ def enrich(*, rows: list[dict] | None = None,
                 jur = r.get("jurir_no")
                 cc = (corp_lookup.get(biz) if biz else None) or (corp_lookup.get(jur) if jur else None)
 
-                # 2-1. sec.lei UPSERT — corp_code 동기화.
+                # 2-1. anxg_sec.lei UPSERT — corp_code 동기화.
                 cur.execute("SAVEPOINT sp_sec_lei")
                 try:
                     cur.execute("""
-                        INSERT INTO sec.lei
+                        INSERT INTO anxg_sec.lei
                           (lei, corp_code, legal_name, legal_jurisdiction,
                            entity_status, registration_status, issued_at, next_renewal_at, raw)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                         ON CONFLICT (lei) DO UPDATE SET
-                          corp_code           = COALESCE(EXCLUDED.corp_code, sec.lei.corp_code),
-                          legal_name          = COALESCE(EXCLUDED.legal_name, sec.lei.legal_name),
-                          legal_jurisdiction  = COALESCE(EXCLUDED.legal_jurisdiction, sec.lei.legal_jurisdiction),
-                          entity_status       = COALESCE(EXCLUDED.entity_status, sec.lei.entity_status),
-                          registration_status = COALESCE(EXCLUDED.registration_status, sec.lei.registration_status),
-                          issued_at           = COALESCE(EXCLUDED.issued_at, sec.lei.issued_at),
-                          next_renewal_at     = COALESCE(EXCLUDED.next_renewal_at, sec.lei.next_renewal_at),
-                          raw                 = sec.lei.raw || EXCLUDED.raw
-                        RETURNING (sec.lei.corp_code IS NOT NULL) AS had_corp
+                          corp_code           = COALESCE(EXCLUDED.corp_code, anxg_sec.lei.corp_code),
+                          legal_name          = COALESCE(EXCLUDED.legal_name, anxg_sec.lei.legal_name),
+                          legal_jurisdiction  = COALESCE(EXCLUDED.legal_jurisdiction, anxg_sec.lei.legal_jurisdiction),
+                          entity_status       = COALESCE(EXCLUDED.entity_status, anxg_sec.lei.entity_status),
+                          registration_status = COALESCE(EXCLUDED.registration_status, anxg_sec.lei.registration_status),
+                          issued_at           = COALESCE(EXCLUDED.issued_at, anxg_sec.lei.issued_at),
+                          next_renewal_at     = COALESCE(EXCLUDED.next_renewal_at, anxg_sec.lei.next_renewal_at),
+                          raw                 = anxg_sec.lei.raw || EXCLUDED.raw
+                        RETURNING (anxg_sec.lei.corp_code IS NOT NULL) AS had_corp
                     """, (
                         lei, cc, r.get("legal_name"), r.get("jurisdiction"),
                         r.get("status"), r.get("registration_status"),
@@ -283,29 +282,29 @@ def enrich(*, rows: list[dict] | None = None,
                         stats["sec_lei_corp_filled"] += 1
                     stats["sec_lei_upserted"] += 1
                     cur.execute("RELEASE SAVEPOINT sp_sec_lei")
-                except Exception as exc:   # noqa: BLE001
+                except Exception as exc:   # noqa: BLE001 — [gleif:sec_lei] LEI UPSERT 실패 흡수 → SAVEPOINT rollback + 다음 LEI 진행
                     cur.execute("ROLLBACK TO SAVEPOINT sp_sec_lei")
                     log.warning("[gleif:sec_lei] %s fail: %s", lei, exc)
 
-                # 2-2. master.entity_map — corp_code 매칭됐을 때만 LEI 등록.
+                # 2-2. anxg_master.entity_map — corp_code 매칭됐을 때만 LEI 등록.
                 # PK = (corp_code, id_type, id_value) → 같은 corp 의 기존 LEI 다른 값은
                 # DELETE 후 INSERT (1 corp ↔ 1 LEI 정합).
                 if cc:
                     cur.execute("SAVEPOINT sp_em")
                     try:
                         cur.execute("""
-                            DELETE FROM master.entity_map
+                            DELETE FROM anxg_master.entity_map
                             WHERE corp_code = %s AND id_type = 'lei' AND id_value <> %s
                         """, (cc, lei))
                         cur.execute("""
-                            INSERT INTO master.entity_map
+                            INSERT INTO anxg_master.entity_map
                               (corp_code, id_type, id_value, source, confidence,
                                resolved_at, resolved_by, notes)
                             VALUES (%s, 'lei', %s, 'gleif_enrich', %s,
                                     now(), 'gleif_kr_enrich', %s)
                             ON CONFLICT (corp_code, id_type, id_value) DO UPDATE SET
                               source      = 'gleif_enrich',
-                              confidence  = GREATEST(master.entity_map.confidence, EXCLUDED.confidence),
+                              confidence  = GREATEST(anxg_master.entity_map.confidence, EXCLUDED.confidence),
                               resolved_at = now(),
                               notes       = EXCLUDED.notes
                             RETURNING (xmax = 0) AS is_new
@@ -318,17 +317,17 @@ def enrich(*, rows: list[dict] | None = None,
                         else:
                             stats["em_lei_updated"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_em")
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — [gleif:em] entity_map LEI 등록 실패 흡수 → SAVEPOINT rollback + 다음 corp 진행
                         cur.execute("ROLLBACK TO SAVEPOINT sp_em")
                         log.warning("[gleif:em] %s/%s fail: %s", cc, lei, exc)
 
-                # 2-3. bridge.corp_entity 의 LEI 컬럼 보강 — corp_code 매칭됐을 때만.
+                # 2-3. anxg_bridge.corp_entity 의 LEI 컬럼 보강 — corp_code 매칭됐을 때만.
                 # 멤버십 변경 없이 lei + match_method 만 강화.
                 if cc:
                     cur.execute("SAVEPOINT sp_bridge")
                     try:
                         cur.execute("""
-                            UPDATE bridge.corp_entity
+                            UPDATE anxg_bridge.corp_entity
                             SET lei = %s,
                                 match_method = CASE
                                     WHEN match_method IN ('lei','wikidata_qid','sec_cik') THEN match_method
@@ -352,7 +351,7 @@ def enrich(*, rows: list[dict] | None = None,
                             if mm == "lei":
                                 stats["bridge_match_upgraded"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_bridge")
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — [gleif:bridge] corp_entity LEI 보강 실패 흡수 → SAVEPOINT rollback + 다음 corp 진행
                         cur.execute("ROLLBACK TO SAVEPOINT sp_bridge")
                         log.warning("[gleif:bridge] %s/%s fail: %s", cc, lei, exc)
 

@@ -21,9 +21,9 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
-CREATE TABLE IF NOT EXISTS auto.master_minerals (
+CREATE TABLE IF NOT EXISTS anxg_auto.master_minerals (
     commodity            VARCHAR(40)  NOT NULL,        -- 'Li' | 'Ni' | 'Co' | 'Mn' | 'Graphite' | …
     snapshot_year        SMALLINT     NOT NULL,
     world_production     BIGINT,                       -- 세계 생산 (metric tons)
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS auto.master_minerals (
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
     PRIMARY KEY (commodity, snapshot_year)
 );
-CREATE INDEX IF NOT EXISTS idx_minerals_year       ON auto.master_minerals(snapshot_year);
-CREATE INDEX IF NOT EXISTS idx_minerals_commodity  ON auto.master_minerals(commodity);
+CREATE INDEX IF NOT EXISTS idx_minerals_year       ON anxg_auto.master_minerals(snapshot_year);
+CREATE INDEX IF NOT EXISTS idx_minerals_commodity  ON anxg_auto.master_minerals(commodity);
 
 
 -- 권한

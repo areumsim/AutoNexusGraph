@@ -1,12 +1,12 @@
 """OpenAlex 승격 — Institution / Work / AUTHORED_AT 적재.
 
 전략 (한국 기업 R&D ↔ 특허 ↔ 재무 3중 cross 진입점):
-    1. ``bridge.corp_entity`` + ``master.entity_map`` 의 wikidata_qid 풀로
+    1. ``anxg_bridge.corp_entity`` + ``anxg_master.entity_map`` 의 wikidata_qid 풀로
        OpenAlex institutions 매칭 (filter=ids.wikidata:<QID>).
     2. 매칭된 institution 마다 상위 N 개 Work fetch
        (sort=cited_by_count:desc, type=article, last 5y).
-    3. PG: ip.works + ip.institution + ip.work_institution 멱등 UPSERT.
-    4. ip.institution.corp_code 는 매칭된 corp_entity 의 corp_code.
+    3. PG: anxg_ip.works + anxg_ip.institution + anxg_ip.work_institution 멱등 UPSERT.
+    4. anxg_ip.institution.corp_code 는 매칭된 corp_entity 의 corp_code.
 
 OpenAlex API 인증:
     ``OPENALEX_API_KEY`` (premium/authenticated plus tier) 또는 ``mailto`` 폴리트 풀.
@@ -27,13 +27,11 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Iterable
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +57,7 @@ def _http_get(url: str, *, params: dict | None = None, retries: int = 3) -> dict
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read())
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — boundary → RuntimeError 변환 (raise, silent 아님)
             last = exc
             log.warning("[openalex] fetch fail %d/%d: %s", i + 1, retries, exc)
             time.sleep(1.5 ** i)
@@ -69,7 +67,7 @@ def _http_get(url: str, *, params: dict | None = None, retries: int = 3) -> dict
 # ── 2. QID 풀 ─────────────────────────────────────────────────
 
 def _gather_qid_pool(cur, *, limit: int | None = None) -> list[dict]:
-    """`bridge.corp_entity` + `master.entity_map(wikidata_qid)` 에서 unique QID 풀.
+    """`anxg_bridge.corp_entity` + `anxg_master.entity_map(wikidata_qid)` 에서 unique QID 풀.
 
     return: [{qid, corp_code|None, name, source}, ...]
     """
@@ -77,16 +75,16 @@ def _gather_qid_pool(cur, *, limit: int | None = None) -> list[dict]:
         WITH brides AS (
           -- bridge 는 corp_code 매칭됐거나 reviewed/manufacturer 인 것만 (정합 신뢰).
           SELECT wikidata_qid AS qid, corp_code, name, 'bridge' AS source
-          FROM bridge.corp_entity
+          FROM anxg_bridge.corp_entity
           WHERE wikidata_qid IS NOT NULL AND wikidata_qid <> ''
             AND (corp_code IS NOT NULL OR entity_type = 'manufacturer'
                  OR reviewed_status IN ('reviewed','validated'))
         ),
         em AS (
-          -- master.entity_map(qid) 는 모든 295 상장사 매핑 — 신뢰 100%.
+          -- anxg_master.entity_map(qid) 는 모든 295 상장사 매핑 — 신뢰 100%.
           SELECT em.id_value AS qid, em.corp_code, c.corp_name AS name, 'entity_map' AS source
-          FROM master.entity_map em
-          LEFT JOIN master.companies c USING (corp_code)
+          FROM anxg_master.entity_map em
+          LEFT JOIN anxg_master.companies c USING (corp_code)
           WHERE em.id_type = 'wikidata_qid' AND em.id_value IS NOT NULL AND em.id_value <> ''
         ),
         all_rows AS (
@@ -131,7 +129,7 @@ def lookup_institution_by_qid(qid: str, *,
             body = _http_get(f"{_OA_BASE}/institutions/ror:{ror}", params={})
             if body and body.get("id"):
                 return body
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [openalex] fail-soft 흡수 → None 반환 (log 동반)
             log.debug("[openalex] ror:%s lookup failed: %s", ror, exc)
     return None
 
@@ -143,7 +141,7 @@ def _wikidata_qid_to_ror(qid: str) -> str | None:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — [openalex] fail-soft 흡수 → None 반환 (log 동반)
         log.debug("[openalex] wikidata fetch %s failed: %s", qid, exc)
         return None
     ent = (data.get("entities") or {}).get(qid) or {}
@@ -157,7 +155,7 @@ def _wikidata_qid_to_ror(qid: str) -> str | None:
 
 
 def _normalize_institution(rec: dict) -> dict:
-    """OpenAlex institution rec → ip.institution row dict."""
+    """OpenAlex institution rec → anxg_ip.institution row dict."""
     ids = rec.get("ids") or {}
     ror = (rec.get("ror") or ids.get("ror") or "").rsplit("/", 1)[-1] or None
     qid = (ids.get("wikidata") or "").rsplit("/", 1)[-1] or None
@@ -202,7 +200,7 @@ def fetch_works_for_institution(oa_inst_id: str, *,
 
 
 def _normalize_work(rec: dict) -> dict:
-    """OpenAlex work rec → ip.works row dict."""
+    """OpenAlex work rec → anxg_ip.works row dict."""
     oa_id = (rec.get("id") or "").rsplit("/", 1)[-1] or None
     doi   = (rec.get("doi") or "").replace("https://doi.org/", "") or None
     abstract = _reconstruct_abstract(rec.get("abstract_inverted_index"))
@@ -235,7 +233,7 @@ def _reconstruct_abstract(inverted: dict | None) -> str | None:
                 if 0 <= p < len(tokens):
                     tokens[p] = term
         return " ".join(t for t in tokens if t)
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — [openalex] fail-soft 흡수 → None 반환
         return None
 
 
@@ -262,15 +260,15 @@ def _first_author_pos(work: dict, inst_id: str) -> str | None:
 
 def _upsert_institution(cur, inst: dict, corp_code: str | None) -> bool:
     cur.execute("""
-        INSERT INTO ip.institution
+        INSERT INTO anxg_ip.institution
           (ror_id, openalex_id, name, country, type, corp_code)
         VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (ror_id) DO UPDATE SET
-          openalex_id = COALESCE(EXCLUDED.openalex_id, ip.institution.openalex_id),
-          name        = COALESCE(EXCLUDED.name, ip.institution.name),
-          country     = COALESCE(EXCLUDED.country, ip.institution.country),
-          type        = COALESCE(EXCLUDED.type, ip.institution.type),
-          corp_code   = COALESCE(EXCLUDED.corp_code, ip.institution.corp_code),
+          openalex_id = COALESCE(EXCLUDED.openalex_id, anxg_ip.institution.openalex_id),
+          name        = COALESCE(EXCLUDED.name, anxg_ip.institution.name),
+          country     = COALESCE(EXCLUDED.country, anxg_ip.institution.country),
+          type        = COALESCE(EXCLUDED.type, anxg_ip.institution.type),
+          corp_code   = COALESCE(EXCLUDED.corp_code, anxg_ip.institution.corp_code),
           updated_at  = now()
         RETURNING (xmax = 0) AS is_new
     """, (inst.get("ror_id"), inst.get("openalex_id"), inst.get("name"),
@@ -280,16 +278,16 @@ def _upsert_institution(cur, inst: dict, corp_code: str | None) -> bool:
 
 def _upsert_work(cur, w: dict) -> bool:
     cur.execute("""
-        INSERT INTO ip.works
+        INSERT INTO anxg_ip.works
           (openalex_id, title, publication_year, cited_by_count, doi, type, abstract)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (openalex_id) DO UPDATE SET
-          title             = COALESCE(EXCLUDED.title, ip.works.title),
-          publication_year  = COALESCE(EXCLUDED.publication_year, ip.works.publication_year),
-          cited_by_count    = GREATEST(COALESCE(ip.works.cited_by_count, 0), COALESCE(EXCLUDED.cited_by_count, 0)),
-          doi               = COALESCE(EXCLUDED.doi, ip.works.doi),
-          type              = COALESCE(EXCLUDED.type, ip.works.type),
-          abstract          = COALESCE(EXCLUDED.abstract, ip.works.abstract),
+          title             = COALESCE(EXCLUDED.title, anxg_ip.works.title),
+          publication_year  = COALESCE(EXCLUDED.publication_year, anxg_ip.works.publication_year),
+          cited_by_count    = GREATEST(COALESCE(anxg_ip.works.cited_by_count, 0), COALESCE(EXCLUDED.cited_by_count, 0)),
+          doi               = COALESCE(EXCLUDED.doi, anxg_ip.works.doi),
+          type              = COALESCE(EXCLUDED.type, anxg_ip.works.type),
+          abstract          = COALESCE(EXCLUDED.abstract, anxg_ip.works.abstract),
           updated_at        = now()
         RETURNING (xmax = 0) AS is_new
     """, (w.get("openalex_id"), w.get("title"), w.get("publication_year"),
@@ -301,12 +299,12 @@ def _upsert_work_institution(cur, openalex_work_id: str, ror_id: str,
                               author_position: str | None,
                               snapshot_year: int | None) -> None:
     cur.execute("""
-        INSERT INTO ip.work_institution
+        INSERT INTO anxg_ip.work_institution
           (openalex_id, ror_id, author_position, snapshot_year)
         VALUES (%s, %s, %s, %s)
         ON CONFLICT (openalex_id, ror_id) DO UPDATE SET
-          author_position = COALESCE(EXCLUDED.author_position, ip.work_institution.author_position),
-          snapshot_year   = COALESCE(EXCLUDED.snapshot_year,   ip.work_institution.snapshot_year)
+          author_position = COALESCE(EXCLUDED.author_position, anxg_ip.work_institution.author_position),
+          snapshot_year   = COALESCE(EXCLUDED.snapshot_year,   anxg_ip.work_institution.snapshot_year)
     """, (openalex_work_id, ror_id, author_position, snapshot_year))
 
 
@@ -351,10 +349,12 @@ def run(*, max_institutions: int | None = None,
     try:
         for entry in pool:
             qid = entry["qid"]
+            if not qid:
+                continue
             stats["qids_searched"] += 1
             try:
                 rec = lookup_institution_by_qid(qid, hint_name=entry.get("name"))
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — [openalex] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 log.warning("[openalex] inst lookup fail %s: %s", qid, exc)
                 rec = None
             if not rec:
@@ -378,6 +378,7 @@ def run(*, max_institutions: int | None = None,
             if dry_run:
                 continue
 
+            assert conn is not None   # dry_run 가드 통과 = 실연결 (mypy narrowing)
             with conn.cursor() as cur:
                 cur.execute("SAVEPOINT sp_inst")
                 try:
@@ -387,7 +388,7 @@ def run(*, max_institutions: int | None = None,
                         stats["institutions_inserted"] += 1
                     else:
                         stats["institutions_updated"] += 1
-                except Exception as exc:   # noqa: BLE001
+                except Exception as exc:   # noqa: BLE001 — [openalex] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                     cur.execute("ROLLBACK TO SAVEPOINT sp_inst")
                     log.warning("[openalex:inst] %s fail: %s", inst.get("ror_id"), exc)
                     continue
@@ -398,7 +399,7 @@ def run(*, max_institutions: int | None = None,
                 works = fetch_works_for_institution(
                     inst["openalex_id"], per_page=works_per_inst,
                     max_pages=1, from_year=from_year)
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — [openalex] works fetch 실패 흡수 → 빈 list + 다음 institution
                 log.warning("[openalex] works fetch fail %s: %s", inst["openalex_id"], exc)
                 works = []
 
@@ -419,7 +420,7 @@ def run(*, max_institutions: int | None = None,
                             stats["works_inserted"] += 1
                         else:
                             stats["works_updated"] += 1
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — [openalex] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                         cur.execute("ROLLBACK TO SAVEPOINT sp_w")
                         log.warning("[openalex:work] %s fail: %s", nw.get("openalex_id"), exc)
                         continue
@@ -431,7 +432,7 @@ def run(*, max_institutions: int | None = None,
                                                   pos, nw.get("publication_year"))
                         stats["work_inst_edges"] += 1
                         cur.execute("RELEASE SAVEPOINT sp_wi")
-                    except Exception as exc:   # noqa: BLE001
+                    except Exception as exc:   # noqa: BLE001 — [openalex:wi] work_institution edge 실패 흡수 → SAVEPOINT rollback + 다음 work
                         cur.execute("ROLLBACK TO SAVEPOINT sp_wi")
                         log.warning("[openalex:wi] %s/%s fail: %s",
                                     nw["openalex_id"], inst["ror_id"], exc)

@@ -157,12 +157,38 @@ class PlantsFile(_Strict):
     plants: list[PlantEntry]
 
 
+class MaterialMetalEntry(_Strict):
+    """알루미늄/강철 합금 entry — materials_metals_seed.yaml 의 materials dict 값."""
+    name: str
+    material_class: str            # 'metal_alloy' 고정 (확장 시 'polymer' 등)
+    alloy_family: str | None = None
+    aliases: list[str] = []
+    typical_processes: list[str] = []
+    typical_modules: list[str] = []
+    density_kg_m3: int | float | None = None
+    wikidata_qid: str | None = None
+
+
+class MetalsModuleMapping(_Strict):
+    """Module → Material 매핑 entry."""
+    module_name: str
+    materials: list[str]
+
+
+class MaterialsMetalsFile(_Strict):
+    version: int
+    last_updated: Any = None
+    materials: dict[str, MaterialMetalEntry]
+    module_to_materials: list[MetalsModuleMapping]
+
+
 # (label, path, model, item_attr) — item_attr 로 개수 카운트.
 AUX_TARGETS: list[tuple[str, Path, type[BaseModel], str]] = [
-    ("auto.extractors",      ROOT / "ontology" / "auto" / "extractors.yaml",      ExtractorsFile,     "extractors"),
-    ("finance.extractors",   ROOT / "ontology" / "extractors.yaml",               ExtractorsFile,     "extractors"),
-    ("auto.system_taxonomy", ROOT / "ontology" / "auto" / "system_taxonomy.yaml", SystemTaxonomyFile, "systems"),
-    ("auto.plants",          ROOT / "ontology" / "auto" / "plants.yaml",          PlantsFile,         "plants"),
+    ("auto.extractors",      ROOT / "ontology" / "auto" / "extractors.yaml",              ExtractorsFile,      "extractors"),
+    ("finance.extractors",   ROOT / "ontology" / "extractors.yaml",                       ExtractorsFile,      "extractors"),
+    ("auto.system_taxonomy", ROOT / "ontology" / "auto" / "system_taxonomy.yaml",         SystemTaxonomyFile,  "systems"),
+    ("auto.plants",          ROOT / "ontology" / "auto" / "plants.yaml",                  PlantsFile,          "plants"),
+    ("auto.materials_metals", ROOT / "ontology" / "auto" / "materials_metals_seed.yaml",  MaterialsMetalsFile, "materials"),
 ]
 
 

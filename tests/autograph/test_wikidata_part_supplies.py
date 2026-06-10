@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 
 # ── SPARQL_PART_SUPPLIES — 등록 + 키 정상 ──────────────────
 def test_sparql_part_supplies_registered():
@@ -25,7 +23,7 @@ def test_sparql_part_supplies_registered():
 
 # ── loader 모듈 import smoke ────────────────────────────────
 def test_loader_importable():
-    from autograph.loaders import load_wikidata_part_supplies as L
+    from autograph.loaders.master import load_wikidata_part_supplies as L
     assert callable(L.load_part_supplies)
     assert hasattr(L, "LoadStats")
     assert L._WIKIDATA_PART_CONFIDENCE == 0.80
@@ -42,7 +40,7 @@ def _write_jsonl(path: Path, rows: list[dict]):
 
 def test_load_part_supplies_inserts_staging(tmp_path, monkeypatch):
     """정상 row 가 INSERT 호출로 변환되는지."""
-    from autograph.loaders import load_wikidata_part_supplies as L
+    from autograph.loaders.master import load_wikidata_part_supplies as L
 
     monkeypatch.setattr(L, "_wikidata_root", lambda: tmp_path)
     _write_jsonl(tmp_path / "part_supplies.jsonl", [
@@ -90,7 +88,7 @@ def test_load_part_supplies_inserts_staging(tmp_path, monkeypatch):
 
 def test_load_part_supplies_skips_bad_rows(tmp_path, monkeypatch):
     """라벨이 QID 그대로(Wikidata label 부재) 인 row 는 skip."""
-    from autograph.loaders import load_wikidata_part_supplies as L
+    from autograph.loaders.master import load_wikidata_part_supplies as L
 
     monkeypatch.setattr(L, "_wikidata_root", lambda: tmp_path)
     _write_jsonl(tmp_path / "part_supplies.jsonl", [
@@ -118,7 +116,7 @@ def test_load_part_supplies_skips_bad_rows(tmp_path, monkeypatch):
 
 def test_load_part_supplies_no_file(tmp_path, monkeypatch):
     """raw 파일 없으면 graceful — 빈 stats."""
-    from autograph.loaders import load_wikidata_part_supplies as L
+    from autograph.loaders.master import load_wikidata_part_supplies as L
     monkeypatch.setattr(L, "_wikidata_root", lambda: tmp_path / "nope")
     stats = L.load_part_supplies()
     assert stats.rows_seen == 0

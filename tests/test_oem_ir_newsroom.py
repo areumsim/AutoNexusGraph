@@ -12,8 +12,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -297,8 +295,9 @@ def test_crawl_robots_check_blocks_url(monkeypatch):
 # ── _meta.jsonl 저장 + loader 통합 ─────────────────────────────
 def test_crawl_writes_meta_jsonl(monkeypatch, tmp_path):
     """fetch 성공 시 _meta.jsonl 에 row append 검증."""
-    from autograph.ingestion.oem_ir_newsroom import FetchedDocument
     import datetime as _dt
+
+    from autograph.ingestion.oem_ir_newsroom import FetchedDocument
 
     fake_doc = FetchedDocument(
         oem="hyundai",
@@ -343,7 +342,7 @@ def test_list_policies_returns_all():
 # ── loader 라이선스 게이트 ──────────────────────────────────────
 def test_loader_skips_when_meta_missing(monkeypatch, tmp_path):
     """raw _meta.jsonl 없으면 graceful skip."""
-    from autograph.loaders import load_oem_ir_news as LD
+    from autograph.loaders.chunks import load_oem_ir_news as LD
 
     class FakeSettings:
         ingest_raw_dir = tmp_path
@@ -355,7 +354,7 @@ def test_loader_skips_when_meta_missing(monkeypatch, tmp_path):
 
 def test_loader_dry_run_reports_tier(monkeypatch, tmp_path):
     """dry_run=True 시 tier 정보 노출."""
-    from autograph.loaders import load_oem_ir_news as LD
+    from autograph.loaders.chunks import load_oem_ir_news as LD
 
     oem_dir = tmp_path / "auto" / "oem_ir" / "hyundai"
     oem_dir.mkdir(parents=True)

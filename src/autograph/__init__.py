@@ -6,7 +6,7 @@ AutoNexusGraph 코어(LangGraph multi-agent, PG/Neo4j/pgvector, cost/number/cyph
 코어 라우팅 결정:
 - 자유 SQL/Cypher 금지 — 모든 Cypher 는 ``autograph.cypher_templates_auto.AUTO_TEMPLATES``
   레지스트리에 등록.
-- 정량 수치는 PG 조회 결과만 사용 (LLM 생성 금지). bridge.corp_entity 경유로 finance 와 연결.
+- 정량 수치는 PG 조회 결과만 사용 (LLM 생성 금지). anxg_bridge.corp_entity 경유로 finance 와 연결.
 - 관계 정보는 Neo4j 에 두되 source / confidence / validated_status / snapshot_year 강제.
 """
 

@@ -40,9 +40,10 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     save_raw,
 )
-from ..config import get_auto_settings
-from ._common_nhtsa import models_from_vpic as _models_from_vpic, nhtsa_http_get
 
+from ..config import get_auto_settings
+from ._common_nhtsa import models_from_vpic as _models_from_vpic
+from ._common_nhtsa import nhtsa_http_get
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ def fetch_safety_ratings(make: str, model: str, year: int) -> dict:
                 for k, v in dres.items():
                     if k not in merged or merged[k] in (None, ""):
                         merged[k] = v
-            except Exception as e:   # noqa: BLE001
+            except Exception as e:   # noqa: BLE001 — [safety] VehicleId detail 호출 실패 흡수 → log + listing 만으로 merged (부분 보강)
                 log.warning("[safety] VehicleId=%s detail 실패: %s", vid, e)
         enriched.append(merged)
 
@@ -120,7 +121,7 @@ def ingest_make_year(make: str, year: int, *,
             n_done += 1
             n_rated_trims += len(data.get("Results") or [])
             ckpt.mark_done(key, {"rated_trims": len(data.get("Results") or [])})
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — [safety] failed %s 흡수 → {"models_fetched": n_done, ... 반환
             log.exception("[safety] failed %s", key)
             ckpt.mark_failed(key, str(e))
 

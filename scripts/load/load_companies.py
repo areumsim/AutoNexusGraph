@@ -1,4 +1,4 @@
-"""master.companies 적재 진입점."""
+"""anxg_master.companies 적재 진입점."""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +12,7 @@ from autonexusgraph.loaders import load_companies  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="master.companies 적재 (DART + KRX)")
+    parser = argparse.ArgumentParser(description="anxg_master.companies 적재 (DART + KRX)")
     parser.add_argument("--dry-run", action="store_true",
                         help="SQL 만 출력하고 실행 X")
     parser.add_argument("--batch-size", type=int, default=200)

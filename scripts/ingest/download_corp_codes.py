@@ -51,7 +51,7 @@ def main() -> int:
 
     with DartClient(api_key=s.dart_api_key, rate_limit_per_sec=s.ingest_rate_limit_per_sec) as client:
         zip_path = out_dir / "corpCode.xml.zip"
-        print(f"[INFO] downloading zip...")
+        print("[INFO] downloading zip...")
         zip_bytes = client.fetch_corp_codes_zip()
         zip_path.write_bytes(zip_bytes)
         print(f"[OK] saved {zip_path} ({len(zip_bytes):,} bytes)")

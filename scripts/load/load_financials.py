@@ -1,4 +1,4 @@
-"""fin.financials 적재 진입점 (184K+ rows)."""
+"""anxg_fin.financials 적재 진입점 (184K+ rows)."""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +12,7 @@ from autonexusgraph.loaders import load_financials  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="fin.financials 적재 (XBRL)")
+    parser = argparse.ArgumentParser(description="anxg_fin.financials 적재 (XBRL)")
     parser.add_argument("--dry-run", action="store_true",
                         help="row 수 / 배치 수만 계산하고 적재 안 함")
     parser.add_argument("--batch-size", type=int, default=1000)

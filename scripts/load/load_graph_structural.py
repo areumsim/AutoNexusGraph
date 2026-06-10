@@ -12,7 +12,9 @@ _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "src"))
 
 from autonexusgraph.loaders import (  # noqa: E402
-    load_executives, load_shareholders, load_subsidiaries,
+    load_executives,
+    load_shareholders,
+    load_subsidiaries,
 )
 
 

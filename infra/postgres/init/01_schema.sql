@@ -19,9 +19,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ── 1. 회사 마스터 ─────────────────────────────────────────────────
-CREATE SCHEMA IF NOT EXISTS master;
+CREATE SCHEMA IF NOT EXISTS anxg_master;
 
-CREATE TABLE IF NOT EXISTS master.companies (
+CREATE TABLE IF NOT EXISTS anxg_master.companies (
     corp_code      CHAR(8)         PRIMARY KEY,         -- DART 고유 8자리
     corp_name      VARCHAR(200)    NOT NULL,
     stock_code     CHAR(6),                              -- 상장사만 (6자리)
@@ -33,10 +33,10 @@ CREATE TABLE IF NOT EXISTS master.companies (
     extra          JSONB           NOT NULL DEFAULT '{}'::jsonb,
     updated_at     TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_companies_stock ON master.companies(stock_code);
-CREATE INDEX IF NOT EXISTS idx_companies_name  ON master.companies(corp_name);
+CREATE INDEX IF NOT EXISTS idx_companies_stock ON anxg_master.companies(stock_code);
+CREATE INDEX IF NOT EXISTS idx_companies_name  ON anxg_master.companies(corp_name);
 
-CREATE TABLE IF NOT EXISTS master.index_constituents (
+CREATE TABLE IF NOT EXISTS anxg_master.index_constituents (
     index_name     VARCHAR(50)     NOT NULL,             -- KOSPI200, KOSDAQ150
     stock_code     CHAR(6)         NOT NULL,
     snapshot_date  DATE            NOT NULL,
@@ -45,11 +45,11 @@ CREATE TABLE IF NOT EXISTS master.index_constituents (
 );
 
 -- ── 2. 재무제표 ────────────────────────────────────────────────────
-CREATE SCHEMA IF NOT EXISTS fin;
+CREATE SCHEMA IF NOT EXISTS anxg_fin;
 
-CREATE TABLE IF NOT EXISTS fin.financials (
+CREATE TABLE IF NOT EXISTS anxg_fin.financials (
     id             BIGSERIAL       PRIMARY KEY,
-    corp_code      CHAR(8)         NOT NULL REFERENCES master.companies(corp_code),
+    corp_code      CHAR(8)         NOT NULL REFERENCES anxg_master.companies(corp_code),
     bsns_year      SMALLINT        NOT NULL,             -- 사업연도
     reprt_code     CHAR(5)         NOT NULL,             -- 11011=사업, 11012=반기...
     fs_div         CHAR(3)         NOT NULL,             -- CFS=연결, OFS=별도
@@ -63,13 +63,13 @@ CREATE TABLE IF NOT EXISTS fin.financials (
     raw            JSONB,                                 -- 원본 row (감사용)
     UNIQUE (corp_code, bsns_year, reprt_code, fs_div, account_id, account_nm)
 );
-CREATE INDEX IF NOT EXISTS idx_fin_corp_year ON fin.financials(corp_code, bsns_year);
-CREATE INDEX IF NOT EXISTS idx_fin_account   ON fin.financials(account_nm);
+CREATE INDEX IF NOT EXISTS idx_fin_corp_year ON anxg_fin.financials(corp_code, bsns_year);
+CREATE INDEX IF NOT EXISTS idx_fin_account   ON anxg_fin.financials(account_nm);
 
 -- ── 3. 공시 보고서 메타 ───────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS fin.filings (
+CREATE TABLE IF NOT EXISTS anxg_fin.filings (
     rcept_no       CHAR(14)        PRIMARY KEY,          -- DART 접수번호
-    corp_code      CHAR(8)         NOT NULL REFERENCES master.companies(corp_code),
+    corp_code      CHAR(8)         NOT NULL REFERENCES anxg_master.companies(corp_code),
     report_nm      VARCHAR(300)    NOT NULL,
     rcept_dt       DATE            NOT NULL,
     flr_nm         VARCHAR(200),
@@ -77,12 +77,12 @@ CREATE TABLE IF NOT EXISTS fin.filings (
     raw            JSONB,
     ingested_at    TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_filings_corp_date ON fin.filings(corp_code, rcept_dt DESC);
+CREATE INDEX IF NOT EXISTS idx_filings_corp_date ON anxg_fin.filings(corp_code, rcept_dt DESC);
 
 -- ── 4. 거시지표 (ECOS) ────────────────────────────────────────────
-CREATE SCHEMA IF NOT EXISTS macro;
+CREATE SCHEMA IF NOT EXISTS anxg_macro;
 
-CREATE TABLE IF NOT EXISTS macro.series (
+CREATE TABLE IF NOT EXISTS anxg_macro.series (
     stat_code      VARCHAR(20)     NOT NULL,
     item_code      VARCHAR(40)     NOT NULL,
     time           VARCHAR(20)     NOT NULL,             -- D=YYYYMMDD, M=YYYYMM, Q=YYYYQN, A=YYYY
@@ -92,12 +92,12 @@ CREATE TABLE IF NOT EXISTS macro.series (
     stat_name      VARCHAR(300),
     PRIMARY KEY (stat_code, item_code, time)
 );
-CREATE INDEX IF NOT EXISTS idx_macro_stat_time ON macro.series(stat_code, time);
+CREATE INDEX IF NOT EXISTS idx_macro_stat_time ON anxg_macro.series(stat_code, time);
 
 -- ── 5. 채팅 / 대화 히스토리 (PRD §7.6) ────────────────────────────
-CREATE SCHEMA IF NOT EXISTS chat;
+CREATE SCHEMA IF NOT EXISTS anxg_chat;
 
-CREATE TABLE IF NOT EXISTS chat.conversations (
+CREATE TABLE IF NOT EXISTS anxg_chat.conversations (
     id             UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     thread_id      VARCHAR(64)     NOT NULL UNIQUE,      -- LangGraph thread_id 와 1:1
     title          VARCHAR(200)    NOT NULL DEFAULT 'New conversation',
@@ -106,11 +106,11 @@ CREATE TABLE IF NOT EXISTS chat.conversations (
     updated_at     TIMESTAMPTZ     NOT NULL DEFAULT now(),
     metadata       JSONB           NOT NULL DEFAULT '{}'::jsonb
 );
-CREATE INDEX IF NOT EXISTS idx_conv_user_updated ON chat.conversations(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conv_user_updated ON anxg_chat.conversations(user_id, updated_at DESC);
 
-CREATE TABLE IF NOT EXISTS chat.messages (
+CREATE TABLE IF NOT EXISTS anxg_chat.messages (
     id             BIGSERIAL       PRIMARY KEY,
-    conversation_id UUID           NOT NULL REFERENCES chat.conversations(id) ON DELETE CASCADE,
+    conversation_id UUID           NOT NULL REFERENCES anxg_chat.conversations(id) ON DELETE CASCADE,
     turn_idx       INT             NOT NULL,             -- conversation 내 0,1,2,...
     role           VARCHAR(20)     NOT NULL,             -- user | assistant | system
     content        TEXT            NOT NULL,
@@ -120,29 +120,29 @@ CREATE TABLE IF NOT EXISTS chat.messages (
     created_at     TIMESTAMPTZ     NOT NULL DEFAULT now(),
     UNIQUE (conversation_id, turn_idx, role)
 );
-CREATE INDEX IF NOT EXISTS idx_msg_conv ON chat.messages(conversation_id, turn_idx);
+CREATE INDEX IF NOT EXISTS idx_msg_conv ON anxg_chat.messages(conversation_id, turn_idx);
 
 -- 전문 검색 (한국어는 simple, 향후 PG `mecab-ko` 검토)
-ALTER TABLE chat.messages
+ALTER TABLE anxg_chat.messages
   ADD COLUMN IF NOT EXISTS content_tsv tsvector
     GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
-CREATE INDEX IF NOT EXISTS idx_msg_tsv ON chat.messages USING GIN(content_tsv);
+CREATE INDEX IF NOT EXISTS idx_msg_tsv ON anxg_chat.messages USING GIN(content_tsv);
 
 -- 사용자 피드백 (PRD §7.6.5 — 👍/👎/📝 → 평가 데이터로 적재)
-CREATE TABLE IF NOT EXISTS chat.feedback (
+CREATE TABLE IF NOT EXISTS anxg_chat.feedback (
     id             BIGSERIAL       PRIMARY KEY,
-    message_id     BIGINT          NOT NULL REFERENCES chat.messages(id) ON DELETE CASCADE,
+    message_id     BIGINT          NOT NULL REFERENCES anxg_chat.messages(id) ON DELETE CASCADE,
     rating         SMALLINT        NOT NULL,                 -- +1 = up, -1 = down, 0 = comment-only
     comment        TEXT,
     created_at     TIMESTAMPTZ     NOT NULL DEFAULT now(),
     UNIQUE (message_id)                                       -- 한 message 당 1건 (덮어쓰기는 별도 UPDATE)
 );
-CREATE INDEX IF NOT EXISTS idx_feedback_msg ON chat.feedback(message_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_msg ON anxg_chat.feedback(message_id);
 
 -- ── 6. 평가 (PRD §8) ──────────────────────────────────────────────
-CREATE SCHEMA IF NOT EXISTS eval;
+CREATE SCHEMA IF NOT EXISTS anxg_eval;
 
-CREATE TABLE IF NOT EXISTS eval.qa_gold (
+CREATE TABLE IF NOT EXISTS anxg_eval.qa_gold (
     id             VARCHAR(50)     PRIMARY KEY,
     question       TEXT            NOT NULL,
     answer         TEXT            NOT NULL,
@@ -153,12 +153,12 @@ CREATE TABLE IF NOT EXISTS eval.qa_gold (
     created_at     TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS eval.runs (
+CREATE TABLE IF NOT EXISTS anxg_eval.runs (
     id             UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     system         VARCHAR(50)     NOT NULL,             -- vector / graph / hybrid / sql_vec
     llm_provider   VARCHAR(20)     NOT NULL,
     llm_model      VARCHAR(100)    NOT NULL,
-    qa_id          VARCHAR(50)     NOT NULL REFERENCES eval.qa_gold(id),
+    qa_id          VARCHAR(50)     NOT NULL REFERENCES anxg_eval.qa_gold(id),
     predicted      TEXT,
     is_correct     BOOLEAN,
     judge_score    NUMERIC(5, 2),
@@ -168,17 +168,17 @@ CREATE TABLE IF NOT EXISTS eval.runs (
     trace          JSONB,
     created_at     TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_runs_system_qa ON eval.runs(system, qa_id);
+CREATE INDEX IF NOT EXISTS idx_runs_system_qa ON anxg_eval.runs(system, qa_id);
 
 -- ── 7. 벡터 저장 (pgvector — Qdrant 대체) ───────────────────────────
-CREATE SCHEMA IF NOT EXISTS vec;
+CREATE SCHEMA IF NOT EXISTS anxg_vec;
 
 -- 청크 단위 본문 + 임베딩.
 -- dim=1024 는 BGE-M3 dense 차원. 모델 바뀌면 별 테이블 또는 ALTER 필요.
-CREATE TABLE IF NOT EXISTS vec.chunks (
+CREATE TABLE IF NOT EXISTS anxg_vec.chunks (
     id             BIGSERIAL       PRIMARY KEY,
-    corp_code      CHAR(8)         NOT NULL REFERENCES master.companies(corp_code),
-    rcept_no       CHAR(14)        REFERENCES fin.filings(rcept_no),
+    corp_code      CHAR(8)         NOT NULL REFERENCES anxg_master.companies(corp_code),
+    rcept_no       CHAR(14)        REFERENCES anxg_fin.filings(rcept_no),
     section        VARCHAR(100),                          -- 사업개요/위험요인/지배구조 등
     chunk_idx      INT             NOT NULL,              -- 보고서 내 순번
     text           TEXT            NOT NULL,
@@ -191,6 +191,6 @@ CREATE TABLE IF NOT EXISTS vec.chunks (
 
 -- ANN 인덱스 (HNSW — pgvector 0.5+). lists 보다 빠름. 코사인 거리.
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw
-  ON vec.chunks USING hnsw (embedding vector_cosine_ops);
+  ON anxg_vec.chunks USING hnsw (embedding vector_cosine_ops);
 
-CREATE INDEX IF NOT EXISTS idx_chunks_corp_section ON vec.chunks(corp_code, section);
+CREATE INDEX IF NOT EXISTS idx_chunks_corp_section ON anxg_vec.chunks(corp_code, section);

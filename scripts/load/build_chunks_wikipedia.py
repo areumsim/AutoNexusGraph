@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wikipedia 본문 HTML → 텍스트 추출 → vec.chunks 적재 (embedding NULL).
+"""Wikipedia 본문 HTML → 텍스트 추출 → anxg_vec.chunks 적재 (embedding NULL).
 
 DART 청크와 같은 테이블, section='wikipedia_<lang>' 으로 식별.
 rcept_no 컬럼은 NULL 허용 → Wikipedia 청크는 rcept_no=NULL 로.
@@ -23,16 +23,15 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 
-
 SQL_DELETE_PREV = """
-DELETE FROM vec.chunks
+DELETE FROM anxg_vec.chunks
  WHERE corp_code = %s AND section = %s AND rcept_no IS NULL
 """
 
 # Wikipedia 청크는 rcept_no NULL. PG 의 (rcept_no, chunk_idx) UNIQUE 는 NULL 을 distinct 로 봐
 # 충돌이 안 나지만, 재실행 멱등성을 위해 같은 (corp_code, section) 전체를 DELETE 후 INSERT.
 SQL_INSERT = """
-INSERT INTO vec.chunks
+INSERT INTO anxg_vec.chunks
   (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata,
    source, fiscal_year, report_type)
 VALUES (%(corp_code)s, NULL, %(section)s, %(chunk_idx)s, %(text)s,
@@ -167,12 +166,12 @@ def main() -> int:
     if not args.dry_run:
         with pool.connection() as conn, conn.cursor() as cur:
             cur.execute("""
-                SELECT section, count(*) FROM vec.chunks
+                SELECT section, count(*) FROM anxg_vec.chunks
                  WHERE section LIKE 'wikipedia_%'
                  GROUP BY section ORDER BY 2 DESC
             """)
             for r in cur.fetchall():
-                print(f"[vec.chunks] {r[0]} : {r[1]:,}")
+                print(f"[anxg_vec.chunks] {r[0]} : {r[1]:,}")
     return 0
 
 

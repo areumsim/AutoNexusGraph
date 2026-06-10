@@ -16,7 +16,6 @@ from typing import Any
 
 from .base import LLMClient, LLMError, LLMResponse, TokenUsage
 
-
 # 모델별 토큰 단가 (USD, 1M 토큰당) — ai.google.dev/pricing
 # ≤200K input tokens 기본 가격. 그 이상은 별 가격이나 MVP 트래픽은 보통 lower tier.
 _PRICING: dict[str, tuple[float, float]] = {
@@ -86,11 +85,11 @@ class GeminiClient(LLMClient):
         try:
             resp = self._client.models.generate_content(
                 model=self.model,
-                contents=contents,
-                config=cfg,
+                contents=contents,  # type: ignore[arg-type]  # google-genai dict/list 입력 허용(stub 엄격)
+                config=cfg,  # type: ignore[arg-type]  # google-genai ConfigDict 입력 허용
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"Gemini chat failed: {e}") from e
 
         content = (resp.text or "") if hasattr(resp, "text") else ""
@@ -114,15 +113,15 @@ class GeminiClient(LLMClient):
         try:
             stream = self._client.models.generate_content_stream(
                 model=self.model,
-                contents=contents,
-                config=cfg,
+                contents=contents,  # type: ignore[arg-type]  # google-genai dict/list 입력 허용(stub 엄격)
+                config=cfg,  # type: ignore[arg-type]  # google-genai ConfigDict 입력 허용
                 **kwargs,
             )
             for chunk in stream:
                 t = getattr(chunk, "text", "") or ""
                 if t:
                     yield t
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"Gemini stream failed: {e}") from e
 
     def chat_json(
@@ -151,11 +150,11 @@ class GeminiClient(LLMClient):
         try:
             resp = self._client.models.generate_content(
                 model=self.model,
-                contents=contents,
-                config=cfg,
+                contents=contents,  # type: ignore[arg-type]  # google-genai dict/list 입력 허용(stub 엄격)
+                config=cfg,  # type: ignore[arg-type]  # google-genai ConfigDict 입력 허용
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"Gemini json failed: {e}") from e
 
         # Gemini 가 parsed 객체를 직접 줄 수도, text 만 줄 수도 있음 — 안전하게 둘 다 처리.

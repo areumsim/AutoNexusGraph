@@ -30,7 +30,8 @@ import importlib.util
 import logging
 import os
 import threading
-from typing import Any, Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
 
 from .state import AgentState
 
@@ -146,7 +147,7 @@ def discover_plugins(*, force: bool = False) -> list[str]:
                 importlib.import_module(name)
                 loaded.append(name)
                 log.info("[domain] plugin %r loaded", name)
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — [domain] plugin %r import failed 흡수 → loaded 반환
                 log.warning("[domain] plugin %r import failed: %s", name, exc)
         return loaded
 

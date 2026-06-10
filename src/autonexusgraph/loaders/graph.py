@@ -1,14 +1,14 @@
-"""master.companies 기반 Neo4j 그래프 1차 적재.
+"""anxg_master.companies 기반 Neo4j 그래프 1차 적재.
 
 생성/갱신되는 노드·관계 (ontology/entities.yaml + relations.yaml SSOT):
 
-    (:Company {corp_code, name, stock_code, market_cap, sector_code})
-    (:Market  {name})
-    (:Industry {code})
-    (:Person  {name})            -- CEO 한정 (임원 전체는 graph_structural.py)
-    (:Company)-[:LISTED_IN]->(:Market)
-    (:Company)-[:IN_INDUSTRY]->(:Industry)
-    (:Company)-[:HAS_CEO]->(:Person)
+    (:Anxg_Company {corp_code, name, stock_code, market_cap, sector_code})
+    (:Anxg_Market  {name})
+    (:Anxg_Industry {code})
+    (:Anxg_Person  {name})            -- CEO 한정 (임원 전체는 graph_structural.py)
+    (:Anxg_Company)-[:LISTED_IN]->(:Anxg_Market)
+    (:Anxg_Company)-[:IN_INDUSTRY]->(:Anxg_Industry)
+    (:Anxg_Company)-[:HAS_CEO]->(:Anxg_Person)
 
 설계 메모:
 - 라벨은 ontology/entities.yaml 의 Industry / Market 와 일치 (이전 'Sector' 명칭은 폐기).
@@ -29,12 +29,11 @@ from ..config import get_settings
 from ._common import LoadStats
 from ._edge_meta import edge_meta_set_clause
 
-
 # 회사 + 시장 — UNWIND 배치, MERGE 기반 멱등.
 # 엣지 메타 7키 (PRD §6.7): edge_meta_set_clause 헬퍼가 coalesce 절 생성.
 CYPHER_COMPANIES = f"""
 UNWIND $rows AS r
-MERGE (c:Company {{corp_code: r.corp_code}})
+MERGE (c:Anxg_Company {{corp_code: r.corp_code}})
 SET c.name = r.name,
     c.stock_code = r.stock_code,
     c.market_cap = r.market_cap,
@@ -42,7 +41,7 @@ SET c.name = r.name,
     c.updated_at = datetime()
 WITH c, r
   WHERE r.market IS NOT NULL
-MERGE (m:Market {{name: r.market}})
+MERGE (m:Anxg_Market {{name: r.market}})
 MERGE (c)-[rel:LISTED_IN]->(m)
 SET rel.source = 'krx',
 {edge_meta_set_clause('rel', source_type='krx_master', confidence_score=0.95)}
@@ -51,8 +50,8 @@ SET rel.source = 'krx',
 # 산업 분류: DART induty_code / KSIC 코드를 키로. ontology 명칭은 Industry.
 CYPHER_INDUSTRIES = f"""
 UNWIND $rows AS r
-MATCH (c:Company {{corp_code: r.corp_code}})
-MERGE (s:Industry {{code: r.sector_code}})
+MATCH (c:Anxg_Company {{corp_code: r.corp_code}})
+MERGE (s:Anxg_Industry {{code: r.sector_code}})
 MERGE (c)-[rel:IN_INDUSTRY]->(s)
 SET rel.source = 'dart',
 {edge_meta_set_clause('rel', source_type='dart_induty_code', confidence_score=0.95)}
@@ -62,9 +61,11 @@ SET rel.source = 'dart',
 # 임원 전체는 graph_structural.py 의 EXECUTIVE_OF 가 SSOT.
 CYPHER_CEOS = f"""
 UNWIND $rows AS r
-MATCH (c:Company {{corp_code: r.corp_code}})
+MATCH (c:Anxg_Company {{corp_code: r.corp_code}})
 UNWIND r.ceos AS name
-MERGE (p:Person {{name: name}})
+// Person 자연키 = (name, birth_year). CEO 명단엔 birth_year 가 없어 -1 로 정규화 —
+// graph_structural.py 의 (name, birth_year) 규약 + person_name_birth_unique 제약과 정합.
+MERGE (p:Anxg_Person {{name: name, birth_year: -1}})
 ON CREATE SET p.source = 'dart_ceo'
 MERGE (c)-[rel:HAS_CEO]->(p)
 SET rel.source = 'dart',
@@ -73,15 +74,17 @@ SET rel.source = 'dart',
 
 # 인덱스 — idempotent. 첫 적재 시 자동 생성.
 CYPHER_INDEXES = [
-    "CREATE INDEX company_corp_code IF NOT EXISTS FOR (c:Company)  ON (c.corp_code)",
-    "CREATE INDEX company_name      IF NOT EXISTS FOR (c:Company)  ON (c.name)",
-    "CREATE INDEX company_stock     IF NOT EXISTS FOR (c:Company)  ON (c.stock_code)",
-    "CREATE INDEX market_name       IF NOT EXISTS FOR (m:Market)   ON (m.name)",
-    "CREATE INDEX industry_code     IF NOT EXISTS FOR (s:Industry) ON (s.code)",
-    "CREATE INDEX person_name       IF NOT EXISTS FOR (p:Person)   ON (p.name)",
-    "CREATE INDEX person_name_birth IF NOT EXISTS FOR (p:Person)   ON (p.name, p.birth_year)",
-    "CREATE INDEX newsevent_hash    IF NOT EXISTS FOR (n:NewsEvent) ON (n.article_hash)",
-    "CREATE INDEX group_name        IF NOT EXISTS FOR (g:Group)    ON (g.name)",
+    "CREATE INDEX company_corp_code IF NOT EXISTS FOR (c:Anxg_Company)  ON (c.corp_code)",
+    "CREATE INDEX company_name      IF NOT EXISTS FOR (c:Anxg_Company)  ON (c.name)",
+    "CREATE INDEX company_stock     IF NOT EXISTS FOR (c:Anxg_Company)  ON (c.stock_code)",
+    "CREATE INDEX market_name       IF NOT EXISTS FOR (m:Anxg_Market)   ON (m.name)",
+    "CREATE INDEX industry_code     IF NOT EXISTS FOR (s:Anxg_Industry) ON (s.code)",
+    "CREATE INDEX person_name       IF NOT EXISTS FOR (p:Anxg_Person)   ON (p.name)",
+    # (name, birth_year) UNIQUE 제약 — MERGE 원자성 보장(제약 없으면 배치 MERGE 가 중복 노드 생성).
+    # ⚠️ 레거시 중복 DB 에선 먼저 scripts/migrate/dedup_persons_neo4j.py --apply 로 dedup 후 생성됨.
+    "CREATE CONSTRAINT person_name_birth_unique IF NOT EXISTS FOR (p:Anxg_Person) REQUIRE (p.name, p.birth_year) IS UNIQUE",
+    "CREATE INDEX newsevent_hash    IF NOT EXISTS FOR (n:Anxg_NewsEvent) ON (n.article_hash)",
+    "CREATE INDEX group_name        IF NOT EXISTS FOR (g:Anxg_Group)    ON (g.name)",
 ]
 
 
@@ -97,7 +100,7 @@ def load_graph_companies(
     dry_run: bool = False,
     batch_size: int = 200,
 ) -> LoadStats:
-    """master.companies → Neo4j (Company + Market + Industry + Person(CEO)).
+    """anxg_master.companies → Neo4j (Company + Market + Industry + Person(CEO)).
 
     Args:
         dry_run: True 면 적재 없이 row 수만 계산.
@@ -110,7 +113,7 @@ def load_graph_companies(
     with psycopg.connect(s.postgres_dsn) as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT corp_code, corp_name, stock_code, market, sector, extra
-            FROM master.companies
+            FROM anxg_master.companies
             WHERE is_active = TRUE
             ORDER BY corp_code
         """)
@@ -125,7 +128,7 @@ def load_graph_companies(
         if isinstance(extra, str):
             try:
                 extra = json.loads(extra)
-            except Exception:
+            except Exception:   # noqa: BLE001 — extra JSONB 파싱 실패 흡수 → 빈 dict
                 extra = {}
         elif extra is None:
             extra = {}
@@ -155,13 +158,12 @@ def load_graph_companies(
         return stats
 
     from ..db import neo4j as nx
-    driver = nx.get_driver()
 
     def _batch(seq: list, n: int):
         for i in range(0, len(seq), n):
             yield seq[i:i + n]
 
-    with driver.session() as session:
+    with nx.get_session() as session:
         # 인덱스 먼저 (idempotent)
         for cypher in CYPHER_INDEXES:
             session.run(cypher)

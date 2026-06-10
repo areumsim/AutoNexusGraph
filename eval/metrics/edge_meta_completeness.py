@@ -59,20 +59,20 @@ def collect_edge_meta_completeness() -> dict[str, Any]:
     """
     out: dict[str, Any] = {"rels": {}, "overall": {}}
     try:
-        from autonexusgraph.db.neo4j import get_driver
+        from autonexusgraph.db.neo4j import get_driver, get_session
     except Exception as e:   # noqa: BLE001
         log.warning("[edge_meta] Neo4j 모듈 import 실패: %s", e)
         return out
 
     try:
-        driver = get_driver()
+        get_driver()   # 연결 probe (실패 시 아래 except 로 early-return). 세션은 get_session() 사용.
     except Exception as e:   # noqa: BLE001
         log.warning("[edge_meta] Neo4j 연결 실패: %s", e)
         return out
 
     # 1) 활성 관계 타입 목록.
     try:
-        with driver.session() as session:
+        with get_session() as session:
             rel_rows = session.run(
                 "CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType"
             ).data()
@@ -87,7 +87,7 @@ def collect_edge_meta_completeness() -> dict[str, Any]:
 
     for rt in rel_types:
         try:
-            with driver.session() as session:
+            with get_session() as session:
                 # 동적 cypher 안전성 — rt 가 db.relationshipTypes 의 결과라 SAFE.
                 clauses = ["count(r) AS total"]
                 for m in REQUIRED_META:

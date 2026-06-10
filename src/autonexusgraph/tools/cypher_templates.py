@@ -25,7 +25,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 # ── 공용 param_schema 상수 (도메인 import 용) ────────────────
 # autograph / ipgraph 가 같은 정의를 반복하지 않도록 core 에 SSOT.
 # (int, ("range", min, max)) 튜플은 validate_template_spec 의 ("range",) 분기 사용.
@@ -99,7 +98,7 @@ TEMPLATES: dict[str, dict] = {
     # ── 회사 식별 ──
     "lookup_company": {
         "cypher": """
-        MATCH (c:Company)
+        MATCH (c:Anxg_Company)
         WHERE c.corp_code = $q
            OR c.stock_code = $q
            OR c.name = $q
@@ -121,8 +120,8 @@ TEMPLATES: dict[str, dict] = {
     # ── 인물 ──
     "lookup_person_by_name": {
         "cypher": """
-        MATCH (p:Person {name: $name})
-        OPTIONAL MATCH (p)-[:EXECUTIVE_OF]->(c:Company)
+        MATCH (p:Anxg_Person {name: $name})
+        OPTIONAL MATCH (p)-[:EXECUTIVE_OF]->(c:Anxg_Company)
         WITH p, collect(DISTINCT c.name)[..5] AS sample_corps
         RETURN p.name AS name, p.birth_year AS birth_year,
                p.gender AS gender, sample_corps
@@ -138,8 +137,8 @@ TEMPLATES: dict[str, dict] = {
 
     "lookup_person_by_name_year": {
         "cypher": """
-        MATCH (p:Person {name: $name, birth_year: $by})
-        OPTIONAL MATCH (p)-[:EXECUTIVE_OF]->(c:Company)
+        MATCH (p:Anxg_Person {name: $name, birth_year: $by})
+        OPTIONAL MATCH (p)-[:EXECUTIVE_OF]->(c:Anxg_Company)
         WITH p, collect(DISTINCT c.name)[..5] AS sample_corps
         RETURN p.name AS name, p.birth_year AS birth_year,
                p.gender AS gender, sample_corps
@@ -156,7 +155,7 @@ TEMPLATES: dict[str, dict] = {
     # ── 자회사·모회사 ──
     "list_subsidiaries": {
         "cypher": """
-        MATCH (child:Company)-[r:SUBSIDIARY_OF]->(parent:Company {corp_code: $cc})
+        MATCH (child:Anxg_Company)-[r:SUBSIDIARY_OF]->(parent:Anxg_Company {corp_code: $cc})
         WHERE $year IS NULL OR r.rcept_year = $year
         RETURN child.corp_code AS child_corp_code,
                child.name      AS child_name,
@@ -176,7 +175,7 @@ TEMPLATES: dict[str, dict] = {
 
     "list_subsidiaries_with_related": {
         "cypher": """
-        MATCH (child:Company)-[r:SUBSIDIARY_OF|RELATED_TO]->(parent:Company {corp_code: $cc})
+        MATCH (child:Anxg_Company)-[r:SUBSIDIARY_OF|RELATED_TO]->(parent:Anxg_Company {corp_code: $cc})
         WHERE $year IS NULL OR r.rcept_year = $year
         RETURN child.corp_code AS child_corp_code,
                child.name      AS child_name,
@@ -196,7 +195,7 @@ TEMPLATES: dict[str, dict] = {
 
     "list_parents": {
         "cypher": """
-        MATCH (child:Company)-[r:SUBSIDIARY_OF]->(parent:Company)
+        MATCH (child:Anxg_Company)-[r:SUBSIDIARY_OF]->(parent:Anxg_Company)
         WHERE child.corp_code = $k OR child.name = $k
         RETURN parent.corp_code AS parent_corp_code,
                parent.name      AS parent_name,
@@ -215,7 +214,7 @@ TEMPLATES: dict[str, dict] = {
     # ── 임원 ──
     "get_executives": {
         "cypher": """
-        MATCH (p:Person)-[r:EXECUTIVE_OF]->(c:Company {corp_code: $cc})
+        MATCH (p:Anxg_Person)-[r:EXECUTIVE_OF]->(c:Anxg_Company {corp_code: $cc})
         WHERE ($role IS NULL
                OR r.role CONTAINS $role
                OR (r.duty IS NOT NULL AND r.duty CONTAINS $role))
@@ -241,7 +240,7 @@ TEMPLATES: dict[str, dict] = {
 
     "get_companies_of_person": {
         "cypher": """
-        MATCH (p:Person {name: $name})-[r:EXECUTIVE_OF]->(c:Company)
+        MATCH (p:Anxg_Person {name: $name})-[r:EXECUTIVE_OF]->(c:Anxg_Company)
         WHERE $role IS NULL OR r.role CONTAINS $role
         RETURN c.corp_code AS corp_code,
                c.name      AS company_name,
@@ -260,7 +259,7 @@ TEMPLATES: dict[str, dict] = {
 
     "get_companies_of_person_year": {
         "cypher": """
-        MATCH (p:Person {name: $name, birth_year: $by})-[r:EXECUTIVE_OF]->(c:Company)
+        MATCH (p:Anxg_Person {name: $name, birth_year: $by})-[r:EXECUTIVE_OF]->(c:Anxg_Company)
         WHERE $role IS NULL OR r.role CONTAINS $role
         RETURN c.corp_code AS corp_code,
                c.name      AS company_name,
@@ -281,7 +280,7 @@ TEMPLATES: dict[str, dict] = {
     # ── 최대주주 ──
     "get_major_shareholders": {
         "cypher": """
-        MATCH (h)-[r:MAJOR_SHAREHOLDER_OF]->(c:Company {corp_code: $cc})
+        MATCH (h)-[r:MAJOR_SHAREHOLDER_OF]->(c:Anxg_Company {corp_code: $cc})
         WHERE r.ownership_pct >= $min_pct
           AND ($year IS NULL OR r.snapshot_year = $year)
         RETURN labels(h)[0]   AS holder_kind,
@@ -310,7 +309,7 @@ TEMPLATES: dict[str, dict] = {
         f"find_paths_{h}hops": {
             "cypher": f"""
             MATCH p = shortestPath(
-              (a:Company {{corp_code: $a}})-[*1..{h}]-(b:Company {{corp_code: $b}})
+              (a:Anxg_Company {{corp_code: $a}})-[*1..{h}]-(b:Anxg_Company {{corp_code: $b}})
             )
             RETURN [n IN nodes(p) | coalesce(n.name, n.corp_code)] AS node_path,
                    [r IN relationships(p) | type(r)] AS rel_types,
@@ -330,7 +329,7 @@ TEMPLATES: dict[str, dict] = {
     **{
         f"get_subgraph_d{d}": {
             "cypher": f"""
-            MATCH (center:Company {{corp_code: $cc}})
+            MATCH (center:Anxg_Company {{corp_code: $cc}})
             CALL apoc.path.subgraphAll(center, {{maxLevel: {d}, limit: $limit}})
             YIELD nodes, relationships
             RETURN nodes, relationships
@@ -346,7 +345,7 @@ TEMPLATES: dict[str, dict] = {
 
     "get_subgraph_fallback": {
         "cypher": """
-        MATCH (center:Company {corp_code: $cc})
+        MATCH (center:Anxg_Company {corp_code: $cc})
         OPTIONAL MATCH (center)-[r1]-(n1)
         OPTIONAL MATCH (n1)-[r2]-(n2)
           WHERE n2 <> center AND $depth >= 2
@@ -366,7 +365,7 @@ TEMPLATES: dict[str, dict] = {
     # ── 뉴스 / 그룹 ──
     "list_mentioning_news": {
         "cypher": """
-        MATCH (n:NewsEvent)-[m:MENTIONS]->(c:Company {corp_code: $cc})
+        MATCH (n:Anxg_NewsEvent)-[m:MENTIONS]->(c:Anxg_Company {corp_code: $cc})
         RETURN n.article_hash AS article_hash,
                n.title        AS title,
                n.source       AS source,
@@ -385,7 +384,7 @@ TEMPLATES: dict[str, dict] = {
 
     "list_cooccurring": {
         "cypher": """
-        MATCH (a:Company {corp_code: $cc})-[r:CO_MENTIONED_WITH]-(b:Company)
+        MATCH (a:Anxg_Company {corp_code: $cc})-[r:CO_MENTIONED_WITH]-(b:Anxg_Company)
         WHERE r.count >= $min
         RETURN b.corp_code AS corp_code,
                b.name      AS name,
@@ -404,7 +403,7 @@ TEMPLATES: dict[str, dict] = {
 
     "list_group_members": {
         "cypher": """
-        MATCH (c:Company)-[:BELONGS_TO_GROUP]->(g:Group {name: $g})
+        MATCH (c:Anxg_Company)-[:BELONGS_TO_GROUP]->(g:Anxg_Group {name: $g})
         RETURN c.corp_code AS corp_code, c.name AS name
         ORDER BY c.name
         LIMIT $limit

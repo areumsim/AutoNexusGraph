@@ -24,14 +24,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from autonexusgraph.mcp import build_tool_manifest   # noqa: E402
+from autonexusgraph.mcp import build_tool_manifest  # noqa: E402
 
 log = logging.getLogger(__name__)
 
 
 def _check_mcp_sdk() -> bool:
     try:
-        import mcp   # noqa: F401
+        import mcp  # noqa: F401
         return True
     except ImportError:
         return False
@@ -45,7 +45,7 @@ def _check_server_boot() -> dict:
         return {"passed": False, "reason": f"server import 실패: {e}"}
     try:
         server, specs = build_mcp_server("all")
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"build_mcp_server 실패: {e}"}
 
     # list_tools 핸들러를 in-process 로 호출 — 외부 에이전트 (Claude Desktop / Cline)
@@ -53,7 +53,8 @@ def _check_server_boot() -> dict:
     list_tools_count = -1
     try:
         import asyncio
-        from mcp.types import ListToolsRequest   # type: ignore[import-not-found]
+
+        from mcp.types import ListToolsRequest  # type: ignore[import-not-found]
         handler = server.request_handlers.get(ListToolsRequest)
         if handler is not None:
             result = asyncio.run(
@@ -62,7 +63,7 @@ def _check_server_boot() -> dict:
             inner = getattr(result, "root", result)
             tools = getattr(inner, "tools", None) or []
             list_tools_count = len(tools)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — list_tools round-trip 실패 (fail-soft) 흡수 → {"passed": True, "n_tools":... 반환
         log.debug("list_tools round-trip 실패 (fail-soft): %s", exc)
 
     return {"passed": True, "n_tools": len(specs),
@@ -87,7 +88,7 @@ def main() -> int:
     # discovery 는 SDK 무관 — 항상 검증.
     try:
         specs = build_tool_manifest("all")
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 1 반환 (log 동반)
         payload = {"passed": False, "reason": f"tool discovery 실패: {e}"}
         out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
                             encoding="utf-8")
