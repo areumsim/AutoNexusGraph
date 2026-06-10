@@ -66,7 +66,7 @@
 | **라이선스** | 공공 (public_domain) — `_license.py:LICENSE_POLICY['dart']` |
 | **수집 의도** | 한국 상장사 corp_code 마스터 + 사업보고서 본문 + XBRL 재무 — finance 도메인의 backbone |
 | **Ingestion 코드** | HTTP 클라이언트 모듈 `src/autonexusgraph/ingestion/dart_client.py` + 실행 스크립트 `scripts/ingest/{download_corp_codes,bulk_dart,bulk_dart_structural,download_business_reports,download_financials}.py` (5 스크립트) |
-| **Loader 코드** | `src/autonexusgraph/loaders/{companies,filings,financials,graph_structural}.py` (각 파일의 `load_companies`/`load_filings`/`load_financials`/`load_graph_structural` 함수) |
+| **Loader 코드** | CLI 스크립트 `scripts/load/{load_companies,load_filings,load_financials,load_graph_companies,load_graph_structural}.py` (라이브러리 `src/autonexusgraph/loaders/{companies,filings,financials,graph,graph_structural}.py` 의 `load_*` 함수 호출) |
 | **raw 저장** | `data/raw/dart/{corp_codes, filings, financials, structural}/` |
 | **PG 테이블** | `anxg_master.companies` (295 row) / `anxg_fin.filings` (4,584 row) / `anxg_fin.financials` (184,199 row XBRL) |
 | **Neo4j 노드·엣지** | `:Company` (12,914) / `:Person` (14,536) / `SUBSIDIARY_OF` (8,661) / `EXECUTIVE_OF` (36,399) / `MAJOR_SHAREHOLDER_OF` (16,725) (6/1 재측정, README §1) |
@@ -105,7 +105,7 @@
 | **라이선스** | CC0 — `_license.py['wikidata']` |
 | **수집 의도** | 한국 상장사 → Wikidata QID + 외부 ID (LEI/CIK/ISIN/homepage) 매핑 → entity_map 보강 |
 | **Ingestion** | HTTP 클라이언트 `src/autonexusgraph/ingestion/wikidata_client.py` (RateLimiter + CheckpointStore) + 실행 스크립트 `scripts/ingest/download_wikidata.py` |
-| **Loader** | `src/autonexusgraph/ingestion/wikidata_client.py` → master/companies 보강 (전용 loader 파일 없음) |
+| **Loader** | `scripts/load/load_wikidata.py` |
 | **raw 저장** | `data/raw/wikidata/{candidates.json, entities/<qid>.json}` |
 | **PG 테이블** | `anxg_wiki.wikidata_facts` (466 row) / `anxg_master.entity_map` 보강 (QID/LEI/CIK/ISIN 등) |
 | **7키 메타** | `confidence_score=0.80` (B 등급) |
@@ -122,7 +122,7 @@
 | **출처** | `https://ko.wikipedia.org/wiki/<Title>` |
 | **라이선스** | CC BY-SA — 본문 저장 OK (출처 표기) |
 | **수집 의도** | 회사 narrative 검색 (사업 설명·역사 등) — vector RAG 원료 |
-| **Ingestion·Loader** | `src/autonexusgraph/ingestion/wikipedia_client.py` + `scripts/ingest/download_wikipedia.py` + `loaders/chunks.py` (위키 청크) |
+| **Ingestion·Loader** | `src/autonexusgraph/ingestion/wikipedia_client.py` + `scripts/ingest/download_wikipedia.py` + `scripts/load/{load_wikipedia,build_chunks_wikipedia}.py` |
 | **raw 저장** | `data/raw/wikipedia/ko/<corp_code>/{meta.json, page.html, summary.json, infobox.json}` |
 | **PG 테이블** | `anxg_wiki.wikipedia_pages` (276 row, 93.6% 매핑) |
 | **anxg_vec.chunks** | `section='wikipedia_ko'` + `corp_code` 메타 |
@@ -141,7 +141,7 @@
 | **라이선스** | 공공 (US Gov) |
 | **수집 의도** | (a) 한국 ADR (Korea ADRs) CIK 매핑 → entity_map 보강, (b) **글로벌 OEM (Tesla/Ford/GM/Stellantis/Toyota/Honda) XBRL** → auto 도메인 cross-domain |
 | **Ingestion** | `src/autonexusgraph/ingestion/sec_client.py` + `scripts/ingest/download_sec_edgar.py` (한국 ADR) + `src/autograph/ingestion/sec_oem.py` (글로벌 OEM) |
-| **Loader** | finance SEC 수집 `autonexusgraph/ingestion/sec_client.py` + auto OEM SEC `src/autograph/loaders/master/load_auto_oem_sec.py` |
+| **Loader** | finance SEC `scripts/load/load_sec_edgar.py` + auto OEM SEC `src/autograph/loaders/master/load_auto_oem_sec.py` |
 | **PG 테이블** | `anxg_sec.filings` (1,857 row) / `anxg_auto.oem_financials_sec` (3,199 row) |
 | **bridge 영향** | `anxg_bridge.corp_entity.sec_cik` 9 매핑 (한국 OEM CIK 부재 시 글로벌 OEM 진입점) |
 | **Tool** | `bridge_sec_cik_to_entity('0001318605')` → Tesla manufacturer entity_id |
@@ -157,7 +157,7 @@
 | **출처** | `https://api.gleif.org/api/v1/` |
 | **라이선스** | CC BY 4.0 |
 | **수집 의도** | 한국 jurisdiction LEI ↔ business_no/jurir_no/corp_code 매핑 |
-| **Ingestion·Loader** | `src/autonexusgraph/ingestion/{gleif_client,gleif_enrich}.py` + `scripts/ingest/download_gleif.py` (master/companies 보강 — 전용 loader 파일 없음) |
+| **Ingestion·Loader** | `src/autonexusgraph/ingestion/{gleif_client,gleif_enrich}.py` + `scripts/ingest/download_gleif.py` + `scripts/load/load_gleif.py` |
 | **PG** | `anxg_sec.lei` (2,704 row, registeredAs 통한 corp_code 매핑 128) / `anxg_master.entity_map` 보강 |
 | **bridge 영향** | `anxg_bridge.corp_entity.lei` 5+ row (supplier strong-match) |
 | **Tool** | `lookup_company` 반환 LEI 포함 |
@@ -172,7 +172,7 @@
 | **출처** | 연합뉴스 RSS (3 feed) |
 | **라이선스** | **copyrighted** — `_license.py['news_yonhap']` — **제목 + 요약 + URL 만 저장**, 본문 X |
 | **수집 의도** | 뉴스 멘션 그래프 (`MENTIONS`, `CO_MENTIONED_WITH`) |
-| **Ingestion·Loader** | `src/autonexusgraph/ingestion/news_client.py` + `scripts/ingest/download_news_rss.py` (뉴스 청크·MENTIONS 적재 — 전용 `load_news.py` 파일 없음) |
+| **Ingestion·Loader** | `src/autonexusgraph/ingestion/news_client.py` + `scripts/ingest/download_news_rss.py` + `scripts/load/{load_news,load_graph_news_corel}.py` (MENTIONS / CO_MENTIONED_WITH 적재) |
 | **PG** | `anxg_news.articles` (338 row) / 멘션 (141 row) |
 | **Neo4j** | `:NewsEvent` (85) / `MENTIONS` |
 | **Tool** | `list_mentioning_news(corp_code)` / `list_cooccurring(corp_code)` |
@@ -187,7 +187,7 @@
 | **출처** | https://www.cgs.or.kr (수동 CSV 다운) |
 | **라이선스** | 회원 한정 — 수동 다운로드 |
 | **수집 의도** | ESG 등급 (A+/A/B+/B/C/D) → ESG-finance cross 분석 |
-| **Loader** | manual CSV (`config.kcgs_csv_dir`, 전용 loader 파일 없음) |
+| **Loader** | `scripts/load/load_kcgs.py` (manual CSV from `config.kcgs_csv_dir`) |
 | **PG** | `anxg_esg.ratings` |
 | **답변 시나리오** | "ESG B+ 이상 코스피200 회사" → SQL filter |
 | **알려진 한계** | 연 1회 발표 (분기 갱신 X). 비회원은 보도자료 모니터로만 추적 (`ingest-kcgs`) |
