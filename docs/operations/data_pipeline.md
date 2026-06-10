@@ -1,6 +1,8 @@
 # 데이터 파이프라인 운영 가이드
 
 > **인용 규약**: 본 문서의 `PRD §6.5` 등 인용은 **구 PRD 표기** — README v3.0 통합 후 README §3.6 (4-Pass + Bridge Pass) / §4 (데이터 소스) 가 새 SSOT.
+>
+> ⚠️ **스키마 규약**: 본 문서의 psql 예시 일부는 약식 스키마명(`auto.` / `bridge.` / `ip.` / `vec.` / `chat.` 등)을 쓰지만, **실 DB 스키마는 `anxg_` 프리픽스** (`anxg_auto` / `anxg_bridge` / `anxg_ip` / `anxg_vec` / `anxg_chat` — `infra/postgres/init/01_schema.sql`, `config.pg_schema()`). 복사 실행 시 `anxg_` 를 붙일 것.
 
 본 문서는 AutoNexusGraph 의 raw → processed → DB 3-tier 멱등 파이프라인을 단계별로 안내한다.
 각 단계는 앞 단계의 raw 가 있다면 언제든 재실행 가능 (멱등). 도중 끊겨도 `state/` 의 done/failed
@@ -113,7 +115,7 @@ make validate-quality                  — 마지막에 매번 실행
 ### Auto 도메인 (`make load-auto-all` 내부 순차 강제)
 
 ```
-neo4j-init                              # CONSTRAINT/INDEX 멱등
+neo4j-init-auto                         # CONSTRAINT/INDEX 멱등
    ↓
 pg                                      # NHTSA vPIC + Recalls + Complaints → auto.master_* / events_*
    ↓
@@ -232,16 +234,16 @@ make validate-quality         # 매핑 커버리지 점검
 1. https://www.car.go.kr/ 의 리콜 검색에서 기간/제조사 필터로 CSV 다운로드.
 2. 파일을 `data/raw/auto/car_go_kr/` 하위에 저장 (UTF-8 권장, BOM 자동 처리).
 3. `python -m autograph.ingestion.car_go_kr_recalls` 실행 — `_normalized.jsonl` 생성.
-4. 이후 표준 적재: `make load-auto-recalls`.
+4. 이후 표준 적재: `make load-datagokr-recalls`.
 
-대체안: 한국 OEM 의 미국 출시 모델 리콜은 NHTSA 자동수집(`make ingest-nhtsa-recalls`)
+대체안: 한국 OEM 의 미국 출시 모델 리콜은 NHTSA 자동수집(`make ingest-auto-recalls`)
 이 KR-only 리콜을 보강하므로, MVP 범위에선 NHTSA 만으로도 80% 커버.
 
 ### KNCAP (KR 안전등급)
 
 1. KNCAP 사무국에서 받은 자료를 `data/raw/auto/kncap/` 하위에 CSV 또는 JSON 으로 저장.
 2. `python -m autograph.ingestion.kncap` — 표준화된 jsonl 생성.
-3. 이후 적재: `make load-auto-kncap` (Standard 노드 + SAFETY_RATED_BY 엣지).
+3. 이후 적재: `python -m autograph.loaders.recall.load_kncap` (Standard 노드 + SAFETY_RATED_BY 엣지; 전용 make 타겟 없음).
 
 `KNCAP_API_KEY` 환경변수는 향후 API 공개 시를 위해 자리만 잡아둠 — 현재 어떤 path
 도 키를 읽지 않는다 (warning 로그만 출력하고 수동 모드로 폴백).

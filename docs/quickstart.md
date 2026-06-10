@@ -35,7 +35,7 @@ make health                                   # pg_isready + Neo4j Bolt ping
 - PostgreSQL `31011` (pgvector 내장)
 - (FastAPI 가동 후) `31020`, Streamlit `31021`
 
-**스키마 자동 적용** — 빈 볼륨이면 `docker-entrypoint-initdb.d` 가 `infra/postgres/init/01~24*.sql` (총 25개) 를 알파벳 순으로 1회 자동 실행. 기존 볼륨에는 [docs/operations/migrations.md](operations/migrations.md) 의 hot-apply.
+**스키마 자동 적용** — 빈 볼륨이면 `docker-entrypoint-initdb.d` 가 `infra/postgres/init/01~30*.sql` (총 31개, 12a/12b 포함) 를 알파벳 순으로 1회 자동 실행. 기존 볼륨에는 [docs/operations/migrations.md](operations/migrations.md) 의 hot-apply.
 
 ---
 

@@ -62,7 +62,7 @@ make bridge-kpi
   "by_entity_type": [ { "entity_type": "supplier", "pending": 4780, "total": 4790 } ] }
 ```
 
-`reviewed_pct` = (reviewed + rejected) / total. 운영 목표: pending 단조 감소 + oldest_pending_age_days 가 `DEFAULT_STALE_DAYS` 이하 유지(자동 만료가 보장).
+`reviewed_pct` = (reviewed + rejected) / total × 100 (percent — 코드 `round(100.0*decided/total, 1)`, `bridge_review.py:203`). 운영 목표: pending 단조 감소 + oldest_pending_age_days 가 `DEFAULT_STALE_DAYS` 이하 유지(자동 만료가 보장).
 
 ---
 
