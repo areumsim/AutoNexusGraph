@@ -64,7 +64,7 @@
 
 | 자랑 | 실제 |
 |---|---|
-| README §1 + README §1 / §3.4.1 — "finance + auto + ip 3 도메인을 bridge.corp_entity 로 한 turn 안에 묶는 GraphRAG" | ✅ **개념·코드 수준 정합** — runbook_traces.md §5 (CD-L1) / §6 (CD-L3) 시연. ⚠️ **단, ip 도메인 cross-domain (§7 CD-L4-IP) 은 wire-up 만 완료 — 실제 답변 불가** (ip.patents 0 row). 실제 작동하는 cross-domain 은 finance+auto 2 도메인 한정 |
+| README §1 + README §1 / §3.4.1 — "finance + auto + ip 3 도메인을 anxg_bridge.corp_entity 로 한 turn 안에 묶는 GraphRAG" | ✅ **개념·코드 수준 정합** — runbook_traces.md §5 (CD-L1) / §6 (CD-L3) 시연. ⚠️ **단, ip 도메인 cross-domain (§7 CD-L4-IP) 은 wire-up 만 완료 — 실제 답변 불가** (anxg_ip.patents 0 row). 실제 작동하는 cross-domain 은 finance+auto 2 도메인 한정 |
 
 ### 3.2 "공급망 추론" (SUPPLIED_BY)
 
@@ -116,7 +116,7 @@
 | **§4 auto L3** | "공급망 추론" | ⚠️ **manual seed 의존** (SUPPLIED_BY 30 edges, [autograph.md §5.1](autograph.md) 정직 표시) | 자동 공급망 추출 routine 부재 — 본 review §3.2 와 동일 뿌리 |
 | **§5 CD-L1** | "한 turn 안에 finance + auto 묶기" | ✅ Bridge reviewed 매핑 11 으로 작동 | latency 측정 미실시 |
 | **§6 CD-L3** | "3 도메인 cross" | ⚠️ supplier candidate 정확도 한계 + 글로벌 OEM 분기 routine 부재 | planner 분기 보강 필요 — 본 review §1.2 P0 (Bridge candidate SOP) 와 연결 |
-| **§7 CD-L4-IP** | "특허 + 재무 + 자동차 한 turn" | ⚠️ **`ip.patents` 0 row** → wire-up 만 완료 | KIPRIS/USPTO 적재 후 실측 가능. 본 review §3.1 와 동일 뿌리 |
+| **§7 CD-L4-IP** | "특허 + 재무 + 자동차 한 turn" | ⚠️ **`anxg_ip.patents` 0 row** → wire-up 만 완료 | KIPRIS/USPTO 적재 후 실측 가능. 본 review §3.1 와 동일 뿌리 |
 | **§8 IP L1** | "특허 카운트" | ⚠️ **gold_answer 비어있음** | KIPRIS/USPTO 적재 후 채움 — 본 review §3.6 (d) 와 동일 |
 | **§9 refusal** | "환각 차단 정책" | ✅ number_guard + validator 작동 | refusal precision 측정 미실시 — 본 review §3.6 (b) 와 연결 (refusal row 비율 5.3% 정책 미달) |
 
@@ -142,7 +142,7 @@
               |                 |                |                          |
 노력    Med   | core_diff       | B10 dedupe     | Bridge candidate SOP     |
 ↓             | 정직 표기 (완료)|                | API 인증 + 운영 보안     |
-              |                 |                | ip.patents 적재          |
+              |                 |                | anxg_ip.patents 적재          |
               |                 |                |                          |
         High  |                 | Qwen3-Emb GPU  | SHACL 도입 (기각)        |
               |                 | 업그레이드     | manual SUPPLIED_BY 50+   |

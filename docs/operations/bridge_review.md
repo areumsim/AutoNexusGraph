@@ -1,6 +1,6 @@
 # Bridge candidate 검토 SOP (Q-1)
 
-> **목적**: `bridge.corp_entity` 의 자동 매칭 후보(`reviewed_status='candidate'`)가 검토 없이 누적(4,792+)되어 cross-domain 답변 신뢰도를 흐리는 것을 막는다. README §12.4 / BACKLOG Q-1.
+> **목적**: `anxg_bridge.corp_entity` 의 자동 매칭 후보(`reviewed_status='candidate'`)가 검토 없이 누적(4,792+)되어 cross-domain 답변 신뢰도를 흐리는 것을 막는다. README §12.4 / BACKLOG Q-1.
 >
 > **데이터 계층 SSOT**: `src/autonexusgraph/bridge_review.py` (사전 정의 함수, 자유 SQL 금지). UI: `src/autonexusgraph/ui/bridge_review.py`.
 
@@ -8,7 +8,7 @@
 
 ## 0. 상태 모델
 
-`bridge.corp_entity.reviewed_status` ∈ `candidate` → `reviewed`(✓) / `rejected`(✗).
+`anxg_bridge.corp_entity.reviewed_status` ∈ `candidate` → `reviewed`(✓) / `rejected`(✗).
 - 자동 매칭(Wikidata QID / LEI / 사업자번호 / 이름)은 `candidate` 로 적재 (08_bridge.sql).
 - 검토 시 `reviewed_at` + `reviewed_by` 기록 (26_bridge_review.sql 추가 컬럼).
 - 조회 도구(`tools/bridge.py`)는 `rejected` 를 항상 제외, `candidate` 는 `include_candidate` 플래그로 제어.

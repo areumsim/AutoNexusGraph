@@ -50,7 +50,7 @@
   ipgraph/tools/patents.py       — ip PG: lookup_patent, get_patent_info, list_patents_by_assignee, …
   ipgraph/tools/graph.py         — ip Neo4j: list_patents_in_cpc, get_citation_network (cap 강제), …
   ipgraph/tools/retrieve.py      — pgvector + assignee/cpc/jurisdiction 메타: search_patents
-  ipgraph/tools/bridge.py        — ip↔corp: bridge_assignee_to_corp (via ip.assignee_corp_map join)
+  ipgraph/tools/bridge.py        — ip↔corp: bridge_assignee_to_corp (via anxg_ip.assignee_corp_map join)
         │
         ▼
 [저장소]

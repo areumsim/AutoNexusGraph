@@ -256,7 +256,7 @@ make restore ARGS="--pg <dump> --neo4j <dump>"       # 파괴적 복원 (FORCE=1
 # cron 예: 0 3 * * *  cd /srv/autonexusgraph && bash scripts/ops/backup.sh >> /var/log/anxg_backup.log 2>&1
 ```
 
-- `vec.chunks` 임베딩은 PG dump 에 **포함** → 정상 복원 시 재생성 불필요. RPO ≤ 24h(일일 cron) / RTO 수~수십 분(dump 보유).
+- `anxg_vec.chunks` 임베딩은 PG dump 에 **포함** → 정상 복원 시 재생성 불필요. RPO ≤ 24h(일일 cron) / RTO 수~수십 분(dump 보유).
 - Neo4j community = online backup 불가 → 대상 DB STOP→dump→START (다운타임 = dump 시간).
 - 재앙(dump 소실) 시에만 raw 재적재 + BGE-M3 재임베딩 ~수 시간. off-site 동기화 + 분기 복원 드릴 권장 — 상세 [backup_dr.md](backup_dr.md).
 

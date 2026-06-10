@@ -1,6 +1,6 @@
 # IPGraph — 특허·기술혁신 도메인 (보조축 — corp_entity 브리지 전용) · 설계 + 구현 SSOT
 
-> **위계 (README §0):** ip 는 **보조축** — finance/auto 와 같은 본체/대칭 도메인이 아니라, `bridge.corp_entity` + `ip.assignee_corp_map` 으로 **수평 cross 진입 어댑터** 역할. 풀 도메인 어댑터(코드/온톨로지/도구/Cypher 25)는 완료 — "보조"는 데이터 약화가 아니라 **architectural role** (corp_entity 브리지 전용 진입).
+> **위계 (README §0):** ip 는 **보조축** — finance/auto 와 같은 본체/대칭 도메인이 아니라, `anxg_bridge.corp_entity` + `anxg_ip.assignee_corp_map` 으로 **수평 cross 진입 어댑터** 역할. 풀 도메인 어댑터(코드/온톨로지/도구/Cypher 25)는 완료 — "보조"는 데이터 약화가 아니라 **architectural role** (corp_entity 브리지 전용 진입).
 >
 > 전체 시스템 구조 (3 패키지 토폴로지 · plug-in 등록 메커니즘 · SSOT 색인) 는
 > [docs/architecture.md](./architecture.md) 가 SSOT. 본 문서는 **ip 도메인 단독 가이드**.
@@ -11,7 +11,7 @@
 >
 > **현재 구현 상태 (2026-06-01)**
 > - **코드**: `src/ipgraph/` 전체 구현 완료. `agent_handler.py` + `policy.py` (route_domain_ip) + `ontology.py` + `cypher_templates_ip.py` (**25 Cypher 템플릿**, `cypher_templates_ip.py:36` dict top-level) + `tools/{bridge,graph,patents,retrieve}.py` (4-tools 미러) + `loaders/{load_cpc,load_openalex}.py` + `ingestion/{cpc_scheme,kipris,uspto_odp,openalex}.py`. `make audit-ipgraph` PASS. wire-up 검증 5종: **handler + router + ontology + 25 Cypher templates + gold (ip 30 + cross_ip 8)**. 별개로 `IPGraphHandler.allowed_intents` whitelist 는 graph 8 + sql 8 (research/sql + bridge 2 + cross_query_ip) + research 3 = **19 intents** (`agent_handler.py:26-42`).
-> - **데이터**: 부분 적재 — `ip.cpc_scheme` **10,695 row** + `ip.works` (OpenAlex) **629 row** + `ip.institution` 38 + `ip.work_institution` 638 + Neo4j `:CPCCode` **10,695 노드**. PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) **적용 완료 (2026-06-01)** — `ip.patents / ip.assignees / ip.inventors / ip.patent_assignees / ip.patent_inventors / ip.patent_cpc / ip.citations / ip.assignee_corp_map` 8 테이블 생성됨 (row=0). 후속: KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset → `ingestion/{kipris,uspto_odp}.py` 실행 + assignee → corp_entity 매핑.
+> - **데이터**: 부분 적재 — `anxg_ip.cpc_scheme` **10,695 row** + `anxg_ip.works` (OpenAlex) **629 row** + `anxg_ip.institution` 38 + `anxg_ip.work_institution` 638 + Neo4j `:CPCCode` **10,695 노드**. PG 스키마 마이그레이션 (18_ipgraph.sql + 19_ipgraph_bridge.sql) **적용 완료 (2026-06-01)** — `anxg_ip.patents / anxg_ip.assignees / anxg_ip.inventors / anxg_ip.patent_assignees / anxg_ip.patent_inventors / anxg_ip.patent_cpc / anxg_ip.citations / anxg_ip.assignee_corp_map` 8 테이블 생성됨 (row=0). 후속: KIPRIS_API_KEY 발급 + USPTO ODP bulk dataset → `ingestion/{kipris,uspto_odp}.py` 실행 + assignee → corp_entity 매핑.
 >
 > **선택 근거:** OpenAlex / **USPTO ODP (data.uspto.gov, PatentsView 후속 — 2026-03-20 이관 완료, REST 종료 → bulk dataset)** / CPC bulk 완전 무료, KIPRIS 로 한국 특허 커버, 거의 전부 정형이라 LLM 예산 거의 무소비.
 > CPC 분류는 정식 계층 온톨로지. assignee → 기업 매핑이 cross-domain 진입점.
@@ -102,7 +102,7 @@ nodes:
     props: [name, name_norm, country, type]       # type: company|individual|university|gov
   Inventor:
     key: inventor_id
-    props: [name, name_norm, country]             # (M-8) master.persons 와 분리 유지
+    props: [name, name_norm, country]             # (M-8) anxg_master.persons 와 분리 유지
   CPCCode:
     key: code
     props: [level, title]                         # (M-6) level: section|class|subclass|maingroup|subgroup
@@ -116,7 +116,7 @@ nodes:
     key: ror_id
     props: [name, country, type]                  # type: company|education|government
   # 엣지: (Assignee)-[:AFFILIATED_WITH]->(Institution), (Work)-[:AUTHORED_AT]->(Institution)
-  # cross: institution(company) → bridge.corp_entity → 특허(assignee) → 재무(R&D비)
+  # cross: institution(company) → anxg_bridge.corp_entity → 특허(assignee) → 재무(R&D비)
 ```
 
 ### `relations.yaml`
@@ -144,8 +144,8 @@ edges:
 | Patent / Assignee / Inventor | KIPRIS · USPTO ODP | A (0.95) | 공식 특허청 (USPTO ODP = PatentsView 후속). 현재 row 0 — KIPRIS_API_KEY 발급 + USPTO ODP bulk 적재 대기 |
 | CLASSIFIED_AS / SUBCLASS_OF | CPC scheme bulk | A (0.95) | 정식 분류 계층. **CPC scheme 적재 완료 (10,695 row + Neo4j `:CPCCode` 10,695 + `SUBCLASS_OF` 10,686 — 7-key 100%)** |
 | CITES | USPTO ODP citations (PatentsView 후속) | A (0.95) | 인용 네트워크. 현재 row 0 — USPTO ODP 적재 대기 |
-| Assignee → corp_entity (via `ip.assignee_corp_map`) | name/QID/business_no 매칭 | A/B | strong → mapped, weak → candidate. 현재 row 0 — assignee 적재 후 |
-| **Work / Institution / AUTHORED_AT / IS_ENTITY (OpenAlex)** | OpenAlex API | A (0.95) | **적재 완료 — 629 / 38 / 638 / 38**. abstract 423건 → `vec.chunks` (BGE-M3 backfill 대상). KR 38 corp_code 매칭 (현대차/모비스/기아/만도/LG/네이버/효성/금호석유/한미약품/Hyundai Steel …) × 상위 인용 work 20씩 × 2020~ |
+| Assignee → corp_entity (via `anxg_ip.assignee_corp_map`) | name/QID/business_no 매칭 | A/B | strong → mapped, weak → candidate. 현재 row 0 — assignee 적재 후 |
+| **Work / Institution / AUTHORED_AT / IS_ENTITY (OpenAlex)** | OpenAlex API | A (0.95) | **적재 완료 — 629 / 38 / 638 / 38**. abstract 423건 → `anxg_vec.chunks` (BGE-M3 backfill 대상). KR 38 corp_code 매칭 (현대차/모비스/기아/만도/LG/네이버/효성/금호석유/한미약품/Hyundai Steel …) × 상위 인용 work 20씩 × 2020~ |
 | AFFILIATED_WITH (Assignee→Institution) | OpenAlex link | A/B | Assignee 적재 후 cross-domain 활성 |
 | SIMILAR_TECH | pgvector 유사 | C | `enabled:false` — ablation 후 활성 검토 |
 
@@ -174,13 +174,13 @@ edges:
 - `bridge_assignee_to_corp(assignee_id)` (`bridge.py:21`) / `bridge_corp_to_assignee(corp_code)` (`:56`)
 - `cross_query_ip(corp_code, ...)` (`:95`) — 특허 ↔ finance(R&D비) ↔ auto(부품·리콜)
 
-### Bridge 구현 — `ip.assignee_corp_map` join 테이블 (M-3)
+### Bridge 구현 — `anxg_ip.assignee_corp_map` join 테이블 (M-3)
 
-`bridge.corp_entity` **컬럼·데이터 직접 변경 없음.** 별도 join 테이블 추가 → core/bridge 스키마 변경 0 → §10.12 보존.
+`anxg_bridge.corp_entity` **컬럼·데이터 직접 변경 없음.** 별도 join 테이블 추가 → core/bridge 스키마 변경 0 → §10.12 보존.
 
 ```sql
 -- 19_ipgraph_bridge.sql  (E-1)
-CREATE TABLE ip.assignee_corp_map (
+CREATE TABLE anxg_ip.assignee_corp_map (
     assignee_id      VARCHAR NOT NULL,
     corp_code        VARCHAR NOT NULL,
     match_type       VARCHAR NOT NULL,   -- qid | business_no | lei | name
@@ -208,10 +208,10 @@ CREATE TABLE ip.assignee_corp_map (
 
 | 데이터 | 출처 | 라이선스 (M-5) | 인증 | 적재 위치 | 상태 |
 |---|---|---|---|---|---|
-| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개** | `KIPRIS_API_KEY` | `ip.patents` | (예정) — 키 발급 + `ingestion/kipris.py` 실행 |
-| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **(M-4) 이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료 (410 Gone), **ODP bulk dataset + Transition Guide** 채택. REST 가정 코드 모두 폐기 | `ip.patents` + `ip.citations` | (예정) — `ingestion/uspto_odp.py` 구현됨, bulk 데이터셋 적재 대기 |
-| CPC 분류 체계 | CPC scheme bulk (USPTO/EPO) | 공공 | 불필요 | `ip.cpc_scheme` | **적재 완료 — 10,695 row + Neo4j `:CPCCode` 10,695 노드** (`loaders/load_cpc.py`) |
-| 글로벌 논문·연구 (institution/author 링크) | OpenAlex API | CC0 | **무료 키 (하루 10만 크레딧, 2025-02 이후 필수)** | `ip.works` | **적재 완료 — 629 row** (`loaders/load_openalex.py`). 특허×논문 cross 승격은 institution↔corp_entity 매핑 후 |
+| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개** | `KIPRIS_API_KEY` | `anxg_ip.patents` | (예정) — 키 발급 + `ingestion/kipris.py` 실행 |
+| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **(M-4) 이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료 (410 Gone), **ODP bulk dataset + Transition Guide** 채택. REST 가정 코드 모두 폐기 | `anxg_ip.patents` + `anxg_ip.citations` | (예정) — `ingestion/uspto_odp.py` 구현됨, bulk 데이터셋 적재 대기 |
+| CPC 분류 체계 | CPC scheme bulk (USPTO/EPO) | 공공 | 불필요 | `anxg_ip.cpc_scheme` | **적재 완료 — 10,695 row + Neo4j `:CPCCode` 10,695 노드** (`loaders/load_cpc.py`) |
+| 글로벌 논문·연구 (institution/author 링크) | OpenAlex API | CC0 | **무료 키 (하루 10만 크레딧, 2025-02 이후 필수)** | `anxg_ip.works` | **적재 완료 — 629 row** (`loaders/load_openalex.py`). 특허×논문 cross 승격은 institution↔corp_entity 매핑 후 |
 
 `src/autonexusgraph/ingestion/_license.py` 에 KIPRIS 정책 게이트 추가 (최근 commit `b70527a` IR/뉴스룸 license-gate 패턴 재사용).
 
@@ -248,12 +248,12 @@ CREATE TABLE ip.assignee_corp_map (
 
 ## 8. 작업 순서 (솔로 · 수 주)
 
-1. ✅ CPC scheme bulk → CPCCode/SUBCLASS_OF (무인증, 온톨로지 골격) — `ip.cpc_scheme` 10,695 row + Neo4j `:CPCCode` 10,695 노드 적재 완료 (`loaders/load_cpc.py`)
+1. ✅ CPC scheme bulk → CPCCode/SUBCLASS_OF (무인증, 온톨로지 골격) — `anxg_ip.cpc_scheme` 10,695 row + Neo4j `:CPCCode` 10,695 노드 적재 완료 (`loaders/load_cpc.py`)
 2. → **USPTO ODP bulk dataset** 채택 (M-4 — PatentsView REST 종료, ODP + Transition Guide) → US 특허 + 인용 → assignee→corp strong 매칭. **`ingestion/uspto_odp.py` (collect 7종) + `loaders/load_uspto_odp.py` (PG 7-table upsert + Neo4j `:Patent`/`:Assignee`/`:Inventor` 노드 + `ASSIGNED_TO`/`INVENTED`/`CLASSIFIED_AS`/`CITES` 엣지, 7-key edge meta 100%) 구현 완료 (2026-06-02 smoke E2E PASS — 합성 데이터 4 patents/3 assignees/2 inventors/4 link/2 citations 적재 + 멱등 재실행 OK + 7키 무결성 100% + 정리)** — bulk dataset 다운로드 (data.uspto.gov/bulkdata/datasets) 후 `raw/ip/uspto_odp/*.jsonl` 7 파일 배치 → `make load-uspto-odp` 1회로 적재. 18_ipgraph.sql + 19_ipgraph_bridge.sql 마이그레이션 **적용 완료** — `ip` 스키마 12 테이블 (`patents / assignees / inventors / patent_assignees / patent_inventors / patent_cpc / citations / cpc_scheme / assignee_corp_map / institution / work_institution / works`). 데이터 row 는 cpc_scheme=10,695 + works=629 + institution=38 + work_institution=638; 나머지 8 테이블 row=0 (USPTO ODP bulk 데이터 / KIPRIS API 키 대기).
 3. → KIPRIS 키 발급 → 한국 특허 (현대차/기아/삼성SDI/LG엔솔/현대모비스 우선) — `ingestion/kipris.py` **XML 파서 완성 (2026-06-02, lxml/stdlib fallback)** + `loaders/load_kipris.py` 신규 (USPTO 헬퍼 source-pluggable 재사용 — `source_type='kipris'`, `jurisdiction='KR'`, `source_prefix='kipris'`). smoke E2E PASS — 합성 XML 2 patents/3 assignees/3 inventors/3 ASSIGNED_TO/3 INVENTED + 7-key edge meta 100% 검증 후 cleanup. `KIPRIS_API_KEY` 발급 → `make load-kipris`. **CPC IPC 매칭 시 PG patent_cpc FK 통과시키려면 `make load-cpc -- --include-subgroups` 먼저** (기본 적재는 subgroup 제외 — KIPRIS IPC 는 통상 subgroup 정밀도 `H01M10/052`).
 4. ✅ `ip_*` Cypher 템플릿 + tool pool + 화이트리스트 — `cypher_templates_ip.py` **25 templates** + `tools/{patents,graph,retrieve,bridge}.py` 4-tools + `IPGraphHandler.allowed_intents` 화이트리스트 완료
 5. ⚠️ gold seed + CD-L3/L4 → 축소 매트릭스 — `gold_qa_ip_v0.jsonl` 30 row + `gold_qa_cross_v0.jsonl` 의 CD-IP 8 row 시드 완료. 매트릭스 LLM 실측은 (예정)
-6. → (옵션) OpenAlex `ip.works` **적재 완료 — 629 row** (`loaders/load_openalex.py`). 배터리·소재 L5/L6 — [docs/autograph.md](./autograph.md) §2.5.4 (auto.master_minerals 5 row 시드만)
+6. → (옵션) OpenAlex `anxg_ip.works` **적재 완료 — 629 row** (`loaders/load_openalex.py`). 배터리·소재 L5/L6 — [docs/autograph.md](./autograph.md) §2.5.4 (anxg_auto.master_minerals 5 row 시드만)
 
 ---
 
@@ -282,4 +282,4 @@ CREATE TABLE ip.assignee_corp_map (
 - **Citation Graph embeddings** — node2vec / GraphSAGE 로 인용 네트워크 임베딩. ([Han et al, "Heterogeneous Citation Network Embedding", arXiv:2005.06104](https://arxiv.org/abs/2005.06104)) PageRank 대비 multi-modal (cite + author + CPC) 결합. **적용**: `gds.beta.node2vec` (Neo4j GDS) 또는 별도 PyG. **기대효과**: "기술 영향력" 순위 + 유사 특허 클러스터링. **비용**: 적재 후 Neo4j GDS 라이선스 확인 필요.
 - **Knowledge-aware patent retrieval** ([Krestel et al, "A Survey on Deep Learning for Patent Analysis", arXiv:2104.13860](https://arxiv.org/abs/2104.13860)) — 특허 본문 + CPC 계층 + citation 결합 retrieval. RAG 형태로 prior art 검색 자동화.
 - **LLM 기반 특허 검색·요약 (PaECTER, ChatGPT-Patent)** — Patent claim parsing + 청구항 분해 + 검색. **본 시스템 적용**: synthesizer prompt 에 "특허 claim 인용 시 출처 + claim 번호 명시" 강제 (number_guard 의 patent_no 화이트리스트 확장).
-- **assignee disambiguation** — 동일 회사의 다양한 표기 (예: "Hyundai Motor Co.", "현대자동차주식회사", "HYUNDAI MOTOR COMPANY") 매칭. ([Kim & Yoon, "Author name disambiguation in scientific data", 2015](https://doi.org/10.1108/AJIM-05-2014-0061)) → 본 시스템의 `ip.assignee_corp_map` strong/medium/weak 정책의 baseline.
+- **assignee disambiguation** — 동일 회사의 다양한 표기 (예: "Hyundai Motor Co.", "현대자동차주식회사", "HYUNDAI MOTOR COMPANY") 매칭. ([Kim & Yoon, "Author name disambiguation in scientific data", 2015](https://doi.org/10.1108/AJIM-05-2014-0061)) → 본 시스템의 `anxg_ip.assignee_corp_map` strong/medium/weak 정책의 baseline.

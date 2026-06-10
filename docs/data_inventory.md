@@ -21,23 +21,23 @@ README §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 
 | **NHTSA component taxonomy** ⭐신규 5/29 | — | (derived) | 176 components | 162 :Module |
 | EPA fueleconomy | 2.1 MB | 1 zip | 1,426 spec_measurements | — |
 | SEC EDGAR OEM | 46 MB | 10 CIK JSON | 3,199 facts | (Manufacturer 노드 + bridge sec_cik 10건) |
-| Wikipedia 자동차 | 900 KB | 193 | 193 vec.chunks | — |
+| Wikipedia 자동차 | 900 KB | 193 | 193 anxg_vec.chunks | — |
 | Wikidata (마스터) | 12 MB | 6 | (manufacturers/suppliers seed 사용) | — |
 | AI-Hub 71347 (모터·배터리) | 3.0 GB | 616,898 라벨 | 4 components (L4) | 통합 |
 | AI-Hub 578 (부품 품질) | 703 MB | 22 tar | 22 components | 통합 |
 | supplier_seed (manual) | — | 1 yaml | 18 components + 19 suppliers | 30 SUPPLIED_BY |
 | **산단공 공정 합성 (15151075)** ⭐ 6/1 | 256 KB | 1 CSV | **550 row 적재 완료** | — (후속 PR) |
 | **DART production (Hyundai+Kia)** ⭐ 6/1 | (DART zip 재사용) | 98 zip | **capacity 107 + production 77 + utilization 53** | **99 edges (12 plants × 4~7년 시계열)** |
-| **DART narrative (4 supplier OEM)** ⭐ 6/1 | (DART zip 재사용) | 4 OEM × 16+ zip | **vec.chunks 182** (Mobis 37 + Hanon 48 + Mando 25 + WIA 72) | LLM P3 통해 향후 적재 |
+| **DART narrative (4 supplier OEM)** ⭐ 6/1 | (DART zip 재사용) | 4 OEM × 16+ zip | **anxg_vec.chunks 182** (Mobis 37 + Hanon 48 + Mando 25 + WIA 72) | LLM P3 통해 향후 적재 |
 | **KAMA macro yearly (15051116)** ⭐ 6/1 | 397 B | 1 CSV | **21 row 적재 완료** | — |
 | **KAMA macro monthly (15051118)** ⭐ 6/1 | 6.3 KB | 1 CSV | **204 row 적재 완료** | — |
-| **OEM IR / 뉴스룸 (Hyundai + Kia ww)** ⭐ 6/1 | (실측 fetch) | 37 HTML pages | **events_oem_news 37 row + vec.chunks 37** | (LLM P3 후) MANUFACTURED_AT 보강 |
+| **OEM IR / 뉴스룸 (Hyundai + Kia ww)** ⭐ 6/1 | (실측 fetch) | 37 HTML pages | **events_oem_news 37 row + anxg_vec.chunks 37** | (LLM P3 후) MANUFACTURED_AT 보강 |
 | **KOTSA 수리검사 (15155857)** ⭐ 6/1 | 1.4 MB | 1 CSV | **events_inspections 47,171 row 적재 완료** | — |
-| **Wikipedia plants** ⭐ 6/1 | 0.5 MB | 30 plant raw | **vec.chunks 38** (ko 18 + en 20 / fuzzy match 12 miss) | :Plant 노드 속성 보강 (후속) |
+| **Wikipedia plants** ⭐ 6/1 | 0.5 MB | 30 plant raw | **anxg_vec.chunks 38** (ko 18 + en 20 / fuzzy match 12 miss) | :Plant 노드 속성 보강 (후속) |
 | 팩토리온 (15087611) | 0 | 0 | 0 | 키 발급 대기 |
 | **한국 리콜 (3048950 CSV)** ⭐ 6/2 | 0.26 MB | 1 CSV | **events_recalls 941 row 적재 완료** (85% 제조사 매핑) | (P3) CAUSED_BY_PROCESS 추출 |
 | **plants.yaml** ⭐ 6/1 | — | 30 plant | (Neo4j seed 적재 후) `:Plant` 29 노드 | `_DART_PLANT_CODE_MAP` 17 raw → :Plant.code 매핑 (100% 매핑, plants_skipped=0) |
-| **합계** | **~3.8 GB** | **~618k files + 6 신규 CSV** | **+48k 신규 행 (KOTSA 47k 우세)** + **vec.chunks +257** | **+99 MANUFACTURED_AT 시계열 edges** |
+| **합계** | **~3.8 GB** | **~618k files + 6 신규 CSV** | **+48k 신규 행 (KOTSA 47k 우세)** + **anxg_vec.chunks +257** | **+99 MANUFACTURED_AT 시계열 edges** |
 
 진행 단계 (2026-06-01 갱신):
 - ✅ MVP 범위 (구 PRD §3.3 → README §1 현황표) OEM 5사 (HYUNDAI/KIA/GENESIS/TESLA/FORD) × 5 year (2020-24) NHTSA 채워짐.
@@ -58,22 +58,22 @@ README §10 자동 측정 결과: `eval/reports/prd_dashboard_latest.md` 참조 
 ## 1. PostgreSQL 실측 (스키마 적용 완료: 07~13)
 
 ```
-auto.master_manufacturers           22,145
-auto.master_vehicle_models           6,770
-auto.master_vehicle_variants           428
-auto.master_suppliers                4,812   (legacy QID 마이그레이션 완료)
-auto.components                        220   (level=4 Module 만 — 5/29 +176 NHTSA taxonomy)
-auto.spec_measurements               3,329
-auto.events_recalls                    493   (5/29 +274 FORD)
-auto.events_complaints              16,005
-auto.events_investigations             154   (4 OEM filter)
-auto.oem_financials_sec              3,199
-auto.staging_relations                   0   (Wikidata P176 rate-limited)
-bridge.corp_entity                   4,806   (5/29 +3 SEC GM/Stellantis/Aptiv)
-vec.chunks (auto+finance domain)    765,247   (auto 16,435)
+anxg_auto.master_manufacturers           22,145
+anxg_auto.master_vehicle_models           6,770
+anxg_auto.master_vehicle_variants           428
+anxg_auto.master_suppliers                4,812   (legacy QID 마이그레이션 완료)
+anxg_auto.components                        220   (level=4 Module 만 — 5/29 +176 NHTSA taxonomy)
+anxg_auto.spec_measurements               3,329
+anxg_auto.events_recalls                    493   (5/29 +274 FORD)
+anxg_auto.events_complaints              16,005
+anxg_auto.events_investigations             154   (4 OEM filter)
+anxg_auto.oem_financials_sec              3,199
+anxg_auto.staging_relations                   0   (Wikidata P176 rate-limited)
+anxg_bridge.corp_entity                   4,806   (5/29 +3 SEC GM/Stellantis/Aptiv)
+anxg_vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 ```
 
-### 1.1 `auto.spec_measurements` source 분포
+### 1.1 `anxg_auto.spec_measurements` source 분포
 
 | source | rows | 등급 |
 |---|---:|---|
@@ -83,7 +83,7 @@ vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 
 → README §10.9 "제원 수치 EM 95%+" 의 정량 측정값 source. 합 **3,329 row**.
 
-### 1.2 `auto.components` source/level 분포 (5/29 NHTSA taxonomy 적재 후)
+### 1.2 `anxg_auto.components` source/level 분포 (5/29 NHTSA taxonomy 적재 후)
 
 | source | rows | level |
 |---|---:|:---:|
@@ -95,7 +95,7 @@ vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 
 → `load_nhtsa_component_taxonomy.py` 가 events_recalls 의 distinct component_text (178 raw 카테고리) 를 normalize·dedupe 한 뒤 module 로 등록 → **176 row** (2 row 는 정규화 후 동일 module 로 흡수). recall→component 매칭율 0 → 100% (no_match=0). 결과 RECALL_OF 39 → **601 edges**.
 
-### 1.3 `auto.events_investigations` 분포 (4 OEM filter — 24,128/154,019 = 15.7%)
+### 1.3 `anxg_auto.events_investigations` 분포 (4 OEM filter — 24,128/154,019 = 15.7%)
 
 | investigation_type | rows |
 |---|---:|
@@ -109,7 +109,7 @@ vec.chunks (auto+finance domain)    765,247   (auto 16,435)
 
 variant 매칭: 31 / 모델 매칭: 154 / campno (조사→리콜 종결) 보유: 62.
 
-### 1.4 `bridge.corp_entity` 4,806 row 의 품질 (README §10.6)
+### 1.4 `anxg_bridge.corp_entity` 4,806 row 의 품질 (README §10.6)
 
 마이그레이션 (`scripts/migrate/migrate_bridge_supplier_qid_to_id.py`) 으로
 supplier entity_id legacy QID (4,830) → numeric supplier_id 변환 완료 (5/28).
@@ -136,7 +136,7 @@ reviewed_only: 15/15 = 100.0%
 
 manufacturer QID 보유율 **45.3%** (10,027/22,145). supplier QID 보유율 **99.9%** (4,808/4,812).
 
-### 1.5 `auto.oem_financials_sec` — 글로벌 OEM XBRL facts (5/29 bridge 7 → 10)
+### 1.5 `anxg_auto.oem_financials_sec` — 글로벌 OEM XBRL facts (5/29 bridge 7 → 10)
 
 | CIK | OEM | facts | year 범위 | bridge entity |
 |---|---|---:|---|---|
@@ -157,7 +157,7 @@ manufacturer QID 보유율 **45.3%** (10,027/22,145). supplier QID 보유율 **9
 - **Stellantis N.V.** — vPIC "Stellantis North America" (id=1000000138) 와 alias 매핑
 - **Aptiv PLC** — Tier1 부품사 → `_ensure_supplier` 로 supplier_id=9000001 신규 발급, entity_type='supplier' bridge
 
-### 1.6 `vec.chunks` 자동 도메인 source
+### 1.6 `anxg_vec.chunks` 자동 도메인 source
 
 | source | rows | embedding 보유 |
 |---|---:|---|
@@ -169,7 +169,7 @@ manufacturer QID 보유율 **45.3%** (10,027/22,145). supplier QID 보유율 **9
 | datagokr_kotsa_inspection | 1 | ✅ 1 |
 | **합 (auto)** | **16,435** | **16,435 (100%)** |
 
-(전체 vec.chunks 765k 중 나머지는 finance 도메인.)
+(전체 anxg_vec.chunks 765k 중 나머지는 finance 도메인.)
 
 ---
 
@@ -186,7 +186,7 @@ manufacturer QID 보유율 **45.3%** (10,027/22,145). supplier QID 보유율 **9
 :Investigation         154
 :Module                203   (5/29 +177 NHTSA taxonomy)
 :Component              15
-:Supplier            9,642   ⚠️ supplier_seed/edges 중복 적재 의심 (auto.master_suppliers 4,812 의 2배)
+:Supplier            9,642   ⚠️ supplier_seed/edges 중복 적재 의심 (anxg_auto.master_suppliers 4,812 의 2배)
 :Standard               22
 :Plant                  18
 :System                 25
@@ -239,7 +239,7 @@ README §3.7 의무 메타 **7키** 중 측정 대상 6개 (source_type/source_i
 ### ✅ B3. SEC OEM bridge 자동 매칭 실패 3건 → 해결 (5/29)
 
 - `_SEC_CIK_TO_VPIC_MFR_ID` alias dict (Stellantis), `_SEC_MANUAL_MFR_SEED` (GM), `_SEC_TIER1_SUPPLIER_SEED` (Aptiv) 추가.
-- bridge.corp_entity sec_cik 7 → 10 (manufacturer 9 + supplier 1).
+- anxg_bridge.corp_entity sec_cik 7 → 10 (manufacturer 9 + supplier 1).
 
 ### ✅ B4. NHTSA 400 false-failure → 해결 (5/28)
 
@@ -262,7 +262,7 @@ README §3.7 의무 메타 **7키** 중 측정 대상 6개 (source_type/source_i
 ```sql
 -- AI-Hub source 의 모델 매핑 분포 확인
 SELECT name, source, level, manufacturer_id
-  FROM auto.components
+  FROM anxg_auto.components
  WHERE source IN ('aihub_578', 'aihub_71347')
  ORDER BY name;
 ```
@@ -295,7 +295,7 @@ grep -E "429|rate.*limit" data/raw/wikidata/part_supplies/*.log 2>/dev/null | ta
 
 ### 🟡 B10. `:Supplier` Neo4j 노드 중복 (신규 인지, 5/29)
 
-- PG `auto.master_suppliers` 4,812 vs Neo4j `:Supplier` 9,642 — 약 2배.
+- PG `anxg_auto.master_suppliers` 4,812 vs Neo4j `:Supplier` 9,642 — 약 2배.
 - 의심: supplier_seed loader 가 manual seed 19 → Neo4j 9,642 fan-out 또는 supplier_id 다른 다중 적재.
 - 영향 범위: 매칭 정확도 — name_norm 기준 dedup 안 됐을 가능성. 별도 진단 필요.
 
@@ -317,7 +317,7 @@ RETURN count(s) AS neo4j_count,
 ```sql
 -- (3) PG 측 manual_supplier_seed source 분포
 SELECT source_type, count(*)
-  FROM auto.master_suppliers
+  FROM anxg_auto.master_suppliers
  GROUP BY 1 ORDER BY 2 DESC;
 ```
 
@@ -340,8 +340,8 @@ SELECT source_type, count(*)
 ```sql
 -- (1) complaint 의 매칭 실패 분포
 SELECT component_text, count(*) AS cnt
-  FROM auto.events_complaints
- WHERE component_text NOT IN (SELECT name FROM auto.components)
+  FROM anxg_auto.events_complaints
+ WHERE component_text NOT IN (SELECT name FROM anxg_auto.components)
  GROUP BY 1 ORDER BY 2 DESC LIMIT 20;
 
 -- (2) L3 system vs L4 module 분류 — 단순 카테고리는 system 가능

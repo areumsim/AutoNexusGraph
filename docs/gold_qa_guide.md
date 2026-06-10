@@ -69,7 +69,7 @@
 # 1. 정답을 DB 에서 직접 조회
 psql -h localhost -p 31011 -U autonexusgraph -d autonexusgraph -c "
   SELECT corp_code, fiscal_year, value_won
-    FROM fin.financials
+    FROM anxg_fin.financials
    WHERE corp_code='00164742' AND fiscal_year=2024
      AND item_name LIKE '%매출%';
 "
@@ -148,7 +148,7 @@ make eval-full
 }
 ```
 
-**검증 방법**: `psql ... SELECT value_won FROM fin.financials WHERE corp_code='00126380' AND fiscal_year=2023 AND item_name='영업이익';`
+**검증 방법**: `psql ... SELECT value_won FROM anxg_fin.financials WHERE corp_code='00126380' AND fiscal_year=2023 AND item_name='영업이익';`
 
 #### B. Auto — NHTSA 리콜 (campaign_id 영구)
 
@@ -188,7 +188,7 @@ make eval-full
   "required_stores": ["AutoGraph.Graph", "Bridge", "AutoNexusGraph.SQL"],
   "main_hop_path": ["Manufacturer", "VehicleModel", "Recall", "Company", "Financials"],
   "is_answerable": true,
-  "notes": "Bridge: corp_code 00164742 ↔ manufacturer_id N (bridge.corp_entity reviewed)"
+  "notes": "Bridge: corp_code 00164742 ↔ manufacturer_id N (anxg_bridge.corp_entity reviewed)"
 }
 ```
 
@@ -206,7 +206,7 @@ make eval-full
   "required_stores": ["IPGraph.SQL"],
   "main_hop_path": ["Assignee", "Patent"],
   "is_answerable": true,
-  "notes": "WAITING: KIPRIS_API_KEY 발급 후 ip.patents 적재 → count_patents_by_field 실측 후 gold_answer_text 채움"
+  "notes": "WAITING: KIPRIS_API_KEY 발급 후 anxg_ip.patents 적재 → count_patents_by_field 실측 후 gold_answer_text 채움"
 }
 ```
 
@@ -423,10 +423,10 @@ make audit-external-ratio ARGS="--strict --target 0.30"
 
 ### Q1. 새 row 의 evidence_corp_codes 가 DB 에 없다고 lint fail
 
-→ `master.companies` 에 해당 corp_code 가 적재 안 됨. (a) 본 시스템 범위 (코스피200+코스닥100) 밖일 가능성, (b) corp_code 8자리 leading-0 형식 오류 (예: `"126380"` 대신 `"00126380"`). 확인:
+→ `anxg_master.companies` 에 해당 corp_code 가 적재 안 됨. (a) 본 시스템 범위 (코스피200+코스닥100) 밖일 가능성, (b) corp_code 8자리 leading-0 형식 오류 (예: `"126380"` 대신 `"00126380"`). 확인:
 
 ```sql
-SELECT * FROM master.companies WHERE corp_code = '00126380';
+SELECT * FROM anxg_master.companies WHERE corp_code = '00126380';
 ```
 
 ### Q2. ip 도메인 gold_answer_text 가 비어있는데 평가 어떻게?
@@ -435,7 +435,7 @@ SELECT * FROM master.companies WHERE corp_code = '00126380';
 
 ```bash
 # ip 적재 완료 가정
-psql ... -c "SELECT COUNT(*) FROM ip.patents WHERE jurisdiction='KR' AND filing_year=2023 AND assignee_id IN (SELECT assignee_id FROM ip.assignees WHERE name LIKE '삼성%');"
+psql ... -c "SELECT COUNT(*) FROM anxg_ip.patents WHERE jurisdiction='KR' AND filing_year=2023 AND assignee_id IN (SELECT assignee_id FROM anxg_ip.assignees WHERE name LIKE '삼성%');"
 # 결과를 IP-L1-001 의 gold_answer_text 에 채움
 ```
 
