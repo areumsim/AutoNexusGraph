@@ -36,8 +36,7 @@ import os
 import statistics
 import subprocess
 import sys
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -260,7 +259,11 @@ def compute_per_question_metrics(
 ) -> list[dict]:
     """gold × pred 머지 → per-question metric dict."""
     from eval.metrics import (
-        exact_match_contains, token_f1, hits_at_k, faithfulness, llm_judge,
+        exact_match_contains,
+        faithfulness,
+        hits_at_k,
+        llm_judge,
+        token_f1,
     )
 
     by_qid = {p["qid"]: p for p in pred_rows}
@@ -297,9 +300,10 @@ def compute_per_question_metrics(
             "question_kind": p.get("question_kind", ""),
             "complexity": g.get("complexity", ""),
             "requires_multi_hop": bool(g.get("requires_multi_hop")),
-            # Cross-Domain QA 4단계 층화 라벨 (CD-L1~L4) — PRD §10.8 측정용.
-            # 비-cross gold 에는 없으므로 빈 문자열로 표기.
-            "difficulty": g.get("difficulty", ""),
+            # Cross-Domain QA 4단계 층화 라벨 (CD-L1~L4) — README §10.8 측정용.
+            # gold cross/ip 는 `level` 필드 SSOT, 구 difficulty 필드는 폴백 (보존).
+            # 비-cross gold (auto/finance) 에는 없으므로 빈 문자열로 표기.
+            "difficulty": g.get("level") or g.get("difficulty", ""),
 
             # span-aware EM — 산문 답변 ⊃ gold span 인정 (full-equality artifact 보정).
             "em":           exact_match_contains(p.get("answer", ""), golds_text),
@@ -375,11 +379,13 @@ def summarize_by_adapter(per_q: list[dict]) -> dict[str, dict]:
 # ─── Cross-Domain 4단계 층화 (PRD §10.8 — CD-L1/L2/L3/L4 80/70/50/40%) ────
 # 각 어댑터 내에서 difficulty 별로 EM/F1 평균 + n 산출.
 # PRD 목표 비교를 위해 임계점 dict 도 같이 반환. SSOT = _thresholds.py.
+from eval.metrics._thesis import compute_diff_pp
 from eval.metrics._thresholds import (
     CD_DIFFICULTY_TARGETS as _PRD_10_8_TARGETS,
+)
+from eval.metrics._thresholds import (
     THESIS_DIFF_PP_TARGET,
 )
-from eval.metrics._thesis import compute_diff_pp
 
 
 def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
@@ -388,6 +394,10 @@ def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
     Returns:
         {adapter: {difficulty: {n, em, f1, em_target, em_target_met}}}.
         difficulty 가 비어있는 row 는 제외 (auto / finance gold).
+
+    Note: per_q[i]['difficulty'] 는 gold 의 `level` 필드(SSOT) 에서 채워진다
+    (run_qa_eval.evaluate_predictions, "difficulty" 라인 참조). cross gold
+    는 모두 CD-L1~CD-L4 4단계 중 하나. CD-PROC-* 도 난이도 기반 흡수.
     """
     out: dict[str, dict[str, dict]] = {}
     for r in per_q:
