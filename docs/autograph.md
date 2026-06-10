@@ -37,28 +37,35 @@ src/autograph/
     factoryon_registry.py         # 팩토리온 공장등록 (data.go.kr 15087611, A grade)
     kosis_industry.py             # KOSIS 산업통계 (월·연 단위 거시)
     kncap.py                      # KNCAP 신차 안전도 평가 (raw 부재 시 skip)
-  loaders/
-    neo4j_init.py                 # CONSTRAINT/INDEX 멱등 생성
-    load_auto_pg.py               # raw → auto.* PG UPSERT
-    load_auto_neo4j.py            # PG → Neo4j MERGE (SSOT=PG)
-    load_bridge.py                # bridge.corp_entity 매칭 (QID > LEI > 사업자번호 > name)
-    build_chunks_auto.py          # 리콜/컴플레인 텍스트 → vec.chunks
-    load_supplier_edges.py        # supplier_seed.yaml → SUPPLIED_BY (manual A-grade)
-    load_recall_components.py     # auto.events_recalls.component_text → RECALL_OF
-    load_seed_standards_plants.py # :Standard + :Plant + OWNS_PLANT
-    load_complaints_neo4j.py      # :Complaint + REPORTED_IN
-    load_kncap.py                 # KNCAP → spec_measurements.safety.kncap.* + SAFETY_RATED_BY
-    load_dart_production.py       # DART 사업보고서 생산·설비 + 가동률 표 파서
-    load_kama_macro.py             # KAMA 매크로 (생산·내수·수출)
-    load_kosis_industry.py        # KOSIS 산업통계 → macro.kosis_series
-    load_factoryon_plants.py      # 팩토리온 :Plant A등급 + PERFORMED_AT 추론 (candidate)
-    load_performed_at.py          # performed_at_seed.yaml 한국 OEM 9공장 (B-grade validated)
-    load_auto_process_nodes.py    # :Process taxonomy + 산단공 적재 (C-grade)
-    load_auto_process_routes.py   # :ProcessStep + INSTANTIATES + PRECEDES (C-grade)
-    load_recall_process_map.py    # 한글 리콜 결함→공정 (deterministic 키워드, candidate)
-    load_process_resources.py     # USES_EQUIPMENT + CONSUMES_MATERIAL (표준 공정 지식)
-    load_produced_by.py            # :Part system→공정 추론 PRODUCED_BY (candidate)
-    load_kamp_process_metrics.py  # KAMP 공정 metrics (scaffold — CSV 부재 시 skip)
+  loaders/                        # 관심사별 5 하위그룹. CLI: python -m autograph.loaders.<group>.<module>
+    neo4j_init.py                 # CONSTRAINT/INDEX 멱등 생성 (최상위)
+    _neo4j_helpers.py             # 공통 엣지 메타 cypher 등 (최상위, _text_utils.py 동반)
+    master/                       # 엔티티·BoM·bridge·supplier·specs
+      load_auto_pg.py             # raw → auto.* PG UPSERT
+      load_auto_neo4j.py          # PG → Neo4j MERGE (SSOT=PG)
+      load_bridge.py              # bridge.corp_entity 매칭 (QID > LEI > 사업자번호 > name)
+      load_supplier_edges.py      # supplier_seed.yaml → SUPPLIED_BY (manual A-grade)
+      load_parts_l5.py / load_auto_specs.py / load_kama_macro.py / derive_contains_system.py / ...
+    recall/                       # 리콜·불만·결함·안전 이벤트
+      load_recall_components.py   # auto.events_recalls.component_text → RECALL_OF
+      load_complaints_neo4j.py    # :Complaint + REPORTED_IN
+      load_kncap.py               # KNCAP → spec_measurements.safety.kncap.* + SAFETY_RATED_BY
+      load_auto_safety.py / load_defect_matches_neo4j.py / load_nhtsa_component_taxonomy.py / ...
+    process/                      # BoP 공정 그래프·공장
+      load_seed_standards_plants.py # :Standard + :Plant + OWNS_PLANT
+      load_dart_production.py     # DART 사업보고서 생산·설비 + 가동률 표 파서
+      load_factoryon_plants.py    # 팩토리온 :Plant A등급 + PERFORMED_AT 추론 (candidate)
+      load_performed_at.py        # 한국 OEM 공장 (B-grade validated)
+      load_auto_process_nodes.py  # :Process taxonomy + 산단공 적재 (C-grade)
+      load_auto_process_routes.py # :ProcessStep + INSTANTIATES + PRECEDES (C-grade)
+      load_recall_process_map.py  # 한글 리콜 결함→공정 (deterministic 키워드, candidate)
+      load_process_resources.py / load_produced_by.py / load_kosis_industry.py / load_kamp_process_metrics.py / ...
+    materials/                    # L6 소재·광물
+      load_materials_metals.py    # 금속 소재
+      load_usgs_minerals.py       # USGS MCS 핵심광물
+    chunks/                       # 벡터 청크·뉴스
+      build_chunks_auto.py        # 리콜/컴플레인 텍스트 → vec.chunks
+      load_oem_ir_news.py         # OEM IR/뉴스룸 본문
   tools/
     spec.py                       # PG SQL — lookup_vehicle / get_spec / compare_vehicles + plant / macro
     graph.py                      # Neo4j — list_recalls_affecting / list_components / ...
@@ -513,7 +520,7 @@ make eval-auto
 - `cypher_templates_auto.AUTO_TEMPLATES` 키는 `auto_` 접두사로 finance 키와 충돌 안 함.
   병합은 `src/autograph/tools/__init__.py` import 시 1회 실행.
 - `autonexusgraph/extractors/base.py` / `engine.py` 의 finance P3 파이프라인 — 코드 이동 없이 import 만. finance 측 P3 / P4 동작은 그대로.
-- testsuite — `pytest -q` unit 310 + `tests/autograph/*` 52 통과.
+- testsuite — `pytest -q` 코어 unit + `tests/autograph/*` 도메인 테스트 (현재 144) 통과. (총 테스트 수는 변동 — `pytest -q` 로 확인)
 - 통합 테스트(`pytest -m integration`) — 마커 부여 케이스 0 개 (실제 Neo4j/PG 인프라가 필요한 검증은 §7.5 verification 절차로 수동 수행).
 
 ---
@@ -530,10 +537,10 @@ ontology/
 └── auto/                 # autograph SSOT
     ├── entities.yaml         # 17 노드 — Manufacturer/VehicleModel/VehicleVariant/System/Module/Part/Supplier/Recall/Complaint/Investigation/Standard/Plant/Material/Mineral/Process/ProcessStep/Equipment
     ├── relations.yaml        # 26 엣지 — MANUFACTURES/HAS_VARIANT/CONTAINS_SYSTEM/CONTAINS_COMPONENT/CONTAINED_IN/SUPPLIED_BY/AFFECTED_BY/RECALL_OF/REPORTED_IN/INVESTIGATED_BY/LED_TO_RECALL/COMPLIES_WITH/SAFETY_RATED_BY/MANUFACTURED_AT/OWNS_PLANT/COMPETES_WITH/MADE_OF/DERIVED_FROM/PRODUCED_BY/PRECEDES/INSTANTIATES/USES_EQUIPMENT/CONSUMES_MATERIAL/PERFORMED_AT/CAUSED_BY_PROCESS/USES_PROCESS (BoP/Investigation 포함)
-    ├── extractors.yaml       # 13 추출기 카탈로그 (P2/P3/P4)
+    ├── extractors.yaml       # 15 추출기 카탈로그 (P2/P3/P4)
     ├── system_taxonomy.yaml  # 19 시스템 코드 + alias_codes (AI Hub 'powertrain' → 'POWERTRAIN')
     ├── standards.yaml        # 22 표준 (FMVSS/ECE/KMVSS/NCAP/UN R155/ISO 26262/…)
-    ├── plants.yaml           # 18 공장 (한국 OEM + 글로벌)
+    ├── plants.yaml           # 30 공장 (한국 OEM + 글로벌)
     └── supplier_seed.yaml    # 19 공급사 × 46 매핑 (manual A-grade)
 ```
 

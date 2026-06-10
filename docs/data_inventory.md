@@ -128,10 +128,10 @@ name match 는 본래 candidate 라 모수 외. deterministic match (wikidata_qi
 lei / business_no / corp_code / sec_cik) 만:
 
 ```
-strong_match: 12/12 = 100.0%  ✅ 목표 80%+ 충족
-              (wikidata_qid 1 + lei 1 + sec_cik 10)
-reviewed_only: 12/12 = 100.0%
-전체 모수 (참고): 12/4,806 = 0.25%
+strong_match: 15/15 = 100.0%  ✅ 목표 80%+ 충족
+              (manufacturer reviewed 11 + supplier reviewed 4, 모두 conf≥0.9 — README §10.6, 2026-06-01 재측정)
+reviewed_only: 15/15 = 100.0%
+전체 모수 (참고): 15/4,806 = 0.31%
 ```
 
 manufacturer QID 보유율 **45.3%** (10,027/22,145). supplier QID 보유율 **99.9%** (4,808/4,812).
@@ -218,7 +218,7 @@ README §11.2 의 14 관계 중 **14종 채워짐**. 추가 누락:
 - `:MANUFACTURED_AT` — model↔plant 매핑 데이터 없음
 - `:COMPETES_WITH` — segment 매핑 데이터 없음
 
-README §3.7 의무 메타 6개 (source_type/source_id/confidence_score/validated_status/snapshot_year/extraction_method) — `SUPPLIED_BY` 30/30 = **100% ✅** (`eval/metrics/edge_meta_completeness.py` 측정).
+README §3.7 의무 메타 **7키** 중 측정 대상 6개 (source_type/source_id/confidence_score/validated_status/snapshot_year/extraction_method) — `schema_version` 은 yaml 헤더서 자동 부여라 completeness 측정서 별도 — `SUPPLIED_BY` 30/30 = **100% ✅** (`eval/metrics/edge_meta_completeness.py` 측정).
 
 ---
 
@@ -384,8 +384,8 @@ PYTHONPATH=src python3 -m eval.metrics.prd_dashboard -o eval/reports/prd_dashboa
 |---|---|:---:|
 | §10.1~10.3 (docker/UI/LLM env) | 외부 측정 — 본 dashboard 범위 밖 | · |
 | §10.4 (OEM 5~8 × 모델 30~50 × 2022-24) | OEM=5 models=102 years=(2020,2024) | ✅ |
-| §10.5 (BOM L0~3 안정 + L4 60%+) | L0~L3 ✅, L4 = 46/102 = 45.1% | ⚠️ |
-| §10.6 (bridge ≥0.9 80%+) | strong_match 12/12 = 100% | ✅ |
+| §10.5 (BOM L0~3 안정 + L4 60%+) | L0~L3 ✅, L4 = 63.7% (`scripts/audit/bom_coverage.py`, README §10.5, 2026-06-01) | ✅ |
+| §10.6 (bridge ≥0.9 80%+) | strong_match 15/15 = 100% (mfr 11 + supplier 4) | ✅ |
 | §10.7~10.10 (LLM eval) | LLM_API_KEY 필요 | ⊘ |
 | §10.11 (SUPPLIED_BY 100% meta) | 30 edges, 6/6 메타 100% | ✅ |
 | §10.12 (코어 변경 < 5%) | 538/12,027 LOC = 4.47% | ✅ |

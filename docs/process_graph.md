@@ -47,7 +47,7 @@ grade 는 `confidence_default`(float) 로 인코딩(`grade` 키 없음). pydanti
 
 | 함수 | 시그니처 | Cypher 템플릿 | 코드 |
 |---|---|---|---|
-| `lookup_process` | `(query, limit)` → name 매칭 (LIKE) | `auto_proc_lookup` | `tools/process.py:53` |
+| `lookup_process` | `(query, limit)` → name 매칭 (ILIKE) | — **raw PG SQL** (`anxg_auto.processes`, Cypher 템플릿 아님) | `tools/process.py:53` |
 | `get_process_info` | `(process_name_norm)` → 공정 정의 + 통계 속성 | `auto_proc_info` | `tools/process.py:81` |
 | `list_process_route` | `(step_id, limit)` → PRECEDES 체인 (depth `*0..10` cap) | `auto_proc_route` | `tools/process.py:89` |
 | `list_steps_of_process` | `(process_name_norm, limit)` → INSTANTIATES 역방향 | `auto_proc_steps_of_process` | `tools/process.py:96` |
