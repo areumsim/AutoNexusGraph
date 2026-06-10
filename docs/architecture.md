@@ -350,7 +350,7 @@ flowchart TD
 
 → 합 7+5+1+5+5+3+4+3+3 = **36 필드**. 안전 신호만 `_list_extend`, 누적 채널 (`task_results`/`tool_results`/`evidence_chunks`) 은 dedup-merge reducer, 나머지는 `_last_wins` reducer (병렬 worker 의 entry-only 필드 충돌 회피).
 
-**replan 사이클** — `validator` 실패 → `mark_replan()` 이 `tool_results / evidence_chunks / plan / tasks / answer` 초기화 + `n_replans += 1` → `planner` 재진입 (`validator.py:184-195`). `n_replans >= MAX_REPLANS (=2)` 면 `finalize` 로.
+**replan 사이클** — `validator` 실패 → `mark_replan()` 이 `tool_results / evidence_chunks / plan / tasks / answer` 초기화 + `n_replans += 1` → `planner` 재진입 (`validator.py:187-195`). `n_replans >= MAX_REPLANS (=2)` 면 `finalize` 로.
 
 **도메인 라우팅**: `triage` 노드가 `_domain_handler.auto_detect_domain(question)` 호출 (`_domain_handler.py:246`) → 등록된 라우터 (autograph: `route_domain`, ipgraph: `route_domain_ip`, finance: 코어 기본) 가 순차 평가 → 최초 match 되는 도메인의 `DomainHandler` 가 worker 호출 시 사용됨.
 
@@ -423,7 +423,7 @@ flowchart TD
 - **대안 1 — 무한 replan**: validator 가 같은 fail 신호를 반복 보내면 무한 루프 — 비용 폭주.
 - **대안 2 — 1회 (MAX=1)**: 첫 시도 + 1회 재시도 = 총 2회. 한 번 fail 시 부분 답변 반환. 너무 보수적 — multi-hop 질문에서 부분 답변 비율↑.
 - **대안 3 — 5회 이상**: replan_factor 가 6 이상 — 사전 추정 비용 6배. 대부분의 fail 은 2회 이내 회복 (LLM stochasticity + planner 재호출이 같은 question 으로 시작).
-- **선택 = MAX=2** (`validator.py:36`) — 총 3회 synthesizer 호출 (base + 2 replan). 비용 사전 추정 `replan_factor = MAX_REPLANS + 1 = 3` (`cost_estimator.py:100-102`) 으로 최악 시나리오 보장. mark_replan 시 `tool_results / evidence_chunks / plan / tasks / answer` 리셋 + `n_replans += 1` (`validator.py:184-195`).
+- **선택 = MAX=2** (`validator.py:39`) — 총 3회 synthesizer 호출 (base + 2 replan). 비용 사전 추정 `replan_factor = MAX_REPLANS + 1 = 3` (`cost_estimator.py:100-102`) 으로 최악 시나리오 보장. mark_replan 시 `tool_results / evidence_chunks / plan / tasks / answer` 리셋 + `n_replans += 1` (`validator.py:187-195`).
 - **[열린 질문]** planner 가 `validation_issues` 신호를 다음 plan 에 실제로 반영하는지 — replan 의미는 두 시도가 달라야만. (`docs/mental_model.md §5.10` 참조.)
 
 ---

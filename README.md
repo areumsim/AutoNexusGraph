@@ -141,7 +141,7 @@ flowchart TB
 | `anxg_sec.filings` (한국 ADR) / `anxg_sec.lei` (GLEIF KR) | 1,857 / 2,704 | GLEIF API enrich — anxg_sec.lei.corp_code 113→**128** / `anxg_master.entity_map(lei)` 120→**128** / anxg_bridge.corp_entity.lei 0→**5** (supplier strong-match 2→**4** +100%) |
 | `anxg_vec.chunks` (DART + Wikipedia) | 748,812 | embedding backfill — 측정 대기 |
 | Neo4j Company / Person / NewsEvent | 12,914 / 14,536 / 85 | 동명이인 2,171 분리 |
-| Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF ⭐ 6/1 재측정 + 7키 cover | 8,661 / **36,399** / **16,725** | 100% 7키 메타 cover (`audit-edge-meta` PASS 2026-06-01 — DART 공시 grade A: `source_type='dart_otr_cpr_invstmnt/exctv_sttus/hyslr_sttus'`, `confidence_score=0.95`, `validated_status='verified'`, `snapshot_year`, `schema_version='v2.2'`). 73,602 finance 엣지(SUBSIDIARY/RELATED/EXEC/SHAREHOLDER/HAS_CEO/LISTED_IN/IN_INDUSTRY/MENTIONS/CO_MENTIONED) 일괄 backfill + loader 4 파일(graph.py/graph_structural.py/load_news.py/load_graph_news_corel.py) cypher 7키 SoT 적재. 동명이인 분리는 (name, birth_year). |
+| Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF ⭐ 6/1 재측정 + 7키 cover | 8,661 / **36,399** / **16,725** | 100% 7키 메타 cover (`audit-edge-meta` PASS 2026-06-01 — DART 공시 grade A: `source_type='dart_otr_cpr_invstmnt/exctv_sttus/hyslr_sttus'`, `confidence_score=0.95`, `validated_status='verified'`, `snapshot_year`, `schema_version='v2.2'`). 73,602 finance 엣지(SUBSIDIARY/RELATED/EXEC/SHAREHOLDER/HAS_CEO/LISTED_IN/IN_INDUSTRY/MENTIONS/CO_MENTIONED) 일괄 backfill + loader (graph.py/graph_structural.py/chunks.py) cypher 7키 SoT 적재. 동명이인 분리는 (name, birth_year). |
 
 ### Auto 도메인 (HYUNDAI/KIA/GENESIS/TESLA/FORD × 2020–2024 — 5 OEM 확장 완료, KGM/르노코리아는 data.go.kr 키 발급 후 추가 예정)
 
@@ -408,7 +408,7 @@ CREATE TABLE anxg_bridge.corp_entity (
 
 ### 3.7 관계 엣지 필수 메타데이터 (7키)
 
-**필수 7키 — `EDGE_REQUIRED_META_KEYS` SSOT** (`src/autonexusgraph/ontology/schema.py:28-36`):
+**필수 7키 — `EDGE_REQUIRED_META_KEYS` SSOT** (`src/autonexusgraph/ontology/schema.py:27-35`):
 
 1. **`source_type`** — `recall | ir_disclosure | manual | wikidata | wikipedia | llm_extraction | manual_curation | dart_*` 등
 2. **`source_id`** — `NHTSA-25V-001 | DART-20240315-... | chunk_id:...`

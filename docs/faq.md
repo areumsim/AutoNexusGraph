@@ -201,7 +201,7 @@ ORDER BY total DESC;
 
 ### Q5.3 `audit-edge-meta --strict` 가 fail
 
-**원인**: Neo4j 엣지 중 일부가 7키 (`source_type / source_id / confidence_score / validated_status / snapshot_year / extraction_method / schema_version`) 누락. `EDGE_REQUIRED_META_KEYS` SSOT = `src/autonexusgraph/ontology/schema.py:28-36`.
+**원인**: Neo4j 엣지 중 일부가 7키 (`source_type / source_id / confidence_score / validated_status / snapshot_year / extraction_method / schema_version`) 누락. `EDGE_REQUIRED_META_KEYS` SSOT = `src/autonexusgraph/ontology/schema.py:27-35`.
 
 **해결**: loader 의 `edge_meta_cypher()` 헬퍼 (`src/autograph/loaders/_neo4j_helpers.py`) 가 7키 자동 부여. 헬퍼 우회한 직접 CREATE 가 원인. 누락 엣지 식별:
 
@@ -231,7 +231,7 @@ grep LANGFUSE_HOST .env
 
 ### Q6.2 replan 무한 루프 의심
 
-**확인**: `MAX_REPLANS = 2` (`agents/validator.py:36`) 가 hard cap. 3번째 replan 시 finalize 노드가 `⚠️ 검증 실패 (replan 2/2 후)` 프리픽스로 답변 패키징.
+**확인**: `MAX_REPLANS = 2` (`agents/validator.py:39`) 가 hard cap. 3번째 replan 시 finalize 노드가 `⚠️ 검증 실패 (replan 2/2 후)` 프리픽스로 답변 패키징.
 
 **진단**: `state.n_replans` 값 확인. SSE stream 에서 노드 진행 표시.
 
