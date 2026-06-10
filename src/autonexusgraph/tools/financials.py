@@ -43,20 +43,38 @@ def lookup_company(query: str = "", limit: int = 5, *,
         return []
     conn = get_connection()
     with conn.cursor() as cur:
-        # 정확 매치들 모두
+        # corp_name 직접 매치 + company_aliases 경유 매치(통칭 'SK하이닉스' 등).
+        # alias 정확=75(≥ triage 임계 60 → 채택), alias 부분=55(임계 미만 → 거름).
         cur.execute("""
-            SELECT corp_code, corp_name, stock_code, market,
-                   CASE WHEN corp_code = %(q)s THEN 100
-                        WHEN stock_code = %(q)s THEN 90
-                        WHEN corp_name = %(q)s THEN 80
-                        WHEN corp_name ILIKE %(q)s || '%%' THEN 60
-                        WHEN corp_name ILIKE '%%' || %(q)s || '%%' THEN 40
-                        ELSE 0 END AS score
-            FROM anxg_master.companies
-            WHERE corp_code = %(q)s
-               OR stock_code = %(q)s
-               OR corp_name ILIKE '%%' || %(q)s || '%%'
-            ORDER BY score DESC, corp_name ASC
+            SELECT c.corp_code, c.corp_name, c.stock_code, c.market,
+                   GREATEST(
+                     CASE WHEN c.corp_code = %(q)s THEN 100
+                          WHEN c.stock_code = %(q)s THEN 90
+                          WHEN c.corp_name = %(q)s THEN 80
+                          WHEN c.corp_name ILIKE %(q)s || '%%' THEN 60
+                          WHEN c.corp_name ILIKE '%%' || %(q)s || '%%' THEN 40
+                          ELSE 0 END,
+                     COALESCE((
+                        SELECT MAX(CASE WHEN a.alias = %(q)s OR a.alias_norm = %(q)s THEN 75
+                                        WHEN a.alias ILIKE '%%' || %(q)s || '%%'
+                                          OR a.alias_norm ILIKE '%%' || %(q)s || '%%' THEN 55
+                                        ELSE 0 END)
+                        FROM anxg_master.company_aliases a
+                        WHERE a.corp_code = c.corp_code), 0)
+                   ) AS score
+            FROM anxg_master.companies c
+            WHERE c.corp_code = %(q)s
+               OR c.stock_code = %(q)s
+               OR c.corp_name ILIKE '%%' || %(q)s || '%%'
+               OR EXISTS (SELECT 1 FROM anxg_master.company_aliases a
+                          WHERE a.corp_code = c.corp_code
+                            AND (a.alias ILIKE '%%' || %(q)s || '%%'
+                                 OR a.alias_norm ILIKE '%%' || %(q)s || '%%'))
+            -- 동점(예: alias 정확 75)일 때 corp_name 이 질의를 포함하는 회사를 우선.
+            -- (wikipedia 출처 등 잘못된 alias 가 의도 회사를 밀어내는 것을 방지.)
+            ORDER BY score DESC,
+                     (CASE WHEN c.corp_name ILIKE '%%' || %(q)s || '%%' THEN 0 ELSE 1 END),
+                     c.corp_name ASC
             LIMIT %(lim)s
         """, {"q": q, "lim": limit})
         rows = cur.fetchall()
