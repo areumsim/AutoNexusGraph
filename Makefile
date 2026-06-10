@@ -32,7 +32,7 @@
         load-auto-investigations load-auto-oem-sec load-auto-mfrcomm \
         derive-auto-contains-system load-wikidata-part-supplies \
         extract-auto-p3 extract-auto-p3-cost validate-auto-p4 extract-validate-auto \
-        audit-bom-coverage audit-edge-meta audit-trace audit-ontology audit-eval-matrix audit-eval-matrix-full audit-mcp audit-ipgraph audit-dod \
+        audit-bom-coverage audit-edge-meta audit-trace audit-trace-full audit-ontology audit-eval-matrix audit-eval-matrix-full audit-mcp audit-ipgraph audit-dod \
         validate-gold-qa eval-cross eval-ip \
         ingest-datagokr-recalls ingest-datagokr-inspections \
         ingest-car-go-kr ingest-katri ingest-kncap \
@@ -117,7 +117,8 @@ help:
 	@echo "── DoD audit (PRD §10) ──"
 	@echo "  audit-bom-coverage                Level 0~5 노드 + L4 coverage 측정"
 	@echo "  audit-edge-meta                   PRD §6.7 의무 메타 invariant (strict)"
-	@echo "  audit-trace                       PRD §10 DoD #17 (b) Langfuse 실측 (turn별 token/cost/replan)"
+	@echo "  audit-trace                       PRD §10 DoD #17 (b) Langfuse 실측 simulation (LLM 비용 0)"
+	@echo "  audit-trace-full                  동일 trace 실 agent run + Langfuse cloud export (LANGFUSE_* 키 시)"
 	@echo "  audit-ontology                    PRD §10 DoD #17 (c) 온톨로지 pydantic strict 검증"
 	@echo "  audit-eval-matrix                 PRD §10 DoD #17 (d) 축소 매트릭스 simulation (ARGS=\"--full --limit N\" 전달 가능)"
 	@echo "  audit-eval-matrix-full            동일 매트릭스 --full 모드 (limit 30 default, §10.7 thesis 측정)"
@@ -634,8 +635,15 @@ audit-edge-meta:
 
 audit-trace:
 	# PRD §10 DoD #17 (b) — Langfuse 실측 (turn별 token/cost/replan).
-	# 기본 = simulation (LLM 비용 0). --full 옵션으로 실제 run_agent 호출 가능.
-	PYTHONPATH=src:. $(PYTHON) scripts/audit/trace_smoke.py
+	# 기본 = simulation (LLM 비용 0). 실 agent run + Langfuse cloud export 은
+	# `make audit-trace-full` (또는 ARGS=--full). LANGFUSE_* 키 발급 시 1-command.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/trace_smoke.py $(ARGS)
+
+audit-trace-full:
+	# PRD §10 DoD #17 (b) — 실 agent run (LLM 비용 발생) + Langfuse cloud export.
+	# LANGFUSE_PUBLIC_KEY/SECRET_KEY(+선택 LANGFUSE_HOST) 설정 시 dashboard 송신까지 검증.
+	# 키 없으면 PG token/cost/replan 적재만 PASS, Langfuse 는 skipped (runbook Step 3).
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/trace_smoke.py --full $(ARGS)
 
 audit-ontology:
 	# PRD §10 DoD #17 (c) — 온톨로지 pydantic strict 검증 (핵심+보조 yaml + cypher cross).

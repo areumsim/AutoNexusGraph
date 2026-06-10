@@ -55,7 +55,7 @@ PY
 | E-1 12조합(도메인별) | `make eval-full` / `eval-auto` / `eval-cross` | `eval/reports/<run>/summary.md` |
 | Q-2 confidence calibration | `make eval-full` → `make audit-calibrate` | Platt + reliability diagram |
 | PG-2 공정↔재무 cross 정확도 | `make eval-cross` (구조 ✅, 정확도만) | DoD §10.20 |
-| S-2 Langfuse cloud export | `LANGFUSE_*` 키 → `make audit-trace --full` | turn별 token/cost/replan |
+| S-2 Langfuse cloud export | `LANGFUSE_*` 키 → `make audit-trace-full` | turn별 token/cost/replan |
 
 ## 4. 트러블슈팅
 - 전 cell `0.000` + cost `$0` → LLM 키 만료/미설정 (synth_status.error_type 확인). §0 점검.
