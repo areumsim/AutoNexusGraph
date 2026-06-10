@@ -101,7 +101,12 @@ class OpenAIClient(LLMClient):
                     "json_schema": {
                         "name": schema.get("name", "Response"),
                         "schema": schema.get("schema", schema),
-                        "strict": True,
+                        # strict=False: 본 스키마들은 free-form object(예: planner PLAN_SCHEMA 의
+                        # ``args: {type: object}`` — 임의 도구 인자)를 포함하는데, OpenAI strict 모드는
+                        # 모든 object 에 additionalProperties:false + 전 속성 required 를 요구해
+                        # free-form object 와 비호환(400 invalid_request_error). 결과 JSON 은 각 caller
+                        # 가 화이트리스트/구조 검증하므로 strict 불요.
+                        "strict": False,
                     },
                 },
                 **kwargs,
