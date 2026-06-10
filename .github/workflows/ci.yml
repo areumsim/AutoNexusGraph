@@ -15,7 +15,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # main 브랜치 run 은 취소하지 않는다 — 모든 머지 커밋이 CI 를 완주(녹색)해야 한다.
+  # PR 브랜치만 cancel-in-progress (빠른 재push 시 직전 run 취소로 CI 절약).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   test:
