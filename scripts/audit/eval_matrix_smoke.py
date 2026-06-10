@@ -17,8 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
-from eval.runners.run_matrix_smoke import main   # noqa: E402
-
+from eval.runners.run_matrix_smoke import main  # noqa: E402
 
 if __name__ == "__main__":
     raise SystemExit(main())

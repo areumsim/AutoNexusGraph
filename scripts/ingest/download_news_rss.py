@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -27,14 +26,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion._license import policy
 from autonexusgraph.ingestion.news_client import KOREAN_FEEDS, NewsRssClient
 
 
 def _article_hash(source: str, link: str) -> str:
-    return hashlib.sha256(f"{source}||{link}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{source}||{link}".encode()).hexdigest()
 
 
 def main() -> int:
@@ -63,7 +65,7 @@ def main() -> int:
             try:
                 items = fetch_with_retry(lambda u=url, n=name: cli.fetch(u, source_name=n),
                                          max_tries=3)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_news_rss] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 print(f"   fetch failed: {e}")
                 ckpt.mark_failed(name, str(e))
                 continue

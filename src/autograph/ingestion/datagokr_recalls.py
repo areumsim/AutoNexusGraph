@@ -33,7 +33,6 @@ from autonexusgraph.ingestion._common import (
 
 from ..config import get_auto_settings
 
-
 log = logging.getLogger(__name__)
 
 
@@ -57,14 +56,14 @@ def _fetch_page(page: int, per_page: int = 100) -> dict:
         "Accept": "application/json",
         "User-Agent": "AutoGraph-Research/0.1",
     })
-    _LIMITER.wait()
+    _LIMITER.acquire()
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         log.error("[datagokr_recalls] page=%d HTTP %s: %s", page, e.code, e.reason)
         return {}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — [datagokr_recalls] fail-soft 흡수 → {} 반환 (log 동반)
         log.error("[datagokr_recalls] page=%d 실패: %s", page, e)
         return {}
 

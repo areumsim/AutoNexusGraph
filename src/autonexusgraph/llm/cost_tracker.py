@@ -5,7 +5,7 @@
   multi-turn 동시 실행 시 turn boundary 가 깨지지 않는다.
 - 기존 process singleton (_singleton + _singleton_lock) 제거.
 - get_tracker / get_session_tracker 이원화 → get_session_tracker 단일 진입점.
-- ops.llm_usage 의 ``meta JSONB`` 컬럼에 turn 식별자 (thread_id, turn_id, n_replans,
+- anxg_ops.llm_usage 의 ``meta JSONB`` 컬럼에 turn 식별자 (thread_id, turn_id, n_replans,
   domain) 적재 — 별도 ALTER 불필요.
 
 수명 주기 (turn 단위):
@@ -40,7 +40,6 @@ from .cost import (
     get_session_limit_usd,
 )
 
-
 log = logging.getLogger(__name__)
 
 
@@ -52,18 +51,19 @@ def _read_session_base() -> float:
     """
     try:
         from datetime import datetime, timedelta, timezone
+
         from .cost_log import total_cost
         hrs = get_cost_window_hours()
         since = None
         if hrs and hrs > 0:
             since = datetime.now(timezone.utc) - timedelta(hours=hrs)
         return float(total_cost(since=since))
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — [COST] session base read failed 흡수 → 0.0 반환
         log.debug("[COST] session base read failed: %s", e)
         return 0.0
 
 
-class BudgetExceeded(Exception):
+class BudgetExceeded(Exception):  # noqa: N818 — 제어흐름 예외(의도적 비-Error 명명)
     """누적 비용이 한도 도달 — turn/batch abort 신호."""
 
 
@@ -79,7 +79,7 @@ class TrackerState:
     cost_usd: float = 0.0
     aborted: bool = False
     finalized: bool = False
-    # turn 식별자 — ops.llm_usage.meta JSONB 에 적재
+    # turn 식별자 — anxg_ops.llm_usage.meta JSONB 에 적재
     thread_id: str | None = None
     turn_id: str | None = None
     domain: str | None = None
@@ -144,7 +144,7 @@ class CostTracker:
         try:
             from ..config import get_settings
             warn_at = max(0.0, float(get_settings().llm_session_warn_at_usd))
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — [cost_tracker] settings 로드 실패 silent → warn_at 기본값(limit*0.9) 유지
             pass
         if n % self._report_every == 0 or cum >= warn_at:
             log.info(f"[COST] {self.state.caller} n_calls={n} cum=${cum:.4f} "
@@ -184,7 +184,7 @@ class CostTracker:
     def finalize(self, status: str = "ok", *,
                  n_replans: int | None = None,
                  extra_meta: dict | None = None) -> None:
-        """run 종료 — ops.llm_usage 의 ended_at/총합/status + meta JSONB 갱신.
+        """run 종료 — anxg_ops.llm_usage 의 ended_at/총합/status + meta JSONB 갱신.
 
         n_replans: turn 단위 lifecycle 에서 final state.n_replans 전달.
         extra_meta: 추가 메타 (예: ``{"question_kind": "factual"}``) — meta JSONB 머지.
@@ -206,7 +206,7 @@ class CostTracker:
 
     # ── meta JSONB 직렬화 (PG 적재 공통) ─────────────────────────
     def _build_meta(self) -> dict:
-        """ops.llm_usage.meta 에 적재할 dict — turn 식별자 + extra_meta 통합."""
+        """anxg_ops.llm_usage.meta 에 적재할 dict — turn 식별자 + extra_meta 통합."""
         meta: dict = {}
         if self.state.thread_id is not None:
             meta["thread_id"] = self.state.thread_id
@@ -223,27 +223,29 @@ class CostTracker:
     def _persist_initial(self) -> None:
         try:
             import json
+
             from ..db.postgres import get_pool
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO ops.llm_usage (run_id, caller, model, status, meta)
+                    INSERT INTO anxg_ops.llm_usage (run_id, caller, model, status, meta)
                     VALUES (%s, %s, %s, 'running', %s::jsonb)
                     """,
                     (self.state.run_id, self.state.caller, self.state.model,
                      json.dumps(self._build_meta())),
                 )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — cost telemetry 적재 실패 흡수 (LLM 호출 자체는 진행)
             log.warning(f"[COST] llm_usage init persist failed: {e}")
 
     def _persist_final(self, status: str) -> None:
         try:
             import json
+
             from ..db.postgres import get_pool
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE ops.llm_usage
+                    UPDATE anxg_ops.llm_usage
                        SET ended_at      = now(),
                            n_calls       = %s,
                            input_tokens  = %s,
@@ -258,7 +260,7 @@ class CostTracker:
                      status, json.dumps(self._build_meta()),
                      self.state.run_id),
                 )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — cost telemetry 적재 실패 흡수 (LLM 호출 결과 보존)
             log.warning(f"[COST] llm_usage final persist failed: {e}")
 
     def _persist_call(self, model: str, input_tokens: int, output_tokens: int,
@@ -269,7 +271,7 @@ class CostTracker:
             with get_pool().connection() as conn, conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO ops.llm_calls
+                    INSERT INTO anxg_ops.llm_calls
                       (run_id, model, purpose, input_tokens, output_tokens,
                        cost_usd, latency_ms)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -277,11 +279,11 @@ class CostTracker:
                     (self.state.run_id, model, purpose, input_tokens,
                      output_tokens, cost, latency_ms),
                 )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — per-call telemetry 실패 흡수 (debug, llm_usage 통계로 충분)
             log.debug(f"[COST] llm_calls persist failed: {e}")
 
     # ── 컨텍스트 매니저 ────────────────────────────────────────
-    def __enter__(self) -> "CostTracker":
+    def __enter__(self) -> CostTracker:
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
@@ -296,7 +298,7 @@ class CostTracker:
 # ─── ContextVar 격리 ─────────────────────────────────────────────
 # FastAPI threadpool / asyncio task 단위로 자동 분리.
 # 동시 turn A/B 가 서로의 tracker 를 덮어쓰지 않는다.
-_tracker_ctx: ContextVar["CostTracker | None"] = ContextVar(
+_tracker_ctx: ContextVar[CostTracker | None] = ContextVar(
     "autonexus_cost_tracker", default=None,
 )
 
@@ -345,12 +347,12 @@ def reset_tracker() -> None:
     _tracker_ctx.set(None)
 
 
-def set_current_tracker(tracker: "CostTracker | None") -> None:
+def set_current_tracker(tracker: CostTracker | None) -> None:
     """ctx 변수에 tracker 박기 — start_turn_context 가 사용."""
     _tracker_ctx.set(tracker)
 
 
-def current_tracker() -> "CostTracker | None":
+def current_tracker() -> CostTracker | None:
     """현재 context 의 tracker (없으면 None) — 진단·테스트용."""
     return _tracker_ctx.get()
 

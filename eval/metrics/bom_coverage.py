@@ -10,7 +10,7 @@ PRD §3.4 의 BOM 깊이 정의:
 
 본 메트릭이 측정하는 것:
     - L0~L3 entity 수 (안정 = 0 초과)
-    - L4 module 수 (auto.components WHERE level=4)
+    - L4 module 수 (anxg_auto.components WHERE level=4)
     - **L4 coverage** = MVP OEM 의 VehicleModel 중 Level 4 module 매핑 ≥ 1 의 비율
       (Neo4j CONTAINS_COMPONENT / CONTAINS_SYSTEM 으로 측정).
 
@@ -80,10 +80,10 @@ def collect_bom_coverage() -> dict[str, Any]:
         # Genesis Motor LLC) — brand name 기준으로 합산.
         cur.execute("""
             SELECT COUNT(DISTINCT UPPER(m.name))
-              FROM auto.master_manufacturers m
-              JOIN auto.master_vehicle_models vm
+              FROM anxg_auto.master_manufacturers m
+              JOIN anxg_auto.master_vehicle_models vm
                 ON vm.manufacturer_id = m.manufacturer_id
-              JOIN auto.master_vehicle_variants vv
+              JOIN anxg_auto.master_vehicle_variants vv
                 ON vv.model_id = vm.model_id
         """)
         l0_n = int(cur.fetchone()[0])
@@ -91,25 +91,25 @@ def collect_bom_coverage() -> dict[str, Any]:
         # L1: Vehicle Model (variant 보유 한정 — MVP OEM 매칭).
         cur.execute("""
             SELECT COUNT(DISTINCT vm.model_id)
-              FROM auto.master_vehicle_models vm
-              JOIN auto.master_vehicle_variants vv
+              FROM anxg_auto.master_vehicle_models vm
+              JOIN anxg_auto.master_vehicle_variants vv
                 ON vv.model_id = vm.model_id
         """)
         l1_n = int(cur.fetchone()[0])
 
         # L2: Variant.
-        cur.execute("SELECT COUNT(*) FROM auto.master_vehicle_variants")
+        cur.execute("SELECT COUNT(*) FROM anxg_auto.master_vehicle_variants")
         l2_n = int(cur.fetchone()[0])
 
         # L3: System (distinct system_code from components).
         cur.execute("""
-            SELECT COUNT(DISTINCT system_code) FROM auto.components
+            SELECT COUNT(DISTINCT system_code) FROM anxg_auto.components
              WHERE system_code IS NOT NULL AND system_code != ''
         """)
         l3_n = int(cur.fetchone()[0])
 
         # L4: Module rows.
-        cur.execute("SELECT COUNT(*) FROM auto.components WHERE level = 4")
+        cur.execute("SELECT COUNT(*) FROM anxg_auto.components WHERE level = 4")
         l4_n = int(cur.fetchone()[0])
 
     out["levels"] = {
@@ -131,21 +131,20 @@ def collect_bom_coverage() -> dict[str, Any]:
     #   (c) 컴플레인 hop: VehicleModel-[:HAS_VARIANT]->Variant<-[:REPORTED_IN]-Complaint
     #                     -[:COMPLAINT_OF]->(Module|Component)
     try:
-        from autonexusgraph.db.neo4j import get_driver
-        driver = get_driver()
-        with driver.session() as s:
+        from autonexusgraph.db.neo4j import get_session
+        with get_session() as s:
             rec = s.run(
                 """
-                MATCH (mfr:Manufacturer)-[:MANUFACTURES]->(vm:VehicleModel)
+                MATCH (mfr:Anxg_Manufacturer)-[:MANUFACTURES]->(vm:Anxg_VehicleModel)
                 WHERE mfr.name IN $mvp
                 OPTIONAL MATCH (vm)-[:CONTAINS_COMPONENT|CONTAINS_SYSTEM]->(c1)
-                  WHERE (c1:Module OR c1:Component)
-                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:VehicleVariant)
-                          -[:AFFECTED_BY]->(:Recall)-[:RECALL_OF]->(c2)
-                  WHERE (c2:Module OR c2:Component)
-                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:VehicleVariant)
-                          -[:REPORTED_IN]->(:Complaint)-[:COMPLAINT_OF]->(c3)
-                  WHERE (c3:Module OR c3:Component)
+                  WHERE (c1:Anxg_Module OR c1:Anxg_Component)
+                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:Anxg_VehicleVariant)
+                          -[:AFFECTED_BY]->(:Anxg_Recall)-[:RECALL_OF]->(c2)
+                  WHERE (c2:Anxg_Module OR c2:Anxg_Component)
+                OPTIONAL MATCH (vm)-[:HAS_VARIANT]->(:Anxg_VehicleVariant)
+                          -[:REPORTED_IN]->(:Anxg_Complaint)-[:COMPLAINT_OF]->(c3)
+                  WHERE (c3:Anxg_Module OR c3:Anxg_Component)
                 WITH vm, (c1 IS NOT NULL OR c2 IS NOT NULL OR c3 IS NOT NULL) AS has_l4
                 RETURN count(DISTINCT vm) AS tot,
                        count(DISTINCT CASE WHEN has_l4 THEN vm END) AS withcomp

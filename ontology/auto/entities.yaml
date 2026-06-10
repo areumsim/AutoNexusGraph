@@ -185,17 +185,25 @@ entities:
 
   Material:
     description: |
-      배터리/소재 화학조성 (Level 6) — NCM811 / NCM622 / NCA / LFP / LMFP 등.
-      Cell 의 cathode chemistry 단위. Wikidata + 셀 제조사 IR PDF (CC0 / 공공).
-    key: code                  # 'NCM811' 같은 화학조성 코드 (대문자 SCREAMING)
+      소재 (Level 6) — 두 갈래:
+        (a) 배터리 chem: NCM811 / NCM622 / NCA / LFP / LMFP — Cell cathode chemistry.
+        (b) 금속 합금: A356/6061/7075 (Al), DP980/HSS (강), Ti6Al4V — 차체/구조 부품.
+      두 카테고리 모두 같은 :Material 노드 라벨. `material_class` 로 구분.
+      SSOT: (a) materials_seed.yaml · (b) materials_metals_seed.yaml.
+    key: code                  # 'NCM811' / 'A356' / 'DP980' 같은 SCREAMING 코드
     bom_level: 6
     required: [code, name]
     optional:
-      - cathode_ratio          # '8:1:1' 등
-      - chem_family            # 'NCM' | 'NCA' | 'LFP' | 'LMFP'
+      - cathode_ratio          # (a) chem '8:1:1' 등
+      - chem_family            # (a) 'NCM' | 'NCA' | 'LFP' | 'LMFP'
       - aliases
-    pg_table: null              # YAML seed (ontology/auto/materials_seed.yaml)
-    provenance_src: [materials_seed, wikidata]
+      - material_class         # 'cathode_chem' | 'metal_alloy' | 'polymer' | …
+      - alloy_family           # (b) 'Al-Si' | 'Al-Mg' | 'AHSS' | 'Ti'
+      - typical_processes      # (b) process_name_norm list — 보통 가공되는 공정 카테고리
+      - typical_modules        # (b) 보통 사용되는 :Module name list (body/wheel 등)
+      - density_kg_m3          # (b) 물성 메타 (선택)
+    pg_table: null              # YAML seed (materials_seed + materials_metals_seed)
+    provenance_src: [materials_seed, materials_metals_seed, wikidata]
 
   Mineral:
     description: |

@@ -6,6 +6,7 @@ PRD §2.2 의 목표: vector-only 대비 multi-hop +30%p 우위 입증.
 from __future__ import annotations
 
 import time
+import uuid
 
 from .base import AgentAdapter, AgentResponse, Evidence
 
@@ -33,8 +34,12 @@ class HybridAdapter(AgentAdapter):
 
         t0 = time.monotonic()
         try:
+            # 질문마다 고유 thread_id — LangGraph PG 체크포인트 공유로 인한 state
+            # bleed 방지. (기본 thread_id="default" 면 모든 eval 질문이 한 스레드를
+            # 공유 → 이전 질문의 target_companies/history 가 누수돼 엉뚱한 회사로 답함.)
             state = run_agent(question, domain=domain, rerank=self.rerank,
-                              llm_planner=self.llm_planner)
+                              llm_planner=self.llm_planner,
+                              thread_id=f"eval-{uuid.uuid4().hex}")
         except Exception as e:
             return AgentResponse(
                 refused=True, refusal_reason=f"agent_failed:{e}",

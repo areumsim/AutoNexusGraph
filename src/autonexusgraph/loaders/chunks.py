@@ -1,4 +1,4 @@
-"""vec.chunks 적재 — DART zip → 청킹 → INSERT (embedding optional).
+"""anxg_vec.chunks 적재 — DART zip → 청킹 → INSERT (embedding optional).
 
 2단계 분리:
 - build_chunks.py: zip → 청킹 → text + metadata 만 INSERT (embedding NULL)
@@ -16,13 +16,12 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
+from ..chunking import chunk_text, parse_dart_zip
 from ..config import get_settings
-from ..extraction import chunk_text, parse_dart_zip
 from ._common import LoadStats, chunked
 
-
 SQL_INSERT_CHUNK = """
-INSERT INTO vec.chunks
+INSERT INTO anxg_vec.chunks
   (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata,
    source, fiscal_year, report_type)
 VALUES (%(corp_code)s, %(rcept_no)s, %(section)s, %(chunk_idx)s, %(text)s,
@@ -39,7 +38,7 @@ ON CONFLICT (rcept_no, chunk_idx) DO UPDATE SET
 """
 
 # rcept_no → (fiscal_year, report_type) lookup 캐시. _build_rows 호출 시 dict 한 번 채움.
-# fin.filings 와 동일한 매핑: report_nm prefix 로 type 판정.
+# anxg_fin.filings 와 동일한 매핑: report_nm prefix 로 type 판정.
 _REPORT_TYPE_MAP = [
     ("사업보고서",     "annual_business"),
     ("반기보고서",     "half_year"),
@@ -49,13 +48,13 @@ _REPORT_TYPE_MAP = [
 
 
 def _load_filing_meta() -> dict[str, tuple[int | None, str]]:
-    """PG fin.filings → {rcept_no: (fiscal_year, report_type)}. RAG filter 용."""
+    """PG anxg_fin.filings → {rcept_no: (fiscal_year, report_type)}. RAG filter 용."""
     from ..db.postgres import get_pool
     out: dict[str, tuple[int | None, str]] = {}
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT rcept_no, report_nm, rcept_dt
-              FROM fin.filings
+              FROM anxg_fin.filings
         """)
         for rcept_no, report_nm, rcept_dt in cur.fetchall():
             year = rcept_dt.year if rcept_dt else None
@@ -93,8 +92,7 @@ def _build_rows(
     """
     try:
         sections = parse_dart_zip(zip_path)
-    except Exception:
-        # 손상 zip, 파싱 실패 → 다음 zip 으로
+    except Exception:   # noqa: BLE001 — 손상 zip / 파싱 실패 흡수 → 다음 zip 으로 진행
         return iter([])
 
     year, rtype = (None, "other")
@@ -135,7 +133,7 @@ def load_chunks(
     batch_size: int = 500,
     progress: bool = True,
 ) -> LoadStats:
-    """DART zip 순회 → 청킹 → vec.chunks 적재 (embedding NULL).
+    """DART zip 순회 → 청킹 → anxg_vec.chunks 적재 (embedding NULL).
 
     Args:
         limit_reports: 처음 N개 zip 만 처리 (smoke test 용).
@@ -184,7 +182,7 @@ def load_chunks(
                     cur.executemany(SQL_INSERT_CHUNK, batch)
                     stats.inserted += len(batch)
                     stats.batches += 1
-                except Exception:
+                except Exception:   # noqa: BLE001 — batch 실패 카운트 후 raise (트랜잭션 rollback)
                     stats.failed += len(batch)
                     raise
     return stats
@@ -192,10 +190,10 @@ def load_chunks(
 
 # ── 임베딩 backfill ────────────────────────────────────────────────
 SQL_SELECT_EMPTY = """
-SELECT id, text FROM vec.chunks WHERE embedding IS NULL ORDER BY id LIMIT %s
+SELECT id, text FROM anxg_vec.chunks WHERE embedding IS NULL ORDER BY id LIMIT %s
 """
 
-SQL_UPDATE_EMBEDDING = "UPDATE vec.chunks SET embedding = %s WHERE id = %s"
+SQL_UPDATE_EMBEDDING = "UPDATE anxg_vec.chunks SET embedding = %s WHERE id = %s"
 
 
 def embed_chunks(
@@ -222,7 +220,7 @@ def embed_chunks(
 
     # 총 NULL 개수 (진행률용)
     with get_connection().cursor() as cur:
-        cur.execute("SELECT count(*) FROM vec.chunks WHERE embedding IS NULL")
+        cur.execute("SELECT count(*) FROM anxg_vec.chunks WHERE embedding IS NULL")
         total = cur.fetchone()[0]
     if total == 0:
         return stats
@@ -245,7 +243,7 @@ def embed_chunks(
         texts = [r[1] for r in rows]
         try:
             vectors = client.embed(texts)
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — embed batch 실패 → EmbeddingError 변환 (raise)
             stats.failed += len(rows)
             raise EmbeddingError(f"embed batch failed: {e}") from e
 
@@ -254,7 +252,7 @@ def embed_chunks(
         with transaction() as conn:
             register_vector(conn)
             with conn.cursor() as cur:
-                for rid, vec in zip(ids, vectors):
+                for rid, vec in zip(ids, vectors, strict=False):
                     cur.execute(SQL_UPDATE_EMBEDDING, (vec, rid))
 
         stats.inserted += len(rows)

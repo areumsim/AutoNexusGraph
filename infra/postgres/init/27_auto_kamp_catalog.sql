@@ -2,7 +2,7 @@
 -- 27_auto_kamp_catalog.sql — KAMP 제조AI 데이터셋 카탈로그 (data.go.kr 15089213)
 -- ════════════════════════════════════════════════════════════════════
 -- KAMP 포털(kamp-ai.kr) 본체 50종 데이터셋의 **메타·링크 인덱스**.
--- 본 테이블은 카탈로그(인덱스)이며, 실제 공정 센서 통계는 별도 `auto.process_metrics`
+-- 본 테이블은 카탈로그(인덱스)이며, 실제 공정 센서 통계는 별도 `anxg_auto.process_metrics`
 -- (source='kamp_15089213') 에 적재된다 (25_auto_process_metrics.sql, Layer B).
 --
 -- 본 테이블은 회사 비귀속(corp_code 없음). KAMP 전 데이터셋은 익명 B 등급(0.80).
@@ -17,9 +17,9 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
-CREATE TABLE IF NOT EXISTS auto.kamp_catalog (
+CREATE TABLE IF NOT EXISTS anxg_auto.kamp_catalog (
     catalog_id        BIGSERIAL    PRIMARY KEY,
     -- 카탈로그 원본 식별 (연번 + 기준년도)
     seq               SMALLINT     NOT NULL,                  -- 연번 1..50
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS auto.kamp_catalog (
     purpose           VARCHAR(60),                            -- 예지보전/품질보증/공정최적화/공급망최적화
     process_name_raw  VARCHAR(120) NOT NULL,                  -- KAMP 원문 ("다이캐스팅 공정")
     process_name_norm VARCHAR(80),                            -- 정규화 ("die_casting") — 산단공 :Process 매핑
-    process_category  VARCHAR(40),                            -- auto.process_metrics 와 동일 분류 (casting/forging/...)
+    process_category  VARCHAR(40),                            -- anxg_auto.process_metrics 와 동일 분류 (casting/forging/...)
     -- 데이터셋 메타
     dataset_name      VARCHAR(160) NOT NULL,
     dataset_desc      TEXT,
@@ -52,11 +52,11 @@ CREATE TABLE IF NOT EXISTS auto.kamp_catalog (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auto_kamp_catalog_industry
-    ON auto.kamp_catalog(industry);
+    ON anxg_auto.kamp_catalog(industry);
 CREATE INDEX IF NOT EXISTS idx_auto_kamp_catalog_process_norm
-    ON auto.kamp_catalog(process_name_norm) WHERE process_name_norm IS NOT NULL;
+    ON anxg_auto.kamp_catalog(process_name_norm) WHERE process_name_norm IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_auto_kamp_catalog_purpose
-    ON auto.kamp_catalog(purpose) WHERE purpose IS NOT NULL;
+    ON anxg_auto.kamp_catalog(purpose) WHERE purpose IS NOT NULL;
 
-COMMENT ON TABLE auto.kamp_catalog IS
-    'KAMP 제조AI 데이터셋 50종 카탈로그 (data.go.kr 15089213). 본체는 auto.process_metrics. corp_code 없음 = 회사 비귀속. grade B(0.80).';
+COMMENT ON TABLE anxg_auto.kamp_catalog IS
+    'KAMP 제조AI 데이터셋 50종 카탈로그 (data.go.kr 15089213). 본체는 anxg_auto.process_metrics. corp_code 없음 = 회사 비귀속. grade B(0.80).';

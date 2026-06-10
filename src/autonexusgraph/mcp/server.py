@@ -20,9 +20,9 @@ import os
 from typing import Any
 
 # import 실패 시 __init__.py 에서 catch.
-from mcp.server import Server                        # type: ignore[import-not-found]
-from mcp.server.stdio import stdio_server            # type: ignore[import-not-found]
-from mcp.types import TextContent, Tool              # type: ignore[import-not-found]
+from mcp.server import Server  # type: ignore[import-not-found]
+from mcp.server.stdio import stdio_server  # type: ignore[import-not-found]
+from mcp.types import TextContent, Tool  # type: ignore[import-not-found]
 
 from .discovery import ToolSpec, build_tool_manifest
 
@@ -50,12 +50,12 @@ def build_mcp_server(domain: str = "all") -> tuple[Server, list[ToolSpec]]:
             return [TextContent(type="text", text=f"unknown tool: {name}")]
         try:
             result = spec.fn(**(arguments or {}))
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → [TextContent(type="text", t... 반환
             return [TextContent(type="text", text=f"error: {exc}")]
         # 결과 정규화 — dict/list/scalar → JSON string.
         try:
             text = json.dumps(result, ensure_ascii=False, default=str, indent=2)
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → [TextContent(type="text", t... 반환
             text = str(result)
         return [TextContent(type="text", text=text)]
 

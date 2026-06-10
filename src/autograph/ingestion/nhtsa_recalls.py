@@ -40,9 +40,10 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     save_raw,
 )
-from ..config import get_auto_settings
-from ._common_nhtsa import models_from_vpic as _models_from_vpic, nhtsa_http_get
 
+from ..config import get_auto_settings
+from ._common_nhtsa import models_from_vpic as _models_from_vpic
+from ._common_nhtsa import nhtsa_http_get
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def ingest_make_year(make: str, year: int, *,
             n_done += 1
             n_recalls += len(data.get("results") or [])
             ckpt.mark_done(key, {"recalls": len(data.get("results") or [])})
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 — [recalls] failed %s 흡수 → {"models_fetched": n_done, ... 반환
             log.exception("[recalls] failed %s", key)
             ckpt.mark_failed(key, str(e))
 

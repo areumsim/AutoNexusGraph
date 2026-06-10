@@ -1,8 +1,8 @@
 """DART 사업보고서 "III. 사업의 내용 → 생산 및 설비" 섹션 파서.
 
 목적: 한국 상장 자동차 OEM 의 공장(법인)별 **생산능력 / 생산실적 / 가동률** 데이터를
-사업보고서 XML 에서 추출 → ``auto.plant_capacity`` / ``auto.plant_production`` /
-``auto.plant_utilization`` 으로 정형화.
+사업보고서 XML 에서 추출 → ``anxg_auto.plant_capacity`` / ``anxg_auto.plant_production`` /
+``anxg_auto.plant_utilization`` 으로 정형화.
 
 원천: ``data/raw/dart_bulk/corp/<corp_code>/documents/<rcept_no>.zip`` 에 들어있는
 DART XML (``dart4.xsd``). 본 파서는 zip 자체는 다루지 않고 추출된 XML 문자열을
@@ -24,15 +24,16 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 from xml.etree import ElementTree as ET
 
 # DART XML 은 종종 unescaped ``&`` ('S&P(미국)') 같은 잘못된 토큰을 포함한다.
 # 표준 xml.etree 는 strict parser 라 첫 violation 에서 전체 파싱 실패.
 # lxml.html (또는 bs4 의 html.parser) 의 lenient 모드로 우회.
 try:
-    from lxml import html as _lxml_html, etree as _lxml_etree
+    from lxml import etree as _lxml_etree  # noqa: F401 — lxml 가용성 게이트 (_HAS_LXML)
+    from lxml import html as _lxml_html
     _HAS_LXML = True
 except ImportError:
     _HAS_LXML = False
@@ -215,7 +216,7 @@ def _row_to_plant_rows(data_cells: list[str], years: list[int],
                        expected_full_count: int,
                        *,
                        plant_col: int = 0,
-                       region_col: int = 1,
+                       region_col: int | None = 1,
                        ) -> tuple[list[PlantRow], str | None]:
     """한 데이터 행 → PlantRow list (연도 수만큼).
 
@@ -263,7 +264,7 @@ def _row_to_plant_rows(data_cells: list[str], years: list[int],
     value_cells = body_cells[-len(years):]
 
     rows: list[PlantRow] = []
-    for year, vcell in zip(years, value_cells):
+    for year, vcell in zip(years, value_cells, strict=False):
         val = _parse_number(vcell)
         if val is None and plant_code in ("", "-"):
             continue
@@ -297,7 +298,7 @@ def _parse_dart_xml(xml_text: str):
             # XML 선언 제거 — lxml.html 은 str 입력에 XML 선언 거부
             text = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", xml_text)
             return _lxml_html.fromstring(text)
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [dart_production] lxml.html 실패 흡수 → ET.fromstring(xml_text) 반환
             log.debug("[dart_production] lxml.html 실패: %s", exc)
 
     # 2차: 표준 etree
@@ -443,11 +444,13 @@ def parse_section(xml_text: str, section: str) -> list[PlantRow]:
         # 컬럼 매핑 자동 검출 — Kia 사업보고서는 header[1]='품목' 이라
         # plant 식별자가 header[2]='소재지' 에 들어있음.
         # Hyundai: header[1]='법인명' (plant_code), header[2]='소재지' (region)
-        plant_col, region_col = 0, 1     # default Hyundai
+        plant_col = 0
+        region_col: int | None = 1     # default Hyundai
         h1 = re.sub(r"\s+", "", (header[1] if len(header) > 1 else ""))
         if "품목" in h1:
             # Kia 스타일 — body[0]='품목', body[1]='소재지' (plant 식별자)
-            plant_col, region_col = 1, None
+            plant_col = 1
+            region_col = None
             log.info("[dart_production] Kia-style header detected (품목/소재지) — "
                      "plant_col=1")
 

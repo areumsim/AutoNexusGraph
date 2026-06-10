@@ -30,7 +30,8 @@ import importlib.util
 import logging
 import os
 import threading
-from typing import Any, Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
 
 from .state import AgentState
 
@@ -146,7 +147,7 @@ def discover_plugins(*, force: bool = False) -> list[str]:
                 importlib.import_module(name)
                 loaded.append(name)
                 log.info("[domain] plugin %r loaded", name)
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — [domain] plugin %r import failed 흡수 → loaded 반환
                 log.warning("[domain] plugin %r import failed: %s", name, exc)
         return loaded
 
@@ -243,6 +244,29 @@ def call_handler_method(
         return None
 
 
+def safe_import_module(dotted: str, *, log_prefix: str | None = None) -> Any | None:
+    """플러그인 도메인 핸들러용 — 모듈 import 실패 시 ``None`` 폴백 + warn.
+
+    ``toolbox_modules`` / ``retrieve_module`` / ``fallback_search`` 같은 6 핸들러
+    메서드 보일러플레이트의 SSOT. 도메인 모듈 (``autograph.tools`` /
+    ``ipgraph.tools.retrieve`` 등) 이 dev / 운영 환경에서 빠질 수 있어 fail-soft
+    필요 — 호출자는 ``None`` 받으면 finance 폴백.
+
+    Args:
+        dotted: importlib 형식 (예: "autograph.tools", "ipgraph.tools.retrieve").
+        log_prefix: 로그 prefix (예: "auto.retrieve"). 미지정 시 dotted 사용.
+
+    Returns:
+        import 성공 시 모듈, 실패 시 None.
+    """
+    try:
+        return importlib.import_module(dotted)
+    except Exception as exc:   # noqa: BLE001 — fail-soft, log.warning 으로 알림.
+        log.warning("[%s] %s import 실패 (skip): %s",
+                    log_prefix or dotted, dotted, exc)
+        return None
+
+
 def auto_detect_domain(question: str, hint: str | None = None) -> str:
     """등록된 라우터들에 차례로 질의. 모두 None 이면 'finance'.
 
@@ -275,4 +299,5 @@ __all__ = [
     "auto_detect_domain",
     "discover_plugins",
     "call_handler_method",
+    "safe_import_module",
 ]

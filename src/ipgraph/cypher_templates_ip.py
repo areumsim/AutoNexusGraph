@@ -17,8 +17,14 @@ from __future__ import annotations
 # 공용 LIMIT/YEAR 상수는 core SSOT (autonexusgraph.tools.cypher_templates) 에서 import.
 from autonexusgraph.tools.cypher_templates import (
     LIMIT_50 as _LIMIT_50,
+)
+from autonexusgraph.tools.cypher_templates import (
     LIMIT_100 as _LIMIT_100,
+)
+from autonexusgraph.tools.cypher_templates import (
     LIMIT_500 as _LIMIT_500,
+)
+from autonexusgraph.tools.cypher_templates import (
     YEAR_RANGE as _YEAR,
 )
 
@@ -31,7 +37,7 @@ IP_TEMPLATES: dict[str, dict] = {
     # ── 식별 / lookup (5개) ─────────────────────────────────────
     "ip_lookup_patent": {
         "cypher": """
-        MATCH (p:Patent)
+        MATCH (p:Anxg_Patent)
         WHERE p.pub_no = $q OR p.title CONTAINS $q OR p.abstract CONTAINS $q
         RETURN p.pub_no AS pub_no,
                p.title AS title,
@@ -48,7 +54,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_lookup_assignee": {
         "cypher": """
-        MATCH (a:Assignee)
+        MATCH (a:Anxg_Assignee)
         WHERE a.name = $q OR a.name CONTAINS $q OR a.name_norm CONTAINS $q
         RETURN a.assignee_id AS assignee_id,
                a.name AS name,
@@ -64,7 +70,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_lookup_cpc": {
         "cypher": """
-        MATCH (c:CPCCode)
+        MATCH (c:Anxg_CPCCode)
         WHERE c.code = $code OR c.title CONTAINS $code
         RETURN c.code AS code,
                c.level AS level,
@@ -79,10 +85,10 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_get_patent_info": {
         "cypher": """
-        MATCH (p:Patent {pub_no: $pub_no})
-        OPTIONAL MATCH (p)-[:ASSIGNED_TO]->(a:Assignee)
-        OPTIONAL MATCH (p)-[:CLASSIFIED_AS]->(c:CPCCode)
-        OPTIONAL MATCH (i:Inventor)-[:INVENTED]->(p)
+        MATCH (p:Anxg_Patent {pub_no: $pub_no})
+        OPTIONAL MATCH (p)-[:ASSIGNED_TO]->(a:Anxg_Assignee)
+        OPTIONAL MATCH (p)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
+        OPTIONAL MATCH (i:Anxg_Inventor)-[:INVENTED]->(p)
         RETURN p, collect(DISTINCT a) AS assignees,
                collect(DISTINCT c.code) AS cpc_codes,
                collect(DISTINCT i.name) AS inventors
@@ -94,7 +100,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_get_inventors_of_patent": {
         "cypher": """
-        MATCH (i:Inventor)-[:INVENTED]->(p:Patent {pub_no: $pub_no})
+        MATCH (i:Anxg_Inventor)-[:INVENTED]->(p:Anxg_Patent {pub_no: $pub_no})
         RETURN i.inventor_id AS inventor_id,
                i.name AS name,
                i.country AS country
@@ -108,7 +114,7 @@ IP_TEMPLATES: dict[str, dict] = {
     # ── Assignee 측 (6개) ───────────────────────────────────────
     "ip_list_patents_of_assignee": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
         RETURN p.pub_no AS pub_no,
                p.title AS title,
                p.filing_date AS filing_date,
@@ -122,8 +128,8 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_assignee_patents_by_cpc": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
-        MATCH (p)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
+        MATCH (p)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WHERE c.code = $cpc_code OR c.code STARTS WITH $cpc_code
         RETURN p.pub_no AS pub_no,
                p.title AS title,
@@ -142,7 +148,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_assignee_filing_year_counts": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
         WHERE p.filing_date IS NOT NULL
         WITH date(p.filing_date).year AS yr, count(p) AS n
         WHERE yr >= $year_from AND yr <= $year_to
@@ -160,8 +166,8 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_find_co_assignees": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a1:Assignee {assignee_id: $assignee_id})
-        MATCH (p)-[:ASSIGNED_TO]->(a2:Assignee)
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a1:Anxg_Assignee {assignee_id: $assignee_id})
+        MATCH (p)-[:ASSIGNED_TO]->(a2:Anxg_Assignee)
         WHERE a2.assignee_id <> $assignee_id
         WITH a2, count(p) AS n_shared
         RETURN a2.assignee_id AS assignee_id,
@@ -177,7 +183,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_compare_assignees_volume": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee)
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee)
         WHERE a.assignee_id IN $assignee_ids
           AND p.filing_date IS NOT NULL
           AND date(p.filing_date).year = $year
@@ -195,8 +201,8 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_count_patents_by_field": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
-        MATCH (p)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
+        MATCH (p)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WHERE c.code STARTS WITH $cpc_section
         RETURN c.code AS cpc_code, count(p) AS n_patents
         ORDER BY n_patents DESC
@@ -213,7 +219,7 @@ IP_TEMPLATES: dict[str, dict] = {
     # ── CPC 측 (6개) ────────────────────────────────────────────
     "ip_list_patents_in_cpc": {
         "cypher": """
-        MATCH (p:Patent)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (p:Anxg_Patent)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WHERE c.code = $cpc_code
         RETURN p.pub_no AS pub_no,
                p.title AS title,
@@ -229,9 +235,9 @@ IP_TEMPLATES: dict[str, dict] = {
         # include_subclasses=True 일 때 SUBCLASS_OF 트리 따라 자식 CPC 도 매칭.
         # depth ≤ 4 cap.
         "cypher": """
-        MATCH (root:CPCCode {code: $cpc_code})
-        MATCH (c:CPCCode)-[:SUBCLASS_OF*0..4]->(root)
-        MATCH (p:Patent)-[:CLASSIFIED_AS]->(c)
+        MATCH (root:Anxg_CPCCode {code: $cpc_code})
+        MATCH (c:Anxg_CPCCode)-[:SUBCLASS_OF*0..4]->(root)
+        MATCH (p:Anxg_Patent)-[:CLASSIFIED_AS]->(c)
         RETURN p.pub_no AS pub_no,
                p.title AS title,
                p.filing_date AS filing_date,
@@ -246,8 +252,8 @@ IP_TEMPLATES: dict[str, dict] = {
     "ip_cpc_descendants": {
         # 본 CPC 의 모든 자식 (depth ≤ 4).
         "cypher": """
-        MATCH (root:CPCCode {code: $cpc_code})
-        MATCH (c:CPCCode)-[:SUBCLASS_OF*1..4]->(root)
+        MATCH (root:Anxg_CPCCode {code: $cpc_code})
+        MATCH (c:Anxg_CPCCode)-[:SUBCLASS_OF*1..4]->(root)
         RETURN c.code AS code,
                c.level AS level,
                c.title AS title
@@ -260,9 +266,9 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_list_assignees_in_field": {
         "cypher": """
-        MATCH (p:Patent)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (p:Anxg_Patent)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WHERE c.code = $cpc_code OR c.code STARTS WITH $cpc_code
-        MATCH (p)-[:ASSIGNED_TO]->(a:Assignee)
+        MATCH (p)-[:ASSIGNED_TO]->(a:Anxg_Assignee)
         WITH a, count(DISTINCT p) AS n_patents
         RETURN a.assignee_id AS assignee_id,
                a.name AS name,
@@ -277,8 +283,8 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_cpc_parent_chain": {
         "cypher": """
-        MATCH (c:CPCCode {code: $cpc_code})
-        OPTIONAL MATCH path = (c)-[:SUBCLASS_OF*1..6]->(root:CPCCode)
+        MATCH (c:Anxg_CPCCode {code: $cpc_code})
+        OPTIONAL MATCH path = (c)-[:SUBCLASS_OF*1..6]->(root:Anxg_CPCCode)
         WHERE NOT (root)-[:SUBCLASS_OF]->()
         RETURN [n IN nodes(path) | {code: n.code, level: n.level, title: n.title}] AS chain
         LIMIT 1
@@ -289,8 +295,8 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_cpc_top_fields_of_assignee": {
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
-        MATCH (p)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
+        MATCH (p)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WITH c, count(p) AS n
         RETURN c.code AS cpc_code,
                c.title AS title,
@@ -305,9 +311,9 @@ IP_TEMPLATES: dict[str, dict] = {
     # ── Citation 측 (4개) — depth ≤ 2, max_total ≤ 1000 cap ─────
     "ip_citation_network_d1": {
         "cypher": """
-        MATCH (p:Patent {pub_no: $pub_no})
-        OPTIONAL MATCH (p)-[:CITES]->(cited:Patent)
-        OPTIONAL MATCH (citing:Patent)-[:CITES]->(p)
+        MATCH (p:Anxg_Patent {pub_no: $pub_no})
+        OPTIONAL MATCH (p)-[:CITES]->(cited:Anxg_Patent)
+        OPTIONAL MATCH (citing:Anxg_Patent)-[:CITES]->(p)
         WITH p, collect(DISTINCT cited)[..$limit_each] AS cited_list,
                 collect(DISTINCT citing)[..$limit_each] AS citing_list
         RETURN p.pub_no AS center,
@@ -322,9 +328,9 @@ IP_TEMPLATES: dict[str, dict] = {
     "ip_citation_network_d2": {
         # depth ≤ 2 cap. max_total 후처리 (코드 level) 로 추가 cap.
         "cypher": """
-        MATCH (p:Patent {pub_no: $pub_no})
-        OPTIONAL MATCH (p)-[:CITES*1..2]->(n1:Patent)
-        OPTIONAL MATCH (n2:Patent)-[:CITES*1..2]->(p)
+        MATCH (p:Anxg_Patent {pub_no: $pub_no})
+        OPTIONAL MATCH (p)-[:CITES*1..2]->(n1:Anxg_Patent)
+        OPTIONAL MATCH (n2:Anxg_Patent)-[:CITES*1..2]->(p)
         WITH p,
              collect(DISTINCT n1)[..$max_per_side] AS cited_list,
              collect(DISTINCT n2)[..$max_per_side] AS citing_list
@@ -339,7 +345,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_most_cited_patents": {
         "cypher": """
-        MATCH (citing:Patent)-[:CITES]->(p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
+        MATCH (citing:Anxg_Patent)-[:CITES]->(p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
         WITH p, count(citing) AS n_citations
         RETURN p.pub_no AS pub_no,
                p.title AS title,
@@ -354,7 +360,7 @@ IP_TEMPLATES: dict[str, dict] = {
 
     "ip_most_cited_in_cpc": {
         "cypher": """
-        MATCH (citing:Patent)-[:CITES]->(p:Patent)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (citing:Anxg_Patent)-[:CITES]->(p:Anxg_Patent)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WHERE c.code = $cpc_code OR c.code STARTS WITH $cpc_code
         WITH p, count(citing) AS n_citations
         RETURN p.pub_no AS pub_no,
@@ -369,10 +375,10 @@ IP_TEMPLATES: dict[str, dict] = {
 
     # ── Cross-Domain (4개) — IP ↔ finance / auto ─────────────────
     "ip_cross_assignee_corp": {
-        # ip.assignee_corp_map join via finance corp.
+        # anxg_ip.assignee_corp_map join via finance corp.
         "cypher": """
-        MATCH (a:Assignee {assignee_id: $assignee_id})
-        OPTIONAL MATCH (a)-[:MAPPED_TO]->(c:Company)
+        MATCH (a:Anxg_Assignee {assignee_id: $assignee_id})
+        OPTIONAL MATCH (a)-[:MAPPED_TO]->(c:Anxg_Company)
         RETURN a.assignee_id AS assignee_id,
                a.name AS assignee_name,
                c.corp_code AS corp_code,
@@ -386,9 +392,9 @@ IP_TEMPLATES: dict[str, dict] = {
     "ip_cross_corp_to_patents": {
         # Company → MAPPED_TO Assignee → ASSIGNED_TO Patent (finance ↔ ip).
         "cypher": """
-        MATCH (c:Company {corp_code: $corp_code})
-        OPTIONAL MATCH (c)<-[:MAPPED_TO]-(a:Assignee)
-        OPTIONAL MATCH (p:Patent)-[:ASSIGNED_TO]->(a)
+        MATCH (c:Anxg_Company {corp_code: $corp_code})
+        OPTIONAL MATCH (c)<-[:MAPPED_TO]-(a:Anxg_Assignee)
+        OPTIONAL MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a)
         WHERE p.filing_date IS NOT NULL
           AND date(p.filing_date).year >= $year_from
           AND date(p.filing_date).year <= $year_to
@@ -409,8 +415,8 @@ IP_TEMPLATES: dict[str, dict] = {
     "ip_cross_assignee_top_cpc_year": {
         # CD-L4 핵심 — 삼성SDI 의 H01M 특허 연도별 분포.
         "cypher": """
-        MATCH (p:Patent)-[:ASSIGNED_TO]->(a:Assignee {assignee_id: $assignee_id})
-        MATCH (p)-[:CLASSIFIED_AS]->(c:CPCCode)
+        MATCH (p:Anxg_Patent)-[:ASSIGNED_TO]->(a:Anxg_Assignee {assignee_id: $assignee_id})
+        MATCH (p)-[:CLASSIFIED_AS]->(c:Anxg_CPCCode)
         WHERE (c.code = $cpc_code OR c.code STARTS WITH $cpc_code)
           AND p.filing_date IS NOT NULL
         WITH date(p.filing_date).year AS yr, count(DISTINCT p) AS n
@@ -426,9 +432,9 @@ IP_TEMPLATES: dict[str, dict] = {
         # CD-L4+ — Patent (assignee) → Company (corp) → 공급사·OEM·리콜.
         # 본 템플릿은 ip 쪽만 — finance/auto bridge 는 별도 tool 호출.
         "cypher": """
-        MATCH (a:Assignee {assignee_id: $assignee_id})
-        OPTIONAL MATCH (a)-[:MAPPED_TO]->(c:Company)
-        OPTIONAL MATCH (s:Supplier {corp_code: c.corp_code})
+        MATCH (a:Anxg_Assignee {assignee_id: $assignee_id})
+        OPTIONAL MATCH (a)-[:MAPPED_TO]->(c:Anxg_Company)
+        OPTIONAL MATCH (s:Anxg_Supplier {corp_code: c.corp_code})
         OPTIONAL MATCH (s)<-[:SUPPLIED_BY]-(comp)
         RETURN a.assignee_id AS assignee_id,
                c.corp_code AS corp_code,

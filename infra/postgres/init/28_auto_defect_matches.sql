@@ -22,13 +22,13 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
 -- ──────────────────────────────────────────────────────────────────────
 -- :DefectType — 회사무관 결함 유형 노드 (Layer 1)
 -- ──────────────────────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS auto.defect_types (
+CREATE TABLE IF NOT EXISTS anxg_auto.defect_types (
     defect_type_id    BIGSERIAL    PRIMARY KEY,
     name              VARCHAR(120) NOT NULL,         -- snake_case 영문 표준 (예: 'fuel_pump_impeller_interference')
     name_en           VARCHAR(160),                  -- 자연어 영문 (예: 'Fuel pump impeller interference')
@@ -54,12 +54,12 @@ CREATE TABLE IF NOT EXISTS auto.defect_types (
 );
 
 CREATE INDEX IF NOT EXISTS idx_defect_types_category
-    ON auto.defect_types(category) WHERE category IS NOT NULL;
+    ON anxg_auto.defect_types(category) WHERE category IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_defect_types_validated
-    ON auto.defect_types(validated_status);
+    ON anxg_auto.defect_types(validated_status);
 -- pgvector IVFFlat 인덱스는 데이터 적재 후 별도 CREATE — 빈 테이블에선 의미 없음.
 
-COMMENT ON TABLE auto.defect_types IS
+COMMENT ON TABLE anxg_auto.defect_types IS
     '회사무관 결함 유형 taxonomy (Layer 1). NHTSA+KOTSA 리콜 텍스트에서 LLM 라벨링으로 시드 추출. corp_code 없음 — 회사 귀속 금지.';
 
 
@@ -67,10 +67,10 @@ COMMENT ON TABLE auto.defect_types IS
 -- DEFECT_MATCHES — :Recall ↔ :DefectType 의미 매칭 (Bridge)
 -- ──────────────────────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS auto.defect_matches (
+CREATE TABLE IF NOT EXISTS anxg_auto.defect_matches (
     match_id          BIGSERIAL    PRIMARY KEY,
-    recall_id         BIGINT       NOT NULL REFERENCES auto.events_recalls(recall_id),
-    defect_type_id    BIGINT       NOT NULL REFERENCES auto.defect_types(defect_type_id),
+    recall_id         BIGINT       NOT NULL REFERENCES anxg_auto.events_recalls(recall_id),
+    defect_type_id    BIGINT       NOT NULL REFERENCES anxg_auto.defect_types(defect_type_id),
     cos_sim           NUMERIC(5,4),                 -- 0..1, NULL for llm_assign
     match_method      VARCHAR(20)  NOT NULL,
         -- 'llm_assign'   — LLM이 카테고리 추출하며 동시에 이 리콜에 할당 (1차)
@@ -91,13 +91,13 @@ CREATE TABLE IF NOT EXISTS auto.defect_matches (
 );
 
 CREATE INDEX IF NOT EXISTS idx_defect_matches_recall
-    ON auto.defect_matches(recall_id);
+    ON anxg_auto.defect_matches(recall_id);
 CREATE INDEX IF NOT EXISTS idx_defect_matches_type
-    ON auto.defect_matches(defect_type_id);
+    ON anxg_auto.defect_matches(defect_type_id);
 CREATE INDEX IF NOT EXISTS idx_defect_matches_method
-    ON auto.defect_matches(match_method, validated_status);
+    ON anxg_auto.defect_matches(match_method, validated_status);
 CREATE INDEX IF NOT EXISTS idx_defect_matches_topk
-    ON auto.defect_matches(recall_id, rank) WHERE rank IS NOT NULL;
+    ON anxg_auto.defect_matches(recall_id, rank) WHERE rank IS NOT NULL;
 
-COMMENT ON TABLE auto.defect_matches IS
+COMMENT ON TABLE anxg_auto.defect_matches IS
     'Bridge — :Recall(회사귀속,A등급) ↔ :DefectType(회사무관,C등급) 의미 매칭. cos_sim/llm_label 두 경로. 회사 주장이 아니라 측정값.';

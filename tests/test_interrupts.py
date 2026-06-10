@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from autonexusgraph.agents.interrupts import (
-    InterruptUnavailable,
     SENSITIVE_KEYWORDS,
+    InterruptUnavailable,
     coerce_clarification_response,
     coerce_sensitive_response,
     detect_sensitive_keyword,
@@ -201,7 +201,7 @@ def test_request_interrupt_raises_when_langgraph_missing(monkeypatch):
     # langgraph 가 있어도 types.interrupt 만 막기는 어려우니, 호출 자체가 raise 하도록
     # interrupt 함수를 임시로 ImportError 던지게.
     try:
-        from langgraph.types import interrupt as _real_interrupt   # noqa: F401
+        from langgraph.types import interrupt as _real_interrupt  # noqa: F401
     except ImportError:
         # 이미 미설치 환경 — request_interrupt 가 InterruptUnavailable 던져야
         with pytest.raises(InterruptUnavailable):

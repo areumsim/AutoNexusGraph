@@ -15,7 +15,7 @@ from typing import Any
 class Evidence:
     """단일 근거 청크.
 
-    AutoNexusGraph 시스템은 vec.chunks row 1개를 1 evidence 로 매핑.
+    AutoNexusGraph 시스템은 anxg_vec.chunks row 1개를 1 evidence 로 매핑.
     """
 
     rank: int = 0

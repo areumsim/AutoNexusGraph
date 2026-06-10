@@ -10,9 +10,9 @@
 -- hot-apply:  make migrate-schema-pg MIGRATE_FILE=25_auto_process_metrics.sql
 -- ════════════════════════════════════════════════════════════════════
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
-CREATE TABLE IF NOT EXISTS auto.process_metrics (
+CREATE TABLE IF NOT EXISTS anxg_auto.process_metrics (
     metric_id          BIGSERIAL       PRIMARY KEY,
     -- 공정 유형 단위 (회사 아님). process_name_norm 은 :Process taxonomy 키와 정렬.
     process_name_norm  VARCHAR(120),
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS auto.process_metrics (
     value_p95          NUMERIC(12,4),
     value_std          NUMERIC(12,4),
     sample_count       INTEGER,
-    -- governance (auto.processes 패턴 — 단, corp_code 없음 = 회사 비귀속)
+    -- governance (anxg_auto.processes 패턴 — 단, corp_code 없음 = 회사 비귀속)
     source             VARCHAR(40)     NOT NULL DEFAULT 'kamp_15089213',
     confidence_score   NUMERIC(4,3)    NOT NULL DEFAULT 0.800,    -- B 등급 (익명·합성)
     validated_status   VARCHAR(20)     NOT NULL DEFAULT 'validated',
@@ -37,9 +37,9 @@ CREATE TABLE IF NOT EXISTS auto.process_metrics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auto_process_metrics_norm
-    ON auto.process_metrics(process_name_norm);
+    ON anxg_auto.process_metrics(process_name_norm);
 CREATE INDEX IF NOT EXISTS idx_auto_process_metrics_cat
-    ON auto.process_metrics(process_category);
+    ON anxg_auto.process_metrics(process_category);
 
-COMMENT ON TABLE auto.process_metrics IS
+COMMENT ON TABLE anxg_auto.process_metrics IS
     'KAMP/AI Hub 익명 공정 파라미터 분포 (cycle_time/yield/defect). 회사 귀속 금지 — corp_code 컬럼 없음 (PRD_process_graph §8). grade B(0.80) 익명.';

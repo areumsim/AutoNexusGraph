@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Any
 
 import httpx
 
@@ -30,7 +29,6 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     fetch_with_retry,
 )
-
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +91,7 @@ def fetch_vehicles_zip(*, force: bool = False) -> Path:
         log.info("[epa] downloaded %s (%.1f MB)", dest, size / 1024 / 1024)
         ckpt.mark_done(key, {"size": size, "url": EPA_VEHICLES_ZIP_URL})
         return dest
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — [epa] download 실패 boundary → checkpoint mark_failed + raise (silent 아님)
         log.exception("[epa] download failed")
         ckpt.mark_failed(key, str(e))
         raise

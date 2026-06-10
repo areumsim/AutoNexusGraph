@@ -14,10 +14,10 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
 -- ── 1. 연간 국내·세계 생산량 (15051116, 2005~2025, 21 row) ──────
-CREATE TABLE IF NOT EXISTS auto.macro_production_yearly (
+CREATE TABLE IF NOT EXISTS anxg_auto.macro_production_yearly (
     snapshot_year       SMALLINT      PRIMARY KEY,
     domestic_units_k    BIGINT,         -- 국내생산 (1000대 단위)
     global_units_k      BIGINT,         -- 세계생산 (1000대 단위)
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS auto.macro_production_yearly (
 
 
 -- ── 2. 월간 산업 보건 (15051118, 2009-01~2025-12, 204 row) ───────
-CREATE TABLE IF NOT EXISTS auto.macro_industry_monthly (
+CREATE TABLE IF NOT EXISTS anxg_auto.macro_industry_monthly (
     snapshot_year       SMALLINT NOT NULL,
     snapshot_month      SMALLINT NOT NULL,
     domestic_sales      BIGINT,           -- 내수판매(국산차) — 대
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS auto.macro_industry_monthly (
     CHECK (snapshot_month BETWEEN 1 AND 12)
 );
 CREATE INDEX IF NOT EXISTS idx_auto_macro_monthly_year
-    ON auto.macro_industry_monthly(snapshot_year);
+    ON anxg_auto.macro_industry_monthly(snapshot_year);
 
 
 -- 권한

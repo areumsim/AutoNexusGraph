@@ -16,10 +16,9 @@ from __future__ import annotations
 import argparse
 import logging
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session
 
 from ..ontology import entity_key_property, entity_labels
-
 
 log = logging.getLogger(__name__)
 
@@ -80,13 +79,13 @@ def init_neo4j() -> None:
         if label in label_set
     ]
 
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         for stmt in constraints + indexes:
             try:
                 session.run(stmt)
                 log.info("[neo4j_init] %s", stmt.split()[1])
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — [neo4j_init] constraint/index 생성 실패 흡수 → log + 다음 stmt (멱등, 기존 제약 OK)
                 log.warning("[neo4j_init] skip %s — %s", stmt[:80], e)
 
 

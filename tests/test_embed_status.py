@@ -52,4 +52,4 @@ def test_format_table_renders(monkeypatch):
     st = es._summarize({"total": 10, "embedded": 7},
                        [{"source": "dart", "total": 10, "embedded": 7}])
     out = es._format_table(st)
-    assert "vec.chunks" in out and "70.0%" in out and "dart" in out
+    assert "anxg_vec.chunks" in out and "70.0%" in out and "dart" in out

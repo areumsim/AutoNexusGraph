@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from autograph.loaders.load_auto_specs import parse_canspec_model_str
+from autograph.loaders.master.load_auto_specs import parse_canspec_model_str
 
 
 @pytest.mark.parametrize("raw, body, drive", [

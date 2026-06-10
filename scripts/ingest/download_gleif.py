@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -15,13 +14,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.gleif_client import GleifClient
 
 
 def main() -> int:
-    limiter = get_rate_limiter("gleif")
+    get_rate_limiter("gleif")
     ckpt = CheckpointStore("gleif_kr")
 
     all_records: list[dict] = []
@@ -38,7 +39,7 @@ def main() -> int:
                     "next_renewal_at": rec.next_renewal_at,
                 })
                 # 페이지 단위는 client 내부에서 — 여기서 직접 rate-limit 은 한번에 X
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 1 반환 (log 동반)
             print(f"[GLEIF] error: {e}")
 
     if not all_records:

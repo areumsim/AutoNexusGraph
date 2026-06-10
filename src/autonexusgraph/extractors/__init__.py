@@ -10,10 +10,9 @@
 """
 
 from .base import BaseExtractor, ExtractorResult, RunContext
-from .engine import ExtractorEngine, EngineRunStats
+from .engine import EngineRunStats, ExtractorEngine
 from .llm_extractor import LLMRelationExtractor
-from .validator import validate_relations, ValidationResult
-
+from .validator import ValidationResult, validate_relations
 
 __all__ = [
     "BaseExtractor", "ExtractorResult", "RunContext",

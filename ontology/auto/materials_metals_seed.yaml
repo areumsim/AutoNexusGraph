@@ -1,0 +1,176 @@
+# AutoGraph 금속 합금 (Level 6 — Material, metal_alloy 분기) seed.
+#
+# 배터리 cathode chemistry (materials_seed.yaml) 와 같은 :Material 노드 라벨이지만
+# `material_class: metal_alloy` 로 구분. 자동차 차체·구조·외장 부품용 핵심 alloy 만 시드.
+#
+# 분기:
+#   - Al alloy 4 (A356/6061/7075/5083) — 다이캐스팅·압출·항공·해양
+#   - 강 합금 4 (DP980/CR980/HSS_Boron/SS304) — 차체 hot stamping + 배기
+#   - Ti 1 (Ti6Al4V) — 항공·고성능 (제한적 사용)
+#
+# Module 매핑은 BoM L4 module name 으로 직접 매칭 (예: '차체 외판'/'휠/타이어').
+# Module 의 정식 시드는 part_seed.yaml + load_auto_aihub.py. 본 시드는 typical_modules
+# 힌트만 — loader 가 :Module name 매칭 시 MADE_OF 후보 생성 (grade B, manual seed).
+#
+# 출처 (SSOT):
+#   - 합금 명세: SAE/JIS/KS 규격 (공공 표준명, CC0 효력)
+#   - typical_processes: KAMP 카탈로그(15089213) 의 process_category 8 + 확장.
+#
+# 등급: B (manual seed, 표준 규격 기반). loader 가 적재 시 MADE_OF 엣지는 candidate 0.50
+# (Module 매칭은 추론) — 확정 출처 들어오면 validated 격상.
+
+version: 1
+last_updated: 2026-06-05
+
+# ── 금속 합금 ────────────────────────────────────────────────────
+materials:
+
+  # === 알루미늄 ===========================================
+  A356:
+    name: "Aluminum A356 (Al-Si 7%-Mg)"
+    material_class: metal_alloy
+    alloy_family: Al-Si
+    aliases: ["A356.0", "AlSi7Mg", "LM25"]
+    typical_processes: [die_casting, machining]
+    typical_modules: ["엔진 블록", "변속기 케이스", "휠/타이어", "서브프레임"]
+    density_kg_m3: 2685
+    wikidata_qid: null
+
+  AL_6061:
+    name: "Aluminum 6061 (Al-Mg-Si)"
+    material_class: metal_alloy
+    alloy_family: Al-Mg-Si
+    aliases: ["6061-T6", "AlMgSi1", "AA6061"]
+    typical_processes: [extrusion, machining, welding]
+    typical_modules: ["범퍼 보강재", "서브프레임", "배터리 트레이", "도어 프레임"]
+    density_kg_m3: 2700
+    wikidata_qid: null
+
+  AL_7075:
+    name: "Aluminum 7075 (Al-Zn-Mg-Cu)"
+    material_class: metal_alloy
+    alloy_family: Al-Zn
+    aliases: ["7075-T6", "AlZn5.5MgCu", "AA7075"]
+    typical_processes: [machining, forging]
+    typical_modules: ["서스펜션 암", "구조 부품 (고강도)"]
+    density_kg_m3: 2810
+    wikidata_qid: null
+
+  AL_5083:
+    name: "Aluminum 5083 (Al-Mg)"
+    material_class: metal_alloy
+    alloy_family: Al-Mg
+    aliases: ["5083-H116", "AlMg4.5Mn", "AA5083"]
+    typical_processes: [stamping, welding]
+    typical_modules: ["배터리 트레이", "차체 외판 (EV)"]
+    density_kg_m3: 2660
+    wikidata_qid: null
+
+  # === 강 합금 (AHSS / Stainless) =========================
+  DP980:
+    name: "Dual-Phase Steel 980 MPa (DP980)"
+    material_class: metal_alloy
+    alloy_family: AHSS
+    aliases: ["DP-980", "Dual Phase 980"]
+    typical_processes: [stamping, welding]
+    typical_modules: ["차체 외판", "B-필러", "사이드 멤버"]
+    density_kg_m3: 7850
+    wikidata_qid: null
+
+  CR980:
+    name: "Cold-Rolled High-Strength Steel 980 (CR980)"
+    material_class: metal_alloy
+    alloy_family: AHSS
+    aliases: ["CR-980", "CR980-DP"]
+    typical_processes: [stamping, welding, machining]
+    typical_modules: ["차체 외판", "도어 내판"]
+    density_kg_m3: 7850
+    wikidata_qid: null
+
+  HSS_BORON:
+    name: "Boron Steel (22MnB5, Hot Stamping)"
+    material_class: metal_alloy
+    alloy_family: AHSS
+    aliases: ["22MnB5", "Boron Steel", "Hot Stamping Steel"]
+    typical_processes: [hot_stamping, welding]
+    typical_modules: ["B-필러", "센터 필러", "도어 임팩트빔"]
+    density_kg_m3: 7850
+    wikidata_qid: null
+
+  SS304:
+    name: "Stainless Steel 304 (18Cr-8Ni)"
+    material_class: metal_alloy
+    alloy_family: Stainless
+    aliases: ["SUS304", "AISI 304", "18-8"]
+    typical_processes: [machining, welding, stamping]
+    typical_modules: ["배기 시스템", "촉매 컨버터", "내장 트림"]
+    density_kg_m3: 7900
+    wikidata_qid: null
+
+  # === 티타늄 (제한적) ====================================
+  TI_6AL_4V:
+    name: "Titanium 6Al-4V (Grade 5)"
+    material_class: metal_alloy
+    alloy_family: Ti
+    aliases: ["Ti-6Al-4V", "Grade 5 Ti", "TC4"]
+    typical_processes: [machining, forging]
+    typical_modules: ["밸브 (고성능)", "스프링 (경량)"]
+    density_kg_m3: 4430
+    wikidata_qid: null
+
+
+# ── Module → Material (MADE_OF) 매핑 ─────────────────────────────
+# materials_seed.yaml 의 배터리팩↔NCM 패턴과 동일. loader 매칭은 :Module name 으로.
+# 매칭 없으면 graceful skip — 매핑은 hint, 실제 적재는 :Module 노드 존재 시.
+#
+# (참고) 매핑 정확도는 grade B (manual seed). 실제 OEM-specific 정확도는 IR/MSDS 출처
+# 들어오면 격상. 다중 alloy 가능 모듈은 list 로.
+module_to_materials:
+  - module_name: "차체 외판"
+    materials: [DP980, CR980, AL_5083]
+  - module_name: "B-필러"
+    materials: [DP980, HSS_BORON]
+  - module_name: "센터 필러"
+    materials: [HSS_BORON, DP980]
+  - module_name: "도어 임팩트빔"
+    materials: [HSS_BORON]
+  - module_name: "도어 프레임"
+    materials: [AL_6061, DP980]
+  - module_name: "엔진 블록"
+    materials: [A356]
+  - module_name: "변속기 케이스"
+    materials: [A356]
+  - module_name: "휠/타이어"
+    materials: [A356]
+  - module_name: "서브프레임"
+    materials: [A356, AL_6061]
+  - module_name: "범퍼 보강재"
+    materials: [AL_6061, DP980]
+  - module_name: "서스펜션 암"
+    materials: [AL_7075, DP980]
+  - module_name: "배터리 트레이"
+    materials: [AL_5083, AL_6061]
+  - module_name: "배기 시스템"
+    materials: [SS304]
+  - module_name: "촉매 컨버터"
+    materials: [SS304]
+  # Ti (niche / 고성능)
+  - module_name: "밸브 (고성능)"
+    materials: [TI_6AL_4V]
+  - module_name: "스프링 (경량)"
+    materials: [TI_6AL_4V, AL_7075]
+
+
+# ── Process 카테고리 보강 (참고) ─────────────────────────────────
+# typical_processes 에서 사용되는 process_name_norm 가 KAMP catalog 또는
+# load_kamp_catalog._PROCESS_NORM 에 정의된 카테고리와 일관해야 한다. 본 seed 가
+# 사용한 process_name_norm 목록:
+#   - die_casting (casting)
+#   - cold_forging / forging (forging)
+#   - press / stamping / hot_stamping (stamping)
+#   - welding (welding)
+#   - machining / cnc_machining / extrusion (machining)
+#   - heat_treatment (heat_treatment)
+# `extrusion` 과 `hot_stamping` 은 본 seed 가 신규 도입 (KAMP catalog 에는 없음).
+# loader 작성 시 :Process 매칭은 process_name_norm 완전일치 — 미존재 process 는
+# 새 :Process 노드 MERGE (category 추론 = stamping/machining).

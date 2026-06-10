@@ -26,7 +26,7 @@ exporter(:9105/metrics)  ──scrape──>  Prometheus(:9090)  ──>  Grafan
 | `anxg_bridge_entries{status}` | gauge | bridge candidate/reviewed/rejected/total |
 | `anxg_llm_cost_usd_total` | counter | 누적 LLM 비용 (cost_log.jsonl) |
 | `anxg_data_sources_stale` / `_total` | gauge | freshness stale 소스 수 (Q-5) |
-| `anxg_llm_turns_total{status}` | counter | ops.llm_usage turn 수 (error rate 산출) |
+| `anxg_llm_turns_total{status}` | counter | anxg_ops.llm_usage turn 수 (error rate 산출) |
 | `anxg_scrape_errors` | gauge | 이번 scrape 실패 collector 수 |
 
 각 collector graceful — 일부 실패해도 scrape 는 200, `anxg_scrape_errors` 로 카운트.

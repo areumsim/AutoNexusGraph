@@ -15,7 +15,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # main 브랜치 run 은 취소하지 않는다 — 모든 머지 커밋이 CI 를 완주(녹색)해야 한다.
+  # PR 브랜치만 cancel-in-progress (빠른 재push 시 직전 run 취소로 CI 절약).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   test:
@@ -24,7 +26,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12"]
+        # PR 은 단일 버전(빠른 피드백), main push 는 전 버전 매트릭스(머지 시 철저 검증).
+        python: ${{ github.event_name == 'pull_request' && fromJSON('["3.11"]') || fromJSON('["3.10", "3.11", "3.12"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

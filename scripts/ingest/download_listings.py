@@ -29,9 +29,9 @@ def _write_listings_csv(listings, path: Path) -> None:
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["stock_code", "name", "market", "market_cap", "sector", "isin"])
-        for l in listings:
-            writer.writerow([l.stock_code, l.name, l.market, l.market_cap or "",
-                             l.sector or "", l.isin or ""])
+        for item in listings:
+            writer.writerow([item.stock_code, item.name, item.market, item.market_cap or "",
+                             item.sector or "", item.isin or ""])
 
 
 def main() -> int:
@@ -73,7 +73,7 @@ def main() -> int:
             path = out_dir / f"top_{label}_{n}.csv"
             _write_listings_csv(top, path)
             print(f"[OK] {path} ({len(top):,} rows; top cap: {top[0].name} = {top[0].market_cap:,})")
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — [listings] market top N 다운로드 실패 흡수 → stderr 경고 + 다음 (market, n) 진행
             print(f"[WARN] {market} top {n} 실패: {e}", file=sys.stderr)
 
     # (선택) 전체 마스터도
@@ -84,7 +84,7 @@ def main() -> int:
                 path = out_dir / f"all_{market.lower()}.csv"
                 df.to_csv(path, index=False, encoding="utf-8-sig")
                 print(f"[OK] {path} ({len(df):,} rows)")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_listings] fail-soft 흡수 → 0 반환 (log 동반)
                 print(f"[WARN] {market} 전체 실패: {e}", file=sys.stderr)
 
     return 0

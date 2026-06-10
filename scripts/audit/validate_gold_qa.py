@@ -5,7 +5,7 @@
 1. 필수 필드 (qid / question / question_type / complexity / domain) 존재.
 2. qid prefix 일치 (FIN-L?-*, AUTO-L?-*, CD-L?-*).
 3. domain 값 (finance / auto / cross_domain).
-4. evidence_corp_codes 는 master.companies 에 실재 (DB 가용 시).
+4. evidence_corp_codes 는 anxg_master.companies 에 실재 (DB 가용 시).
 5. requires_multi_hop=true 또는 complexity='hard' 인데 hop_count<2 면 경고.
 6. is_answerable=true 인데 gold_answer_text 비어있으면 경고.
 
@@ -25,7 +25,6 @@ import json
 import re
 import sys
 from pathlib import Path
-
 
 REQUIRED_FIELDS = ("qid", "question", "question_type", "complexity")
 
@@ -109,7 +108,7 @@ def _check_row(path: Path, lineno: int, row: dict,
     # 3. multi_hop / complexity 정합.
     if row.get("complexity") == "hard":
         if not row.get("requires_multi_hop") and int(row.get("hop_count") or 0) < 2:
-            warn(f"complexity=hard 인데 requires_multi_hop=false & hop_count<2")
+            warn("complexity=hard 인데 requires_multi_hop=false & hop_count<2")
 
     # 3a. main_hop_path ↔ hop_count 정합. path 가 list 면 hop_count = len(path)-1 권장.
     mhp = row.get("main_hop_path")
@@ -137,18 +136,18 @@ def _check_row(path: Path, lineno: int, row: dict,
     if corp_codes_in_db is not None:
         for cc in row.get("evidence_corp_codes") or []:
             if cc and cc not in corp_codes_in_db:
-                err(f"evidence_corp_code={cc!r} 가 master.companies 에 없음")
+                err(f"evidence_corp_code={cc!r} 가 anxg_master.companies 에 없음")
 
     return msgs
 
 
 def _load_corp_codes_from_db() -> set[str] | None:
-    """master.companies.corp_code 전체. DB 가용 시 set, 실패 시 None (lint 4번 skip)."""
+    """anxg_master.companies.corp_code 전체. DB 가용 시 set, 실패 시 None (lint 4번 skip)."""
     try:
         from autograph.tools._db import query_dicts
-        rows = query_dicts("SELECT corp_code FROM master.companies", ())
+        rows = query_dicts("SELECT corp_code FROM anxg_master.companies", ())
         return {str(r["corp_code"]) for r in rows if r.get("corp_code")}
-    except Exception:
+    except Exception:   # noqa: BLE001 — [validate_gold_qa] fail-soft 흡수 → None 반환
         return None
 
 
@@ -173,7 +172,7 @@ def main() -> int:
     skipped = [p for p in paths if p.name.startswith("_")]
     paths   = [p for p in paths if not p.name.startswith("_")]
     if skipped:
-        print(f"[lint] skip (사용자 작업물 — `_` prefix): "
+        print("[lint] skip (사용자 작업물 — `_` prefix): "
               + ", ".join(p.name for p in skipped), file=sys.stderr)
     if not paths:
         print("[lint] 검사할 파일 없음", file=sys.stderr)

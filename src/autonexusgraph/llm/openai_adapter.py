@@ -11,7 +11,6 @@ from typing import Any
 
 from .base import LLMClient, LLMError, LLMResponse, TokenUsage
 
-
 # 모델별 토큰 단가 (USD, 1M 토큰당) — 2025-01 기준 공식 가격
 # 갱신: https://openai.com/api/pricing/
 _PRICING: dict[str, tuple[float, float]] = {
@@ -52,7 +51,7 @@ class OpenAIClient(LLMClient):
                 max_tokens=max_tokens,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"OpenAI chat failed: {e}") from e
 
         usage = _build_usage(self.model, resp.usage)
@@ -76,10 +75,10 @@ class OpenAIClient(LLMClient):
                 stream=True,
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"OpenAI stream failed: {e}") from e
         for chunk in stream:
-            delta = chunk.choices[0].delta.content if chunk.choices else None
+            delta = chunk.choices[0].delta.content if chunk.choices else None  # type: ignore[union-attr]  # openai Stream[ChatCompletionChunk]
             if delta:
                 yield delta
 
@@ -93,7 +92,7 @@ class OpenAIClient(LLMClient):
     ) -> dict[str, Any]:
         """Structured Outputs (response_format=json_schema)."""
         try:
-            resp = self._client.chat.completions.create(
+            resp = self._client.chat.completions.create(  # type: ignore[call-overload]  # openai SDK kwargs 동적
                 model=self.model,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=temperature,
@@ -102,12 +101,17 @@ class OpenAIClient(LLMClient):
                     "json_schema": {
                         "name": schema.get("name", "Response"),
                         "schema": schema.get("schema", schema),
-                        "strict": True,
+                        # strict=False: 본 스키마들은 free-form object(예: planner PLAN_SCHEMA 의
+                        # ``args: {type: object}`` — 임의 도구 인자)를 포함하는데, OpenAI strict 모드는
+                        # 모든 object 에 additionalProperties:false + 전 속성 required 를 요구해
+                        # free-form object 와 비호환(400 invalid_request_error). 결과 JSON 은 각 caller
+                        # 가 화이트리스트/구조 검증하므로 strict 불요.
+                        "strict": False,
                     },
                 },
                 **kwargs,
             )
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — 외부 API boundary → LLMError 변환 (raise, silent 아님)
             raise LLMError(f"OpenAI json failed: {e}") from e
 
         content = resp.choices[0].message.content or "{}"

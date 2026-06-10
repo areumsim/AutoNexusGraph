@@ -7,6 +7,29 @@
 from __future__ import annotations
 
 
+# ── span-aware EM (prose ⊃ gold span) ──────────────────────
+def test_exact_match_contains_credits_gold_span_in_prose():
+    """산문 답변에 gold span 이 포함되면 1.0 — strict EM 의 0 artifact 보정."""
+    from eval.metrics.em_f1 import exact_match, exact_match_contains
+
+    prose = "# 삼성전자 2024년 매출\n\n**300조 8,709억원**\n\n전년 대비 16.2% 증가"
+    golds = ["약 300조원", "300조 8,709억원"]
+    # strict full-equality 는 산문 ≠ gold 라 항상 0 (이게 EM=0.0 artifact 의 근원).
+    assert exact_match(prose, golds) == 0.0
+    # span-aware 는 gold ⊆ prose 인정. 자릿수 구분기호(8,709)도 정규화로 흡수.
+    assert exact_match_contains(prose, golds) == 1.0
+
+
+def test_exact_match_contains_guards_short_gold():
+    """정규화 길이 < 3 인 gold 는 strict equality 로만 — 1~2글자 오탐 차단."""
+    from eval.metrics.em_f1 import exact_match_contains
+
+    # '의' 가 답변에 부분문자열로 존재하지만 짧아서 포함 매칭 불가.
+    assert exact_match_contains("회의실의 구조 설명", ["의"]) == 0.0
+    # 빈 gold 는 측정 불가 → 0.0.
+    assert exact_match_contains("아무 답변", []) == 0.0
+
+
 # ── PRD §10.7 — hybrid vs vector +30%p ─────────────────────
 def test_hybrid_vs_vector_target_met():
     from eval.runners.run_qa_eval import compute_hybrid_vs_vector

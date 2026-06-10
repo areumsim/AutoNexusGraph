@@ -35,8 +35,8 @@ from pathlib import Path
 
 from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._common import CheckpointStore
-from ..config import get_auto_settings
 
+from ..config import get_auto_settings
 
 log = logging.getLogger(__name__)
 

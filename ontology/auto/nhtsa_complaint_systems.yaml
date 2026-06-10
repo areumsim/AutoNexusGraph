@@ -1,0 +1,52 @@
+# NHTSA complaint component category → L3 system_code 매핑 (B11 — complaint L3 매칭).
+#
+# events_complaints.components 의 NHTSA 카테고리는 L4 부품명이 아니라 **L3 시스템 수준**이라
+# components.canonical_name(L4) 와 직접 매칭되지 않는다. 본 매핑이 NHTSA 카테고리를
+# system_taxonomy 의 system_code 로 연결해, 복합(comma) 분리 후 L3 매칭을 인정한다.
+#
+# - L4 와 이미 일치하는 카테고리(ELECTRICAL SYSTEM / ENGINE / AIR BAGS 등)는 여기 없어도 매칭됨.
+# - 'UNKNOWN OR OTHER' / 'OTHER' / 'Other/I am not sure' 는 본질적으로 분류 불가 → 매핑 제외(미매칭).
+# - 모호한 소수 카테고리('FIRERELATED' 7 / 'AIR' 6)는 의도적으로 미매핑(추측 금지).
+#
+# 값은 anxg_auto.components.system_code 에 존재하는 코드여야 한다.
+
+mapping:
+  "FORWARD COLLISION AVOIDANCE": forward_collision_avoidance
+  "LANE DEPARTURE":              lane_departure
+  "VEHICLE SPEED CONTROL":       vehicle_speed_control
+  "POWER TRAIN":                 power_train
+  "SERVICE BRAKES":              service_brakes_hydraulic
+  "HYDRAULIC":                   service_brakes_hydraulic
+  "PARKING BRAKE":               parking_brake
+  "AUTOHOLD BRAKE SYSTEM/BRAKE HOLD": parking_brake
+  "STEERING":                    steering
+  "STRUCTURE":                   structure
+  "SUSPENSION":                  suspension
+  "WHEELS":                      wheels
+  "FUEL/PROPULSION SYSTEM":      fuel_system_gasoline
+  "FUEL SYSTEM":                 fuel_system_gasoline
+  "GASOLINE":                    fuel_system_gasoline
+  "DIESEL":                      fuel_system_diesel
+  "VISIBILITY":                  visibility
+  "LATCHES/LOCKS/LINKAGES":      latches_locks_linkages
+  "EQUIPMENT":                   equipment
+  "ELECTRONIC STABILITY CONTROL (ESC)": chassis
+  "TRACTION CONTROL SYSTEM":     chassis
+  "CHILD SEAT":                  child_seat
+  # 카시트 부품(NHTSA 아동용 카시트 결함 세부 부위) → child_seat
+  "Chest Clip":                  child_seat
+  "Buckle":                      child_seat
+  "Harness":                     child_seat
+  "Tether":                      child_seat
+  "Insert":                      child_seat
+  "Padding":                     child_seat
+  "Shell":                       child_seat
+  "Base":                        child_seat
+  "Carry Handle":                child_seat
+  "Lower Anchor (on car seat or vehicle)": child_seat
+
+# 분류 불가로 분모에서 제외(미매칭이지만 '해결 불가' 명시).
+excluded:
+  - "UNKNOWN OR OTHER"
+  - "OTHER"
+  - "Other/I am not sure"

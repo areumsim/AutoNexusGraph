@@ -26,7 +26,7 @@ def _check_neo4j() -> tuple[str, str]:
         return ("OK", "ping ok") if nx.ping() else ("FAIL", "ping returned False")
     except ImportError as e:
         return ("SKIP", f"neo4j package missing: {e}")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -36,7 +36,7 @@ def _check_postgres() -> tuple[str, str]:
         return ("OK", "ping ok") if pg.ping() else ("FAIL", "ping returned False")
     except ImportError as e:
         return ("SKIP", f"psycopg missing: {e}")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -50,7 +50,7 @@ def _check_qdrant() -> tuple[str, str]:
         return ("OK", "ping ok") if qd.ping() else ("FAIL", "ping returned False")
     except ImportError as e:
         return ("SKIP", f"qdrant-client missing: {e}")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -67,7 +67,7 @@ def _check_pgvector() -> tuple[str, str]:
             return ("FAIL", "vector extension not installed — 01_schema.sql 적용 확인")
     except ImportError as e:
         return ("SKIP", f"psycopg missing: {e}")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -80,7 +80,7 @@ def _check_embedding() -> tuple[str, str]:
         if h.get("embed") or h.get("rerank"):
             return ("PARTIAL", str(h))
         return ("FAIL", "neither endpoint responding")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -101,7 +101,7 @@ def _check_dart() -> tuple[str, str]:
         if status == "000":
             return ("OK", f"company.json status=000 ({data.get('corp_name','?')})")
         return ("FAIL", f"DART status={status} message={data.get('message','')}")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -120,7 +120,7 @@ def _check_ecos() -> tuple[str, str]:
         if "StatisticSearch" in data:
             return ("OK", "ECOS responding")
         return ("FAIL", f"unexpected: {str(data)[:120]}")
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → ("FAIL", f"{type(e).__name_... 반환
         return ("FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -152,7 +152,7 @@ def main() -> int:
     for name in names:
         try:
             status, detail = CHECKS[name]()
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — healthcheck 개별 checker 실패 흡수 → status='FAIL' 표시 + 다음 checker (전체 health probe 진행 보존)
             status, detail = "FAIL", f"checker crashed: {e}"
         line = f"{name:12s}  {status:8s}  {detail}"
         print(line)

@@ -1,4 +1,4 @@
-"""master.companies → Neo4j (Company/Market/Sector/Person)."""
+"""anxg_master.companies → Neo4j (Company/Market/Sector/Person)."""
 from __future__ import annotations
 
 import argparse

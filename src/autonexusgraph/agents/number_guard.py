@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
+from typing import Any
 
 from ._number_patterns import BIG_NUMBER_RE, collect_numbers_from_state, normalize_number
 
@@ -45,7 +47,7 @@ def _format_with_commas(n: str) -> str:
         return n
 
 
-def collect_approved_numbers(state: dict) -> set[str]:
+def collect_approved_numbers(state: Mapping[str, Any]) -> set[str]:
     """tool_results + evidence_chunks 에 등장한 큰 숫자(정규형) 수집.
 
     SSOT 헬퍼 ``_number_patterns.collect_numbers_from_state`` 를 거치므로

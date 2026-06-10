@@ -8,7 +8,7 @@
   2. ``start_turn_context`` enter — 새 CostTracker (+ 키 있으면 Langfuse span).
   3. ``tracker.record(...)`` 로 가짜 토큰 적재 (input=100/output=50, mock 모델).
   4. ``turn.state`` 에 n_replans=2 + answer 박기.
-  5. exit → tracker.finalize → PG ops.llm_usage 의 meta JSONB 영구 적재 +
+  5. exit → tracker.finalize → PG anxg_ops.llm_usage 의 meta JSONB 영구 적재 +
      Langfuse span.update + flush.
   6. PG 검증: 최신 row 의 meta JSONB 에 thread_id/turn_id/n_replans 존재.
      n_calls/input_tokens/output_tokens/cost_usd > 0.
@@ -61,7 +61,7 @@ def _langfuse_ready() -> tuple[bool, str]:
             s = get_settings()
             pub = pub or getattr(s, "langfuse_public_key", "")
             sec = sec or getattr(s, "langfuse_secret_key", "")
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → False, "LANGFUSE_PUBLIC_KEY... 반환
             pass
     if not (pub and sec):
         return False, "LANGFUSE_PUBLIC_KEY/SECRET_KEY 미설정"
@@ -82,7 +82,7 @@ def _pg_available() -> bool:
             cur.execute("SELECT 1")
             cur.fetchone()
         return True
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — [trace_smoke] fail-soft 흡수 → False 반환
         return False
 
 
@@ -122,10 +122,10 @@ def _run_real_agent(thread_id: str) -> dict:
 
 
 def _verify_pg(thread_id: str) -> dict:
-    """ops.llm_usage 의 thread_id 일치 최신 row 검증."""
+    """anxg_ops.llm_usage 의 thread_id 일치 최신 row 검증."""
     try:
         from autonexusgraph.db.postgres import get_pool
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"pg import 실패: {e}"}
 
     try:
@@ -134,7 +134,7 @@ def _verify_pg(thread_id: str) -> dict:
                 """
                 SELECT run_id::text, caller, n_calls, input_tokens, output_tokens,
                        cost_usd, status, meta
-                FROM ops.llm_usage
+                FROM anxg_ops.llm_usage
                 WHERE meta ->> 'thread_id' = %s
                 ORDER BY started_at DESC
                 LIMIT 1
@@ -142,7 +142,7 @@ def _verify_pg(thread_id: str) -> dict:
                 (thread_id,),
             )
             row = cur.fetchone()
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"pg query 실패: {e}"}
 
     if not row:
@@ -152,7 +152,7 @@ def _verify_pg(thread_id: str) -> dict:
     if isinstance(meta, str):
         try:
             meta = json.loads(meta)
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, 반환
             meta = {}
     required = ("thread_id", "turn_id", "n_replans", "domain")
     missing = [k for k in required if k not in (meta or {})]
@@ -184,13 +184,13 @@ def _verify_langfuse() -> dict:
     try:
         from autonexusgraph.agents.tracing import _get_langfuse_client
         client = _get_langfuse_client()
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"langfuse client init 실패: {e}"}
     if client is None:
         return {"passed": False, "reason": "langfuse 비활성 (SDK 또는 auth 실패)"}
     try:
         client.flush()
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → {"passed": False, "reason":... 반환
         return {"passed": False, "reason": f"flush 실패: {e}"}
     return {"passed": True, "auth": "ok"}
 
@@ -237,7 +237,7 @@ def main() -> int:
             final_state = _run_real_agent(args.thread_id)
         else:
             final_state = _simulate_turn(args.thread_id)
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — fail-soft 흡수 → 1 반환
         _emit({"passed": False, "reason": f"turn 실행 실패: {e}"}, args.out_dir)
         return 1
 

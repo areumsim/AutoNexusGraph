@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,9 +30,9 @@ from autonexusgraph.ingestion._common import (
     RateLimiter,
     save_raw,
 )
+
 from ..config import get_auto_settings
 from ._common_nhtsa import nhtsa_http_get
-
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +118,7 @@ def ingest_make_year(make: str, year: int, *, with_canspec: bool = True) -> dict
                 log.warning("[vpic] canspec %s %s failed: %s", make, year, e)
         ckpt.mark_done(key, {"models": len(models)})
         return {"models": len(models)}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — [vpic] failed %s 흡수 → {"error": str(e)} 반환
         log.exception("[vpic] failed %s", key)
         ckpt.mark_failed(key, str(e))
         return {"error": str(e)}

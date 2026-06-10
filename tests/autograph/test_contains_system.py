@@ -34,7 +34,7 @@ def test_auto_systems_of_model_param_validation():
 
 
 def test_derive_contains_system_importable():
-    from autograph.loaders import derive_contains_system as d
+    from autograph.loaders.master import derive_contains_system as d
     assert hasattr(d, "derive_contains_system")
     assert hasattr(d, "DeriveStats")
     # cypher 본문 RO 검증 — MERGE/SET 은 합법이지만 DELETE/CREATE 노드는 없어야.

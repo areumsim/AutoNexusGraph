@@ -1,4 +1,4 @@
-"""fin.filings 적재 진입점."""
+"""anxg_fin.filings 적재 진입점."""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +12,7 @@ from autonexusgraph.loaders import load_filings  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="fin.filings 적재 (공시 메타)")
+    parser = argparse.ArgumentParser(description="anxg_fin.filings 적재 (공시 메타)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--batch-size", type=int, default=1000)
     args = parser.parse_args()

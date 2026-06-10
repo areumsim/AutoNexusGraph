@@ -3,7 +3,7 @@
 
 (A, B) 와 (B, A) 는 같은 관계 — directed=false. 알파벳/사전순 정렬 후 보관.
 
-산출: (:Company)-[:CO_MENTIONED_WITH {count, last_seen, sources}]-(:Company)
+산출: (:Anxg_Company)-[:CO_MENTIONED_WITH {count, last_seen, sources}]-(:Anxg_Company)
 """
 from __future__ import annotations
 
@@ -18,11 +18,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.loaders._edge_meta import edge_meta_set_clause
 
-
 CYPHER = f"""
 UNWIND $rows AS r
-MATCH (a:Company {{corp_code: r.a}})
-MATCH (b:Company {{corp_code: r.b}})
+MATCH (a:Anxg_Company {{corp_code: r.a}})
+MATCH (b:Anxg_Company {{corp_code: r.b}})
 MERGE (a)-[rel:CO_MENTIONED_WITH]-(b)
 ON CREATE SET rel.count = r.count, rel.last_seen = r.last_seen, rel.sources = r.sources
 ON MATCH  SET rel.count = r.count, rel.last_seen = r.last_seen, rel.sources = r.sources
@@ -47,8 +46,8 @@ def main() -> int:
         cur.execute("""
             SELECT m.article_hash, m.corp_code,
                    a.source, a.published_at::text
-              FROM news.article_mentions m
-              JOIN news.articles a ON a.article_hash = m.article_hash
+              FROM anxg_news.article_mentions m
+              JOIN anxg_news.articles a ON a.article_hash = m.article_hash
         """)
         for ah, cc, source, pub in cur.fetchall():
             article_to_corps[ah].add(cc)
@@ -94,12 +93,12 @@ def main() -> int:
             print("  ", r)
         return 0
 
-    from autonexusgraph.db.neo4j import get_driver
-    with get_driver().session() as session:
+    from autonexusgraph.db.neo4j import get_session
+    with get_session() as session:
         for i in range(0, len(rows), 200):
             session.run(CYPHER, rows=rows[i:i + 200])
 
-    with get_driver().session() as session:
+    with get_session() as session:
         n = session.run("MATCH ()-[r:CO_MENTIONED_WITH]-() RETURN count(r) AS n").single()["n"]
     print(f"[news_corel] CO_MENTIONED_WITH edges (incl. both directions): {n}")
     return 0

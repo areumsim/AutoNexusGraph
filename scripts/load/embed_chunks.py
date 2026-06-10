@@ -1,4 +1,4 @@
-"""embedding IS NULL 인 vec.chunks 행에 BGE-M3 임베딩 채우기.
+"""embedding IS NULL 인 anxg_vec.chunks 행에 BGE-M3 임베딩 채우기.
 
 사전 요건:
     python scripts/serve_embeddings.py   # 다른 터미널에서
@@ -20,7 +20,7 @@ from autonexusgraph.loaders import embed_chunks  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="vec.chunks 임베딩 backfill (BGE-M3)")
+    parser = argparse.ArgumentParser(description="anxg_vec.chunks 임베딩 backfill (BGE-M3)")
     parser.add_argument("--batch-size", type=int, default=64,
                         help="BGE-M3 호출 1회당 청크 수")
     parser.add_argument("--no-progress", action="store_true")
@@ -28,7 +28,7 @@ def main() -> int:
 
     try:
         stats = embed_chunks(batch_size=args.batch_size, progress=not args.no_progress)
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 2 반환
         print(f"[ERROR] {e}", file=sys.stderr)
         return 2
     print(f"[OK] embedded — {stats.summary()}")

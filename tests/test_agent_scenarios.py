@@ -174,8 +174,10 @@ def test_s4_empty_results_recovery():
 def test_s5_ambiguous_company_clarification():
     """모호 회사 → interrupt 미지원 환경에서 1순위 자동선택 + safety_signal 기록."""
     session.clear()
-    hits = [{"corp_code": "00111111", "name": "삼성전자", "score": 0.80},
-            {"corp_code": "00222222", "name": "삼성SDI", "score": 0.79}]
+    # score 는 lookup_company 실제 스케일(0~100: 100 corp_code/90 stock/80 name/60 prefix/
+    # 40 substring) 기준. (과거 mock 은 0~1 스케일을 썼으나 실 함수와 불일치 → 정합.)
+    hits = [{"corp_code": "00111111", "name": "삼성전자", "score": 80},
+            {"corp_code": "00222222", "name": "삼성SDI", "score": 79}]
 
     def fake_lookup(query, limit=5):
         return hits if query == "삼성" else []
@@ -337,7 +339,10 @@ def test_multihop_plan_emits_spawn_template():
 def test_fanin_reducers_dedup_and_clear():
     """dedup-concat/merge reducer — 손실 0·pre-fork 중복 0·clear 마커 동작."""
     from autonexusgraph.agents.state import (
-        _ClearedDict, _ClearedList, _concat_dedup_by, _merge_dict_dedup,
+        _ClearedDict,
+        _ClearedList,
+        _concat_dedup_by,
+        _merge_dict_dedup,
     )
     concat = _concat_dedup_by("id")
     e0 = [{"id": "c0"}]

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 
-
 _MIN_KOREAN_RATIO = float(os.getenv("FINGRAPH_MIN_KOREAN_RATIO", "0.30"))
 _MIN_MEASURED_CHARS = int(os.getenv("FINGRAPH_MIN_LANG_CHARS", "20"))
 

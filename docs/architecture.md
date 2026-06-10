@@ -18,9 +18,18 @@ PG/Neo4j/pgvector + cost/cypher guard) 위에 **도메인 plug-in** 을 import-s
 
 | 패키지 | py 파일 | 역할 | 상태 |
 |---|---:|---|---|
-| `src/autonexusgraph/` | 106 | 코어 (finance 도메인 + LangGraph + 공통 인프라) | ✅ 완료 |
-| `src/autograph/` | 97 | auto plug-in (자동차 OEM/부품/리콜 + BoP 공정) | ✅ MVP 안정 |
+| `src/autonexusgraph/` | 111 | 코어 (finance 도메인 + LangGraph + 공통 인프라) | ✅ 완료 |
+| `src/autograph/` | 104 | auto plug-in (자동차 OEM/부품/리콜 + BoP 공정) | ✅ MVP 안정 |
 | `src/ipgraph/` | 21 | ip plug-in (특허·기술혁신, 보조축) | ✅ 코드/온톨로지/스키마 완료, 특허 데이터 (KIPRIS/USPTO ODP) 적재 대기 |
+| `src/common/` | 2 | 순수 공유 헬퍼 (코어·plug-in 양쪽이 import — 결합 방향 회피). 현재 retrieve top-k cap 등 | ✅ |
+
+> py 파일 수는 `git ls-files 'src/<pkg>/*.py' | wc -l` 2026-06-10 실측. 정확한 수는 변동하므로 비율(코어 ≫ auto ≫ ip)만 의미. 아래 mermaid 라벨도 동일 값.
+
+> **왜 4개 top-level 패키지인가**: 도메인(`autograph`/`ipgraph`)을 코어의 *하위*가 아니라 *형제*
+> 패키지로 두어 "코어는 도메인을 import 하지 않는다"를 **물리적으로 강제**한다(§2 의존 방향).
+> `common/` 은 어느 쪽에도 속하지 않는 순수 헬퍼만 담아 core↔domain 양방향 결합을 피한다.
+> ⚠️ 네이밍 주의: `autonexusgraph`(코어) ↔ `autograph`(auto 도메인) 은 이름이 비슷하나 의미가
+> 다르다(코어 vs 한 도메인).
 
 핵심 정책: **코어는 plug-in 을 직접 import 하지 않는다** (역의존 0건). plug-in 이 import 되는
 순간 부작용으로 `register_handler` / `register_router` 가 호출되어 코어 라우터에 합류.
@@ -32,7 +41,7 @@ ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (csv, 기본 `autograph`) 가 import 대상 
 
 ```mermaid
 flowchart TD
-    subgraph Core["src/autonexusgraph/ — 코어 (95 py)"]
+    subgraph Core["src/autonexusgraph/ — 코어 (111 py)"]
         AG[agents/ — LangGraph multi-agent]
         TL[tools/ — finance retrieve/graph/financials]
         ON[ontology/ — finance entities/relations/extractors]
@@ -44,7 +53,7 @@ flowchart TD
         UI[ui/ + api/ — REPL/HTTP entry]
     end
 
-    subgraph Auto["src/autograph/ — auto plug-in (81 py)"]
+    subgraph Auto["src/autograph/ — auto plug-in (104 py)"]
         AH[agent_handler.py — AutoHandler + CrossDomainHandler]
         AT[tools/ — retrieve/graph/specs/recalls]
         AON[ontology.py + ontology/auto/*.yaml]
@@ -54,7 +63,7 @@ flowchart TD
         AP[policy.py — auto routing]
     end
 
-    subgraph IP["src/ipgraph/ — ip plug-in (18 py)"]
+    subgraph IP["src/ipgraph/ — ip plug-in (21 py)"]
         IH[agent_handler.py — IPGraphHandler]
         IT[tools/ — retrieve/graph/patents/bridge]
         ION[ontology.py + ontology/ip/*.yaml]
@@ -81,6 +90,38 @@ flowchart TD
 `grep -rn '^from ipgraph\|^import ipgraph' src/autonexusgraph/ src/autograph/` → 0 건.
 **코어는 plug-in 을 모른다.** 코어 변경 없이 새 도메인 추가 가능 (README §10.15 baseline reset).
 
+> **코어 서브패키지 명명 주의**: `chunking/`(결정적 문서 파싱·청킹 → `anxg_vec.chunks` 벡터 청크)
+> 와 `extractors/`(LLM 엔티티·관계 추출 엔진, P3) 는 역할이 전혀 다르다. 과거 `extraction/` 이
+> `extractors/` 와 이름이 혼동되어 `chunking/` 로 개명.
+
+> **`autograph/loaders/` 관심사별 하위그룹** (48 모듈 → 5 그룹, 평탄 디렉터리 탐색성 개선):
+> `master/`(엔티티·BoM·bridge·supplier·specs) · `recall/`(리콜·불만·결함·안전 이벤트) ·
+> `process/`(BoP 공정 그래프·공장) · `materials/`(L6 소재·광물) · `chunks/`(벡터 청크·뉴스).
+> 공유 헬퍼(`_neo4j_helpers`·`_text_utils`)·`neo4j_init` 은 `loaders/` 최상위 유지. CLI 는
+> `python -m autograph.loaders.<group>.<module>`.
+
+---
+
+## 2.5 계층 책임·경계 (data / model / app / bridge)
+
+패키지 토폴로지(§2)가 "누가 누구를 import 하나"라면, 본 절은 "각 계층이 무엇을 책임지고
+어디서 끝나나"의 수평 분해다. 한 모듈이 두 계층을 겸하면(예: finance tool 이 app+model)
+경계가 흐려지므로, 아래 책임 분리를 SSOT 로 둔다.
+
+| 계층 | 책임 | 코드 위치 | 경계 규칙 (넘으면 안 되는 선) |
+|---|---|---|---|
+| **Data** | 외부 raw 수집 → 정규화 → PG/Neo4j 멱등 적재. 스키마·제약·인덱스 정의. | `ingestion/` · `loaders/` · `infra/postgres/init/*.sql` | LLM 호출 금지(추출 Pass 제외). 답변 로직 모름 — 적재만. |
+| **Model** | 온톨로지(entities/relations/extractors yaml) + 추출 Pass(P1~P4) + 신뢰도 등급. 그래프 "의미" 정의. | `ontology/` · `extractors/` · `*/ontology.py` | 사용자 질의·UI 모름. 도메인 schema_version 의 SSOT. |
+| **App** | LangGraph multi-agent(triage→…→validator) + 도구 풀(tools) + 안전 가드 + cost. 질의→답변. | `agents/` · `tools/` · `safety/` · `llm/` | raw 적재 로직·SQL DDL 모름. 사전 정의 도구만 호출(자유 SQL/Cypher 금지). |
+| **Bridge** | 도메인 간 entity 연결 — `anxg_bridge.corp_entity`(corp↔글로벌) + `anxg_ip.assignee_corp_map`. cross-domain 진입점. | `anxg_bridge.corp_entity` 테이블 · `*/tools/bridge.py` · `loaders/master/load_bridge.py` | 한 도메인에 종속 안 함. confidence 임계로 false match 차단(§5.1(g)). |
+
+**왜 이 4 분할인가 (대안·기각)**: (1) **계층 없이 도메인별 수직 슬라이스만** — 도메인 추가마다
+ingestion~app 전체를 복제, 공통 인프라(LLM/cost/guard) 중복. **기각**. (2) **app+model 통합**(tool 이
+온톨로지까지) — 추출 규칙 변경이 답변 코드에 번져 테스트 격리 불가. **기각**. (3) **선택 = 4 계층 수평 +
+도메인 plug-in 수직** — 공통 인프라는 코어 1벌, 도메인은 plug-in, bridge 는 양쪽에 안 종속. 데이터
+적재(Data)와 답변(App)이 분리돼 "DB 없이 app 단위 테스트"·"app 없이 적재 배치"가 각각 가능
+(`tests/` 의 unit/integration 이층 구조가 이를 반영).
+
 ---
 
 ## 3. 도메인별 모듈 매트릭스
@@ -88,21 +129,22 @@ flowchart TD
 | 모듈 카테고리 | autonexusgraph (코어/finance) | autograph (auto) | ipgraph (ip) |
 |---|---|---|---|
 | **agent_handler** | (코어 자체) | `agent_handler.py` `AutoHandler` + `CrossDomainHandler` | `agent_handler.py` `IPGraphHandler` |
-| **policy / router** | `agents/_domain_handler.py` registry | `policy.py` `route_domain_auto` | `policy.py` `route_domain_ip` |
+| **policy / router** | `agents/_domain_handler.py` registry | `policy.py` `route_domain` (등록: `agent_handler.py:158 register_router`) | `policy.py` `route_domain_ip` |
 | **tools (LLM 호출)** | `tools/` finance retrieve/graph/financials | `tools/` retrieve/graph/specs/recalls | `tools/` retrieve/graph/patents/bridge |
 | **cypher 템플릿** | (코어 SafeCypher) | `cypher_templates_auto.py` `auto_*` | `cypher_templates_ip.py` `ip_*` |
 | **ontology** | `ontology/` + `ontology/entities.yaml` / `relations.yaml` | `ontology.py` + `ontology/auto/*.yaml` | `ontology.py` + `ontology/ip/*.yaml` |
 | **ingestion (raw 수집)** | `ingestion/` DART/ECOS/FSS/news | `ingestion/` NHTSA/Wikidata/KOTSA/USGS/Wikipedia/DART 부록 | `ingestion/` KIPRIS/USPTO ODP/CPC/OpenAlex |
 | **loaders (PG/Neo4j 적재)** | `loaders/` finance | `loaders/` (+ `_neo4j_helpers.py` 공통, BoP: `load_auto_process_*` / `load_factoryon_plants` / `load_performed_at` / `load_recall_process_map` / `load_process_resources` / `load_produced_by`) | `loaders/` (`load_cpc` / `load_openalex` / `load_kipris` / `load_uspto_odp`) |
-| **gold QA** | `eval/qa_gold/gold_qa_v0.jsonl` (30) | `eval/qa_gold/gold_qa_auto_v0.jsonl` (46) | `eval/qa_gold/gold_qa_ip_v0.jsonl` (30, gold_answer 채우기는 KIPRIS/USPTO 적재 후) |
-| **cross_domain QA** | `eval/qa_gold/gold_qa_cross_v0.jsonl` (44 실측. level: CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형) — 공통 영역 |||
+| **gold QA** | `eval/qa_gold/gold_qa_v0.jsonl` (30) | `eval/qa_gold/gold_qa_auto_v0.jsonl` (56) | `eval/qa_gold/gold_qa_ip_v0.jsonl` (30, gold_answer 채우기는 KIPRIS/USPTO 적재 후) |
+| **cross_domain QA** | `eval/qa_gold/gold_qa_cross_v0.jsonl` (49 실측. qid prefix: CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + IP 결합 8 + CD-PROC 5) — 공통 영역 |||
 
 **onlogy SSOT**: `ontology/<domain>/relations.yaml` 헤더 1곳에 `schema_version` 정의. 로더는
 `default_schema_version()` 로 동적 회수 — 코드에 박지 않는다 (README §3.7).
 
-**의무 메타 강제** (README §3.7): 모든 Neo4j 엣지 적재 시 `source_type` / `source_id` /
-`confidence_score` / `snapshot_year` / `schema_version` 필수. `_neo4j_helpers.py:edge_meta_cypher()`
-가 통합 진입점. `scripts/audit/edge_meta_invariants.py` 가 사후 검증.
+**의무 메타 강제** (README §3.7): 모든 Neo4j 엣지 적재 시 7키 `source_type` / `source_id` /
+`confidence_score` / `validated_status` / `snapshot_year` / `extraction_method` / `schema_version`
+필수 (SSOT = `src/autonexusgraph/ontology/schema.py:27` `EDGE_REQUIRED_META_KEYS`).
+`_neo4j_helpers.py:edge_meta_cypher()` 가 통합 진입점. `scripts/audit/edge_meta_invariants.py` 가 사후 검증.
 
 ---
 
@@ -131,9 +173,9 @@ flowchart LR
     end
 
     subgraph DB[저장소]
-        PG[(PostgreSQL<br/>master / sec / wiki / auto / ip / vec / bridge)]
-        NEO[(Neo4j<br/>Company / Vehicle / Patent / RECALL_OF / SUPPLIED_BY ...)]
-        VEC[(pgvector<br/>vec.chunks BGE-M3 1024-dim)]
+        PG[(PostgreSQL<br/>anxg_master / anxg_sec / anxg_wiki / anxg_auto / anxg_ip / anxg_vec / anxg_bridge)]
+        NEO[(Neo4j<br/>Anxg_Company / Anxg_VehicleModel / Anxg_Patent / RECALL_OF / SUPPLIED_BY ...)]
+        VEC[(pgvector<br/>anxg_vec.chunks BGE-M3 1024-dim)]
     end
 
     subgraph A[adapters]
@@ -180,12 +222,12 @@ flowchart LR
 | 12a | `12a_autograph_inspections.sql` | auto | KOTSA 수리검사 (data.go.kr 15155857) |
 | 12b | `12b_autograph_investigations.sql` | auto | NHTSA ODI 조사 |
 | 13 | `13_autograph_oem_sec.sql` | auto | 글로벌 OEM SEC EDGAR |
-| 14 | `14_master_entities.sql` | core | master.entities 다형 ER |
+| 14 | `14_master_entities.sql` | core | anxg_master.entities 다형 ER |
 | 15 | `15_autograph_production.sql` | auto | DART 사업보고서 생산·설비 |
 | 16 | `16_autograph_kama_macro.sql` | auto | KAMA 매크로 통계 |
 | 17 | `17_autograph_oem_news.sql` | auto | OEM IR/뉴스룸 본문 |
 | 18 | `18_ipgraph.sql` | ip | IPGraph 핵심 스키마 |
-| 19 | `19_ipgraph_bridge.sql` | ip-bridge | `ip.assignee_corp_map` |
+| 19 | `19_ipgraph_bridge.sql` | ip-bridge | `anxg_ip.assignee_corp_map` |
 | 20 | `20_auto_minerals.sql` | auto-L6 | USGS MCS 결정적 SSOT |
 | 21 | `21_auto_ev_chargers.sql` | auto | EV 충전 인프라 |
 | 22 | `22_ip_works.sql` | ip | OpenAlex Work/Institution 슬롯 |
@@ -221,6 +263,35 @@ MIGRATE_FILE=<파일>` 으로 hot-apply ([docs/operations/migrations.md](operati
 
 ---
 
+## 4.4 공유 DB 멀티테넌시 — namespace 격리
+
+3-store(Neo4j/PostgreSQL/pgvector·Qdrant)는 **다른 프로젝트와 공유되는 기존 서버**를 쓴다.
+프로젝트별 데이터가 충돌하지 않도록, **단일 토큰 `app_namespace`**(env `APP_NAMESPACE`, 기본 `anxg`)
+에서 스토어별 namespace 를 파생한다 — 토큰 한 곳만 바꾸면 전체 일관.
+
+| 스토어 | 격리 메커니즘 | 코드 SSOT | 비고 |
+|---|---|---|---|
+| **PostgreSQL** | (1) DSN **database 명** `autonexusgraph` (1차) + (2) **스키마 프리픽스** `anxg_<schema>` (2차) | `config.pg_schema(name)` (`config.py`) · `infra/postgres/init/*.sql` `CREATE SCHEMA anxg_*` | 17 스키마(master/auto/ip/vec/bridge/…) 전부 `anxg_` 프리픽스. LangGraph 체크포인트 = `anxg_chat`. |
+| **Neo4j** | (1) **named database** `NEO4J_DATABASE`(Enterprise) + (2) **노드 라벨 프리픽스** `Anxg_<Label>` | `db/neo4j.get_session()`(database 주입) · `config.neo4j_label(label)` | community 단일 db 에선 라벨 프리픽스가 유일 격리. **관계 타입은 불변**(라벨만 대상). 노드 라벨 31종. |
+| **pgvector / Qdrant** | pgvector = PG `anxg_vec.chunks`(DB명+스키마 격리). Qdrant = **컬렉션 프리픽스** | `db/qdrant.collection_name()` · `config.qdrant_collection`(기본 `anxg_chunks`) | 현 주력은 pgvector(PG 격리 상속). Qdrant 활성 시 컬렉션 namespace. |
+
+**왜 db명 위에 프리픽스까지 (이중 방어)**: PG 는 database 명으로 이미 격리되지만, 같은 database 를
+여러 프로젝트가 공유하는 운영도 대비해 스키마 프리픽스를 더한다. Neo4j community 는 named database 가
+**없어**(`neo4j:5.18-community`, 단일 `neo4j` db) 라벨 프리픽스가 사실상 유일한 격리 수단 —
+그래서 둘 다 적용한다.
+
+**핵심 규약 (코드 리뷰 게이트)**:
+- 모든 Neo4j 세션은 `get_session()` 으로 연다 — `driver.session()` 직접 호출 금지(database 주입 누락 방지).
+- 노드 라벨은 `Anxg_*`, **관계 타입은 프리픽스 없음**(예: `(:Anxg_Company)-[:SUPPLIED_BY]->(:Anxg_Supplier)`).
+- PG 참조는 `anxg_<schema>.<table>` 정적 사용. 동적 조립은 `pg_schema()` 헬퍼.
+
+**기존 적재 DB 마이그레이션** (코드는 이미 프리픽스를 참조하므로 기존 데이터도 한 번 옮겨야 일치):
+- Neo4j: `scripts/migrate/relabel_neo4j_namespace.py` — 라벨별 `SET n:Anxg_X REMOVE n:X`(apoc 배치, 멱등).
+- PG: `scripts/migrate/rename_pg_schemas_namespace.sql` — `ALTER SCHEMA <s> RENAME TO anxg_<s>`(멱등).
+- 절차: DB 백업([operations/backup_dr.md](operations/backup_dr.md)) → 마이그레이션 실행 → 앱 재기동 → audit.
+
+---
+
 ## 5. LangGraph 노드 토폴로지
 
 `src/autonexusgraph/agents/graph.py` 가 진입점. langgraph 설치 시 StateGraph, 미설치 시 함수 체인 폴백.
@@ -247,41 +318,41 @@ flowchart TD
     finalize --> END((END))
 ```
 
-**노드 책임 + AgentState 34 필드 read/write 매트릭스** (`agents/state.py:99-161`):
+**노드 책임 + AgentState 36 필드 read/write 매트릭스** (`agents/state.py:156-225`):
 
 | 노드 | 책임 | read 필드 (entry-only / 누적) | write 필드 |
 |---|---|---|---|
 | `triage` | 사용자 발화 → 도메인 분류 + 의도 추출 + 모호성 감지 | `question` / `history` / `domain` (hint) | `question_rewritten` / `temporal_audit` / `rewrite_audit` / `safety_signals` / `pending_interrupt` (모호성 시) / `domain` (auto_detect 결과) |
-| `planner` | task DAG 생성 (multi-hop 분해) — handler 의 `plan_tasks()` 호출 | `question_rewritten` / `domain` / `target_*` / `safety_signals` | `question_kind` / `target_companies` / `session_carryover` / `plan` / `tasks` |
+| `planner` | task DAG 생성 (multi-hop 분해) — handler 의 `plan_tasks()` 호출 | `question_rewritten` / `domain` / `target_*` / `safety_signals` / `llm_planner` (ablation 토글) / `replan_hint` (result-aware replan) | `question_kind` / `target_companies` / `session_carryover` / `plan` / `tasks` |
 | `supervisor` | 의존성 없는 task 병렬 Send dispatch (langgraph 활성 시) | `tasks` (의존성 그래프) | `_current_task` (Send 한정, 결과 누적 후 제거) |
-| `worker_research` | LLM Q&A (자유 회신) — `tools/retrieve.py` 호출 가능 | `_current_task` / `domain` (toolbox 선택) / `evidence_chunks` | `task_results[id]` / `tool_results[]` / `evidence_chunks[]` |
+| `worker_research` | LLM Q&A (자유 회신) — `tools/retrieve.py` 호출 가능 | `_current_task` / `domain` (toolbox 선택) / `evidence_chunks` / `rerank` (reranker on/off) | `task_results[id]` / `tool_results[]` / `evidence_chunks[]` |
 | `worker_graph` | Cypher 템플릿 호출 (`tools/graph.py` + `cypher_templates_*`) — `cypher_guard.assert_read_only` 강제 | `_current_task` / `domain` | `task_results[id]` / `tool_results[]` / `graph_subgraph` |
 | `worker_sql` | PG 정형 조회 (`tools/financials.py` / `spec.py` / `patents.py`) | `_current_task` / `domain` | `task_results[id]` / `tool_results[]` |
 | `worker_calculator` | 산술 sandbox (`numexpr`) — 그래프·SQL 결과 후처리 | `_current_task` / `tool_results` | `task_results[id]` |
 | `executor_legacy` | tasks DAG 비어 있고 plan 만 있을 때 호환 경로 | `plan` (legacy) | `tool_results` / `evidence_chunks` |
 | `synthesizer` | worker 결과 통합 + 답안 생성 + number_guard 마스킹 | `question_rewritten` / `tool_results` / `evidence_chunks` / `graph_subgraph` / `tasks` | `answer` / `citations` / `visualizations` / `llm_usage_usd` (증가) |
-| `validator` | 6 검사 (length / self-report bypass / language / grounding / hallucinated_numbers / edge_confidence) + replan 트리거 | `answer` / `tool_results` / `evidence_chunks` / `graph_subgraph` / `n_replans` | `validation_status` / `validation_issues` / `grounding` / `n_replans` (replan 시 증가) |
+| `validator` | 6 검사 (length / self-report bypass / language / grounding / hallucinated_numbers / edge_confidence) + replan 트리거 | `answer` / `tool_results` / `evidence_chunks` / `graph_subgraph` / `n_replans` | `validation_status` / `validation_issues` / `grounding` / `n_replans` (replan 시 증가) / `replan_hint` (mark_replan) |
 | `finalize` | 실패 응답 패키징 (`⚠️ 검증 실패 (replan n/MAX 후)` 프리픽스) | `validation_status` / `validation_issues` / `answer` / `n_replans` | `answer` (프리픽스 추가) |
 
-**AgentState 34 필드 그룹** (state.py:99-161 의 `Annotated[..., _last_wins|_list_extend]` 필드):
+**AgentState 36 필드 그룹** (state.py:156-225 의 `Annotated[..., _last_wins|_list_extend|...]` 필드):
 
 | 그룹 | 필드 수 | 필드 이름 | 채우는 노드 |
 |---|---:|---|---|
 | **입력** | 7 | `thread_id`, `question`, `history`, `domain`, `target_vehicles`, `target_models`, `target_makes` | 외부 호출자 / `run_agent` |
-| **전처리·평가 메타** | 4 | `rerank`, `question_rewritten`, `temporal_audit`, `rewrite_audit` | triage |
+| **전처리·평가 메타** | 5 | `rerank`, `llm_planner`, `question_rewritten`, `temporal_audit`, `rewrite_audit` | `rerank`/`llm_planner` 는 entry-only (run_agent ablation 토글) + 나머지 triage |
 | **안전 신호** | 1 | `safety_signals` (reducer: `_list_extend`) | 모든 노드 누적 |
 | **Triage·Planner 산출** | 5 | `question_kind`, `target_companies`, `session_carryover`, `plan`, `tasks` | triage(부분) + planner |
 | **Worker 누적** | 5 | `task_results`, `tool_results`, `evidence_chunks`, `graph_subgraph`, `fallback_used` | research / graph / sql / calculator + executor_legacy |
 | **합성** | 3 | `answer`, `citations`, `visualizations` | synthesizer |
-| **검증** | 3 | `validation_status`, `validation_issues`, `grounding` | validator |
+| **검증** | 4 | `validation_status`, `validation_issues`, `grounding`, `replan_hint` | validator / mark_replan |
 | **HITL** | 3 | `pending_interrupt`, `interrupt_response`, `interrupt_handled` | triage(clarification) / planner(cost) / synthesizer(sensitive) |
 | **메타** | 3 | `llm_usage_usd`, `n_replans`, `aborted_reason` | tracing / validator / 모든 노드 |
 
-→ 합 7+4+1+5+5+3+3+3+3 = **34 필드**. 안전 신호만 `_list_extend` (병렬 worker 신호 누적), 나머지는 `_last_wins` reducer (병렬 worker 의 entry-only 필드 충돌 회피).
+→ 합 7+5+1+5+5+3+4+3+3 = **36 필드**. 안전 신호만 `_list_extend`, 누적 채널 (`task_results`/`tool_results`/`evidence_chunks`) 은 dedup-merge reducer, 나머지는 `_last_wins` reducer (병렬 worker 의 entry-only 필드 충돌 회피).
 
-**replan 사이클** — `validator` 실패 → `mark_replan()` 이 `tool_results / evidence_chunks / plan / tasks / answer` 초기화 + `n_replans += 1` → `planner` 재진입 (`validator.py:184-195`). `n_replans >= MAX_REPLANS (=2)` 면 `finalize` 로.
+**replan 사이클** — `validator` 실패 → `mark_replan()` 이 `tool_results / evidence_chunks / plan / tasks / answer` 초기화 + `n_replans += 1` → `planner` 재진입 (`validator.py:187-195`). `n_replans >= MAX_REPLANS (=2)` 면 `finalize` 로.
 
-**도메인 라우팅**: `triage` 노드가 `_domain_handler.auto_detect_domain(question)` 호출 (`_domain_handler.py:246`) → 등록된 라우터 (autograph: `route_domain_auto`, ipgraph: `route_domain_ip`, finance: 코어 기본) 가 순차 평가 → 최초 match 되는 도메인의 `DomainHandler` 가 worker 호출 시 사용됨.
+**도메인 라우팅**: `triage` 노드가 `_domain_handler.auto_detect_domain(question)` 호출 (`_domain_handler.py:246`) → 등록된 라우터 (autograph: `route_domain`, ipgraph: `route_domain_ip`, finance: 코어 기본) 가 순차 평가 → 최초 match 되는 도메인의 `DomainHandler` 가 worker 호출 시 사용됨.
 
 **Tracing**: `agents/tracing.py` `start_turn_context(thread_id, state)` 가 ContextVar 로 turn 단위 격리. cost_tracker 통합 (README §10.17(b)).
 
@@ -312,7 +383,7 @@ flowchart TD
 - **대안 1 — `setuptools entry_points`**: 표준이지만 패키지 설치 (pip install) 필요. 개발·테스트 환경에서 ENV 만 바꾸는 게 빠름. CI/CD 통합 복잡. **기각**.
 - **대안 2 — Hard-coded import (`from autograph import ...`)**: 코어가 도메인을 알아야 함 — 역의존 0건 정책 위배. README §10.15 "core 변경 < 5%" 위배. **기각**.
 - **대안 3 — Plugin discovery via filesystem scan**: `src/*graph/` 패턴 scan. 명시성 부족 (왜 이 도메인이 import 되었는가 불명). **기각**.
-- **선택 = ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV)** — 명시적 (`.env` 에 적힌 도메인만 활성), 운영자 친화적 (KIPRIS 키 없으면 ip 빼면 됨), CI 친화적 (테스트는 finance 만으로 가능). 코드: `_domain_handler.py:130 os.getenv("AUTONEXUSGRAPH_DOMAIN_PLUGINS", DEFAULT_DOMAIN_PLUGINS)`.
+- **선택 = ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (CSV)** — 명시적 (`.env` 에 적힌 도메인만 활성), 운영자 친화적 (KIPRIS 키 없으면 ip 빼면 됨), CI 친화적 (테스트는 finance 만으로 가능). 코드: `_domain_handler.py:133 os.getenv("AUTONEXUSGRAPH_DOMAIN_PLUGINS", DEFAULT_DOMAIN_PLUGINS)`.
 
 **(d) 왜 `_last_wins` reducer (vs append / merge)?**
 
@@ -335,7 +406,7 @@ flowchart TD
 - **단일 한도의 한계**: 한 한도만 두면 (a) 세션 누적은 작은데 한 turn 이 폭주 / (b) 한 turn 은 작은데 세션 누적이 큰 두 실패 모드를 모두 방어 못 함.
 - **각 tier 가 막는 실패 모드**:
   - **세션 hard limit** (`LLM_SESSION_HARD_LIMIT_USD=5.00`, `llm/cost.py:141`) — 영속 누적. 일·주 단위 폭주 차단. cost_log.jsonl 기반.
-  - **도메인별 turn budget** (`config.turn_budget_for_domain`, ENV `LLM_TURN_BUDGET_<DOMAIN>_USD` override) — 한 대화 turn 의 LLM 비용 한도. finance·auto·ip 가 다른 한도 (정형 도메인 ip 는 1/10 수준).
+  - **도메인별 turn budget** (`config.turn_budget_for_domain`, ENV `AGENT_TURN_BUDGET_<DOMAIN>_USD` override) — 한 대화 turn 의 LLM 비용 한도. **현재 모든 도메인 fallback `$0.20` 동일** (`agent_turn_budget_usd`). declared field (`agent_turn_budget_{finance,auto,cross_domain}_usd`) 는 `0.0` → fallback 상속. 도메인별 차등화 필요 시 env 또는 settings field 양수 지정.
   - **호출별 사전 추정** (`agents/cost_estimator.py`) — Rewriter·Synthesizer·Title 각 호출 시작 전 토큰·비용 추정. `LLM_COST_AUTO_APPROVE_USD=0.50` 초과 시 HITL 승인 interrupt.
 - **선택 = 3 tier 직교** — 세 tier 가 직교적 실패 모드를 막음. ENV override 로 도메인·운영 환경별 조정 가능.
 
@@ -352,7 +423,7 @@ flowchart TD
 - **대안 1 — 무한 replan**: validator 가 같은 fail 신호를 반복 보내면 무한 루프 — 비용 폭주.
 - **대안 2 — 1회 (MAX=1)**: 첫 시도 + 1회 재시도 = 총 2회. 한 번 fail 시 부분 답변 반환. 너무 보수적 — multi-hop 질문에서 부분 답변 비율↑.
 - **대안 3 — 5회 이상**: replan_factor 가 6 이상 — 사전 추정 비용 6배. 대부분의 fail 은 2회 이내 회복 (LLM stochasticity + planner 재호출이 같은 question 으로 시작).
-- **선택 = MAX=2** (`validator.py:36`) — 총 3회 synthesizer 호출 (base + 2 replan). 비용 사전 추정 `replan_factor = MAX_REPLANS + 1 = 3` (`cost_estimator.py:100-102`) 으로 최악 시나리오 보장. mark_replan 시 `tool_results / evidence_chunks / plan / tasks / answer` 리셋 + `n_replans += 1` (`validator.py:184-195`).
+- **선택 = MAX=2** (`validator.py:39`) — 총 3회 synthesizer 호출 (base + 2 replan). 비용 사전 추정 `replan_factor = MAX_REPLANS + 1 = 3` (`cost_estimator.py:100-102`) 으로 최악 시나리오 보장. mark_replan 시 `tool_results / evidence_chunks / plan / tasks / answer` 리셋 + `n_replans += 1` (`validator.py:187-195`).
 - **[열린 질문]** planner 가 `validation_issues` 신호를 다음 plan 에 실제로 반영하는지 — replan 의미는 두 시도가 달라야만. (`docs/mental_model.md §5.10` 참조.)
 
 ---
@@ -364,7 +435,7 @@ flowchart TD
 ```
 1. 코어 import 시 (`autonexusgraph.agents._domain_handler` 로드)
    └ discover_plugins() 가 ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` (기본 "autograph") 파싱
-2. 각 모듈명을 `importlib.import_module(name)` 으로 import (한 번만 — `_DISCOVERY_DONE` 플래그 + `_DISCOVERY_LOCK`, `_domain_handler.py:105-106`)
+2. 각 모듈명을 `importlib.import_module(name)` 으로 import (한 번만 — `_DISCOVERY_DONE` 플래그 `_domain_handler.py:105` + `_DISCOVERY_LOCK` 가드 `:127-131`)
 3. 도메인 패키지의 `__init__.py` 가 `from . import agent_handler` 부작용 실행
 4. agent_handler 모듈 import 시 모듈 최상단에서
    `register_handler(AutoHandler())` + `register_handler(CrossDomainHandler())` 호출
@@ -376,7 +447,7 @@ flowchart TD
 코어가 plug-in 을 직접 import 하지 않는데도 plug-in 이 코어를 import 하면 순환 import 가 발생할 수 있다. 본 시스템은 다음 4가지로 회피:
 
 1. **단방향 의존**: plug-in (`autograph`, `ipgraph`) → 코어 (`autonexusgraph`) **만** 허용. 코어 안 어디에서도 `from autograph` / `from ipgraph` 등 plug-in import 금지. 빠른 검증: §9 의 `grep -rn '^from autograph' src/autonexusgraph/` → 0 건.
-2. **지연 import (lazy load)**: `discover_plugins()` 는 코어 모듈 로드 시점이 아니라 **첫 핸들러 조회 시점** 에 호출 (`_domain_handler.py:175 get_handler`). 코어가 import 되는 동안엔 plug-in 이 import 되지 않으므로 cyclic 위험 0.
+2. **지연 import (lazy load)**: `discover_plugins()` 는 코어 모듈 로드 시점이 아니라 **첫 핸들러 조회 시점** 에 호출 (`_domain_handler.py:180 get_handler` → `:186` 에서 `_DISCOVERY_DONE` 미완료 시 discover 트리거). 코어가 import 되는 동안엔 plug-in 이 import 되지 않으므로 cyclic 위험 0.
 3. **idempotent registration**: `register_handler` 가 dict 덮어쓰기 — 동일 모듈이 두 번 import 돼도 안전.
 4. **plug-in 의 `register_handler` import 경로 단순화**: `from autonexusgraph.agents._domain_handler import register_handler` 만 — 코어의 상위 모듈 (`autonexusgraph.agents`) 의 `__init__.py` 를 건드리지 않아 추가 사이드이펙트 없음.
 
@@ -423,6 +494,9 @@ flowchart TD
 | 어댑터 인터페이스 | `eval/adapters/base.py` `AgentResponse` / `Evidence` | base 한 곳 |
 | LangGraph 노드 정의 | `src/autonexusgraph/agents/graph.py` `_build_langgraph_app()` | 코드 한 곳 |
 | Plug-in 등록 정책 | `src/autonexusgraph/agents/_domain_handler.py` | ENV + 한 곳 |
+| DB namespace 토큰·헬퍼 | `config.py` `app_namespace` / `pg_schema()` / `neo4j_label()`; `db/qdrant.collection_name()` | env `APP_NAMESPACE` 한 곳 (§4.4) |
+| Neo4j 세션(격리 db) | `src/autonexusgraph/db/neo4j.py:get_session()` | 모든 세션 진입점 |
+| DB namespace 마이그레이션 | `scripts/migrate/relabel_neo4j_namespace.py` · `rename_pg_schemas_namespace.sql` | 기존 적재 DB 1회 이동 |
 
 ---
 
@@ -430,13 +504,13 @@ flowchart TD
 
 | 문서 | 라인 수 | 분담 |
 |---|---:|---|
-| README.md | ~1440 | **통합 SSOT v3.0** — 정량 수치 + 요구사항 + DoD 20항 + 로드맵 + 의사결정 로그 + Quickstart |
-| **docs/architecture.md (본 문서)** | ~420 | **구조 SSOT** — 패키지/노드/SSOT 색인 |
-| docs/autograph.md | ~590 | 도메인2 (auto) 단독 SSOT |
-| docs/process_graph.md | ~110 | 도메인2-심화 (process BoP, 주요 축) 단독 SSOT |
-| docs/ipgraph.md | ~265 | 도메인3 (ip 보조축) 단독 SSOT |
+| README.md | ~1470 | **통합 SSOT v3.0** — 정량 수치 + 요구사항 + DoD 20항 + 로드맵 + 의사결정 로그 + Quickstart |
+| **docs/architecture.md (본 문서)** | ~525 | **구조 SSOT** — 패키지/계층/노드/namespace 격리/SSOT 색인 |
+| docs/autograph.md | ~695 | 도메인2 (auto) 단독 SSOT |
+| docs/process_graph.md | ~115 | 도메인2-심화 (process BoP, 주요 축) 단독 SSOT |
+| docs/ipgraph.md | ~285 | 도메인3 (ip 보조축) 단독 SSOT |
 | docs/mental_model.md | ~1150 | 결정·트레이드오프·열린 질문 |
-| docs/learning_guide.md | ~1830 | 이론 (BGE/HNSW/LangGraph/리랭커) + 세미나 Q&A |
+| docs/learning_guide.md | ~1940 | 이론 (BGE/HNSW/LangGraph/리랭커) + 세미나 Q&A |
 | docs/data_sources.md | ~495 | 외부 데이터 소스 카탈로그 |
 | docs/operations/* | — | 운영 절차 (migrations / docker / agents / rag_tools) |
 

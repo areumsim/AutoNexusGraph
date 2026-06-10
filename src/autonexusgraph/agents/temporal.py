@@ -23,12 +23,11 @@ import logging
 import os
 import re
 from datetime import date, datetime
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-def _resolve_reference_date(reference_date: Optional[date] = None) -> date:
+def _resolve_reference_date(reference_date: date | None = None) -> date:
     if reference_date is not None:
         return reference_date
     raw = os.getenv("FINGRAPH_REFERENCE_DATE", "").strip()
@@ -65,7 +64,7 @@ _RANGE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 def normalize_temporal_terms(
     question: str,
     *,
-    reference_date: Optional[date] = None,
+    reference_date: date | None = None,
 ) -> tuple[str, dict]:
     """질문 안의 상대 시간 표현을 절대 연도로 치환.
 
@@ -126,7 +125,7 @@ def normalize_temporal_terms(
     return rewritten, audit
 
 
-def extract_year_hint(question: str, *, reference_date: Optional[date] = None) -> Optional[int]:
+def extract_year_hint(question: str, *, reference_date: date | None = None) -> int | None:
     """질문에서 단일 연도 힌트 추출 (planner.get_revenue year= 용).
 
     우선순위: (1) 정규화가 적용된 경우 audit.year_to ← 사용자의 의도가 명백한 상대 시점.

@@ -7,13 +7,13 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS ip;
+CREATE SCHEMA IF NOT EXISTS anxg_ip;
 
 COMMENT ON SCHEMA ip IS
   'IPGraph 도메인 (도메인3) — 특허·기술혁신. docs/ipgraph.md SSOT';
 
 -- ── Patents ─────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ip.patents (
+CREATE TABLE IF NOT EXISTS anxg_ip.patents (
     pub_no            VARCHAR PRIMARY KEY,            -- 'KR1020230012345' / 'US11234567B2'
     app_no            VARCHAR,                        -- 출원번호
     title             TEXT,
@@ -28,14 +28,14 @@ CREATE TABLE IF NOT EXISTS ip.patents (
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_patents_filing_date
-    ON ip.patents(filing_date) WHERE filing_date IS NOT NULL;
+    ON anxg_ip.patents(filing_date) WHERE filing_date IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_patents_jurisdiction
-    ON ip.patents(jurisdiction);
+    ON anxg_ip.patents(jurisdiction);
 CREATE INDEX IF NOT EXISTS idx_patents_source
-    ON ip.patents(source);
+    ON anxg_ip.patents(source);
 
 -- ── Assignees ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ip.assignees (
+CREATE TABLE IF NOT EXISTS anxg_ip.assignees (
     assignee_id       VARCHAR PRIMARY KEY,            -- USPTO assignee_id 또는 KIPRIS applicantNo
     name              TEXT NOT NULL,
     name_norm         TEXT,                           -- normalize (lowercase, 공백/기호 제거)
@@ -47,14 +47,14 @@ CREATE TABLE IF NOT EXISTS ip.assignees (
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_assignees_name_norm
-    ON ip.assignees(name_norm) WHERE name_norm IS NOT NULL;
+    ON anxg_ip.assignees(name_norm) WHERE name_norm IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_assignees_country
-    ON ip.assignees(country) WHERE country IS NOT NULL;
+    ON anxg_ip.assignees(country) WHERE country IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_assignees_qid
-    ON ip.assignees(wikidata_qid) WHERE wikidata_qid IS NOT NULL;
+    ON anxg_ip.assignees(wikidata_qid) WHERE wikidata_qid IS NOT NULL;
 
 -- ── Inventors ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ip.inventors (
+CREATE TABLE IF NOT EXISTS anxg_ip.inventors (
     inventor_id       VARCHAR PRIMARY KEY,
     name              TEXT NOT NULL,
     name_norm         TEXT,
@@ -63,54 +63,54 @@ CREATE TABLE IF NOT EXISTS ip.inventors (
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_inventors_name_norm
-    ON ip.inventors(name_norm) WHERE name_norm IS NOT NULL;
+    ON anxg_ip.inventors(name_norm) WHERE name_norm IS NOT NULL;
 
 -- ── Patent ↔ Assignee / Inventor (다대다) ───────────────────────
-CREATE TABLE IF NOT EXISTS ip.patent_assignees (
-    pub_no            VARCHAR NOT NULL REFERENCES ip.patents(pub_no) ON DELETE CASCADE,
-    assignee_id       VARCHAR NOT NULL REFERENCES ip.assignees(assignee_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS anxg_ip.patent_assignees (
+    pub_no            VARCHAR NOT NULL REFERENCES anxg_ip.patents(pub_no) ON DELETE CASCADE,
+    assignee_id       VARCHAR NOT NULL REFERENCES anxg_ip.assignees(assignee_id) ON DELETE CASCADE,
     sequence          INT,                            -- order in patent
     PRIMARY KEY (pub_no, assignee_id)
 );
 CREATE INDEX IF NOT EXISTS idx_patent_assignees_assignee
-    ON ip.patent_assignees(assignee_id);
+    ON anxg_ip.patent_assignees(assignee_id);
 
-CREATE TABLE IF NOT EXISTS ip.patent_inventors (
-    pub_no            VARCHAR NOT NULL REFERENCES ip.patents(pub_no) ON DELETE CASCADE,
-    inventor_id       VARCHAR NOT NULL REFERENCES ip.inventors(inventor_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS anxg_ip.patent_inventors (
+    pub_no            VARCHAR NOT NULL REFERENCES anxg_ip.patents(pub_no) ON DELETE CASCADE,
+    inventor_id       VARCHAR NOT NULL REFERENCES anxg_ip.inventors(inventor_id) ON DELETE CASCADE,
     sequence          INT,
     PRIMARY KEY (pub_no, inventor_id)
 );
 CREATE INDEX IF NOT EXISTS idx_patent_inventors_inventor
-    ON ip.patent_inventors(inventor_id);
+    ON anxg_ip.patent_inventors(inventor_id);
 
 -- ── CPC 분류 체계 (depth ≥ 4: section/class/subclass/maingroup/subgroup) ──
-CREATE TABLE IF NOT EXISTS ip.cpc_scheme (
+CREATE TABLE IF NOT EXISTS anxg_ip.cpc_scheme (
     code              VARCHAR PRIMARY KEY,            -- 'H01M', 'H01M 10/052', etc.
     level             VARCHAR(16) NOT NULL,           -- 'section'|'class'|'subclass'|'maingroup'|'subgroup'
     title             TEXT,
-    parent_code       VARCHAR REFERENCES ip.cpc_scheme(code) ON DELETE SET NULL,
+    parent_code       VARCHAR REFERENCES anxg_ip.cpc_scheme(code) ON DELETE SET NULL,
     snapshot_year     INT,
     schema_version    VARCHAR,
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_cpc_scheme_parent
-    ON ip.cpc_scheme(parent_code) WHERE parent_code IS NOT NULL;
+    ON anxg_ip.cpc_scheme(parent_code) WHERE parent_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_cpc_scheme_level
-    ON ip.cpc_scheme(level);
+    ON anxg_ip.cpc_scheme(level);
 
-CREATE TABLE IF NOT EXISTS ip.patent_cpc (
-    pub_no            VARCHAR NOT NULL REFERENCES ip.patents(pub_no) ON DELETE CASCADE,
-    cpc_code          VARCHAR NOT NULL REFERENCES ip.cpc_scheme(code) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS anxg_ip.patent_cpc (
+    pub_no            VARCHAR NOT NULL REFERENCES anxg_ip.patents(pub_no) ON DELETE CASCADE,
+    cpc_code          VARCHAR NOT NULL REFERENCES anxg_ip.cpc_scheme(code) ON DELETE CASCADE,
     primary_flag      BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (pub_no, cpc_code)
 );
 CREATE INDEX IF NOT EXISTS idx_patent_cpc_code
-    ON ip.patent_cpc(cpc_code);
+    ON anxg_ip.patent_cpc(cpc_code);
 
 -- ── Citations ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ip.citations (
-    citing_pub_no     VARCHAR NOT NULL REFERENCES ip.patents(pub_no) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS anxg_ip.citations (
+    citing_pub_no     VARCHAR NOT NULL REFERENCES anxg_ip.patents(pub_no) ON DELETE CASCADE,
     cited_pub_no      VARCHAR NOT NULL,               -- cited patent may be outside our adapter scope — no FK
     citation_type     VARCHAR(8),                     -- 'A' (applicant) / 'X' (examiner) / 'P' (patent) ...
     snapshot_year     INT,
@@ -118,9 +118,9 @@ CREATE TABLE IF NOT EXISTS ip.citations (
     PRIMARY KEY (citing_pub_no, cited_pub_no)
 );
 CREATE INDEX IF NOT EXISTS idx_citations_cited
-    ON ip.citations(cited_pub_no);
+    ON anxg_ip.citations(cited_pub_no);
 
-COMMENT ON TABLE ip.patents IS 'IPGraph 도메인 Patent 마스터 — USPTO ODP / KIPRIS / OpenAlex 합집합';
-COMMENT ON TABLE ip.assignees IS '특허 출원인 — corp_entity 브리지 진입점 (ip.assignee_corp_map join)';
-COMMENT ON TABLE ip.cpc_scheme IS 'CPC 분류 계층 (depth ≥ 4). 무인증 bulk (USPTO/EPO)';
-COMMENT ON TABLE ip.citations IS '특허 인용 네트워크. USPTO ODP citations bulk';
+COMMENT ON TABLE anxg_ip.patents IS 'IPGraph 도메인 Patent 마스터 — USPTO ODP / KIPRIS / OpenAlex 합집합';
+COMMENT ON TABLE anxg_ip.assignees IS '특허 출원인 — corp_entity 브리지 진입점 (anxg_ip.assignee_corp_map join)';
+COMMENT ON TABLE anxg_ip.cpc_scheme IS 'CPC 분류 계층 (depth ≥ 4). 무인증 bulk (USPTO/EPO)';
+COMMENT ON TABLE anxg_ip.citations IS '특허 인용 네트워크. USPTO ODP citations bulk';

@@ -1,6 +1,6 @@
 """전체 적재 — companies → filings → financials 순.
 
-순서가 중요한 이유: filings/financials 에 corp_code FK 가 master.companies 를 참조.
+순서가 중요한 이유: filings/financials 에 corp_code FK 가 anxg_master.companies 를 참조.
 """
 from __future__ import annotations
 

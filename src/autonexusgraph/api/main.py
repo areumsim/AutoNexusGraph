@@ -1,9 +1,11 @@
 """FastAPI 진입점 — 에이전트 채팅 API.
 
 엔드포인트:
-- POST /chat                : 단일 turn 실행 → 답변 + 인용 + 비용
-- GET  /threads/{id}        : 대화 히스토리 조회 (PG chat.messages)
-- POST /threads/{id}/message: 멀티턴 — history 자동 주입
+- POST /chat         : 단일 turn 실행 → 답변 + 인용 + 비용 (use_history=True 면 멀티턴 자동 주입)
+- POST /chat/stream  : SSE — 노드 진입마다 partial state, 마지막 data: [DONE]
+- POST /chat/resume  : HITL interrupt 후 사용자 응답으로 graph 재개 (SSE)
+- GET  /threads/{id} : 대화 히스토리 조회 (PG anxg_chat.messages, 소유자만)
+- GET  /health       : PG/Neo4j ping (인증 없음)
 
 응답 메타에 cost_usd / tokens 포함 (사용자 명시 — 모든 호출 비용 가시화).
 
@@ -21,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -38,18 +41,22 @@ from .auth import authenticate
 
 log = logging.getLogger(__name__)
 
+# settings.log_level 적용 — 미설정 시 app INFO 로그(history/worker/cost)가 표면화 안 됨.
+from ..logging_setup import configure_logging  # noqa: E402
+
+configure_logging()
 
 app = FastAPI(title="AutoNexusGraph Agent API", version="0.1")
 
 
-def _hop_fields(state: dict) -> dict:
+def _hop_fields(state: Mapping[str, Any]) -> dict:
     """E-3 — per-turn trace 에 hop_count / tool_sequence 부착 (fail-soft)."""
     try:
         h = trace_hop_summary(state)
         return {"hop_count": h["hop_count"],
                 "max_hop_depth": h["max_hop_depth"],
                 "tool_sequence": h["tool_sequence"]}
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — [main] fail-soft 흡수 → {} 반환
         return {}
 
 
@@ -83,11 +90,11 @@ def chat(req: ChatRequest, user_id: str = Depends(authenticate)) -> ChatResponse
     try:
         state = run_agent(req.message, thread_id=req.thread_id,
                           history=history, domain=req.domain)
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — agent 실패 → HTTP 500 (HTTPException, raise)
         log.exception("[chat] agent failed")
-        raise HTTPException(500, f"agent failed: {e}")
+        raise HTTPException(500, f"agent failed: {e}") from e
 
-    # PG chat.messages 에 user + assistant 두 turn 적재
+    # PG anxg_chat.messages 에 user + assistant 두 turn 적재
     _persist_turn(req.thread_id, "user", req.message, citations=None, trace=None,
                    user_id=user_id)
     _persist_turn(req.thread_id, "assistant", state.get("answer", ""),
@@ -173,7 +180,7 @@ def chat_stream(req: ChatRequest, user_id: str = Depends(authenticate)) -> Strea
                                           **_hop_fields(st)})
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [chat_stream] failed 흡수 → StreamingResponse( 반환
             log.exception("[chat_stream] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
@@ -236,7 +243,7 @@ def chat_resume(req: ResumeRequest, user_id: str = Depends(authenticate)) -> Str
                    "error": f"resume_unavailable: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [chat_resume] failed 흡수 → StreamingResponse( 반환
             log.exception("[chat_resume] failed")
             err = {"node": "__error__", "error": f"{type(exc).__name__}: {exc}"}
             yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
@@ -266,14 +273,14 @@ def health() -> dict:
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT 1")
         out["postgres"] = "ok"
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — PG ping 실패 → health response 에 error 표기
         out["postgres"] = f"error: {e}"
     try:
-        from ..db.neo4j import get_driver
-        with get_driver().session() as s:
+        from ..db.neo4j import get_session
+        with get_session() as s:
             s.run("RETURN 1").consume()
         out["neo4j"] = "ok"
-    except Exception as e:
+    except Exception as e:   # noqa: BLE001 — Neo4j ping 실패 → health response 에 error 표기
         out["neo4j"] = f"error: {e}"
     return out
 
@@ -282,7 +289,7 @@ def health() -> dict:
 def _fetch_conv_owner(thread_id: str) -> tuple[bool, str | None]:
     """(존재여부, user_id). 분리된 함수 — 테스트에서 monkeypatch 용이."""
     with get_pool().connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT user_id FROM chat.conversations WHERE thread_id = %s",
+        cur.execute("SELECT user_id FROM anxg_chat.conversations WHERE thread_id = %s",
                     (thread_id,))
         row = cur.fetchone()
     if row is None:
@@ -309,10 +316,10 @@ def _load_history(thread_id: str, limit: int = 20) -> list[dict]:
     """이전 메시지 N 개. user/assistant 만 (system 제외)."""
     sql = """
     WITH conv AS (
-      SELECT id FROM chat.conversations WHERE thread_id = %s
+      SELECT id FROM anxg_chat.conversations WHERE thread_id = %s
     )
     SELECT role, content, citations, agent_trace, created_at
-      FROM chat.messages m
+      FROM anxg_chat.messages m
       JOIN conv c ON m.conversation_id = c.id
      WHERE m.role IN ('user', 'assistant')
      ORDER BY turn_idx DESC
@@ -325,6 +332,8 @@ def _load_history(thread_id: str, limit: int = 20) -> list[dict]:
             out.append({"role": role, "content": content,
                          "citations": citations or [], "agent_trace": trace or {},
                          "created_at": created.isoformat() if created else None})
+    log.info("[history] thread=%s loaded=%d msgs (src=PG anxg_chat.messages, limit=%d)",
+             thread_id, len(out), limit)
     return list(reversed(out))
 
 
@@ -338,16 +347,16 @@ def _persist_turn(thread_id: str, role: str, content: str,
     legacy NULL 소유자만 claim (COALESCE).
     """
     sql_conv = """
-    INSERT INTO chat.conversations (thread_id, user_id)
+    INSERT INTO anxg_chat.conversations (thread_id, user_id)
     VALUES (%s, %s)
     ON CONFLICT (thread_id) DO UPDATE
       SET updated_at = now(),
-          user_id = COALESCE(chat.conversations.user_id, EXCLUDED.user_id)
+          user_id = COALESCE(anxg_chat.conversations.user_id, EXCLUDED.user_id)
     RETURNING id
     """
-    sql_max_turn = "SELECT coalesce(max(turn_idx), -1) + 1 FROM chat.messages WHERE conversation_id = %s"
+    sql_max_turn = "SELECT coalesce(max(turn_idx), -1) + 1 FROM anxg_chat.messages WHERE conversation_id = %s"
     sql_insert = """
-    INSERT INTO chat.messages
+    INSERT INTO anxg_chat.messages
       (conversation_id, turn_idx, role, content, citations, agent_trace)
     VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
     ON CONFLICT (conversation_id, turn_idx, role) DO NOTHING
