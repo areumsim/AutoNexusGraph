@@ -152,11 +152,12 @@ def _neo4j_load(seed: dict, snapshot_year: int,
     """Material/Mineral 노드 + DERIVED_FROM 엣지 적재. (있으면) Module-MADE_OF-Material."""
     # cartesian-product performance INFO 노티는 unique key 매칭이라 무해 — 묵음.
     logging.getLogger("neo4j.notifications").setLevel(logging.WARNING)
-    from neo4j import GraphDatabase
-    uri  = os.environ["NEO4J_URI"]
-    user = os.environ.get("NEO4J_USER", "neo4j")
-    pw   = os.environ["NEO4J_PASSWORD"]
-    drv = GraphDatabase.driver(uri, auth=(user, pw))
+    # 프로젝트 표준 Neo4j 연결 — config(.env) 경유 + 싱글톤 driver.
+    # (과거 raw os.environ["NEO4J_URI"] 직접 읽어 셸 미export 시 KeyError 버그.
+    #  load_materials_metals 등 다른 로더와 동일 패턴으로 정합.)
+    from autonexusgraph.config import get_settings
+    from autonexusgraph.db.neo4j import get_driver
+    drv = get_driver()
 
     stats = {
         "materials_merged": 0,
@@ -165,7 +166,7 @@ def _neo4j_load(seed: dict, snapshot_year: int,
         "made_of_merged":   0,
     }
     try:
-        with drv.session(database=os.environ.get("NEO4J_DATABASE") or None) as s:
+        with drv.session(database=get_settings().neo4j_database or None) as s:
             for q in _CONSTRAINTS_CYPHER:
                 s.run(q)
 
@@ -249,7 +250,8 @@ def _neo4j_load(seed: dict, snapshot_year: int,
                     rec = res.single()
                     stats["made_of_merged"] += rec.get("n", 0) if rec else 0
     finally:
-        drv.close()
+        # get_driver() 는 @lru_cache 싱글톤 — 다른 호출자와 공유하므로 close 하지 않음.
+        pass
     return stats
 
 
