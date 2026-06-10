@@ -175,6 +175,11 @@ class Settings(BaseSettings):
     agent_max_replan: int = 2
     agent_query_budget_sec: int = 40
     agent_max_answer_len: int = 5000
+    # 대화형 interrupt(HITL) 허용 여부. True=API/UI(clarification·cost 승인 가능).
+    # False=batch/eval/cron(재개 불가) → request_interrupt 가 InterruptUnavailable 로
+    # 다운그레이드 → 호출부가 1순위 자동선택 등 폴백. (eval 에서 모호 회사명 질문이
+    # langgraph interrupt 로 멈춰 빈 답 나가던 버그 차단 — AGENT_ALLOW_INTERRUPTS=false.)
+    agent_allow_interrupts: bool = True
     # 축2: LLM 자율 planner (plan-and-execute). True 면 planner 가 LLM 으로 task DAG 를
     # 제안하고 화이트리스트 검증 후 사용 — 실패/빈결과 시 기존 룰·handler 로 폴백.
     # 기본 False (opt-in) — 룰 planner 가 검증된 안전 기본값.

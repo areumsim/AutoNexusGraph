@@ -104,11 +104,17 @@ def test_specs_unique_by_name():
     assert len(names) == len(set(names))     # finance 와 auto 사이 중복 없음 보장
 
 
-def test_finance_lookup_company_required_query():
+def test_finance_lookup_company_accepts_query_or_corp_code():
+    """lookup_company 는 query 또는 corp_code(별칭) 로 회사 식별 — 둘 다 schema 노출.
+
+    (LLM planner 가 회사를 corp_code 로 식별해 호출하는 경로를 흡수하기 위해 corp_code
+    를 query 별칭으로 받는다. 따라서 query 는 더 이상 단독 required 가 아니다.)
+    """
     specs = {s.name: s for s in build_tool_manifest("finance")}
     if "lookup_company" in specs:
-        s = specs["lookup_company"]
-        assert "query" in s.input_schema.get("required", [])
+        props = specs["lookup_company"].input_schema.get("properties", {})
+        assert "query" in props
+        assert "corp_code" in props
 
 
 # ── fail-soft: server module SDK 미설치 시 ───────────────────────

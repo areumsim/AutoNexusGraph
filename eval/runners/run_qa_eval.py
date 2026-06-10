@@ -597,6 +597,10 @@ def write_per_question_csv(per_q: list[dict], out_path: Path) -> None:
 
 # ─── main ───────────────────────────────────────────────────
 def main() -> int:
+    # eval 은 본질상 비대화형 — 모호 회사명 질문이 langgraph interrupt 로 멈춰 빈 답이
+    # 나가지 않도록 interrupt 를 끈다(호출부가 1순위 자동선택 폴백). get_settings 캐시
+    # 전에 설정해야 반영. 운영자가 명시 export 하면 그 값 우선(setdefault).
+    os.environ.setdefault("AGENT_ALLOW_INTERRUPTS", "false")
     parser = argparse.ArgumentParser()
     parser.add_argument("--gold", type=Path, required=True)
     parser.add_argument("--adapters", default="vector,graph,hybrid,sql_vec")

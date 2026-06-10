@@ -55,7 +55,19 @@ def request_interrupt(payload: InterruptPayload) -> Any:
     """LangGraph interrupt 호출. 응답을 반환 (resume 값).
 
     langgraph 미설치 / fallback chain → InterruptUnavailable raise.
+
+    비대화형(batch/eval/cron, ``agent_allow_interrupts=False``) 에서는 langgraph
+    runnable context 안이어도 interrupt() 로 멈추지 않고 InterruptUnavailable 로
+    다운그레이드 — 호출부가 1순위 자동선택 등으로 우아하게 진행한다.
     """
+    try:
+        from ..config import get_settings
+        if not get_settings().agent_allow_interrupts:
+            raise InterruptUnavailable("interrupts 비활성 (비대화형 모드)")
+    except InterruptUnavailable:
+        raise
+    except Exception:   # noqa: BLE001 — config 로드 실패 흡수 → 기존 동작(대화형) 유지
+        pass
     try:
         from langgraph.types import interrupt  # type: ignore[import-not-found]
     except ImportError:
