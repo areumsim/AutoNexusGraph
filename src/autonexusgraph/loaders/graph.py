@@ -63,7 +63,9 @@ CYPHER_CEOS = f"""
 UNWIND $rows AS r
 MATCH (c:Anxg_Company {{corp_code: r.corp_code}})
 UNWIND r.ceos AS name
-MERGE (p:Anxg_Person {{name: name}})
+// Person 자연키 = (name, birth_year). CEO 명단엔 birth_year 가 없어 -1 로 정규화 —
+// graph_structural.py 의 (name, birth_year) 규약 + person_name_birth_unique 제약과 정합.
+MERGE (p:Anxg_Person {{name: name, birth_year: -1}})
 ON CREATE SET p.source = 'dart_ceo'
 MERGE (c)-[rel:HAS_CEO]->(p)
 SET rel.source = 'dart',
@@ -78,7 +80,9 @@ CYPHER_INDEXES = [
     "CREATE INDEX market_name       IF NOT EXISTS FOR (m:Anxg_Market)   ON (m.name)",
     "CREATE INDEX industry_code     IF NOT EXISTS FOR (s:Anxg_Industry) ON (s.code)",
     "CREATE INDEX person_name       IF NOT EXISTS FOR (p:Anxg_Person)   ON (p.name)",
-    "CREATE INDEX person_name_birth IF NOT EXISTS FOR (p:Anxg_Person)   ON (p.name, p.birth_year)",
+    # (name, birth_year) UNIQUE 제약 — MERGE 원자성 보장(제약 없으면 배치 MERGE 가 중복 노드 생성).
+    # ⚠️ 레거시 중복 DB 에선 먼저 scripts/migrate/dedup_persons_neo4j.py --apply 로 dedup 후 생성됨.
+    "CREATE CONSTRAINT person_name_birth_unique IF NOT EXISTS FOR (p:Anxg_Person) REQUIRE (p.name, p.birth_year) IS UNIQUE",
     "CREATE INDEX newsevent_hash    IF NOT EXISTS FOR (n:Anxg_NewsEvent) ON (n.article_hash)",
     "CREATE INDEX group_name        IF NOT EXISTS FOR (g:Anxg_Group)    ON (g.name)",
 ]
