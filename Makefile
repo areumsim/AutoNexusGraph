@@ -876,6 +876,18 @@ load-dart-production-no-neo4j:
 audit-data-channels:
 	$(PYTHON) scripts/audit/data_channels.py
 
+# 문서·코드 정합성 감사 — drift 회귀 가드.
+# 측정: AgentState 필드 / 도메인별 .py / gold QA row / PRD § 잔재 / MCP tools
+# baseline: docs/audit_baseline.json (의도된 변경 시 --update-baseline 로 갱신)
+audit-docs:
+	PYTHONPATH=src $(PYTHON) scripts/audit_docs.py
+
+audit-docs-strict:                                   # CI 용 — drift 시 exit 1
+	PYTHONPATH=src $(PYTHON) scripts/audit_docs.py --strict
+
+audit-docs-update:                                   # 의도된 변경 후 baseline 갱신
+	PYTHONPATH=src $(PYTHON) scripts/audit_docs.py --update-baseline
+
 # ── OEM IR/뉴스룸 — 사용자 명시 P1 (B2). 약관 준수 crawler ──────
 # robots.txt + ToS 게이트 (_license.OEM_NEWSROOM_POLICY). Kia 한국은
 # robots.txt Disallow 라 active=False — 기본 비활성. 키 불필요.
