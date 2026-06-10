@@ -1,8 +1,8 @@
 {
-  "agent_state_fields": 36,
+  "agent_state_fields": 39,
   "py_per_domain": {
-    "autonexusgraph": 107,
-    "autograph": 97,
+    "autonexusgraph": 112,
+    "autograph": 104,
     "ipgraph": 21,
     "common": 2
   },
@@ -13,8 +13,8 @@
     "gold_qa_v0": 30
   },
   "prd_refs": {
-    "src": 174,
-    "docs": 67
+    "src": 180,
+    "docs": 59
   },
-  "mcp_tools": 59
+  "mcp_tools": 78
 }
