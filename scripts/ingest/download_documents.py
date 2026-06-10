@@ -1,6 +1,6 @@
 """DART 사업보고서 본문 zip 다운로드.
 
-PG fin.filings 를 source-of-truth 로 사용 (이미 적재된 메타 기반).
+PG anxg_fin.filings 를 source-of-truth 로 사용 (이미 적재된 메타 기반).
 사업보고서만 필터 (`report_nm LIKE '%사업보고서%'`).
 
 저장:
@@ -94,7 +94,7 @@ def main() -> int:
     with psycopg.connect(s.postgres_dsn) as conn, conn.cursor() as cur:
         sql = """
             SELECT corp_code, rcept_no, report_nm
-            FROM fin.filings
+            FROM anxg_fin.filings
             WHERE report_nm LIKE %s
               AND EXTRACT(YEAR FROM rcept_dt) BETWEEN %s AND %s
             ORDER BY rcept_dt DESC, corp_code
@@ -159,7 +159,7 @@ def main() -> int:
     bytes_total = 0
 
     with DartClient(api_key=s.dart_api_key, rate_limit_per_sec=s.ingest_rate_limit_per_sec) as client:
-        for corp_code, rcept_no, report_nm in tqdm(targets, desc="documents", unit="rpt"):
+        for corp_code, rcept_no, _report_nm in tqdm(targets, desc="documents", unit="rpt"):
             if stop["flag"]:
                 break
             zip_path = _zip_path(out_dir, corp_code, rcept_no)
@@ -181,7 +181,7 @@ def main() -> int:
                 tmp.rename(zip_path)
                 summary["ok"] += 1
                 bytes_total += len(content)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [docs] document download 실패 흡수 → failed.txt 기록 + 다음 (corp, rcept) 진행
                 _append_failed(out_dir, corp_code, rcept_no, str(e))
                 summary["fail"] += 1
             call_count += 1

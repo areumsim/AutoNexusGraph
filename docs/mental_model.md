@@ -66,7 +66,7 @@ finance 단독으로 검증된 AutoNexusGraph 의 한계 (구 PRD.md §1.1 → R
 
 `README:3` 의 정의를 그대로 인용:
 
-> 자동차 제품·부품·리콜·공급망 (auto) + 한국 상장사 공시·재무 (finance) 두 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 멀티도메인 GraphRAG 에이전트.
+> 자동차 제품·부품·리콜·공급망 (auto) + 한국 상장사 공시·재무 (finance) 두 도메인을 그래프·정형·벡터 하이브리드로 추론하고, `anxg_bridge.corp_entity` 로 Cross-Domain 까지 한 turn 안에 묶는 멀티도메인 GraphRAG 에이전트.
 
 [확정] 사용자 시나리오 예시 (README §1 + §11.3 추론 가치):
 
@@ -101,24 +101,24 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 ## 2. 핵심 개념·추상화 — 이걸 모르면 코드가 안 읽힌다
 
-이 절은 **개념 사전**이다. 코드를 읽기 전에 한 번 통독하면, `master.entities` 가 등장했을 때 무슨 의미인지 모르고 헤매지 않게 된다.
+이 절은 **개념 사전**이다. 코드를 읽기 전에 한 번 통독하면, `anxg_master.entities` 가 등장했을 때 무슨 의미인지 모르고 헤매지 않게 된다.
 
 ### 2.1 Domain 개념 (그래프·데이터 모델 측)
 
-#### 2.1.1 Entity Resolution 마스터 (`master.entities` + `master.entity_map`)
+#### 2.1.1 Entity Resolution 마스터 (`anxg_master.entities` + `anxg_master.entity_map`)
 
 - **정의**: 모든 엔티티(법인·차량·부품·인물 등)에 단일 ID 공간을 부여하는 SSOT.
 - **왜 필요**: 같은 회사가 DART 의 `corp_code`, Wikidata 의 `QID`, GLEIF 의 `LEI`, NHTSA 의 `manufacturer_id` 등 여러 식별자를 가짐. 도메인 간 join 을 위해 통합 키 필요.
 - **위치**: v2.1 에서 `corp_code` 단일 중심키 → `entity_id + entity_type` 다형 키로 일반화 (README §3.4 ER 마스터 + §3.4.1 마이그레이션 1:1 매핑). 스키마 파일은 `infra/postgres/init/*.sql`.
-- **확장 인덱스 테이블**: `master.entity_map` 에 ticker / QID / LEI / CIK / ISIN / 사업자번호 / 법인등록번호 / NHTSA mfr_id / wikipedia_title 등을 매핑 (`README §1.1`).
+- **확장 인덱스 테이블**: `anxg_master.entity_map` 에 ticker / QID / LEI / CIK / ISIN / 사업자번호 / 법인등록번호 / NHTSA mfr_id / wikipedia_title 등을 매핑 (`README §1.1`).
 - [확정] v2.1 에서 entity_id 다형 키 도입.
 - [잠정] 현재 finance 엔티티(Company) 와 auto 엔티티(Manufacturer/Supplier) 의 entity_type 분리 — 인물(Person) 통합 여부는 미정 (auto 측 인물 엔티티가 없음).
 - **열린 질문**: ER 마스터의 변경 이력(corp_code 재부여, jurir_no 변경) 추적 정책. 현재 `snapshot_year` 로만 시점 분리.
 
-#### 2.1.2 Bridge (`bridge.corp_entity`)
+#### 2.1.2 Bridge (`anxg_bridge.corp_entity`)
 
 - **정의**: 두 도메인의 ID 를 묶는 다리. `corp_code (finance) ↔ entity_id (auto)` 매칭 테이블.
-- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (README §3.5 Bridge 일반화 명세, `docs/autograph.md §3`, `src/autograph/loaders/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
+- **매칭 우선순위**: Wikidata QID > LEI > 사업자번호 > 이름 (README §3.5 Bridge 일반화 명세, `docs/autograph.md §3`, `src/autograph/loaders/master/load_bridge.py`). 별도로 `sec_cik` 컬럼이 글로벌 OEM 진입점 — `bridge_sec_cik_to_entity` (`src/autograph/tools/bridge.py:64`).
 - **신뢰도 라벨링**: 자동 매칭은 `candidate`. 사람이 검토하면 `reviewed` / `rejected`. 신뢰도 0.95 (QID 일치 시) 부터 시작. `match_method` 6종 enum: `qid_exact | lei_exact | business_no_exact | corp_code_exact | fuzzy_name | manual` (README §3.5 SQL schema).
 - **현황** (`README §1.1`): **4,806 행** — manufacturer cand 1 + rev 11 + supplier cand 4,790 + rev 4. `strong_match` (confidence ≥ 0.9) = 15/15 = 100%.
 - [확정] Bridge 분리 테이블 도입 — 도메인 직접 FK 가 아닌 별도 테이블에 confidence·reviewed_status·source_type 보유.
@@ -188,7 +188,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 | **pgvector / Qdrant** | 의미·서술 | "삼성전자의 주요 사업 위험 요인은?" |
 
 - [확정 / 핵심 원칙] **재무 수치는 절대 LLM 이 생성하지 않는다 — 반드시 PostgreSQL 조회 결과만 사용** (`README:110`). 이 원칙은 `agents/number_guard.py` 의 pre-synth 가드가 강제.
-- [확정] PG 가 SSOT, Neo4j 는 관계의 그래프 미러 (BOM·자회사 관계 등). `vec.chunks` 는 PG 안에 (pgvector) — 100만 청크 이하면 Qdrant 분리 안 함.
+- [확정] PG 가 SSOT, Neo4j 는 관계의 그래프 미러 (BOM·자회사 관계 등). `anxg_vec.chunks` 는 PG 안에 (pgvector) — 100만 청크 이하면 Qdrant 분리 안 함.
 - **열린 질문**: 청크가 100만 넘으면 Qdrant 분리 — 운영 분기 시점·절차 (`README §3` 의 "(옵션) Qdrant" 가 [잠정]).
 
 ### 2.2 Code / Architecture 개념
@@ -230,7 +230,7 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 
 #### 2.2.3 사전 정의 도구 풀 — LLM 의 권한 경계
 
-- **정의**: LLM 은 함수명 + 파라미터만 결정. SQL/Cypher 직접 생성 금지 (`docs/operations/agents.md (구 PRD §7.5).10`, `README:160`).
+- **정의**: LLM 은 함수명 + 파라미터만 결정. SQL/Cypher 직접 생성 금지 (`docs/operations/agents.md` §1 도구 풀, `README:160`).
 - **목록**:
   - `autonexusgraph.tools.financials` — PG 정형 (lookup_company, get_revenue, compare_companies, …)
   - `autonexusgraph.tools.graph` — Neo4j 탐색 (list_subsidiaries, get_executives, find_paths, …)
@@ -256,11 +256,11 @@ Vector 단독 RAG 로는 #1 도 일부만, #2/#3 은 사실상 불가능. 그래
 - **정의**: 데이터 → 그래프 적재의 4단계 (`README §3.6 (4-Pass)/§6.6`, `docs/operations/data_pipeline.md`, `docs/autograph.md §7.4`):
   - **P1 — 정형 직매핑**: raw → PG (XBRL, NHTSA vPIC 표). LLM 0%.
   - **P2 — Deterministic relation**: PG FK / 룰 / 코드 매칭으로 그래프 엣지 (`SUBSIDIARY_OF`, `MANUFACTURES`, `RECALL_OF` 일부 등). 0% LLM.
-  - **P3 — Selective LLM**: 서술형 텍스트(리콜 본문, IR, 매뉴얼)에서 관계 추출 (`SUPPLIED_BY`, `COMPETES_WITH` 후보 등). Schema-aware. `auto.staging_relations` 에 적재.
+  - **P3 — Selective LLM**: 서술형 텍스트(리콜 본문, IR, 매뉴얼)에서 관계 추출 (`SUPPLIED_BY`, `COMPETES_WITH` 후보 등). Schema-aware. `anxg_auto.staging_relations` 에 적재.
   - **P4 — Cross-validate**: P3 산출 vs P2 SSOT 비교. 일치하면 `validated`, 충돌하면 `rejected` (deterministic 우선), 결정 없음 + 0.80↑ 면 `candidate`, 0.65↑ 면 `needs_review`. Neo4j MERGE 시 `validated_status` 플래그.
 - **위치**: `src/autonexusgraph/extractors/` (finance), `src/autograph/extractors/` (auto).
 - [확정] Deterministic-first 원칙. 정형은 LLM 안 거침.
-- [잠정] auto P3 의 활성 관계는 현재 2종 (`SUPPLIED_BY`, `RECALL_OF`). 4종은 `enabled:false` (`docs/autograph.md §7.6`, `ontology/auto/relations.yaml`).
+- [잠정] auto P3 의 활성 관계는 현재 2종 (`SUPPLIED_BY`, `CAUSED_BY_PROCESS`). `COMPETES_WITH` 는 `enabled:false` (P3 정의 3종 중 1종 비활성). `RECALL_OF` 는 P3 아닌 **P2 deterministic** (`ontology/auto/relations.yaml`, `docs/autograph.md §7.6`).
 
 #### 2.2.6 도메인 라우팅 — `route_domain`
 
@@ -285,7 +285,7 @@ Triage → Planner(DAG) → Supervisor(Send 병렬) → Workers(4종) → Synthe
 ```
 
 - **Triage** (`agents/nodes.py:32`): 안전 가드 + coreference 해소 + 시간 정규화 + question_kind 분류 + 1차 회사/차량 식별. LLM 0건 (룰).
-- **Planner** (`agents/nodes.py` 의 planner_node): DAG `tasks` 생성. 룰 기반 (docs/operations/agents.md (구 PRD §7.5).3) — 향후 LLM 업그레이드 가능 (`agents/nodes.py:12`).
+- **Planner** (`agents/nodes.py` 의 planner_node): DAG `tasks` 생성. 룰 기반 (`docs/operations/agents.md` §2 한 turn 흐름) — 향후 LLM 업그레이드 가능 (`agents/nodes.py:12`).
 - **Supervisor** (`agents/supervisor.py`): 의존성·순환 검증, budget guard, LangGraph `Send` API 로 worker 병렬 디스패치.
 - **Workers 4종** (`agents/workers.py`):
   - `research_worker` — pgvector 검색
@@ -463,8 +463,8 @@ Response (answer + citations + cost + visualizations)
   - `FIN_RESEARCH_INTENTS` (3종): search_documents, search_by_metadata, get_chunk
 
 - auto 화이트리스트 — handler 가 보유 (`autograph/agent_handler.py:42-61`):
-  - `AUTO_GRAPH_ALLOWED` (9종): lookup_vehicle_graph, lookup_supplier, list_components, list_systems_of_model, list_models_with_system, list_recalls_affecting, list_investigations_affecting, get_investigation_recall_chain, get_suppliers_of_component, get_vehicles_using_component, find_vehicle_component_paths
-  - `AUTO_SQL_ALLOWED` (10종): lookup_vehicle, get_vehicle_info, get_spec, compare_vehicles, get_safety_rating, bridge_corp_to_entity, bridge_entity_to_corp, bridge_sec_cik_to_entity, bridge_entity_to_sec_cik, get_oem_financials_sec, cross_query
+  - `AUTO_GRAPH_ALLOWED` (11종): lookup_vehicle_graph, lookup_supplier, list_components, list_systems_of_model, list_models_with_system, list_recalls_affecting, list_investigations_affecting, get_investigation_recall_chain, get_suppliers_of_component, get_vehicles_using_component, find_vehicle_component_paths
+  - `AUTO_SQL_ALLOWED` (17종): lookup_vehicle, get_vehicle_info, get_spec, compare_vehicles, get_safety_rating, get_plant_capacity, get_oem_production, list_plants_by_oem, search_processes, get_macro_industry, get_macro_production, bridge_corp_to_entity, bridge_entity_to_corp, bridge_sec_cik_to_entity, bridge_entity_to_sec_cik, get_oem_financials_sec, cross_query
   - `AUTO_RESEARCH_INTENTS` (3종): search_documents_auto, search_by_metadata_auto, get_chunk_auto
 
 - cross_domain — fin ∪ auto (CrossDomainHandler 가 `super().allowed_intents() | fin` 으로 합집합, `agent_handler.py:139-148`).
@@ -488,12 +488,12 @@ Response (answer + citations + cost + visualizations)
 | `news.*` | 연합뉴스 메타+요약 |
 | `esg.*` | KCGS ratings |
 | `macro.*` | ECOS 거시지표 (+ KOSIS 후속) |
-| `vec.chunks` | 텍스트 청크 + embedding (pgvector) |
+| `anxg_vec.chunks` | 텍스트 청크 + embedding (pgvector) |
 | `chat.*` | 멀티턴 히스토리, LangGraph checkpoint |
 
 [확정] PG 가 모든 정형 데이터의 SSOT. Neo4j 는 미러.
 
-[잠정] auto P3 결과는 `auto.staging_relations` 에 적재 → P4 결정 후 Neo4j 적재. PG 가 staging area 역할도 겸함.
+[잠정] auto P3 결과는 `anxg_auto.staging_relations` 에 적재 → P4 결정 후 Neo4j 적재. PG 가 staging area 역할도 겸함.
 
 #### 3.4.2 Neo4j (관계 미러)
 
@@ -505,38 +505,38 @@ Response (answer + citations + cost + visualizations)
 
 [확정] Neo4j 적재는 PG → Neo4j 방향 (`loaders/load_*_neo4j.py`). 역방향 없음.
 
-#### 3.4.3 pgvector (`vec.chunks`)
+#### 3.4.3 pgvector (`anxg_vec.chunks`)
 
 - 청크 메타: `chunk_id`, `source`, `corp_code` (finance), `manufacturer_id`/`model_id`/`variant_id` (auto), `fiscal_year`, `section`, `embedding (vector(1024))`.
-- finance 청크 ~748K (`README §1.1`); auto 청크 16,242 (모두 embedded — `README §1.2`).
+- finance 청크 ~748K (`README §1.1`); auto 청크 16,435 (모두 embedded — `README §1.2`).
 - BGE-M3 1024d cosine 으로 backfill (`make embed-chunks`).
 
-[잠정] `vec.chunks.corp_code` NOT NULL → nullable 로 완화 (auto 청크 추가 시) — `docs/autograph.md §6`. 영구성 [의도 확인 필요].
+[잠정] `anxg_vec.chunks.corp_code` NOT NULL → nullable 로 완화 (auto 청크 추가 시) — `docs/autograph.md §6`. 영구성 [의도 확인 필요].
 
 ### 3.5 멱등 데이터 파이프라인 (raw → processed → DB)
 
 ```
 [수집 (ingestion)]                  [적재 (loader)]                [그래프]
 ─────────────────                   ────────────────                ────────
-DART (corp_code 기준)         ──→   master.companies + fin.* ──→   :Company
-KRX 마스터                    ──→   master.companies (보강) ──→   stock_code 속성
-ECOS                          ──→   macro.series
-Wikidata SPARQL               ──→   master.entity_map + wiki.* ──→   QID 속성
-Wikipedia                     ──→   wiki.wikipedia_pages
-                                    + vec.chunks (section=wikipedia_ko)
-연합뉴스 RSS                  ──→   news.articles ──→   :NewsEvent + CO_MENTIONED_WITH
-SEC EDGAR (ADR)               ──→   sec.filings
-GLEIF                         ──→   sec.lei + master.entity_map
-KCGS (수동 CSV)               ──→   esg.ratings + Company.esg_grade
-DART chunks                   ──→   vec.chunks (section=dart_*)
+DART (corp_code 기준)         ──→   anxg_master.companies + fin.* ──→   :Company
+KRX 마스터                    ──→   anxg_master.companies (보강) ──→   stock_code 속성
+ECOS                          ──→   anxg_macro.series
+Wikidata SPARQL               ──→   anxg_master.entity_map + wiki.* ──→   QID 속성
+Wikipedia                     ──→   anxg_wiki.wikipedia_pages
+                                    + anxg_vec.chunks (section=wikipedia_ko)
+연합뉴스 RSS                  ──→   anxg_news.articles ──→   :NewsEvent + CO_MENTIONED_WITH
+SEC EDGAR (ADR)               ──→   anxg_sec.filings
+GLEIF                         ──→   anxg_sec.lei + anxg_master.entity_map
+KCGS (수동 CSV)               ──→   anxg_esg.ratings + Company.esg_grade
+DART chunks                   ──→   anxg_vec.chunks (section=dart_*)
 
 NHTSA vPIC                    ──→   auto.master_* + (P2) :Manufacturer/:Model/:Variant
-NHTSA Recalls                 ──→   auto.events_recalls + (P2) :Recall + AFFECTED_BY
-NHTSA Complaints              ──→   auto.events_complaints + (P2) :Complaint + REPORTED_IN
+NHTSA Recalls                 ──→   anxg_auto.events_recalls + (P2) :Recall + AFFECTED_BY
+NHTSA Complaints              ──→   anxg_auto.events_complaints + (P2) :Complaint + REPORTED_IN
 NHTSA SafetyRatings           ──→   spec_measurements.safety.* + SAFETY_RATED_BY
-Wikidata (auto)               ──→   master.entity_map + (B0.80) :Manufacturer/:Model
-data.go.kr 3048950 (CSV)      ──→   auto.events_recalls (941 row) — [확정 — 구 15089863 API 폐기]
-data.go.kr 15155857 (CSV)     ──→   auto.events_inspections — [잠정 — manual]
+Wikidata (auto)               ──→   anxg_master.entity_map + (B0.80) :Manufacturer/:Model
+data.go.kr 3048950 (CSV)      ──→   anxg_auto.events_recalls (941 row) — [확정 — 구 15089863 API 폐기]
+data.go.kr 15155857 (CSV)     ──→   anxg_auto.events_inspections — [잠정 — manual]
 KATRI (bigdata-tic OAuth)     ──→   auto.cert_* — [잠정 — credentials 필요]
 KNCAP / Euro NCAP / IIHS      ──→   spec_measurements + :Standard — [부분 — KNCAP만 인터페이스]
 AI Hub (부품 결함, 자율주행)  ──→   :Module + CONTAINS_COMPONENT
@@ -544,7 +544,7 @@ supplier_seed.yaml (19사 46)  ──→   :SUPPLIED_BY (manual A-grade)
 manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 [P3 LLM] (chunks 중 manufacturer_id 보유, source ∈ recall/complaint/wikipedia_auto)
-  → AutoRelationExtractor → auto.staging_relations
+  → AutoRelationExtractor → anxg_auto.staging_relations
   → cross_validate (P4) → p4_decision: validated/candidate/needs_review/rejected
   → 결정에 따라 Neo4j MERGE
 ```
@@ -560,13 +560,13 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 | 소스 | 도메인 | 상태 | 근거 |
 |---|---|---|---|
 | DART Open API | finance | [확정] 활성 | `ingestion/dart_client.py` + `fin.*` 184K rows |
-| KRX 마스터 | finance | [확정] 활성 | `master.companies` 295 |
-| ECOS | finance | [확정] 활성 | `macro.series` |
-| Wikidata SPARQL | both | [확정] 활성 | `wiki.wikidata_facts` 466, `master.entity_map` 보강 |
-| Wikipedia (ko) | finance | [확정] 활성 | `wiki.wikipedia_pages` 276 (93.6% 매핑) |
-| 연합뉴스 RSS | finance | [확정] 활성 (메타+요약만, 저작권) | `news.articles` 338 |
-| SEC EDGAR | finance | [확정] 활성 (한국 ADR 한정) | `sec.filings` 1,857 |
-| GLEIF | finance | [확정] 활성 | `sec.lei` 2,700 (LEI 매칭 120) |
+| KRX 마스터 | finance | [확정] 활성 | `anxg_master.companies` 295 |
+| ECOS | finance | [확정] 활성 | `anxg_macro.series` |
+| Wikidata SPARQL | both | [확정] 활성 | `anxg_wiki.wikidata_facts` 466, `anxg_master.entity_map` 보강 |
+| Wikipedia (ko) | finance | [확정] 활성 | `anxg_wiki.wikipedia_pages` 276 (93.6% 매핑) |
+| 연합뉴스 RSS | finance | [확정] 활성 (메타+요약만, 저작권) | `anxg_news.articles` 338 |
+| SEC EDGAR | finance | [확정] 활성 (한국 ADR 한정) | `anxg_sec.filings` 1,857 |
+| GLEIF | finance | [확정] 활성 | `anxg_sec.lei` 2,700 (LEI 매칭 120) |
 | KCGS ESG | finance | [잠정] 수동 CSV (회원 라이선스) | `docs/data_lineage.md §1.8 KCGS ESG` |
 | 공정위 기업집단 (data.go.kr) | finance | [미정] 키 확보 후 | `README §4` |
 | KOSIS 산업통계 | finance | [미정] 키 확보 후 | `README §4` |
@@ -577,7 +577,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 | NHTSA Complaints | auto | [확정] 활성 | 16,005 (97% 매핑) |
 | NHTSA SafetyRatings | auto | [확정] 활성 | `spec_measurements.safety.ncap.*` |
 | AI Hub (부품 결함 71347, 자율 578) | auto | [확정] 활성 | `:Module` + CONTAINS_COMPONENT |
-| data.go.kr 3048950 (한국 리콜 CSV) | auto | [확정] 941 row 적재 (구 15089863 API 폐기) | `loaders/load_datagokr_recalls.py --csv` |
+| data.go.kr 3048950 (한국 리콜 CSV) | auto | [확정] 941 row 적재 (구 15089863 API 폐기) | `loaders/recall/load_datagokr_recalls.py --csv` |
 | data.go.kr 15155857 (수리검사 CSV) | auto | [잠정] 인터페이스 wired, raw 수동 | `ingestion/datagokr_inspections.py` |
 | car.go.kr | auto | [잠정] CSV 파서만, 공식 API 미정 | `ingestion/car_go_kr_recalls.py` |
 | KATRI (bigdata-tic) | auto | [잠정] OAuth 인터페이스, credentials 필요 | `ingestion/katri_tic.py` |
@@ -596,8 +596,8 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 #### 3.7.1 Gold QA
 
 - `eval/qa_gold/gold_qa_v0.jsonl` — finance, **seed 30** ([잠정] 목표 100, `README §6`).
-- `eval/qa_gold/gold_qa_auto_v0.jsonl` — auto, **seed 46** ([잠정] 목표 100).
-- `eval/qa_gold/gold_qa_cross_v0.jsonl` — Cross-Domain, **44 row** (level 기준 CD-L1=10 / L2=8 / L3=12 / L4=8 + 6 row IP 결합 변형. qid prefix 기준은 CD-L3- 15 / CD-L4- 11) ([잠정] 확장 대기).
+- `eval/qa_gold/gold_qa_auto_v0.jsonl` — auto, **seed 56** ([잠정] 목표 100).
+- `eval/qa_gold/gold_qa_cross_v0.jsonl` — Cross-Domain, **49 row** (qid prefix 기준 CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + IP 결합 8 [CD-L3-IP 4 / CD-L4-IP 4] + CD-PROC 5) ([잠정] 확장 대기).
 - `eval/qa_gold/gold_qa_ip_v0.jsonl` — ip, **seed 30** (IP-L1/L2/L3 각 10. gold_answer 채우기는 KIPRIS/USPTO 적재 후).
 - lint: `make validate-gold-qa` (`scripts/audit/validate_gold_qa.py`).
 
@@ -694,7 +694,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
   - **LLM 자유 SQL/Cypher 생성** — 유연하지만 모든 보안 가드를 LLM 뒤에서 사후 검증해야 함.
   - **DSL 중간층** — LLM 이 DSL 생성 → DSL 컴파일러가 SQL/Cypher 생성. 표현력은 사전 정의보다 높고 자유 SQL 보다 안전.
 - **대안 트레이드오프**: 자유 SQL → 1건의 prompt injection 이 전체 DB 노출. DSL → 컴파일러 자체가 또 하나의 시스템.
-- [확정] 사전 정의만. docs/operations/agents.md (구 PRD §7.5).10.
+- [확정] 사전 정의만. `docs/operations/agents.md` §1 도구 풀 박스.
 
 ### 4.4 왜 Deterministic-first 추출 (LLM 은 selective)
 
@@ -721,7 +721,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 ### 4.6 왜 ER 마스터 + Bridge
 
-- **결정**: 도메인 직접 FK 가 아니라, `master.entities` (단일 ID 공간) + `bridge.corp_entity` (cross-domain 다리).
+- **결정**: 도메인 직접 FK 가 아니라, `anxg_master.entities` (단일 ID 공간) + `anxg_bridge.corp_entity` (cross-domain 다리).
 - **이득**: 도메인 추가 시 신규 FK 추가 없음. confidence 와 reviewed_status 를 bridge 자체에 저장.
 - **비용**: 모든 cross-domain 조회가 bridge 1 hop 추가. bridge 신뢰도가 cross-domain 정답률을 결정.
 - **대안**:
@@ -734,7 +734,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 - **결정**: BGE-M3 (1024d, cosine) 자체 호스팅 + BGE-Reranker-v2-m3 (옵션).
 - **이득**: 한국어 성능. 비용 0 (외부 API 없음). 데이터 외부 송신 없음.
-- **비용**: GPU 운영. 모델 업그레이드 시 backfill (vec.chunks 748K+).
+- **비용**: GPU 운영. 모델 업그레이드 시 backfill (anxg_vec.chunks 748K+).
 - **대안**:
   - **OpenAI text-embedding-3-large** — 외부 API. 한국어 성능 차이 (BGE 대비). 비용 발생.
   - **Cohere multilingual-3** — 비슷한 트레이드오프.
@@ -822,18 +822,18 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 - **[가정]** `cost_estimator` 의 사전 추정이 실제 비용과 ±20% 이내. 검증 없음.
 - **[열린 질문]** budget guard 가 turn 중간에 발동하면 — 이미 시작된 worker 의 sunk cost 처리?
 - **[열린 질문]** HARD_LIMIT 도달 시 사용자 경험 — "예산 초과로 답변 불가" 가 신뢰를 어떻게 깎는가?
-- 관련: `agents/cost_estimator.py`, `llm/budget_aware.py`, `docs/operations/agents.md (구 PRD §7.5).6`.
+- 관련: `agents/cost_estimator.py`, `llm/budget_aware.py`, `docs/operations/agents.md` §7.5 HITL.
 
 ### 5.6 동명이인 / 다중 식별자 충돌
 
-- **finance**: `master.persons` 는 (name, birth_year) 키로 동명이인 분리 (`README §1.1`).
+- **finance**: `anxg_master.persons` 는 (name, birth_year) 키로 동명이인 분리 (`README §1.1`).
 - **[열린 질문]** `birth_year` 가 없는 인물 (DART 비공개) — 동명이인 묶을 키 없음. 현재 어떻게 처리?
 - **회사**: corp_code 는 안정적이지만 `jurir_no` (법인등록번호) 가 재부여될 수 있음. snapshot_year 로 시점 분리하지만 — 같은 corp_code 가 다른 jurir_no 인 경우?
 - **[열린 질문]** 자동차 측 인물 데이터 (예: 부품사 CEO) — 통합 ER 마스터의 entity_type 에 Person 이 들어가는가? auto ontology 에는 Person 없음.
 
 ### 5.7 평가셋의 자기충족 위험
 
-- gold QA 30+42+30 행 — 작성자가 시스템에 익숙해서 "잡힐 만한" 질문만 골랐을 가능성.
+- gold QA 30+56+49+30 행 (= 165; finance/auto/cross/ip) — 작성자가 시스템에 익숙해서 "잡힐 만한" 질문만 골랐을 가능성.
 - **[위험]** Multi-hop 정답률 측정의 ground truth 가 시스템 그래프에 의존. 그래프에 없는 관계는 질문도 못 만듦.
 - **[열린 질문]** Vector RAG 비교 매트릭스가 의미가 있으려면, gold QA 가 "Vector 도 풀 수 있는 질문" 을 포함해야 함. 그렇지 않으면 비교가 불공평.
 - **[미정]** 외부 작성 gold QA (블라인드 큐레이터) 도입 여부.
@@ -849,14 +849,14 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 - `register_handler` 가 import 시점 부작용 (`autograph/__init__.py:23`).
 - **[위험]** 테스트에서 `import autograph` 하면 다른 테스트의 핸들러 레지스트리 오염. `unregister_handler` 함수는 있음 (`_domain_handler.py:97`) 이지만 자동 사용 안 됨.
-- **[열린 질문]** 코어 단독 테스트 (`tests/autonexusgraph/`) 가 `import autograph` 없이 통과하는가? README §6 의 310 unit 테스트가 어떻게 격리되는가?
+- **[열린 질문]** 코어 단독 테스트 (`tests/autonexusgraph/`) 가 `import autograph` 없이 통과하는가? 코어 unit 테스트 스위트가 어떻게 격리되는가? (총 테스트 수는 변동 — `pytest -q` 로 확인)
 - **[열린 질문]** `agents/nodes.py:34` 가 `from ..tools.financials import lookup_company as lookup_pg` — 이게 도메인 무지 위반인지 (finance 가 코어 안에 있으니 무관인지) 의 경계가 모호.
 
 ### 5.10 `[의도 확인 필요]` 리스트 (코드만으론 안 풀림)
 
 - `_legacy/v2/` 폴더의 운명 — 삭제 예정인가, 보존인가?
-- `vec.chunks.corp_code` nullable 완화의 영구성 — auto 청크 위해 완화됐는데, finance 청크에 영향 0이라 사실상 영구로 보임 (`docs/autograph.md §6`).
-- `bridge.corp_entity.reviewed_status='rejected'` 운영 프로세스 — 누가, 얼마나 자주.
+- `anxg_vec.chunks.corp_code` nullable 완화의 영구성 — auto 청크 위해 완화됐는데, finance 청크에 영향 0이라 사실상 영구로 보임 (`docs/autograph.md §6`).
+- `anxg_bridge.corp_entity.reviewed_status='rejected'` 운영 프로세스 — 누가, 얼마나 자주.
 - DomainHandler 의 메서드 누락 허용 (`_domain_handler.py:40-42`) — 디자인 의도인가 임시 구현인가.
 - `agent_handler.py:99-100` 의 "target_makes/vehicles 는 호환 시그니처가 없어 미적용" — TODO 인가 의도된 보수성인가.
 
@@ -876,7 +876,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 | 우선순위 | 질문 | 정의 절 | 진행 상태 | cross-link | 해결 가능 시점 |
 |---:|---|---|---|---|---|
-| ⭐⭐⭐ P0 | confidence_score calibration | [§5.2](#52-confidence_score-의-정량성) | **미실행** — 측정 가능 (gold QA 120 row 충족) | learning_guide §11.4.0 (Platt routine) + PRD §3.5 (cross-link 완료 2026-06-02) | LLM 키 활성 + `make eval-full` 후 5분 |
+| ⭐⭐⭐ P0 | confidence_score calibration | [§5.2](#52-confidence_score-의-정량성) | **미실행** — 측정 가능 (gold QA answerable 135 row 충족; ip 30 제외) | learning_guide §11.4.0 (Platt routine) + PRD §3.5 (cross-link 완료 2026-06-02) | LLM 키 활성 + `make eval-full` 후 5분 |
 | ⭐⭐⭐ P0 | 외부 작성 gold QA (자기충족 위험) | [§5.7](#57-평가셋의-자기충족-위험) | **wired (2026-06-02)** — 측정 routine `make audit-external-ratio` (실측 0/150 = 0.0%) + 변환 routine `make convert-allganize` 신규. **Allganize 흡수 후 즉시 30%+ 가능** | gold_qa_guide.md §6.3-6.4 (wired) + `scripts/audit/{convert_allganize_gold,external_curator_ratio}.py` | (a) `git clone allganize/RAG-Evaluation-Dataset-KO` → `make convert-allganize` 5분, (b) 별도 외부 큐레이터 발주는 후속 |
 | ⭐⭐⭐ P0 | Bridge candidate 검토 운영 SOP | [§5.3](#53-bridge-자동-매칭의-false-positive) | **미설계** (4,790 supplier candidate 영속 누적) | README §11.4 (P1 운영) / data_inventory §3 B10 | Streamlit 검토 UI + 6개월 자동 만료 정책 |
 | ⭐⭐ P1 | Cross-Domain QA "정답" 정의 | [§5.8](#58-cross-domain-qa-의-정답-정의) | **부분** — `snapshot_year` 필드 강제로 일부 해소 | gold_qa_guide §2.3 (정답 무결성 표) | snapshot_year 필드 추가 + valid_until 도입 |
@@ -910,7 +910,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 | 순번 | 항목 | 우선순위 판단 사유 |
 |---:|---|---|
-| P0-1 | **confidence calibration** | 가장 자주 인용되는 시스템 자랑 (PRD §3.5) 의 정량 근거. 측정 도구 wired (`calibrate_confidence.py`), 데이터 충족 (gold 120 row), LLM 키만 있으면 5 분 — **즉시 실행성 최고** |
+| P0-1 | **confidence calibration** | 가장 자주 인용되는 시스템 자랑 (PRD §3.5) 의 정량 근거. 측정 도구 wired (`calibrate_confidence.py`), 데이터 충족 (gold answerable 135 row; ip 30 제외), LLM 키만 있으면 5 분 — **즉시 실행성 최고** |
 | P0-2 | **외부 작성 gold QA** | 평가 매트릭스 전체의 신뢰성을 좌우. 현재 0% 외부 = sanity check 수준 (gold_qa_guide §6.1). 변환 routine wired (2026-06-02), `git clone allganize/...` + `make convert-allganize` 1 회로 30%+ 가능 — **즉시 실행성 최고** |
 | P0-3 | **Bridge candidate 운영 SOP** | 4,790 row supplier candidate 가 영구 누적 (data_inventory §3 B10). 시간이 지날수록 graph quality 저하 — **방치 시 시스템 가치 자체 위협**. 단 Streamlit UI 필요 = 즉시 실행 못함 → P0 이지만 "측정/디자인 우선" |
 | P1-1 | **Cross-Domain QA "정답" 정의** | snapshot_year 필드로 일부 해소 (gold_qa_guide §2.3). 완전 해소엔 `valid_until` 등 시계열 정합 추가 필요 — 외부 데이터 의존 (재무·리콜 시점 매칭). 즉시 실행 불가 → P1 |
@@ -938,7 +938,7 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 새로 합류한 사람이 멘탈 모델을 잡는 최단 경로:
 
-1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **34 필드**, 라인 99-161).
+1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **36 필드**, 라인 156-225).
 2. `src/autonexusgraph/agents/_domain_handler.py` — DomainHandler Protocol + 라우터 + ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` soft-import.
 3. `src/autograph/agent_handler.py` — auto/cross_domain 구현체.
 4. `src/autograph/policy.py:1-100` (10분) — 키워드 라우팅 / question kind 분류.
@@ -1029,7 +1029,7 @@ from . import agent_handler  # 등록 부작용
 체크리스트:
 - [ ] `domain` 문자열 결정 (소문자, 영문).
 - [ ] `ontology/pharma/{entities,relations,extractors}.yaml` 작성 + `edge_required_meta` 보유.
-- [ ] PG 스키마 `pharma.*` 신설 + `bridge.corp_entity` 매칭 전략 결정.
+- [ ] PG 스키마 `pharma.*` 신설 + `anxg_bridge.corp_entity` 매칭 전략 결정.
 - [ ] Cypher 템플릿 레지스트리 (`cypher_templates_pharma.py`) 작성, `__init__` 에서 병합.
 - [ ] 사전 정의 도구 (`tools/spec.py`, `tools/graph.py`, `tools/retrieve.py`, `tools/bridge.py`).
 - [ ] 화이트리스트 3종.
@@ -1067,7 +1067,7 @@ from . import agent_handler  # 등록 부작용
 | **BGE-M3** | 한국어 임베딩 모델 1024d cosine | `README §8` |
 | **BGE-Reranker** | 한국어 재랭킹 모델 (옵션) | `README §8` |
 | **BOM** | Bill of Materials. 자동차 도메인의 계층 척추 (L0~L6) | `README §11.2`, `docs/autograph.md §2.5.4` |
-| **Bridge** | Cross-domain 매칭 테이블 `bridge.corp_entity` | `README §3.5` |
+| **Bridge** | Cross-domain 매칭 테이블 `anxg_bridge.corp_entity` | `README §3.5` |
 | **CD-L1~L4** | Cross-Domain QA 난이도 4단계 | `PRD §2.2` |
 | **Cypher template registry** | 사전 정의 Cypher 템플릿 (finance/auto/ip 도메인별) | `src/autonexusgraph/tools/cypher_templates.py` |
 | **DAG** | Directed Acyclic Graph. Planner 가 만드는 task 의존 그래프 | `docs/operations/agents.md §7.5.3` |
@@ -1075,7 +1075,7 @@ from . import agent_handler  # 등록 부작용
 | **DoD** | Definition of Done. 20항 트래픽라이트 | `README §10` |
 | **DomainHandler** | 코어가 도메인을 위임하는 Protocol | `src/autonexusgraph/agents/_domain_handler.py:36` |
 | **edge_required_meta** | auto 엣지 의무 7키 (source_type, confidence_score, …) | `README §3.7`, `ontology/auto/relations.yaml:19` |
-| **Entity Resolution (ER) 마스터** | `master.entities` + `master.entity_map`. 다형 ID 공간 | `README §3.4` |
+| **Entity Resolution (ER) 마스터** | `anxg_master.entities` + `anxg_master.entity_map`. 다형 ID 공간 | `README §3.4` |
 | **GLEIF** | Global Legal Entity Identifier Foundation. LEI 공급 | `README §4` |
 | **gold QA** | 평가용 정답 큐레이션 데이터 | `eval/qa_gold/README.md` |
 | **HITL** | Human-in-the-loop. clarification / cost approval interrupt | `docs/operations/agents.md §7.5.6` |
@@ -1094,12 +1094,12 @@ from . import agent_handler  # 등록 부작용
 | **prompt_safety** | injection 신호 감지 + XML 경계 escape | `src/autonexusgraph/safety/prompt_safety.py` |
 | **QID** | Wikidata 의 엔티티 ID (Q123…) | `PRD §3.2` |
 | **RAG** | Retrieval-Augmented Generation | `PRD §1` |
-| **replan** | Validator 실패 시 Planner 로 복귀. 최대 2회 | `state.py:71`, `docs/operations/agents.md (구 PRD §7.5).5` |
+| **replan** | Validator 실패 시 Planner 로 복귀. 최대 2회 | `state.py:71`, `docs/operations/agents.md` §5 Replan |
 | **route_domain** | finance/auto/cross_domain 키워드 룰 라우터 | `src/autograph/policy.py:87` |
-| **Send (LangGraph)** | Supervisor 의 worker 병렬 디스패치 API | `docs/operations/agents.md (구 PRD §7.5).7` |
+| **Send (LangGraph)** | Supervisor 의 worker 병렬 디스패치 API | `docs/operations/agents.md` §2 (Send 다이어그램) |
 | **snapshot_year** | 엣지의 기준 연도 메타. 시점 분리 | `ontology/auto/relations.yaml:23` |
 | **SSOT** | Single Source of Truth | 전반 |
-| **stage_relations** | P3 LLM 산출 임시 테이블 (`auto.staging_relations`) | `docs/autograph.md §7.4` |
+| **stage_relations** | P3 LLM 산출 임시 테이블 (`anxg_auto.staging_relations`) | `docs/autograph.md §7.4` |
 | **vPIC** | NHTSA Vehicle Product Information Catalog. 제원·VIN 디코드 | `README §4` |
 | **Wikidata** | CC0 글로벌 지식 그래프. QID·LEI 공급 | `README §4` |
 | **XBRL** | eXtensible Business Reporting Language. DART 의 재무 표준 | `README §1.1` |

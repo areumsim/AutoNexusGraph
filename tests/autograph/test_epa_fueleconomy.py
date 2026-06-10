@@ -5,14 +5,9 @@ DB / HTTP 모두 mock — 파서·매핑·CSV iteration 만 실제.
 
 from __future__ import annotations
 
-import csv
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 
 # ── ingestion 모듈 ─────────────────────────────────────────
@@ -25,7 +20,7 @@ def test_ingestion_module_importable():
 
 # ── loader 모듈 ────────────────────────────────────────────
 def test_loader_module_importable():
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
     assert callable(L.load_epa)
     assert hasattr(L, "LoadStats")
     assert L._SOURCE_KEY == "epa_fueleconomy"
@@ -33,7 +28,7 @@ def test_loader_module_importable():
 
 
 def test_map_covers_core_fields():
-    from autograph.loaders.load_auto_epa import _MAP
+    from autograph.loaders.master.load_auto_epa import _MAP
     csv_fields = {row[0] for row in _MAP}
     measure_keys = {row[1] for row in _MAP}
 
@@ -49,15 +44,15 @@ def test_map_covers_core_fields():
 
 
 def test_map_value_types_valid():
-    from autograph.loaders.load_auto_epa import _MAP
+    from autograph.loaders.master.load_auto_epa import _MAP
     allowed = {"num", "score", "text", "yn", "count"}
-    for csv_field, measure_key, unit, vtype in _MAP:
+    for csv_field, _measure_key, _unit, vtype in _MAP:
         assert vtype in allowed, f"{csv_field}: {vtype}"
 
 
 # ── _parse_value ───────────────────────────────────────────
 def test_parse_value_num():
-    from autograph.loaders.load_auto_epa import _parse_value
+    from autograph.loaders.master.load_auto_epa import _parse_value
     assert _parse_value("25", "num") == (25.0, None)
     assert _parse_value("3.5", "num") == (3.5, None)
     # sentinel -1 = missing.
@@ -71,7 +66,7 @@ def test_parse_value_num():
 
 def test_parse_value_score_bounds():
     """ghgScore / feScore 는 1~10 범위. 0 / 11 / -1 모두 missing."""
-    from autograph.loaders.load_auto_epa import _parse_value
+    from autograph.loaders.master.load_auto_epa import _parse_value
     assert _parse_value("7", "score") == (7.0, None)
     assert _parse_value("10", "score") == (10.0, None)
     assert _parse_value("1", "score") == (1.0, None)
@@ -80,14 +75,14 @@ def test_parse_value_score_bounds():
 
 
 def test_parse_value_count():
-    from autograph.loaders.load_auto_epa import _parse_value
+    from autograph.loaders.master.load_auto_epa import _parse_value
     assert _parse_value("4", "count") == (4.0, None)
     assert _parse_value("8", "count") == (8.0, None)
     assert _parse_value("-1", "count") == (None, None)
 
 
 def test_parse_value_text():
-    from autograph.loaders.load_auto_epa import _parse_value
+    from autograph.loaders.master.load_auto_epa import _parse_value
     assert _parse_value("Regular Gasoline", "text") == (None, "Regular Gasoline")
     assert _parse_value("E85", "text") == (None, "E85")
     # 무의미한 sentinel.
@@ -98,7 +93,7 @@ def test_parse_value_text():
 
 def test_parse_value_yn():
     """sCharger / tCharger / startStop — 'Y' 또는 's'/'t' 만 의미 있음."""
-    from autograph.loaders.load_auto_epa import _parse_value
+    from autograph.loaders.master.load_auto_epa import _parse_value
     assert _parse_value("Y", "yn") == (None, "Y")
     assert _parse_value("yes", "yn") == (None, "Y")
     assert _parse_value("S", "yn") == (None, "Y")
@@ -115,7 +110,7 @@ def _write_zip_csv(zip_path: Path, csv_content: str, *, name: str = "vehicles.cs
 
 
 def test_iter_csv_rows_from_zip(tmp_path):
-    from autograph.loaders.load_auto_epa import _iter_csv_rows
+    from autograph.loaders.master.load_auto_epa import _iter_csv_rows
 
     csv_data = (
         "id,year,make,model,city08,highway08,comb08,cylinders,displ,"
@@ -135,7 +130,7 @@ def test_iter_csv_rows_from_zip(tmp_path):
 
 
 def test_iter_csv_rows_from_plain_csv(tmp_path):
-    from autograph.loaders.load_auto_epa import _iter_csv_rows
+    from autograph.loaders.master.load_auto_epa import _iter_csv_rows
 
     csv_data = "id,year,make,model\n42,2022,Kia,EV6\n"
     p = tmp_path / "vehicles.csv"
@@ -147,7 +142,7 @@ def test_iter_csv_rows_from_plain_csv(tmp_path):
 # ── _process_row — variant 매칭 + insert ─────────────────
 def test_process_row_skips_unmatched(tmp_path, monkeypatch):
     """variant 매칭 0 → unmatched 카운트만 증가, INSERT 호출 없음."""
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
 
     inserts: list[tuple] = []
     cur = MagicMock()
@@ -155,7 +150,7 @@ def test_process_row_skips_unmatched(tmp_path, monkeypatch):
     def fake_execute(sql, params=None):
         if sql.strip().startswith("SELECT v.variant_id"):
             cur._last_select = []
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchall = lambda: cur._last_select if hasattr(cur, "_last_select") else []
@@ -173,7 +168,7 @@ def test_process_row_skips_unmatched(tmp_path, monkeypatch):
 
 def test_process_row_inserts_measurements(monkeypatch):
     """매칭된 variant 1개에 정상 측정값 다수 insert 되는지."""
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
 
     inserts: list[tuple] = []
     deletes: list[tuple] = []
@@ -183,10 +178,10 @@ def test_process_row_inserts_measurements(monkeypatch):
     def fake_execute(sql, params=None):
         if sql.strip().startswith("SELECT v.variant_id"):
             cur._fetch = [(42,)]
-        elif sql.strip().startswith("DELETE FROM auto.spec_measurements"):
+        elif sql.strip().startswith("DELETE FROM anxg_auto.spec_measurements"):
             deletes.append(params)
             cur.rowcount = 0
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
 
     cur.execute = fake_execute
@@ -222,7 +217,7 @@ def test_process_row_inserts_measurements(monkeypatch):
 
 def test_process_row_year_filter(monkeypatch):
     """year_min 미만 row 는 매칭 시도 없이 filtered."""
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
 
     cur = MagicMock()
     cur.execute = lambda *a, **kw: None
@@ -239,7 +234,7 @@ def test_process_row_year_filter(monkeypatch):
 
 def test_process_row_no_useful_measurements(monkeypatch):
     """모든 측정값이 sentinel — variant 매칭돼도 INSERT 없음."""
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
 
     inserts: list = []
     cur = MagicMock()
@@ -248,7 +243,7 @@ def test_process_row_no_useful_measurements(monkeypatch):
     def fake_execute(sql, params=None):
         if sql.strip().startswith("SELECT v.variant_id"):
             cur._fetch = [(42,)]
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchall = lambda: cur._fetch
@@ -270,7 +265,7 @@ def test_process_row_no_useful_measurements(monkeypatch):
 # ── load_epa — 파일 + DB 통합 ──────────────────────────────
 def test_load_epa_no_file(tmp_path, monkeypatch):
     """raw 디렉토리 없으면 graceful — 빈 stats."""
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
     monkeypatch.setattr(L, "_epa_root", lambda: tmp_path / "nope")
     stats = L.load_epa()
     assert stats.rows_seen == 0
@@ -278,7 +273,7 @@ def test_load_epa_no_file(tmp_path, monkeypatch):
 
 def test_load_epa_end_to_end_with_zip(tmp_path, monkeypatch):
     """raw zip 만들고 → load_epa 가 행을 다 처리 + INSERT 호출."""
-    from autograph.loaders import load_auto_epa as L
+    from autograph.loaders.master import load_auto_epa as L
 
     csv_data = (
         "id,year,make,model,city08,highway08,comb08,cylinders,displ,"
@@ -302,7 +297,7 @@ def test_load_epa_end_to_end_with_zip(tmp_path, monkeypatch):
                 cur._fetch = [(101,)]
             else:
                 cur._fetch = []
-        elif "INSERT INTO auto.spec_measurements" in sql:
+        elif "INSERT INTO anxg_auto.spec_measurements" in sql:
             inserts.append(params)
     cur.execute = fake_execute
     cur.fetchall = lambda: cur._fetch

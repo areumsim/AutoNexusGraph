@@ -1,7 +1,7 @@
 """IPGraph Cross-Domain Bridge — assignee_id ↔ corp_code 매핑.
 
-docs/ipgraph.md §4 — ip.assignee_corp_map join 테이블 활용.
-``bridge.corp_entity`` 직접 변경 0 → core 스키마 보존 (§10.12).
+docs/ipgraph.md §4 — anxg_ip.assignee_corp_map join 테이블 활용.
+``anxg_bridge.corp_entity`` 직접 변경 0 → core 스키마 보존 (§10.12).
 
 Cross-Domain 시연:
 - CD-L3: "현대모비스 R&D비 (finance) 대비 ADAS(CPC B60W) 출원 추세 (ip)"
@@ -32,8 +32,8 @@ def bridge_assignee_to_corp(assignee_id: str) -> dict[str, Any] | None:
            m.match_type,
            m.confidence_score,
            m.reviewed_status
-      FROM ip.assignee_corp_map m
-      LEFT JOIN master.companies c ON c.corp_code = m.corp_code
+      FROM anxg_ip.assignee_corp_map m
+      LEFT JOIN anxg_master.companies c ON c.corp_code = m.corp_code
      WHERE m.assignee_id = %s
        AND m.reviewed_status <> 'rejected'
      ORDER BY (m.reviewed_status = 'reviewed') DESC,
@@ -47,8 +47,8 @@ def bridge_assignee_to_corp(assignee_id: str) -> dict[str, Any] | None:
             if not row:
                 return None
             cols = [d.name for d in cur.description]
-            return dict(zip(cols, row))
-    except Exception as e:   # noqa: BLE001
+            return dict(zip(cols, row, strict=False))
+    except Exception as e:   # noqa: BLE001 — [bridge] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[ip.bridge_assignee_to_corp] PG 실패: %s", e)
         return None
 
@@ -76,8 +76,8 @@ def bridge_corp_to_assignee(corp_code: str,
            m.match_type,
            m.confidence_score,
            m.reviewed_status
-      FROM ip.assignee_corp_map m
-      JOIN ip.assignees a ON a.assignee_id = m.assignee_id
+      FROM anxg_ip.assignee_corp_map m
+      JOIN anxg_ip.assignees a ON a.assignee_id = m.assignee_id
      WHERE m.corp_code = %s
        AND {status_filter}
      ORDER BY m.confidence_score DESC
@@ -86,8 +86,8 @@ def bridge_corp_to_assignee(corp_code: str,
         with get_pool().connection() as conn, conn.cursor() as cur:
             cur.execute(sql, (corp_code,))
             cols = [d.name for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
-    except Exception as e:   # noqa: BLE001
+            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
+    except Exception as e:   # noqa: BLE001 — [bridge] fail-soft 흡수 → [] 반환 (log 동반)
         log.warning("[ip.bridge_corp_to_assignee] PG 실패: %s", e)
         return []
 
@@ -100,7 +100,7 @@ def cross_query_ip(corp_code: str,
     """CD-L3/L4 패키지 쿼리 — 한 줄 호출로 IP ↔ finance 묶음.
 
     Args:
-        corp_code: master.companies.corp_code
+        corp_code: anxg_master.companies.corp_code
         cpc: CPC 코드 (prefix 매칭) — 없으면 전체 분야
         year_range: (from, to) inclusive
 
@@ -125,7 +125,7 @@ def cross_query_ip(corp_code: str,
     params: list[Any] = [assignee_ids]
     clauses: list[str] = ["pa.assignee_id = ANY(%s)"]
     if cpc:
-        clauses.append("EXISTS (SELECT 1 FROM ip.patent_cpc pc "
+        clauses.append("EXISTS (SELECT 1 FROM anxg_ip.patent_cpc pc "
                        "WHERE pc.pub_no = p.pub_no AND pc.cpc_code LIKE %s)")
         params.append(f"{cpc}%")
     if year_range:
@@ -134,8 +134,8 @@ def cross_query_ip(corp_code: str,
     where = " AND ".join(clauses)
     sql = f"""
     SELECT pa.assignee_id, COUNT(DISTINCT p.pub_no) AS n_patents
-      FROM ip.patents p
-      JOIN ip.patent_assignees pa ON pa.pub_no = p.pub_no
+      FROM anxg_ip.patents p
+      JOIN anxg_ip.patent_assignees pa ON pa.pub_no = p.pub_no
      WHERE {where}
      GROUP BY pa.assignee_id
     """
@@ -145,7 +145,7 @@ def cross_query_ip(corp_code: str,
             cur.execute(sql, params)
             for r in cur.fetchall():
                 counts[r[0]] = int(r[1])
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — [ip.cross_query_ip] PG 조회 실패 흡수 → n_patents 0 으로 enrich 진행 (부분 성공 보존)
         log.warning("[ip.cross_query_ip] PG 실패: %s", e)
 
     enriched = [

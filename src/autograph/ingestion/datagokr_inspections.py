@@ -24,7 +24,6 @@ from pathlib import Path
 
 from ..config import get_auto_settings
 
-
 log = logging.getLogger(__name__)
 
 

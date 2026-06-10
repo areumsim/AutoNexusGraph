@@ -15,9 +15,6 @@ from autograph.ontology import (
     entity_key_property,
     entity_labels,
     load_edge_required_meta,
-    load_entities,
-    load_relations,
-    load_system_taxonomy,
     relation_endpoints,
     relation_types,
 )

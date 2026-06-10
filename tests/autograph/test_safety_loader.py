@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from autograph.loaders.load_auto_safety import (
+from autograph.loaders.recall.load_auto_safety import (
     _RATING_MAP,
     _parse_pct,
     _parse_star,
@@ -71,14 +71,14 @@ def test_rating_map_covers_core_ncap_fields():
 
 def test_rating_map_value_types():
     """value_type 'star' | 'pct' | 'text' 만 허용."""
-    for field, (measure_key, unit, vtype) in _RATING_MAP.items():
+    for field, (measure_key, _unit, vtype) in _RATING_MAP.items():
         assert vtype in ("star", "pct", "text"), f"{field}: {vtype}"
         # measure_key 컨벤션 — safety.* 접두사.
         assert measure_key.startswith("safety."), f"{field}: {measure_key}"
 
 
 def test_star_fields_have_star_unit():
-    for field, (measure_key, unit, vtype) in _RATING_MAP.items():
+    for field, (_measure_key, unit, vtype) in _RATING_MAP.items():
         if vtype == "star":
             assert unit == "star", f"{field}: {unit}"
         elif vtype == "pct":
@@ -89,7 +89,7 @@ def test_star_fields_have_star_unit():
 def test_safety_modules_importable():
     """ingestion + loader 둘 다 import 가능 (cypher_guard 등 의존 깨지지 않음)."""
     import autograph.ingestion.nhtsa_safety_ratings as ing
-    import autograph.loaders.load_auto_safety as ldr
+    import autograph.loaders.recall.load_auto_safety as ldr
 
     # ingestion module
     assert hasattr(ing, "fetch_safety_ratings")

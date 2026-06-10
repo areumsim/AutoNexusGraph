@@ -16,13 +16,12 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
 # ── M-11 factoryon ────────────────────────────────────────────
 def test_factoryon_normalize_row():
-    from autograph.loaders.load_factoryon import _normalize_row
+    from autograph.loaders.process.load_factoryon import _normalize_row
     item = {
         "fctryManageNo": "F123",
         "cmpnyNm":       "현대모비스",
@@ -41,7 +40,7 @@ def test_factoryon_normalize_row():
 
 def test_factoryon_collect_rows_empty_when_no_raw(tmp_path):
     """raw 디렉토리 미존재 → 0 rows."""
-    from autograph.loaders.load_factoryon import collect_rows
+    from autograph.loaders.process.load_factoryon import collect_rows
     empty = tmp_path / "factoryon_missing"
     rows = collect_rows(empty)
     assert rows == []
@@ -49,7 +48,7 @@ def test_factoryon_collect_rows_empty_when_no_raw(tmp_path):
 
 def test_factoryon_dedup_by_factory_no(tmp_path):
     """동일 factory_no 가 두 파일에 있을 때 dedup."""
-    from autograph.loaders.load_factoryon import collect_rows
+    from autograph.loaders.process.load_factoryon import collect_rows
     base = tmp_path / "ft"
     (base / "by_company").mkdir(parents=True)
     (base / "by_factory_no").mkdir(parents=True)
@@ -92,6 +91,7 @@ def test_parse_pct_basic():
 def test_utilization_table_function_exists():
     """가동률 표 파서 함수 시그니처 보존."""
     import inspect
+
     from autograph.extractors.dart_production_parser import _parse_utilization_table
     sig = inspect.signature(_parse_utilization_table)
     assert "data_rows" in sig.parameters
@@ -99,7 +99,7 @@ def test_utilization_table_function_exists():
 
 
 def test_plant_utilization_table_in_pg_schema():
-    """auto.plant_utilization 테이블 정의 SQL 존재 확인."""
+    """anxg_auto.plant_utilization 테이블 정의 SQL 존재 확인."""
     sql_file = ROOT / "infra" / "postgres" / "init" / "15_autograph_production.sql"
     assert sql_file.exists()
     content = sql_file.read_text(encoding="utf-8")
@@ -108,7 +108,7 @@ def test_plant_utilization_table_in_pg_schema():
 
 # ── M-13 KOSIS ────────────────────────────────────────────────
 def test_kosis_loader_coerce_rows():
-    from autograph.loaders.load_kosis_industry import _coerce_rows
+    from autograph.loaders.process.load_kosis_industry import _coerce_rows
     raw = [
         {"TBL_ID": "DT_X", "ITM_ID": "I1", "PRD_DE": "202401",
          "DT": "108.5", "UNIT_NM": "지수",
@@ -127,7 +127,7 @@ def test_kosis_loader_coerce_rows():
 
 def test_kosis_loader_handles_null_dt():
     """DT='-' 또는 빈 값 → value=None."""
-    from autograph.loaders.load_kosis_industry import _coerce_rows
+    from autograph.loaders.process.load_kosis_industry import _coerce_rows
     raw = [{"TBL_ID": "DT_X", "ITM_ID": "I1", "PRD_DE": "2024",
             "DT": "-", "UNIT_NM": "지수"}]
     out = _coerce_rows(raw, stat_code_hint="manufacturing")
@@ -135,7 +135,7 @@ def test_kosis_loader_handles_null_dt():
 
 
 def test_kosis_loader_empty_when_no_raw(tmp_path):
-    from autograph.loaders.load_kosis_industry import collect_rows
+    from autograph.loaders.process.load_kosis_industry import collect_rows
     rows = collect_rows(tmp_path / "kosis_missing")
     assert rows == []
 
@@ -175,7 +175,7 @@ def test_materials_seed_yaml_present():
 
 
 def test_load_usgs_minerals_module_importable():
-    from autograph.loaders import load_usgs_minerals
+    from autograph.loaders.materials import load_usgs_minerals
     # _SCHEMA_VERSION 이 default_schema_version() 의 'v2.2' 인지 (B1 fix).
     assert load_usgs_minerals._SCHEMA_VERSION == "v2.2"
 
@@ -195,14 +195,14 @@ def test_pg_init_24_factoryon_exists():
     p = ROOT / "infra" / "postgres" / "init" / "24_auto_factoryon.sql"
     assert p.exists()
     content = p.read_text(encoding="utf-8")
-    assert "auto.factoryon_registry" in content
+    assert "anxg_auto.factoryon_registry" in content
     assert "factory_no" in content
 
 
 def test_pg_init_kosis_macro_exists():
-    """KOSIS 적재 대상 테이블 (macro.kosis_series) SQL 정의 확인."""
+    """KOSIS 적재 대상 테이블 (anxg_macro.kosis_series) SQL 정의 확인."""
     p = ROOT / "infra" / "postgres" / "init" / "04_external_data.sql"
     assert p.exists()
     content = p.read_text(encoding="utf-8")
-    assert "macro.kosis_series" in content
+    assert "anxg_macro.kosis_series" in content
     assert "stat_code" in content

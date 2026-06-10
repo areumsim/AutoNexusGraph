@@ -1,6 +1,6 @@
 """P3 chunk 선별 — 자동차 도메인.
 
-vec.chunks 에 자동차 메타 (manufacturer_id/model_id/variant_id) 와 source 컨벤션
+anxg_vec.chunks 에 자동차 메타 (manufacturer_id/model_id/variant_id) 와 source 컨벤션
 ('nhtsa_recall', 'nhtsa_complaint', 'wikipedia_auto', 'aihub_71347' …) 이 있으므로
 finance 의 corp_code 필터와 분리한 별도 SELECT.
 
@@ -10,15 +10,15 @@ finance 의 corp_code 필터와 분리한 별도 SELECT.
 from __future__ import annotations
 
 import logging
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from autonexusgraph.db.postgres import get_pool
-
 
 log = logging.getLogger(__name__)
 
 
-# 본 PR 의 P3 대상이 되는 vec.chunks.source 값들.
+# 본 PR 의 P3 대상이 되는 anxg_vec.chunks.source 값들.
 DEFAULT_SOURCES: tuple[str, ...] = (
     "nhtsa_recall",
     "nhtsa_complaint",
@@ -50,7 +50,7 @@ def select_ir_chunks(
     """OEM IR 본문 chunk 필터.
 
     nhtsa_* 와 달리 IR 청크는 manufacturer_id 무관 (oem 식별자 'hyundai'/'mobis'/
-    'kia_worldwide' 키 사용). vec.chunks 의 metadata->>'oem' 으로 필터.
+    'kia_worldwide' 키 사용). anxg_vec.chunks 의 metadata->>'oem' 으로 필터.
     """
     sources_list = list(sources)
     where = ["c.source = ANY(%(sources)s)",
@@ -71,7 +71,7 @@ def select_ir_chunks(
     sql = f"""
         SELECT c.id, c.source, c.section, c.text, c.metadata,
                c.manufacturer_id, c.model_id, c.variant_id
-          FROM vec.chunks c
+          FROM anxg_vec.chunks c
          WHERE {' AND '.join(where)}
          ORDER BY c.id DESC
          LIMIT %(limit)s
@@ -79,7 +79,7 @@ def select_ir_chunks(
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
     log.info("[chunk_selector:ir] %d chunks (oems=%s)",
              len(rows), oems or "all")
     return rows
@@ -96,7 +96,7 @@ def select_auto_chunks(
     limit: int = 200,
     limit_per_manufacturer: int = 50,
 ) -> list[dict[str, Any]]:
-    """vec.chunks 필터 — manufacturer_id/source/token 범위.
+    """anxg_vec.chunks 필터 — manufacturer_id/source/token 범위.
 
     Returns:
         각 dict 는 LLM 호출에 충분한 메타 + 본문:
@@ -125,7 +125,7 @@ def select_auto_chunks(
              c.manufacturer_id, c.model_id, c.variant_id, c.metadata,
              row_number() OVER (PARTITION BY c.manufacturer_id
                                 ORDER BY c.token_count DESC) AS rk
-        FROM vec.chunks c
+        FROM anxg_vec.chunks c
        WHERE {' AND '.join(where)}
     )
     SELECT id, source, section, text, token_count,
@@ -140,7 +140,7 @@ def select_auto_chunks(
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
 
     log.info("[p3.select] %d chunks (manufacturers=%s sources=%s)",
              len(rows),
@@ -153,7 +153,7 @@ def resolve_manufacturer_name(manufacturer_id: int) -> str | None:
     """LLM 프롬프트 hint 용 — manufacturer_id → name."""
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT name FROM auto.master_manufacturers WHERE manufacturer_id = %s",
+            "SELECT name FROM anxg_auto.master_manufacturers WHERE manufacturer_id = %s",
             (manufacturer_id,),
         )
         r = cur.fetchone()

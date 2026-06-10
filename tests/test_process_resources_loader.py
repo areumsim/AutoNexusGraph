@@ -5,13 +5,13 @@
 
 from __future__ import annotations
 
-from autograph.loaders.load_process_resources import _build_equipment_rows, _EQUIPMENT
+from autograph.loaders.process.load_process_resources import _EQUIPMENT, _build_equipment_rows
 
 
 def test_every_process_has_equipment():
     # 9 공정유형 모두 설비 1개 이상.
     assert set(_EQUIPMENT) >= {"프레스", "차체", "도장", "의장", "파워트레인", "가공", "사출", "용접"}
-    for proc, eqs in _EQUIPMENT.items():
+    for _proc, eqs in _EQUIPMENT.items():
         assert len(eqs) >= 1
 
 

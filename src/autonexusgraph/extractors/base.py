@@ -7,7 +7,7 @@
 
 우리 도메인 단순화:
 - entity 는 P2 정형(DART)에서 SSOT — extractor 는 relation 만 추출.
-- chunk 입력 = vec.chunks row dict (id, corp_code, text, fiscal_year, section, ...)
+- chunk 입력 = anxg_vec.chunks row dict (id, corp_code, text, fiscal_year, section, ...)
 - RunContext = LLM client / 비용 가드 / company name resolver 묶음.
 """
 
@@ -55,7 +55,7 @@ class ExtractorResult:
         *,
         warnings: Sequence[str] = (),
         latency_ms: int = 0,
-    ) -> "ExtractorResult":
+    ) -> ExtractorResult:
         return cls(
             relations=(), extractor_name=name, extractor_version=version,
             latency_ms=latency_ms, warnings=tuple(warnings),
@@ -96,7 +96,7 @@ class BaseExtractor(ABC):
             return self.extract(chunk, ctx)
         except BudgetExceeded:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — 호출 실패 흡수 → ExtractorResult.empty( 반환
             elapsed = int((time.monotonic() - t0) * 1000)
             return ExtractorResult.empty(
                 self.name, self.version,

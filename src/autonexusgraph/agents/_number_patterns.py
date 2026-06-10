@@ -14,7 +14,7 @@ post-synth 가드가 동일 정규식을 사용해야 일관성이 보장된다.
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 BIG_NUMBER_RE: re.Pattern[str] = re.compile(
     r"(?<![\d,])(\d{1,3}(?:,\d{3}){2,}|[1-9]\d{6,})(?![\d,])"

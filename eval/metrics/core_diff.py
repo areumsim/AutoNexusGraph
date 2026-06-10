@@ -179,8 +179,37 @@ def collect_core_diff() -> dict[str, Any]:
         "changed_loc":     changed,
         "change_ratio":    round(ratio, 4),
         "target_met":      ratio < TARGET_RATIO,
+        "ledger":          _read_ledger_summary(),
     })
     return out
+
+
+def _read_ledger_summary() -> dict[str, Any]:
+    """baseline reset ledger 에서 누계 + 현 baseline 의 사유 추출.
+
+    `eval/reports/core_diff_baseline_ledger.md` 가 SSOT. markdown 표 row 의
+    첫 컬럼(commit) 과 reset 사유 컬럼만 추출. 파싱 실패는 빈 dict (fail-soft).
+    """
+    import re
+    from pathlib import Path
+    ledger_path = Path(__file__).resolve().parents[2] / "eval" / "reports" / "core_diff_baseline_ledger.md"
+    if not ledger_path.is_file():
+        return {"resets_total": 0, "current_reason": None}
+    try:
+        text = ledger_path.read_text(encoding="utf-8")
+    except Exception:   # noqa: BLE001 — ledger 읽기 실패 흡수 → 빈 dict (best-effort)
+        return {"resets_total": 0, "current_reason": None}
+    # `| YYYY-MM-... | `<sha>...` | <reason> |` 패턴
+    row_pat = re.compile(r"^\|\s*[*\d][^|]*\|\s*\**`([0-9a-f]+)`[^|]*\|\s*([^|]+)\|", re.MULTILINE)
+    rows = row_pat.findall(text)
+    if not rows:
+        return {"resets_total": 0, "current_reason": None}
+    last_commit, last_reason = rows[-1]
+    return {
+        "resets_total":   len(rows),
+        "current_reason": last_reason.strip()[:140],
+        "current_sha":    last_commit[:10],
+    }
 
 
 def format_summary_md(d: dict[str, Any]) -> str:

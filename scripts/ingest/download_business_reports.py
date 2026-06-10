@@ -57,7 +57,7 @@ def _download_for_corp(
             try:
                 content = client.download_filing_document(fl.rcept_no)
                 doc_path.write_bytes(content)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → len(filings) 반환
                 print(f"[WARN] {fl.rcept_no} 다운로드 실패: {e}", file=sys.stderr)
     return len(filings)
 
@@ -117,7 +117,7 @@ def main() -> int:
             try:
                 total += _download_for_corp(client, cc, args.start, args.end, out_root,
                                             download_documents=args.download_documents)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_business_reports] fail-soft 흡수 → 0 반환 (log 동반)
                 print(f"[WARN] {cc} 실패: {e}", file=sys.stderr)
     print(f"[DONE] total filings: {total:,}")
     return 0

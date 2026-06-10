@@ -25,7 +25,6 @@ from ..config import get_settings
 from ._common import LoadStats
 from ._edge_meta import edge_meta_set_clause
 
-
 # ── 자회사 / 관계회사 ─────────────────────────────────────────────
 # DART API 응답 키 (otrCprInvstmntSttus):
 #   inv_prm                 : 출자대상 회사명
@@ -36,8 +35,8 @@ from ._edge_meta import edge_meta_set_clause
 
 CYPHER_SUBSIDIARIES = f"""
 UNWIND $rows AS r
-MERGE (parent:Company {{corp_code: r.parent_corp_code}})
-MERGE (child:Company {{name: r.child_name}})
+MERGE (parent:Anxg_Company {{corp_code: r.parent_corp_code}})
+MERGE (child:Anxg_Company {{name: r.child_name}})
 ON CREATE SET child.created_at = datetime(),
               child.source     = 'dart_subsidiary_external'
 WITH parent, child, r
@@ -72,9 +71,9 @@ FOREACH (_ IN CASE WHEN r.ownership_pct < 50 AND r.ownership_pct >= 5 THEN [1] E
 
 CYPHER_EXECUTIVES = f"""
 UNWIND $rows AS r
-MERGE (c:Company {{corp_code: r.corp_code}})
+MERGE (c:Anxg_Company {{corp_code: r.corp_code}})
 // Person 자연키 = (name, birth_year). birth_year 미상은 -1 로 정규화 → 동명이인 안전 분리.
-MERGE (p:Person {{name: r.name, birth_year: coalesce(r.birth_year, -1)}})
+MERGE (p:Anxg_Person {{name: r.name, birth_year: coalesce(r.birth_year, -1)}})
 ON CREATE SET p.created_at = datetime(),
               p.source     = 'dart_executive'
 SET p.gender = coalesce(r.gender, p.gender)
@@ -102,14 +101,14 @@ SET rel.registered   = r.registered,
 
 CYPHER_SHAREHOLDERS = f"""
 UNWIND $rows AS r
-MERGE (c:Company {{corp_code: r.corp_code}})
+MERGE (c:Anxg_Company {{corp_code: r.corp_code}})
 // 법인 주주 vs 개인 주주 구분 — 끝에 ㈜/주식회사/법인 이면 법인, 아니면 자연인
 WITH c, r,
      CASE WHEN r.name =~ '.*(㈜|주식회사|\\\\(주\\\\)|Corp|Inc|Ltd|법인).*'
           THEN 'company' ELSE 'person' END AS holder_kind
 FOREACH (_ IN CASE WHEN holder_kind = 'person' THEN [1] ELSE [] END |
   // 최대주주 보고서엔 birth_year 가 거의 없어 -1 로 정규화. 후속 ER 단계에서 보강.
-  MERGE (h:Person {{name: r.name, birth_year: -1}})
+  MERGE (h:Anxg_Person {{name: r.name, birth_year: -1}})
   ON CREATE SET h.source = 'dart_shareholder'
   MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {{snapshot_year: r.year, relation: r.relation}}]->(c)
   SET rel.ownership_pct = r.ownership_pct,
@@ -120,7 +119,7 @@ FOREACH (_ IN CASE WHEN holder_kind = 'person' THEN [1] ELSE [] END |
                        snapshot_year_expr='r.year')}
 )
 FOREACH (_ IN CASE WHEN holder_kind = 'company' THEN [1] ELSE [] END |
-  MERGE (h:Company {{name: r.name}})
+  MERGE (h:Anxg_Company {{name: r.name}})
   ON CREATE SET h.source = 'dart_shareholder_external'
   MERGE (h)-[rel:MAJOR_SHAREHOLDER_OF {{snapshot_year: r.year, relation: r.relation}}]->(c)
   SET rel.ownership_pct = r.ownership_pct,
@@ -208,8 +207,8 @@ def load_subsidiaries(
         stats.batches = (len(rows) + batch_size - 1) // batch_size
         return stats
 
-    from ..db.neo4j import get_driver
-    with get_driver().session() as session:
+    from ..db.neo4j import get_session
+    with get_session() as session:
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
             session.run(CYPHER_SUBSIDIARIES, rows=batch)
@@ -270,8 +269,8 @@ def load_executives(
         stats.batches = (len(rows) + batch_size - 1) // batch_size
         return stats
 
-    from ..db.neo4j import get_driver
-    with get_driver().session() as session:
+    from ..db.neo4j import get_session
+    with get_session() as session:
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
             session.run(CYPHER_EXECUTIVES, rows=batch)
@@ -315,8 +314,8 @@ def load_shareholders(
         stats.batches = (len(rows) + batch_size - 1) // batch_size
         return stats
 
-    from ..db.neo4j import get_driver
-    with get_driver().session() as session:
+    from ..db.neo4j import get_session
+    with get_session() as session:
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
             session.run(CYPHER_SHAREHOLDERS, rows=batch)

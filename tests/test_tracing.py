@@ -173,15 +173,17 @@ def test_turn_context_isolated_per_thread(monkeypatch):
 
     def _run(tid: str) -> None:
         with tracing.start_turn_context(tid, {"domain": "auto",
-                                               "question": tid}) as turn:
+                                               "question": tid}):
             barrier.wait()
             # 양 thread 동시에 ctx 보유 — 서로 안 덮어써야.
             results[tid] = ct.current_tracker().state.thread_id   # type: ignore[union-attr]
 
     threads = [threading.Thread(target=_run, args=(t,))
                for t in ("A", "B")]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     assert results == {"A": "A", "B": "B"}
 
 

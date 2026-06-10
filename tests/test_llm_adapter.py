@@ -61,7 +61,7 @@ def test_get_llm_client_unknown_provider(monkeypatch):
     get_settings.cache_clear()
     # Settings 가 Literal validator 로 막아서 ValidationError. 우리 LLMError 도달 X.
     monkeypatch.setenv("LLM_PROVIDER", "xxx")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — 잘못된 provider 거부만 검증 (예외 타입 비결합)
         get_llm_client()
 
 

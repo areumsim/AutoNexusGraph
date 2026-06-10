@@ -14,21 +14,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
 # ── 핸들러 + 라우터 등록 ─────────────────────────────────────
 def test_ipgraph_imports():
-    import ipgraph                         # noqa: F401
+    import ipgraph  # noqa: F401
     from ipgraph.agent_handler import IPGraphHandler
     assert IPGraphHandler().domain == "ip"
 
 
 def test_register_handler_side_effect():
-    import ipgraph                         # noqa: F401  (등록 부작용 발생)
+    import ipgraph  # noqa: F401  (등록 부작용 발생)
     from autonexusgraph.agents._domain_handler import get_handler
     h = get_handler("ip")
     assert h is not None
@@ -36,8 +33,8 @@ def test_register_handler_side_effect():
 
 
 def test_register_router_side_effect():
-    import ipgraph                         # noqa: F401
-    from autonexusgraph.agents._domain_handler import _ROUTERS   # type: ignore[attr-defined]
+    import ipgraph  # noqa: F401
+    from autonexusgraph.agents._domain_handler import _ROUTERS  # type: ignore[attr-defined]
     from ipgraph.policy import route_domain_ip
     assert route_domain_ip in _ROUTERS
 
@@ -117,8 +114,10 @@ def test_allowed_intents_includes_core_ip_tools():
 # ── ontology 검증 ────────────────────────────────────────
 def test_ontology_loads_with_schema_version():
     from ipgraph.ontology import (
-        ontology_schema_version, entity_labels, relation_types,
+        entity_labels,
         load_edge_required_meta,
+        ontology_schema_version,
+        relation_types,
     )
     assert ontology_schema_version() == "v2.2"
     labels = entity_labels()
@@ -151,7 +150,7 @@ def test_25_cypher_templates_defined():
 
 def test_cypher_templates_merged_into_finance_registry():
     """ipgraph.tools import 시 IP_TEMPLATES 자동 병합."""
-    import ipgraph.tools                  # noqa: F401  부작용
+    import ipgraph.tools  # noqa: F401  부작용
     from autonexusgraph.tools.cypher_templates import TEMPLATES
     ip_keys = [k for k in TEMPLATES if k.startswith("ip_")]
     assert len(ip_keys) >= 25
@@ -159,9 +158,10 @@ def test_cypher_templates_merged_into_finance_registry():
 
 def test_citation_network_template_caps_depth():
     """get_citation_network 의 depth ≤ 2 cap 검증 (PRD §10.12 그래프 폭발 방지)."""
-    from ipgraph.tools.graph import get_citation_network
     # depth=3 입력 시 내부에서 2로 절단 — 직접 검증 어려우니 함수 signature 만.
     import inspect
+
+    from ipgraph.tools.graph import get_citation_network
     sig = inspect.signature(get_citation_network)
     assert "depth" in sig.parameters
     assert "max_total" in sig.parameters
@@ -227,9 +227,15 @@ def test_gold_ip_distribution_l1_l2_l3():
 # ── tools import 확인 ─────────────────────────────────────
 def test_ip_tools_importable():
     from ipgraph.tools import (
-        lookup_patent, get_patent_info, list_patents_by_assignee,
-        lookup_assignee_graph, list_patents_in_cpc, get_citation_network,
-        search_patents, bridge_assignee_to_corp, cross_query_ip,
+        bridge_assignee_to_corp,
+        cross_query_ip,
+        get_citation_network,
+        get_patent_info,
+        list_patents_by_assignee,
+        list_patents_in_cpc,
+        lookup_assignee_graph,
+        lookup_patent,
+        search_patents,
     )
     # 각 함수가 callable 임만 확인.
     for f in (lookup_patent, get_patent_info, list_patents_by_assignee,
@@ -240,8 +246,9 @@ def test_ip_tools_importable():
 
 # ── ingestion adapters fail-soft ─────────────────────────
 def test_kipris_collect_without_key_skips():
-    from ipgraph.ingestion.kipris import collect
     import os
+
+    from ipgraph.ingestion.kipris import collect
     # 키 없으면 fetch skip — raw XML 도 없으면 0 row (graceful, parse-raw-anyway 설계).
     if not os.getenv("KIPRIS_API_KEY"):
         result = collect()

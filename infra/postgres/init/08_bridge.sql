@@ -8,11 +8,11 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS bridge;
+CREATE SCHEMA IF NOT EXISTS anxg_bridge;
 
-CREATE TABLE IF NOT EXISTS bridge.corp_entity (
+CREATE TABLE IF NOT EXISTS anxg_bridge.corp_entity (
     id                 BIGSERIAL       PRIMARY KEY,
-    corp_code          CHAR(8)         REFERENCES master.companies(corp_code),
+    corp_code          CHAR(8)         REFERENCES anxg_master.companies(corp_code),
     entity_id          VARCHAR(64)     NOT NULL,
     entity_type        VARCHAR(30)     NOT NULL,
         -- 'manufacturer' | 'supplier' | 'vehicle_model' | 'variant' | 'recall'
@@ -37,12 +37,12 @@ CREATE TABLE IF NOT EXISTS bridge.corp_entity (
 -- 한 (corp_code, entity_type, entity_id) 조합당 1행. 미상장 entity 도 corp_code=NULL 로 유일하지 않을 수 있어
 -- 부분 unique index 로 NULL 안전 처리.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_bridge_corp_entity
-  ON bridge.corp_entity (COALESCE(corp_code, ''), entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_bridge_corp     ON bridge.corp_entity(corp_code, entity_type);
-CREATE INDEX IF NOT EXISTS idx_bridge_entity   ON bridge.corp_entity(entity_id, entity_type);
-CREATE INDEX IF NOT EXISTS idx_bridge_qid      ON bridge.corp_entity(wikidata_qid);
-CREATE INDEX IF NOT EXISTS idx_bridge_reviewed ON bridge.corp_entity(reviewed_status);
+  ON anxg_bridge.corp_entity (COALESCE(corp_code, ''), entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_bridge_corp     ON anxg_bridge.corp_entity(corp_code, entity_type);
+CREATE INDEX IF NOT EXISTS idx_bridge_entity   ON anxg_bridge.corp_entity(entity_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_bridge_qid      ON anxg_bridge.corp_entity(wikidata_qid);
+CREATE INDEX IF NOT EXISTS idx_bridge_reviewed ON anxg_bridge.corp_entity(reviewed_status);
 
 COMMENT ON SCHEMA bridge IS 'Cross-Domain Bridge — finance 도메인 corp_code ↔ AutoGraph/기타 도메인 entity 매핑.';
-COMMENT ON TABLE  bridge.corp_entity IS
+COMMENT ON TABLE  anxg_bridge.corp_entity IS
   'corp_code ↔ entity_id 매핑. 자동 매칭은 candidate, 사람 검토 후 reviewed 로 승급.';

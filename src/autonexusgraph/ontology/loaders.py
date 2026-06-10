@@ -11,10 +11,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from . import OntologyFile, load_and_validate
 
@@ -28,7 +29,7 @@ class DomainOntologyLoaders:
     load_relations: Callable[[], dict[str, dict[str, Any]]]
     load_edge_required_meta: Callable[[], tuple[str, ...]]
     ontology_schema_version: Callable[[], str]
-    entity_key_property: Callable[[str], "str | list[str]"]
+    entity_key_property: Callable[[str], str | list[str]]
     entity_labels: Callable[[], list[str]]
     relation_types: Callable[[], list[str]]
     relation_endpoints: Callable[[str], tuple[str, str]]
@@ -80,7 +81,7 @@ def make_domain_loaders(ontology_dir: Path,
         ont = _load_relations_file()
         return ont.schema_version or "v0"
 
-    def entity_key_property(label: str) -> "str | list[str]":
+    def entity_key_property(label: str) -> str | list[str]:
         """라벨의 자연 키 속성명 (단일 str 또는 복합 list[str])."""
         spec = load_entities().get(label)
         if not spec:

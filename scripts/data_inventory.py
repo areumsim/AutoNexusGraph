@@ -187,7 +187,7 @@ def main() -> int:
     print(f"  finstat rows   : {db['total_finstat_rows']:,}")
 
     if partial[:5]:
-        print(f"  partial 샘플 (앞 5):")
+        print("  partial 샘플 (앞 5):")
         for cc in partial[:5]:
             d = per_corp[cc]
             print(f"    - {cc}  company={d['company']}  "

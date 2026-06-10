@@ -24,7 +24,6 @@ from typing import Any
 
 import httpx
 
-
 SEC_BASE_DATA = "https://data.sec.gov"
 SEC_BASE_WWW  = "https://www.sec.gov"
 
@@ -50,7 +49,7 @@ class SecEdgarClient:
             headers={"User-Agent": user_agent, "Accept": "application/json"},
         )
 
-    def __enter__(self) -> "SecEdgarClient":
+    def __enter__(self) -> SecEdgarClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

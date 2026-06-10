@@ -6,9 +6,9 @@ DB 없이 seed → row 변환(_build_rows)만 검증 — 실제 Neo4j 적재는 
 
 from __future__ import annotations
 
-from autograph.loaders.load_performed_at import _build_rows, _norm
-from autograph.ontology import load_performed_at_seed
 from autograph.loaders._neo4j_helpers import EDGE_META_KEYS
+from autograph.loaders.process.load_performed_at import _build_rows, _norm
+from autograph.ontology import load_performed_at_seed
 
 
 def test_norm_strips_and_lowercases():

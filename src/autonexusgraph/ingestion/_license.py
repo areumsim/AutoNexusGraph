@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 LicenseTier = Literal[
     "public_domain",
     "cc0",

@@ -131,11 +131,11 @@ def test_turn_budget_auto_override(monkeypatch):
 
 
 def test_turn_budget_remaining_uses_domain(monkeypatch):
-    from autonexusgraph.config import get_settings
     from autonexusgraph.agents.policy import (
-        turn_budget_remaining,
         turn_budget_exceeded,
+        turn_budget_remaining,
     )
+    from autonexusgraph.config import get_settings
 
     get_settings.cache_clear()
     monkeypatch.setenv("AGENT_TURN_BUDGET_USD", "0.10")

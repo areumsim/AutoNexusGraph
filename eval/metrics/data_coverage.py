@@ -70,10 +70,10 @@ def collect_data_coverage() -> dict[str, Any]:
         cur.execute("""
             SELECT m.name, COUNT(DISTINCT vm.model_id) AS models,
                           COUNT(DISTINCT vv.variant_id) AS variants
-              FROM auto.master_manufacturers m
-              LEFT JOIN auto.master_vehicle_models vm
+              FROM anxg_auto.master_manufacturers m
+              LEFT JOIN anxg_auto.master_vehicle_models vm
                 ON vm.manufacturer_id = m.manufacturer_id
-              LEFT JOIN auto.master_vehicle_variants vv
+              LEFT JOIN anxg_auto.master_vehicle_variants vv
                 ON vv.model_id = vm.model_id
              WHERE vv.variant_id IS NOT NULL
              GROUP BY m.name
@@ -90,7 +90,7 @@ def collect_data_coverage() -> dict[str, Any]:
 
         # 2) 연식 분포.
         cur.execute("""
-            SELECT model_year, COUNT(*) FROM auto.master_vehicle_variants
+            SELECT model_year, COUNT(*) FROM anxg_auto.master_vehicle_variants
              WHERE model_year IS NOT NULL
              GROUP BY model_year ORDER BY model_year
         """)
@@ -106,27 +106,27 @@ def collect_data_coverage() -> dict[str, Any]:
 
         # 3) 이벤트.
         for src_key, tbl in (
-            ("recalls", "auto.events_recalls"),
-            ("complaints", "auto.events_complaints"),
-            ("investigations", "auto.events_investigations"),
+            ("recalls", "anxg_auto.events_recalls"),
+            ("complaints", "anxg_auto.events_complaints"),
+            ("investigations", "anxg_auto.events_investigations"),
         ):
             cur.execute(f"SELECT COUNT(*) FROM {tbl}")
             out["events"][src_key] = int(cur.fetchone()[0])
         # safety_ratings 는 별도 — spec_measurements 안에 들어감.
         cur.execute("""
-            SELECT COUNT(*) FROM auto.spec_measurements
+            SELECT COUNT(*) FROM anxg_auto.spec_measurements
              WHERE measure_key LIKE 'safety.%'
         """)
         out["events"]["safety_ratings"] = int(cur.fetchone()[0])
 
         # 4) spec / components.
-        cur.execute("SELECT COUNT(*) FROM auto.spec_measurements")
+        cur.execute("SELECT COUNT(*) FROM anxg_auto.spec_measurements")
         out["spec_measurements"] = int(cur.fetchone()[0])
-        cur.execute("SELECT COUNT(*) FROM auto.components")
+        cur.execute("SELECT COUNT(*) FROM anxg_auto.components")
         out["components"] = int(cur.fetchone()[0])
 
         # 5) SEC 재무.
-        cur.execute("SELECT COUNT(*), COUNT(DISTINCT sec_cik) FROM auto.oem_financials_sec")
+        cur.execute("SELECT COUNT(*), COUNT(DISTINCT sec_cik) FROM anxg_auto.oem_financials_sec")
         rr = cur.fetchone()
         out["sec_financials"] = {
             "rows": int(rr[0]), "ciks": int(rr[1]),

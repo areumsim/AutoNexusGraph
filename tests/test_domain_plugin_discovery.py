@@ -11,7 +11,6 @@ CrossDomainHandler / route_domain 이 등록되어 ``auto`` / ``cross_domain``
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 from unittest import mock
 
@@ -49,8 +48,7 @@ def _reset_registry():
     if not DH._HANDLERS or not DH._ROUTERS:
         try:
             DH.discover_plugins(force=True)
-        except Exception:
-            # discovery 실패는 무시 — 본 테스트 외부에서 자체 처리.
+        except Exception:   # noqa: BLE001 — discovery 실패 무시 (테스트 fixture cleanup, 본 테스트 외부에서 자체 처리)
             pass
 
 
@@ -106,7 +104,6 @@ def test_discovery_handles_import_failure(monkeypatch):
     monkeypatch.setenv("AUTONEXUSGRAPH_DOMAIN_PLUGINS", "autograph")
 
     real_import = importlib.import_module
-    orig_find = importlib.util.find_spec
 
     # autograph import 가 raise 하면 어떻게 되나
     def _import_module(name, *args, **kwargs):

@@ -2,7 +2,7 @@
 """P3 — 사업보고서 본문 청크 → LLM 관계 추출 진입점.
 
 처리 흐름:
-1. PG vec.chunks 에서 대상 청크 SELECT (회사 / 연도 / section / 토큰수 필터)
+1. PG anxg_vec.chunks 에서 대상 청크 SELECT (회사 / 연도 / section / 토큰수 필터)
 2. 청크 묶음에 대해 dry-run 비용 추정 → BudgetCheck 통과
 3. LLMClient (budget_aware wrapper) 호출 — 누적 비용 한도 도달 시 즉시 중단
 4. 결과는 data/processed/extracted/<corp_code>/<rcept_no>.jsonl 에 append
@@ -39,7 +39,7 @@ def _select_top_corps(n: int) -> list[str]:
     with get_pool().connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT corp_code
-              FROM master.companies
+              FROM anxg_master.companies
              WHERE is_active = TRUE
                AND stock_code IS NOT NULL
              ORDER BY (extra->>'market_cap_krw')::numeric DESC NULLS LAST
@@ -55,7 +55,7 @@ def _load_company_names(corps: list[str]) -> dict[str, str]:
     if not corps:
         return out
     with get_pool().connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT corp_code, corp_name FROM master.companies WHERE corp_code = ANY(%s)", (corps,))
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies WHERE corp_code = ANY(%s)", (corps,))
         for cc, nm in cur.fetchall():
             out[cc] = nm
     return out
@@ -100,10 +100,14 @@ def main() -> int:
 
     print(f"[P3] target corps: {len(corps)} (sample: {corps[:5]})")
 
-    from autonexusgraph.extractors.llm_relations import (
-        filter_target_chunks, estimate_p3_cost, load_prompt, extract_one, save_result,
-    )
     from autonexusgraph.config import get_settings
+    from autonexusgraph.extractors.llm_relations import (
+        estimate_p3_cost,
+        extract_one,
+        filter_target_chunks,
+        load_prompt,
+        save_result,
+    )
     settings = get_settings()
 
     # 1) 대상 청크 SELECT
@@ -198,7 +202,7 @@ def _existing_chunk_ids(root: Path) -> set[int]:
                 d = json.loads(line)
                 if "chunk_id" in d:
                     ids.add(int(d["chunk_id"]))
-        except Exception:
+        except Exception:   # noqa: BLE001 — [extract_business_report_relations] 1 unit 실패 흡수 → continue (부분 성공 보존)
             continue
     return ids
 

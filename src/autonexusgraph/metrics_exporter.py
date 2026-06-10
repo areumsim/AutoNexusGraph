@@ -15,7 +15,8 @@ Makefile: ``make metrics`` (once) / ``make serve-metrics``.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def _collect_db_up() -> list[dict]:
     for comp, mod in (("postgres", postgres), ("neo4j", neo4j)):
         try:
             up = 1.0 if mod.ping() else 0.0
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — 호출 실패 흡수 → out 반환
             up = 0.0
         out.append(_m("up", up, help="DB component reachable (1/0)", labels={"component": comp}))
     return out
@@ -45,7 +46,7 @@ def _collect_chunks() -> list[dict]:
     from autonexusgraph.embed_status import embed_status
     st = embed_status()
     return [
-        _m("vec_chunks_total", st["total"], help="vec.chunks 행 수"),
+        _m("vec_chunks_total", st["total"], help="anxg_vec.chunks 행 수"),
         _m("vec_chunks_embedded", st["embedded"], help="임베딩 채워진 chunk 수"),
     ]
 
@@ -54,16 +55,16 @@ def _collect_bridge() -> list[dict]:
     from autonexusgraph.bridge_review import review_progress_kpi
     k = review_progress_kpi()
     return [
-        _m("bridge_entries", k["total"], help="bridge.corp_entity 총 행", labels={"status": "total"}),
-        _m("bridge_entries", k["candidate"], help="bridge.corp_entity 총 행", labels={"status": "candidate"}),
-        _m("bridge_entries", k["reviewed"], help="bridge.corp_entity 총 행", labels={"status": "reviewed"}),
-        _m("bridge_entries", k["rejected"], help="bridge.corp_entity 총 행", labels={"status": "rejected"}),
+        _m("bridge_entries", k["total"], help="anxg_bridge.corp_entity 총 행", labels={"status": "total"}),
+        _m("bridge_entries", k["candidate"], help="anxg_bridge.corp_entity 총 행", labels={"status": "candidate"}),
+        _m("bridge_entries", k["reviewed"], help="anxg_bridge.corp_entity 총 행", labels={"status": "reviewed"}),
+        _m("bridge_entries", k["rejected"], help="anxg_bridge.corp_entity 총 행", labels={"status": "rejected"}),
     ]
 
 
 def _collect_neo4j_nodes() -> list[dict]:
-    from autonexusgraph.db.neo4j import get_driver
-    with get_driver().session() as s:
+    from autonexusgraph.db.neo4j import get_session
+    with get_session() as s:
         n = s.run("MATCH (n) RETURN count(n) AS n").single()["n"]
     return [_m("neo4j_nodes_total", n, help="Neo4j 전체 노드 수")]
 
@@ -82,15 +83,15 @@ def _collect_stale() -> list[dict]:
 
 
 def _collect_llm_status() -> list[dict]:
-    """ops.llm_usage status 분포 → error rate 산출 근거."""
+    """anxg_ops.llm_usage status 분포 → error rate 산출 근거."""
     from autonexusgraph.db.postgres import get_connection
     conn = get_connection()
     with conn.cursor() as cur:
-        cur.execute("SELECT status, count(*) FROM ops.llm_usage GROUP BY status")
+        cur.execute("SELECT status, count(*) FROM anxg_ops.llm_usage GROUP BY status")
         rows = cur.fetchall()
     conn.commit()
     return [_m("llm_turns_total", int(c), mtype="counter",
-               help="ops.llm_usage turn 수 (status별)", labels={"status": str(st or "unknown")})
+               help="anxg_ops.llm_usage turn 수 (status별)", labels={"status": str(st or "unknown")})
             for st, c in rows]
 
 
@@ -107,7 +108,7 @@ def collect_metrics() -> list[dict]:
     for c in COLLECTORS:
         try:
             out.extend(c())
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — [metrics] collector %s 실패 흡수 → out 반환
             errors += 1
             log.warning("[metrics] collector %s 실패: %s", getattr(c, "__name__", c), e)
     out.append(_m("scrape_errors", errors, help="이번 scrape 에서 실패한 collector 수"))

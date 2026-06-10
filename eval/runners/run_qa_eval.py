@@ -260,7 +260,7 @@ def compute_per_question_metrics(
 ) -> list[dict]:
     """gold × pred 머지 → per-question metric dict."""
     from eval.metrics import (
-        exact_match, token_f1, hits_at_k, faithfulness, llm_judge,
+        exact_match_contains, token_f1, hits_at_k, faithfulness, llm_judge,
     )
 
     by_qid = {p["qid"]: p for p in pred_rows}
@@ -275,6 +275,10 @@ def compute_per_question_metrics(
         golds_text = g.get("gold_answer_text") or []
         if isinstance(golds_text, str):
             golds_text = [golds_text]
+        # gold_answer_text 부재 row 는 EM/F1 측정 불가 (gold curation 미완).
+        # 0.0 으로 집계하면 전 어댑터 EM 이 0 으로 끌려가 측정이 무의미해진다 →
+        # scorable 표시로 분리해 집계에서 제외 (hits@k 는 entity 기반으로 별도 측정).
+        em_scorable = bool(golds_text)
         gold_entities = g.get("gold_answer_entities") or []
         ev_texts = [e.get("evidence_text", "") for e in (p.get("evidence") or [])]
         is_answerable = bool(g.get("is_answerable", True))
@@ -297,8 +301,10 @@ def compute_per_question_metrics(
             # 비-cross gold 에는 없으므로 빈 문자열로 표기.
             "difficulty": g.get("difficulty", ""),
 
-            "em":           exact_match(p.get("answer", ""), golds_text),
+            # span-aware EM — 산문 답변 ⊃ gold span 인정 (full-equality artifact 보정).
+            "em":           exact_match_contains(p.get("answer", ""), golds_text),
             "f1":           token_f1(p.get("answer", ""), golds_text),
+            "em_scorable":  em_scorable,
             "hits@k":       hits_at_k(pred_ents, gold_entities, k=top_k),
             "faithfulness": faithfulness(p.get("answer", ""), ev_texts),
 
@@ -337,10 +343,14 @@ def summarize_by_adapter(per_q: list[dict]) -> dict[str, dict]:
 
     for adapter, rows in by_adapter.items():
         ref = refusal_metrics(rows)
+        # EM/F1 은 gold_answer_text 가용(scorable) row 한정 평균 — 부재 row 의 0.0 이
+        # 평균을 끌어내려 측정이 무의미해지는 것을 방지. scorable_n 으로 표본 노출.
+        em_rows = [r for r in rows if r.get("em_scorable")]
         out[adapter] = {
             "n":                len(rows),
-            "em":               _safe_mean([r["em"] for r in rows]),
-            "f1":               _safe_mean([r["f1"] for r in rows]),
+            "em_scorable_n":    len(em_rows),
+            "em":               _safe_mean([r["em"] for r in em_rows]),
+            "f1":               _safe_mean([r["f1"] for r in em_rows]),
             "hits@k":           _safe_mean([r["hits@k"] for r in rows]),
             "faithfulness":     _safe_mean([r["faithfulness"] for r in rows]),
             "latency_sec_avg":  _safe_mean([r["latency_sec"] for r in rows]),
@@ -353,9 +363,11 @@ def summarize_by_adapter(per_q: list[dict]) -> dict[str, dict]:
         # 정직한 측정 대체 — gold_qa_v0 의 gold_answer_entities 30/30 가용.
         mh = [r for r in rows if r["requires_multi_hop"]]
         if mh:
+            mh_em = [r for r in mh if r.get("em_scorable")]
             out[adapter]["multi_hop_n"] = len(mh)
-            out[adapter]["multi_hop_em"] = _safe_mean([r["em"] for r in mh])
-            out[adapter]["multi_hop_f1"] = _safe_mean([r["f1"] for r in mh])
+            out[adapter]["multi_hop_em_scorable_n"] = len(mh_em)
+            out[adapter]["multi_hop_em"] = _safe_mean([r["em"] for r in mh_em])
+            out[adapter]["multi_hop_f1"] = _safe_mean([r["f1"] for r in mh_em])
             out[adapter]["multi_hop_hits"] = _safe_mean([r["hits@k"] for r in mh])
     return out
 
@@ -388,14 +400,17 @@ def summarize_by_difficulty(per_q: list[dict]) -> dict[str, dict[str, dict]]:
     for adapter, by_diff in out.items():
         rendered[adapter] = {}
         for diff, rows in by_diff.items():
-            em = _safe_mean([r["em"] for r in rows])
+            em_rows = [r for r in rows if r.get("em_scorable")]
+            em = _safe_mean([r["em"] for r in em_rows])
             target = _PRD_10_8_TARGETS.get(diff)
             rendered[adapter][diff] = {
                 "n":               len(rows),
+                "em_scorable_n":   len(em_rows),
                 "em":              em,
-                "f1":              _safe_mean([r["f1"] for r in rows]),
+                "f1":              _safe_mean([r["f1"] for r in em_rows]),
                 "em_target":       target,
-                "em_target_met":   (target is not None and em >= target),
+                # 표본 0 (gold curation 미완) 이면 목표 도달 판정 보류.
+                "em_target_met":   (target is not None and bool(em_rows) and em >= target),
             }
     return rendered
 
@@ -582,6 +597,10 @@ def write_per_question_csv(per_q: list[dict], out_path: Path) -> None:
 
 # ─── main ───────────────────────────────────────────────────
 def main() -> int:
+    # eval 은 본질상 비대화형 — 모호 회사명 질문이 langgraph interrupt 로 멈춰 빈 답이
+    # 나가지 않도록 interrupt 를 끈다(호출부가 1순위 자동선택 폴백). get_settings 캐시
+    # 전에 설정해야 반영. 운영자가 명시 export 하면 그 값 우선(setdefault).
+    os.environ.setdefault("AGENT_ALLOW_INTERRUPTS", "false")
     parser = argparse.ArgumentParser()
     parser.add_argument("--gold", type=Path, required=True)
     parser.add_argument("--adapters", default="vector,graph,hybrid,sql_vec")

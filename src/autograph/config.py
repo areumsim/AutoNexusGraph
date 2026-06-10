@@ -12,7 +12,6 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # data/raw 루트는 SSOT 로 autonexusgraph.config.Settings.ingest_raw_dir 한 곳만 사용.

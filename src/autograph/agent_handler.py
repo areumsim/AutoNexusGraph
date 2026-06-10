@@ -18,12 +18,13 @@ PRD §10.12 의도: core 는 ``from autograph`` 를 0건 보유. 핸들러 등�
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, cast
 
 from autonexusgraph.agents._domain_handler import (
-    DomainHandler,
     register_handler,
     register_router,
+    safe_import_module,
 )
 from autonexusgraph.agents.state import AgentState
 
@@ -33,7 +34,6 @@ from .policy import (
     plan_cross_domain_tasks,
     route_domain,
 )
-
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class AutoHandler:
     domain = "auto"
 
     def identify_targets(self, state: AgentState, *, question: str) -> None:
-        identify_auto_targets(state, question=question)
+        identify_auto_targets(cast(dict, state), question=question)
 
     def plan_tasks(self, state: AgentState, *, question: str) -> list[dict]:
         return plan_auto_tasks(
@@ -83,8 +83,8 @@ class AutoHandler:
         )
 
     def toolbox_modules(self) -> list[Any]:
-        from . import tools as auto_tb
-        return [auto_tb]
+        mod = safe_import_module("autograph.tools", log_prefix="auto.toolbox")
+        return [mod] if mod is not None else []
 
     def allowed_intents(self, kind: str) -> set[str]:
         return {
@@ -96,11 +96,9 @@ class AutoHandler:
     def fallback_search(
         self, state: AgentState, *, query: str,
     ) -> tuple[str, Callable, dict] | None:
-        try:
-            from .tools import search_documents_auto
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[auto.fallback] tools.search_documents_auto unavailable: %s",
-                        exc)
+        mod = safe_import_module("autograph.tools", log_prefix="auto.fallback")
+        fn = getattr(mod, "search_documents_auto", None) if mod is not None else None
+        if fn is None:
             return None
         args: dict[str, Any] = {"query": query, "top_k": 6}
         # 좁혀줄 수 있는 model_id 가 있으면 활용. target_makes/vehicles 는 호환
@@ -108,15 +106,11 @@ class AutoHandler:
         if state.get("target_models"):
             models = state["target_models"]
             args["model_id"] = models[0] if len(models) == 1 else models
-        return ("search_documents_auto", search_documents_auto, args)
+        return ("search_documents_auto", fn, args)
 
     def retrieve_module(self) -> Any | None:
-        try:
-            from .tools import retrieve
-            return retrieve
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[auto.retrieve] tools.retrieve unavailable: %s", exc)
-            return None
+        return safe_import_module("autograph.tools.retrieve",
+                                   log_prefix="auto.retrieve")
 
 
 # ── CrossDomainHandler ────────────────────────────────────────────
@@ -136,13 +130,17 @@ class CrossDomainHandler(AutoHandler):
 
     def toolbox_modules(self) -> list[Any]:
         # auto 가 먼저 — auto 전용 intent 가 finance 의 동명 함수보다 우선 매치.
-        from . import tools as auto_tb
-        from autonexusgraph import tools as fin_tb
-        return [auto_tb, fin_tb]
+        auto_tb = safe_import_module("autograph.tools",
+                                       log_prefix="cross.auto_toolbox")
+        fin_tb = safe_import_module("autonexusgraph.tools",
+                                      log_prefix="cross.fin_toolbox")
+        return [m for m in (auto_tb, fin_tb) if m is not None]
 
     def allowed_intents(self, kind: str) -> set[str]:
         from autonexusgraph.agents.workers import (
-            FIN_GRAPH_ALLOWED, FIN_SQL_ALLOWED, FIN_RESEARCH_INTENTS,
+            FIN_GRAPH_ALLOWED,
+            FIN_RESEARCH_INTENTS,
+            FIN_SQL_ALLOWED,
         )
         fin = {
             "graph":    FIN_GRAPH_ALLOWED,

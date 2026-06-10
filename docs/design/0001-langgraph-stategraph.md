@@ -13,7 +13,7 @@
 ## Consequences
 - (+) 노드 단위 trace·재현·replan(MAX_REPLANS=2) 가능. fallback 으로 LangGraph 선택적 의존.
 - (+) state 계약이 단일 SSOT → API/UI/Langfuse 가 같은 필드 소비.
-- (−) state 가 비대(33 필드)해질 수 있어 reducer 규칙(`_last_wins` 등) 필요.
+- (−) state 가 비대(39 필드)해질 수 있어 reducer 규칙(`_last_wins` 등) 필요.
 
 ## Alternatives
 - 단일 거대 프롬프트 체인 → 디버깅·부분 재실행 불가로 기각.

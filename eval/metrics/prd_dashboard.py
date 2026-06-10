@@ -27,7 +27,7 @@ CRITERIA = [
     ("10.3",  "LLM Provider 환경변수 전환", "config"),
     ("10.4",  "MVP 범위 (OEM 5~8 × 모델 30~50 × 2022~2024)", "data"),
     ("10.5",  "BOM Level 0~3 안정 + Level 4 coverage ≥ 60%", "data"),
-    ("10.6",  "bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+", "bridge"),
+    ("10.6",  "anxg_bridge.corp_entity QID/LEI 강매칭 confidence ≥0.9 비율 80%+", "bridge"),
     ("10.7",  "Hybrid vs Vector Multi-hop +30%p", "eval-llm"),
     ("10.8",  "Cross-Domain QA 4단계 (CD-L1 80%+/L2 70%+/L3 50%+/L4 40%+)", "eval-llm"),
     ("10.9",  "제원 수치 EM 95%+", "eval-llm"),
@@ -514,6 +514,10 @@ def collect_dashboard() -> dict[str, Any]:
             base = (cd["baseline_commit"] or "")[:10]
             label = (f"baseline `{base}` → {cd['changed_loc']:,}/{cd['baseline_loc']:,} "
                      f"LOC = {pct:.2f}%")
+            ledger = cd.get("ledger") or {}
+            resets = int(ledger.get("resets_total") or 0)
+            if resets:
+                label += f" | resets={resets} (도메인 추가/대형 기능 마다 reset)"
             status = "pass" if cd["target_met"] else "fail"
             detail = label
     except Exception as e:   # noqa: BLE001

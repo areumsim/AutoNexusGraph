@@ -9,7 +9,6 @@ LLM 호출 수가 더 줄어든다 (룰이 먼저 잡으면 LLM 안 부름).
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
 
 from .base import BaseExtractor, ExtractorResult, RunContext
 from .llm_relations import extract_one

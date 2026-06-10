@@ -78,7 +78,7 @@ print('등록된 핸들러:', sorted(_HANDLERS.keys()))
 
 ### Q2.3 세션 hard limit 도달 — 후속 turn 차단
 
-**증상**: `data/cost_log.jsonl` 누적이 `LLM_SESSION_HARD_LIMIT_USD` (기본 $10) 초과 → 차단.
+**증상**: `data/cost_log.jsonl` 누적이 `LLM_SESSION_HARD_LIMIT_USD` (기본 $5) 초과 → 차단.
 
 **해결**: 세션 재시작 (`cost_log.jsonl` 은 누적이라 재시작해도 누적값 유지 — 운영 환경에서는 일·주별 rotate 필요, §11.2 운영 보안 P1).
 
@@ -112,11 +112,11 @@ neo4j-init → pg → specs → neo4j → bridge → standards/plants → safety
 
 ### Q3.2 Wikidata P176 (manufactured by) staging 이 0 row
 
-**원인**: Wikidata SPARQL endpoint 의 rate-limit (1 req/min, 429 응답). `auto.staging_relations` 미적재가 정상 상태 — `docs/data_inventory.md §3 B-issue` 추적 중.
+**원인**: Wikidata SPARQL endpoint 의 rate-limit (1 req/min, 429 응답). `anxg_auto.staging_relations` 미적재가 정상 상태 — `docs/data_inventory.md §3 B-issue` 추적 중.
 
 **해결**: `supplier_seed.yaml` 19 공급사 × 46 매핑 (Neo4j `SUPPLIED_BY` 30 distinct edges) 으로 대체. P3 LLM 추출은 후속.
 
-### Q3.3 `:Supplier` Neo4j 9,642 vs PG `auto.master_suppliers` 4,812 — 2배 중복?
+### Q3.3 `:Supplier` Neo4j 9,642 vs PG `anxg_auto.master_suppliers` 4,812 — 2배 중복?
 
 **원인**: 미해결 이슈 (`data_inventory.md §3 B10`). `supplier_seed.yaml` + `auto.suppliers_edges` loader 의 중복 적재 의심. 진단 routine 미구현.
 
@@ -133,7 +133,7 @@ SELECT
     COUNT(*) AS total,
     SUM(CASE WHEN embedding IS NULL THEN 1 ELSE 0 END) AS missing,
     ROUND(100.0 * SUM(CASE WHEN embedding IS NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS missing_pct
-FROM vec.chunks
+FROM anxg_vec.chunks
 GROUP BY section
 ORDER BY total DESC;
 ```
@@ -171,7 +171,7 @@ ORDER BY total DESC;
 - `all_low` → hard fail → replan 트리거 (max 2회)
 - `some_low` → soft warning → 답변에 "후보 정보" 명시
 
-**해결**: 출처 등급 (`docs/data_lineage.md` 채널별 §7키 메타 항목의 `confidence_score`) 확인 후 더 높은 등급 (A/B) 의 데이터로 보강. 또는 `bridge.corp_entity` 의 supplier candidate 검토 SOP 적용 (4,790 row 영속 누적 — 운영 미설계, README §11.4 P1).
+**해결**: 출처 등급 (`docs/data_lineage.md` 채널별 §7키 메타 항목의 `confidence_score`) 확인 후 더 높은 등급 (A/B) 의 데이터로 보강. 또는 `anxg_bridge.corp_entity` 의 supplier candidate 검토 SOP 적용 (4,790 row 영속 누적 — 운영 미설계, README §11.4 P1).
 
 ### Q4.3 multi-hop 쿼리가 폭발 (timeout)
 
@@ -201,7 +201,7 @@ ORDER BY total DESC;
 
 ### Q5.3 `audit-edge-meta --strict` 가 fail
 
-**원인**: Neo4j 엣지 중 일부가 7키 (`source_type / source_id / confidence_score / validated_status / snapshot_year / extraction_method / schema_version`) 누락. `EDGE_REQUIRED_META_KEYS` SSOT = `src/autonexusgraph/ontology/schema.py:28-36`.
+**원인**: Neo4j 엣지 중 일부가 7키 (`source_type / source_id / confidence_score / validated_status / snapshot_year / extraction_method / schema_version`) 누락. `EDGE_REQUIRED_META_KEYS` SSOT = `src/autonexusgraph/ontology/schema.py:27-35`.
 
 **해결**: loader 의 `edge_meta_cypher()` 헬퍼 (`src/autograph/loaders/_neo4j_helpers.py`) 가 7키 자동 부여. 헬퍼 우회한 직접 CREATE 가 원인. 누락 엣지 식별:
 
@@ -231,7 +231,7 @@ grep LANGFUSE_HOST .env
 
 ### Q6.2 replan 무한 루프 의심
 
-**확인**: `MAX_REPLANS = 2` (`agents/validator.py:36`) 가 hard cap. 3번째 replan 시 finalize 노드가 `⚠️ 검증 실패 (replan 2/2 후)` 프리픽스로 답변 패키징.
+**확인**: `MAX_REPLANS = 2` (`agents/validator.py:39`) 가 hard cap. 3번째 replan 시 finalize 노드가 `⚠️ 검증 실패 (replan 2/2 후)` 프리픽스로 답변 패키징.
 
 **진단**: `state.n_replans` 값 확인. SSE stream 에서 노드 진행 표시.
 

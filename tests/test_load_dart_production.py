@@ -7,13 +7,10 @@ integration 영역.
 from __future__ import annotations
 
 import zipfile
-from pathlib import Path
 from unittest import mock
 
-import pytest
-
 from autograph.extractors.dart_production_parser import PlantRow
-from autograph.loaders import load_dart_production as L
+from autograph.loaders.process import load_dart_production as L
 
 
 # ── OEM_CORP_CODES 형태 ───────────────────────────────────────
@@ -182,7 +179,7 @@ def test_read_main_xml_no_xml_returns_none(tmp_path):
 
 # ── _resolve_manufacturer_id with mocks ───────────────────────
 def test_resolve_manufacturer_id_uses_bridge_first(monkeypatch):
-    """bridge.corp_entity 에 매핑이 있으면 그것을 우선."""
+    """anxg_bridge.corp_entity 에 매핑이 있으면 그것을 우선."""
     fake_cur = mock.MagicMock()
     fake_cur.fetchone.return_value = (498,)
     fake_conn = mock.MagicMock()

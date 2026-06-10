@@ -13,7 +13,6 @@ turn budget / circuit breaker 체크는 worker 진입 직전에도 다시 한다
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from .dag import (
     all_done,
@@ -168,10 +167,10 @@ def sup_send_directives(state: AgentState):
     빈 리스트면 langgraph 가 conditional edge 의 'done' 경로로 이동한다.
     """
     try:
-        from langgraph.types import Send   # type: ignore[import-not-found]
+        from langgraph.types import Send  # type: ignore[import-not-found]
     except ImportError:
         try:
-            from langgraph.graph import Send   # type: ignore[attr-defined]
+            from langgraph.graph import Send  # type: ignore[attr-defined,no-redef]
         except ImportError:
             return []
 
@@ -188,13 +187,14 @@ def sup_send_directives(state: AgentState):
         return []
 
     # worker 노드명은 graph.py 의 add_node 명과 일치해야 한다.
-    NODE_BY_AGENT = {
+    NODE_BY_AGENT = {  # noqa: N806 — 지역 상수(매핑)
         "research": "worker_research",
         "graph": "worker_graph",
         "sql": "worker_sql",
         "calculator": "worker_calculator",
     }
     sends = []
+    dispatched: list[str] = []   # 병렬 가시화용 — (node, task_id) 쌍
     for t in ready:
         agent = str(t.get("agent"))
         if agent == "_spawn":
@@ -208,6 +208,10 @@ def sup_send_directives(state: AgentState):
         t["status"] = "running"
         # 각 Send 는 child invocation 의 입력 state — task 와 전체 state 모두 전달
         sends.append(Send(node, {**state, "_current_task": t}))
+        dispatched.append(f"{node}#{t.get('id')}")
+    if sends:
+        log.info("[supervisor] dispatch %d parallel workers (Send API): %s",
+                 len(sends), dispatched)
     return sends
 
 

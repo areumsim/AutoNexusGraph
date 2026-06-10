@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from autograph.loaders import load_master_korean_aliases as L
+from autograph.loaders.master import load_master_korean_aliases as L
 
 
 def test_existing_aliases_shape():
@@ -14,7 +14,7 @@ def test_existing_aliases_shape():
     assert "HYUNDAI" in L.EXISTING_ALIASES
     assert "KIA" in L.EXISTING_ALIASES
     assert "CHEVROLET" in L.EXISTING_ALIASES   # 한국지엠 alias 대상
-    for name, aliases in L.EXISTING_ALIASES.items():
+    for _name, aliases in L.EXISTING_ALIASES.items():
         assert isinstance(aliases, list)
         assert all(isinstance(a, str) and a.strip() for a in aliases)
 

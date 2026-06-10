@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-
 AutoQuestionKind = Literal[
     "vehicle_spec",        # 차종 제원 (SQL)
     "vehicle_recall",      # 리콜 관계 (Graph) + 텍스트 (Vector)
@@ -128,9 +127,9 @@ def plan_auto_tasks(*, question: str,
             _next_id("sql_"), "sql", "lookup_vehicle",
             {"query": question, "limit": 5},
         ))
-        lookup_id = tasks[-1]["id"]
+        tasks[-1]["id"]
     else:
-        lookup_id = None
+        pass
 
     if kind == "vehicle_spec":
         for vid in target_vehicles:
@@ -329,7 +328,7 @@ def identify_auto_targets(state: dict, *,
             break
         try:
             hits = lookup_vehicle(word, year=year, limit=max_per_word)
-        except Exception:   # noqa: BLE001
+        except Exception:   # noqa: BLE001 — [policy] 1 unit 실패 흡수 → continue (부분 성공 보존)
             continue
         for h in hits:
             vid = h.get("variant_id")

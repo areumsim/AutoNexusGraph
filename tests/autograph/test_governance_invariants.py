@@ -18,7 +18,6 @@ import importlib
 import re
 from pathlib import Path
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. edge_required_meta 가 모든 loader 의 cypher MERGE 절에 들어가는지.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -26,6 +25,15 @@ from pathlib import Path
 def _loader_dir() -> Path:
     import autograph.loaders as _l
     return Path(_l.__file__).resolve().parent
+
+
+def _loader_src(name: str) -> str | None:
+    """loader 소스 읽기 — 그룹 하위폴더(master/recall/process/...) 포함 재귀 검색.
+
+    loaders/ 가 관심사별 하위폴더로 재편되어 평탄 경로가 깨질 수 있어 rglob 으로 탐색.
+    """
+    hits = list(_loader_dir().rglob(f"{name}.py"))
+    return hits[0].read_text(encoding="utf-8") if hits else None
 
 
 def test_edge_meta_keys_present_in_all_merge_loaders():
@@ -41,10 +49,9 @@ def test_edge_meta_keys_present_in_all_merge_loaders():
         "load_auto_safety",
     ]
     for name in direct_loaders:
-        path = _loader_dir() / f"{name}.py"
-        if not path.exists():
+        src = _loader_src(name)
+        if src is None:
             continue
-        src = path.read_text(encoding="utf-8")
         # edge_meta_cypher() 사용 → 통과.
         if "edge_meta_cypher" in src:
             continue
@@ -92,8 +99,8 @@ def test_cross_validate_rejected_not_loaded():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_bridge_low_confidence_marked_candidate():
-    lb_path = _loader_dir() / "load_bridge.py"
-    src = lb_path.read_text(encoding="utf-8")
+    src = _loader_src("load_bridge")
+    assert src is not None, "load_bridge.py 를 찾을 수 없음 (loaders 재편 경로 확인)"
     # 정책: PRD §4.6 — qid_exact=0.95, lei_exact=0.93, biz_no=0.90,
     # corp_code_exact=0.95, fuzzy_name=0.60~0.75.
     # fuzzy 가 0.7 미만이면 자동 'candidate' 또는 'needs_review' 로 들어가야 함.

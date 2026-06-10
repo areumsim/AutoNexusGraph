@@ -14,9 +14,9 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS ip;
+CREATE SCHEMA IF NOT EXISTS anxg_ip;
 
-CREATE TABLE IF NOT EXISTS ip.cpc_scheme (
+CREATE TABLE IF NOT EXISTS anxg_ip.cpc_scheme (
     code              VARCHAR(40)  PRIMARY KEY,        -- 'A' | 'A01' | 'A01B' | 'A01B1/00' | 'A01B1/02'
     parent_code       VARCHAR(40),                      -- 상위 코드 (section 은 NULL)
     level             VARCHAR(20)  NOT NULL,            -- 'section' | 'class' | 'subclass' | 'main_group' | 'subgroup'
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS ip.cpc_scheme (
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_cpc_parent ON ip.cpc_scheme(parent_code) WHERE parent_code IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_cpc_level  ON ip.cpc_scheme(level);
+CREATE INDEX IF NOT EXISTS idx_cpc_parent ON anxg_ip.cpc_scheme(parent_code) WHERE parent_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cpc_level  ON anxg_ip.cpc_scheme(level);
 
 
 -- 권한

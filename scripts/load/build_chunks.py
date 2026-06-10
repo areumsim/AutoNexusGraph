@@ -1,4 +1,4 @@
-"""DART 사업보고서 zip → 청킹 → vec.chunks 적재 (embedding NULL).
+"""DART 사업보고서 zip → 청킹 → anxg_vec.chunks 적재 (embedding NULL).
 
 임베딩은 별도 단계 (scripts/load/embed_chunks.py) — BGE-M3 서버 필요.
 
@@ -20,7 +20,7 @@ from autonexusgraph.loaders import load_chunks  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="DART zip → vec.chunks 적재")
+    parser = argparse.ArgumentParser(description="DART zip → anxg_vec.chunks 적재")
     parser.add_argument("--limit-reports", type=int, default=None,
                         help="처음 N 개 zip 만 (smoke)")
     parser.add_argument("--batch-size", type=int, default=500)

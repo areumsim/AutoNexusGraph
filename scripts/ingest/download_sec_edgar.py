@@ -2,7 +2,7 @@
 """SEC EDGAR — 한국 ADR/외국법인의 SEC 공시.
 
 대상 선정:
-- master.entity_map 에 id_type='cik' 이 있는 회사 (Wikidata 수집 시 P5531 매핑됨)
+- anxg_master.entity_map 에 id_type='cik' 이 있는 회사 (Wikidata 수집 시 P5531 매핑됨)
 - 없으면 manual CIK 리스트도 인자로 전달 가능
 
 저장:
@@ -26,15 +26,17 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.sec_client import SecEdgarClient
 
-
 SELECT_CIK = """
 SELECT em.corp_code, em.id_value AS cik, c.corp_name
-  FROM master.entity_map em
-  JOIN master.companies c ON c.corp_code = em.corp_code
+  FROM anxg_master.entity_map em
+  JOIN anxg_master.companies c ON c.corp_code = em.corp_code
  WHERE em.id_type = 'cik' AND c.is_active = TRUE
 """
 
@@ -73,7 +75,7 @@ def main() -> int:
             limiter.acquire()
             print(f"[SEC] cik={cik} corp_code={corp_code} name={name}")
             try:
-                sub = fetch_with_retry(lambda: cli.get_submissions(cik), max_tries=3)
+                sub = fetch_with_retry(lambda cik=cik: cli.get_submissions(cik), max_tries=3)
                 if not sub:
                     ckpt.mark_failed(entity_id, "submissions_404")
                     continue
@@ -81,14 +83,14 @@ def main() -> int:
 
                 if args.with_facts:
                     limiter.acquire()
-                    facts = fetch_with_retry(lambda: cli.get_company_facts(cik), max_tries=3)
+                    facts = fetch_with_retry(lambda cik=cik: cli.get_company_facts(cik), max_tries=3)
                     if facts:
                         save_raw("sec", f"{entity_id}/companyfacts.json", facts)
 
                 filings = cli.extract_filings(sub)
                 print(f"   filings: {len(filings)}")
                 ckpt.mark_done(entity_id, {"corp_code": corp_code, "filings": len(filings)})
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_sec_edgar] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(entity_id, str(e))
                 print(f"   failed: {e}")
 

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from autograph.loaders.load_factoryon_plants import _processes_for, _build, _city_of
+from autograph.loaders.process.load_factoryon_plants import _build, _city_of, _processes_for
 
 
 def test_industry_to_processes_완성차():

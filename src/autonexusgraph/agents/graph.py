@@ -18,21 +18,20 @@ PRD §7.6.5: Streaming — UI node-by-node 진행 표시
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator, Mapping
+from typing import Any
 
 from .nodes import executor_node, planner_node, synthesizer_node, triage_node
 from .state import AgentState
 from .supervisor import (
     mid_execution_reflect,
-    supervisor_done,
-    supervisor_node,
     sup_send_directives,
+    supervisor_node,
 )
 from .tracing import start_turn_context
 from .validator import MAX_REPLANS, mark_replan, should_replan, validator_node
 from .workers import (
     calculator_worker,
-    dispatch_one,
     graph_worker,
     research_worker,
     sql_worker,
@@ -48,7 +47,7 @@ except ImportError:
     _HAS_LANGGRAPH = False
 
 try:
-    from langgraph.types import Command   # type: ignore[import-not-found]
+    from langgraph.types import Command  # type: ignore[import-not-found]
     _HAS_COMMAND = True
 except ImportError:
     _HAS_COMMAND = False
@@ -101,8 +100,12 @@ def _worker_wrap(worker_fn):
         if task is None:
             return state
         # _current_task 은 Send 한정 — 결과 누적 후 제거
+        tid = task.get("id") if isinstance(task, dict) else None
+        log.info("[worker] %s start task=%s (thread=%s)",
+                 worker_fn.__name__, tid, state.get("thread_id"))
         out_state = worker_fn(state, task)
         out_state.pop("_current_task", None)
+        log.info("[worker] %s done  task=%s", worker_fn.__name__, tid)
         return out_state
     _wrapped.__name__ = f"wrap_{worker_fn.__name__}"
     return _wrapped
@@ -186,7 +189,7 @@ def _get_langgraph_app():
     return _LG_APP
 
 
-def _make_run_config(thread_id: str, *, state: dict | None = None) -> dict:
+def _make_run_config(thread_id: str, *, state: Mapping[str, Any] | None = None) -> dict:
     """LangGraph app.invoke 에 넘길 config — checkpoint + LangSmith 태그.
 
     Langfuse 4.x 는 OTEL native ─ start_turn_context 의 ``start_as_current_observation``
@@ -202,7 +205,7 @@ def _make_run_config(thread_id: str, *, state: dict | None = None) -> dict:
             domain = state.get("domain") if isinstance(state, dict) else None
             cfg["tags"] = tags_for_domain(domain)
             cfg["metadata"] = metadata_for_state(state)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — tracing config skip 흡수 → cfg 반환
         log.debug("tracing config skip: %s", exc)
     return cfg
 
@@ -241,7 +244,7 @@ def run_agent(question: str, *,
     """단일 turn 실행 (blocking). PRD §10 DoD #17 (b) — turn 단위 token/cost/replan 적재.
 
     ``start_turn_context`` 가 ContextVar 격리된 CostTracker + Langfuse span 을
-    enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG ops.llm_usage 의
+    enter/exit. 어떤 경로 (langgraph / 폴백 / 예외) 든 exit 시 PG anxg_ops.llm_usage 의
     meta JSONB 에 thread_id/turn_id/n_replans/domain 영구 적재.
 
     ``rerank`` (PRD §10 DoD #17 (d) 평가 매트릭스 ablation): None=기본(retrieve 도구
@@ -259,7 +262,7 @@ def run_agent(question: str, *,
                 result = _run_with_langgraph(state)
                 turn.state = result   # type: ignore[assignment]
                 return result
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — [run_agent] LangGraph 실행 실패 흡수 → result 반환
                 log.warning("[run_agent] LangGraph 실행 실패 — 함수 체인 폴백: %s", exc)
         result = _run_with_fallback_chain(state)
         turn.state = result   # type: ignore[assignment]
@@ -291,7 +294,7 @@ def run_agent_stream(question: str, *,
                     turn.state = partial   # type: ignore[assignment]
                     yield (node_name, partial)
                 return
-            except Exception as exc:   # noqa: BLE001
+            except Exception as exc:   # noqa: BLE001 — [run_agent_stream] LangGraph 실패 흡수 → 함수 체인 폴백 (LangGraph 미설치/오류 graceful)
                 log.warning("[run_agent_stream] LangGraph stream 실패 — 함수 체인 폴백: %s", exc)
                 state = _init_state(question, thread_id, history, domain=domain,
                                     rerank=rerank, llm_planner=llm_planner)
@@ -350,7 +353,7 @@ def run_agent_resume(thread_id: str, response: Any) -> AgentState:
     """interrupt 후 graph 재개 (blocking). PRD §7.5.6.
 
     동일 thread_id 의 checkpoint 에서 이어감 + Command(resume=response).
-    resume 는 새 turn 으로 간주 — 별도의 ops.llm_usage row + Langfuse span.
+    resume 는 새 turn 으로 간주 — 별도의 anxg_ops.llm_usage row + Langfuse span.
     langgraph 미설치 환경 → InterruptUnavailable 우회: 호출자가 새 turn 으로
     response 를 question 에 합쳐 재호출하는 패턴 권장.
     """

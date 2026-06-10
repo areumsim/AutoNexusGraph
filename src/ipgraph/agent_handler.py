@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
+from autonexusgraph.agents._domain_handler import safe_import_module
 
 log = logging.getLogger(__name__)
 
@@ -99,12 +101,8 @@ class IPGraphHandler:
         )
 
     def toolbox_modules(self) -> list[Any]:
-        try:
-            from . import tools as ip_tb
-        except ImportError as exc:
-            log.warning("[ipgraph.tools] import 실패 (skip): %s", exc)
-            return []
-        return [ip_tb]
+        mod = safe_import_module("ipgraph.tools", log_prefix="ip.toolbox")
+        return [mod] if mod is not None else []
 
     def allowed_intents(self, kind: str) -> set[str]:
         return {
@@ -116,24 +114,20 @@ class IPGraphHandler:
     def fallback_search(
         self, state: Any, *, query: str,
     ) -> tuple[str, Callable, dict] | None:
-        try:
-            from .tools.retrieve import search_patents
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[ip.fallback] tools.search_patents unavailable: %s", exc)
+        mod = safe_import_module("ipgraph.tools.retrieve",
+                                   log_prefix="ip.fallback")
+        fn = getattr(mod, "search_patents", None) if mod is not None else None
+        if fn is None:
             return None
         args: dict[str, Any] = {"query": query, "top_k": 6}
         ta = state.get("target_assignees") or []
         if ta:
             args["assignee_id"] = ta[0]
-        return ("search_patents", search_patents, args)
+        return ("search_patents", fn, args)
 
     def retrieve_module(self) -> Any | None:
-        try:
-            from .tools import retrieve
-            return retrieve
-        except Exception as exc:   # noqa: BLE001
-            log.warning("[ip.retrieve] tools.retrieve unavailable: %s", exc)
-            return None
+        return safe_import_module("ipgraph.tools.retrieve",
+                                   log_prefix="ip.retrieve")
 
 
 def _register() -> None:
@@ -146,18 +140,18 @@ def _register() -> None:
             register_handler,
             register_router,
         )
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — core registry import 실패 → register skip (finance-only / 테스트 환경)
         log.debug("[ipgraph.agent_handler] core handler API unavailable: %s", exc)
         return
     try:
         register_handler(IPGraphHandler())
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — handler 등록 실패 흡수 → silent (debug log, core 가 finance 폴백)
         log.debug("[ipgraph.agent_handler] register_handler failed: %s", exc)
 
     try:
         from .policy import route_domain_ip
         register_router(route_domain_ip)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — router 등록 실패 흡수 → silent (라우팅이 finance 만 동작)
         log.debug("[ipgraph.agent_handler] register_router failed: %s", exc)
 
 

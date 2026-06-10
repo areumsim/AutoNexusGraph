@@ -12,9 +12,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from autonexusgraph.db.neo4j import get_driver
+from autonexusgraph.db.neo4j import get_session, serialize_record
 from autonexusgraph.tools.cypher_templates import render_template
-
 
 log = logging.getLogger(__name__)
 
@@ -33,10 +32,10 @@ def _run(cypher: str, **params: Any) -> list[dict]:
     """READ-only Neo4j 실행. cypher_guard 적용."""
     from autonexusgraph.safety.cypher_guard import assert_read_only
     assert_read_only(cypher)
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         result = session.run(cypher, **params)
-        return [dict(r) for r in result]
+        return [serialize_record(r) for r in result]
 
 
 def _exec(template_name: str, **params: Any) -> list[dict]:

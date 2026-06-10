@@ -1,4 +1,4 @@
-"""P3 산출 → auto.staging_relations UPSERT.
+"""P3 산출 → anxg_auto.staging_relations UPSERT.
 
 ExtractorEngine 의 merged_relations 출력 (dict 리스트) 을 받아 PG staging 테이블에 적재.
 merge key 는 (relation_type, head_kind, head_text_norm, tail_kind, tail_text_norm,
@@ -14,11 +14,10 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
-
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ def upsert_staging(rels: Iterable[dict], *, extractor_name: str,
                     snap_yr = None
 
                 cur.execute("""
-                    INSERT INTO auto.staging_relations
+                    INSERT INTO anxg_auto.staging_relations
                       (relation_type, head_kind, head_text_norm, tail_kind, tail_text_norm,
                        snapshot_year, head_pg_id, tail_pg_id,
                        head_text, tail_text,
@@ -88,22 +87,22 @@ def upsert_staging(rels: Iterable[dict], *, extractor_name: str,
                                  COALESCE(snapshot_year, 0))
                     DO UPDATE SET
                       confidence_score = GREATEST(
-                          auto.staging_relations.confidence_score,
+                          anxg_auto.staging_relations.confidence_score,
                           EXCLUDED.confidence_score),
                       evidence_text = CASE
                           WHEN EXCLUDED.confidence_score
-                               > auto.staging_relations.confidence_score
+                               > anxg_auto.staging_relations.confidence_score
                           THEN EXCLUDED.evidence_text
-                          ELSE auto.staging_relations.evidence_text END,
+                          ELSE anxg_auto.staging_relations.evidence_text END,
                       evidence_chunk_ids = (
                         SELECT array_agg(DISTINCT x) FROM unnest(
-                          auto.staging_relations.evidence_chunk_ids
+                          anxg_auto.staging_relations.evidence_chunk_ids
                           || EXCLUDED.evidence_chunk_ids) x),
                       gate_status = CASE
                           WHEN EXCLUDED.confidence_score
-                               > auto.staging_relations.confidence_score
+                               > anxg_auto.staging_relations.confidence_score
                           THEN EXCLUDED.gate_status
-                          ELSE auto.staging_relations.gate_status END
+                          ELSE anxg_auto.staging_relations.gate_status END
                 """, (
                     rel_type, head_kind, normalize_corp_name(head_text),
                     tail_kind, normalize_corp_name(tail_text),
@@ -114,7 +113,7 @@ def upsert_staging(rels: Iterable[dict], *, extractor_name: str,
                     extractor_name, extractor_version, gate,
                     json.dumps(r, ensure_ascii=False, default=str),
                 ))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — [staging] relation row UPSERT 실패 흡수 → errors 카운트 + 다음 row (트랜잭션 commit 시점 보존)
                 counts["errors"] += 1
                 log.warning("[staging] upsert failed for %s: %s", r.get("relation"), e)
     conn.commit()

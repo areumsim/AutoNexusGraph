@@ -37,8 +37,8 @@ from autonexusgraph.ingestion._common import (
     raw_dir,
     save_raw,
 )
-from ..config import get_auto_settings
 
+from ..config import get_auto_settings
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ QUERIES = {
 }
 
 
-def _parse_retry_after(resp: "httpx.Response") -> float | None:
+def _parse_retry_after(resp: httpx.Response) -> float | None:
     """``Retry-After`` 헤더 파싱 — 초 단위. 무효 시 None."""
     raw = resp.headers.get("retry-after") or resp.headers.get("Retry-After")
     if not raw:
@@ -197,7 +197,7 @@ def _run_sparql(query: str, *, label: str = "") -> list[dict]:
                         f":{label}" if label else "",
                         e.response.status_code if e.response else "?")
             return fetch_with_retry(_do_once, max_tries=3, base=3.0)
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — SPARQL 비-HTTP 예외 흡수 → fetch_with_retry 위임 (재시도 boundary)
             log.warning("[wikidata%s] %s — fetch_with_retry 위임",
                         f":{label}" if label else "", type(e).__name__)
             return fetch_with_retry(_do_once, max_tries=3, base=3.0)
@@ -262,7 +262,7 @@ def _ingest_part_supplies_chunked() -> dict:
             all_bindings.extend(rows)
             total += len(rows)
             succeeded.append(class_qid)
-        except Exception as e:   # noqa: BLE001
+        except Exception as e:   # noqa: BLE001 — chunk 단위 실패 흡수 → checkpoint mark_failed + 다음 chunk (부분 성공 보존)
             ckpt.mark_failed(chunk_key, str(e))
             log.warning("[wikidata:part_supplies] %s (%s) 실패 — 보존 후 계속: %s",
                         class_qid, label, e)
@@ -315,7 +315,7 @@ def ingest_kind(kind: str) -> dict:
         log.info("[wikidata] %s -> %d rows", kind, len(bindings))
         ckpt.mark_done(kind, {"rows": len(bindings)})
         return {"kind": kind, "rows": len(bindings)}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — kind 전체 실패 흡수 → checkpoint mark_failed + error 반환 (다음 kind 진행)
         log.exception("[wikidata] failed %s", kind)
         ckpt.mark_failed(kind, str(e))
         return {"error": str(e)}

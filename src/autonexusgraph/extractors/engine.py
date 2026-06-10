@@ -17,11 +17,10 @@ import logging
 import time
 from collections.abc import Sequence
 from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from .base import BaseExtractor, ExtractorResult, RunContext
 from ..llm.cost_tracker import BudgetExceeded
-
+from .base import BaseExtractor, ExtractorResult, RunContext
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +130,7 @@ class ExtractorEngine:
                         if not other.done():
                             other.cancel()
                     raise
-                except Exception as e:
+                except Exception as e:   # noqa: BLE001 — extractor future 실패 흡수 → empty result + warning
                     result = ExtractorResult.empty(
                         ex.name, ex.version,
                         warnings=(f"future_error: {e}",),

@@ -17,24 +17,44 @@ cost guard 적용 원칙 (사용자 명시):
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import cast
 
 from . import session
 from ._domain_handler import call_handler_method, get_handler
-from .policy import classify_question, select_tools, turn_budget_exceeded
-from .state import AgentState
-from .temporal import normalize_temporal_terms, extract_year_hint
-
+from .policy import classify_question, turn_budget_exceeded
+from .state import AgentState, QuestionKind
+from .temporal import extract_year_hint, normalize_temporal_terms
 
 log = logging.getLogger(__name__)
+
+
+# 한국어 조사 — 회사명 lookup 전 어절 끝에서 제거 ('삼성전자의' → '삼성전자').
+# 긴 것 먼저 (그리디) — '들의' 를 '의' 보다 먼저 떼어야 한다.
+_KO_JOSA: tuple[str, ...] = (
+    "으로서", "으로써", "에서의", "에게서", "들에게", "들의", "들은", "들이", "들을",
+    "에서", "에게", "에는", "에도", "까지", "부터", "마다", "조차", "처럼", "만큼",
+    "보다", "라도", "이나", "이란", "이라", "으로",
+    "의", "은", "는", "이", "가", "을", "를", "에", "와", "과", "도", "만", "로", "들",
+)
+# substring(중간 일치) 약매치 차단 임계 — financials.lookup_company score:
+#   100 corp_code / 90 stock / 80 exact name / 60 prefix / 40 substring.
+# 공통명사('자회사'·'반도체')가 회사명 일부와 substring(40) 으로 오매치되는 것을 거른다.
+_COMPANY_MIN_SCORE = 60
+
+
+def _strip_josa(word: str) -> str:
+    """어절 끝 조사 1개 제거. 어간이 2자 미만이 되면 원형 유지(과다 절단 방지)."""
+    for j in _KO_JOSA:
+        if word.endswith(j) and len(word) - len(j) >= 2:
+            return word[: -len(j)]
+    return word
 
 
 # ── Triage ──────────────────────────────────────────────────
 def triage_node(state: AgentState) -> AgentState:
     """질문 유형 분류 + 1차 회사 식별 + 상대 시간 정규화."""
-    from ..tools.financials import lookup_company as lookup_pg
-
     from ..safety import is_high_risk_injection, sanitize_user_input
+    from ..tools.financials import lookup_company as lookup_pg
     from .rewriter import rewrite_query
 
     raw_q = state.get("question", "")
@@ -100,11 +120,24 @@ def triage_node(state: AgentState) -> AgentState:
         for word in q.split():
             if len(word) < 2:
                 continue
-            try:
-                hits = lookup_pg(word, limit=5)
-            except Exception:
-                hits = []
+            # 원형 → 매칭 실패 시 조사 제거형 재시도 ('삼성전자의' → '삼성전자').
+            candidates = [word]
+            stripped = _strip_josa(word)
+            if stripped != word:
+                candidates.append(stripped)
+            hits = []
+            for cand in candidates:
+                try:
+                    h = lookup_pg(cand, limit=5)
+                except Exception:   # noqa: BLE001 — PG lookup 실패 흡수 → 빈 hits (다음 후보/word)
+                    h = []
+                if h:
+                    hits = h
+                    break
             if not hits:
+                continue
+            # 약매치(공통명사 substring 오선택) 차단 — 상위 hit score 가 임계 미만이면 skip.
+            if (hits[0].get("score") or 0) < _COMPANY_MIN_SCORE:
                 continue
             # 모호성 — 후보 ≥ 2 + score margin 작음
             if is_ambiguous_company(hits):
@@ -210,7 +243,7 @@ def _llm_planner_enabled(state: AgentState | None = None) -> bool:
     try:
         from ..config import get_settings
         return bool(getattr(get_settings(), "agent_llm_planner", False))
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — [nodes] fail-soft 흡수 → False 반환
         return False
 
 
@@ -226,7 +259,7 @@ def _replan_escalate_kind(kind: str, hint: dict) -> str:
     issues = hint.get("prev_issues") or []
     if any(str(i).startswith("hallucinated_numbers") for i in issues):
         return "structural" if kind == "narrative" else kind
-    _ESCALATE = {
+    _ESCALATE = {  # noqa: N806 — 지역 상수(매핑)
         "factual": "multi_hop",
         "structural": "multi_hop",
         "narrative": "multi_hop",
@@ -236,7 +269,7 @@ def _replan_escalate_kind(kind: str, hint: dict) -> str:
     return _ESCALATE.get(kind, "narrative")
 
 
-def _apply_replan_widen(state: "AgentState") -> None:
+def _apply_replan_widen(state: AgentState) -> None:
     """replan 시 retrieval 폭 확대 — research task 의 top_k 를 배수 증가(상한 20).
 
     replan 횟수 n 이 클수록 더 넓게 검색. handler/finance 양 경로의 산출 tasks 에
@@ -268,7 +301,6 @@ def planner_node(state: AgentState) -> AgentState:
     여전히 ``state["plan"]`` (flat list) 도 채워서 executor 폴백 호환.
     """
     from .dag import make_spawn_task, make_task
-
     from .state import _ClearedDict, _ClearedList
 
     # 축6: 누적 채널 per-turn 리셋 — 마커로 reducer 에 교체 지시. checkpointer 다중턴
@@ -299,7 +331,7 @@ def planner_node(state: AgentState) -> AgentState:
             log.info("[planner] replan#%s — kind 승격 %s→%s (issues=%s)",
                      replan_hint.get("n"), kind, new_kind,
                      (replan_hint.get("prev_issues") or [])[:2])
-        kind = new_kind
+        kind = cast(QuestionKind, new_kind)
         state["question_kind"] = kind
 
     # ── 축2: LLM 자율 planner (opt-in) ──────────────────────────────
@@ -327,7 +359,7 @@ def planner_node(state: AgentState) -> AgentState:
     domain = str(state.get("domain") or "finance").lower()
     handler = get_handler(domain)
     if handler is not None and hasattr(handler, "plan_tasks"):
-        tasks = call_handler_method(state, handler, "plan_tasks", state, question=q)
+        tasks: list[dict] = call_handler_method(state, handler, "plan_tasks", state, question=q)
         state["tasks"] = tasks or []
         # task_results 는 planner 진입부에서 이미 마커로 리셋됨 — 재대입 금지(마커 보존).
         state["plan"] = [
@@ -338,7 +370,7 @@ def planner_node(state: AgentState) -> AgentState:
         log.info("[planner:%s] tasks=%d", domain, len(state["tasks"]))
         return _planner_cost_gate(state, kind, targets, len(state["tasks"]))
 
-    tasks: list[dict] = []
+    tasks = []
     tid = 0
 
     def _next_id(prefix: str) -> str:
@@ -466,7 +498,7 @@ def planner_node(state: AgentState) -> AgentState:
     return _planner_cost_gate(state, kind, targets, len(tasks))
 
 
-def _handle_cost_resume(state: "AgentState") -> bool:
+def _handle_cost_resume(state: AgentState) -> bool:
     """이미 보낸 cost_approval 의 사용자 응답을 처리.
 
     Returns:
@@ -493,7 +525,7 @@ def _handle_cost_resume(state: "AgentState") -> bool:
     return True
 
 
-def _request_cost_approval(state: "AgentState", kind: str, targets: list,
+def _request_cost_approval(state: AgentState, kind: str, targets: list,
                             n_tasks: int, domain: str) -> None:
     """새로운 cost approval 요청 — replan 첫 turn 일 때만."""
     from .cost_estimator import needs_cost_approval
@@ -536,8 +568,8 @@ def _request_cost_approval(state: "AgentState", kind: str, targets: list,
                     est.estimated_cost_usd)
 
 
-def _planner_cost_gate(state: "AgentState", kind: str, targets: list,
-                       n_tasks: int) -> "AgentState":
+def _planner_cost_gate(state: AgentState, kind: str, targets: list,
+                       n_tasks: int) -> AgentState:
     """planner 의 cost-approval 게이트 — finance/auto/cross_domain 모두 공통.
 
     PRD §7.5.6 HITL. replan 중이거나 이미 승인된 turn 은 skip.
@@ -606,7 +638,7 @@ def _attempt_fallback_recovery(state: AgentState) -> bool:
     _maybe_inject_rerank(state, fb_fn, fb_args)
     try:
         fb_out = fb_fn(**fb_args)
-    except Exception as e:   # noqa: BLE001
+    except Exception as e:   # noqa: BLE001 — [nodes] fail-soft 흡수 → False 반환 (log 동반)
         log.warning("[recovery] fallback %s failed: %s", fb_tool, e)
         return False
     if not fb_out:
@@ -637,13 +669,13 @@ def executor_node(state: AgentState) -> AgentState:
             break
         tool_name = step.get("tool")
         args = step.get("args") or {}
-        fn = getattr(toolbox, tool_name, None)
+        fn = getattr(toolbox, tool_name or "", None)
         if fn is None:
             log.warning(f"[executor] unknown tool: {tool_name}")
             continue
         try:
             out = fn(**args)
-        except Exception as e:
+        except Exception as e:   # noqa: BLE001 — tool 실행 실패 흡수 → log + 다음 step (executor 진행)
             log.warning(f"[executor] {tool_name} failed: {e}")
             continue
         item = {"tool": tool_name, "purpose": step.get("purpose"), "args": args,
@@ -743,10 +775,10 @@ def synthesizer_node(state: AgentState,
         "llm_called": False, "fallback_used": None,
     }
     try:
+        from ..config import turn_budget_for_domain
         from ..llm.base import get_llm_client
         from ..llm.budget_aware import budget_aware_client
         from ..llm.cost_tracker import BudgetExceeded
-        from ..config import turn_budget_for_domain
 
         domain = state.get("domain")
         hard_limit = turn_budget_for_domain(domain)
@@ -781,8 +813,7 @@ def synthesizer_node(state: AgentState,
             "ok": False, "error_type": "BudgetExceeded", "error": str(e),
             "llm_called": False, "fallback_used": "budget",
         }
-    except Exception as e:    # noqa: BLE001
-        # fail-soft 유지 (eval 진행 보장) — 단, 실패 정보를 state 에 명시.
+    except Exception as e:    # noqa: BLE001 — [synth] LLM 합성 실패 흡수 → 결정적 brief 폴백 + state 에 실패 정보 명시 (eval 진행 보장)
         log.warning("[synth] LLM failed: %s: %s", type(e).__name__, e)
         from .answering import build_deterministic_brief
         state["answer"] = (
@@ -844,14 +875,14 @@ def synthesizer_node(state: AgentState,
         )
         try:
             resp = request_interrupt(payload)
-            approved = coerce_sensitive_response(resp)
+            sensitive_approved = coerce_sensitive_response(resp)
         except InterruptUnavailable:
             # 폴백 환경 — 보수적 거절 (외부 노출 회피).
-            approved = False
+            sensitive_approved = False
             state.setdefault("safety_signals", []).append(
                 f"sensitive_blocked_fallback:{hit}"
             )
-        if not approved:
+        if not sensitive_approved:
             log.warning("[synth] sensitive answer blocked — hit=%r", hit)
             state["answer"] = (
                 f"민감/외부 보고 인접 답변으로 분류 ('{hit}') — 공개 보류됨. "

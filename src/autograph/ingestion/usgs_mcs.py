@@ -29,8 +29,9 @@ import logging
 import re
 import sys
 import urllib.request
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def fetch(commodity: str, year: int, *,
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — [usgs_mcs] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[usgs_mcs] fetch fail %s/%s: %s", year, commodity, exc)
         return None
     if len(data) < 100_000:
@@ -168,7 +169,7 @@ def _find_row_with_n_nums(text: str, label_substring: str, *,
         if len(tokens) >= min_nums:
             return tokens, i
     # 2차: wrap — 라벨 라인의 다음 1~2 줄에서 검색.
-    for i, line in label_lines:
+    for i, _line in label_lines:
         for j in (i + 1, i + 2):
             if j >= len(lines):
                 break
@@ -263,7 +264,7 @@ def parse(pdf_path: Path, commodity_code: str) -> dict | None:
     """PDF 1개 → 정형 dict."""
     try:
         text = _extract_text(pdf_path)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — [usgs_mcs] fail-soft 흡수 → None 반환 (log 동반)
         log.warning("[usgs_mcs:parse] %s 텍스트 추출 실패: %s", pdf_path.name, exc)
         return None
 

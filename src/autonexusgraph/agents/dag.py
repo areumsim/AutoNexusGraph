@@ -11,7 +11,8 @@ state 가 dict 만 받기 때문에 graph object 는 안 만든다). 의존성·
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 
 def make_task(
@@ -185,7 +186,7 @@ def _resolve_binding(result: object, spec: dict) -> object:
     return spec.get("default")
 
 
-def resolve_arg_bindings(state: dict, args: dict | None) -> dict:
+def resolve_arg_bindings(state: Mapping[str, Any], args: dict | None) -> dict:
     """task args 안의 upstream 결과 참조(``$from``)를 실제 값으로 치환.
 
     PRD §7.5.3 의 depends_on 을 **선언만** 이 아니라 **데이터가 흐르게** 만드는 핵심.

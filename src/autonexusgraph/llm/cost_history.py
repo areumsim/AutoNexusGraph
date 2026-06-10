@@ -175,7 +175,7 @@ def format_report(s: dict[str, Any], *, daily_limit: int | None = 31,
             frac = s["total_cost"] / limit
             lines.append(f" 한도   : {_fmt_usd(s['total_cost']).strip()} / "
                          f"${limit:.2f}  {_bar(frac)} {frac*100:4.0f}%")
-    except Exception:   # noqa: BLE001
+    except Exception:   # noqa: BLE001 — [cost_history] 한도 표시 계산 실패 silent → 비용 본문은 유지 (한도 라인만 누락)
         pass
     proj = _month_projection(s.get("by_month", {}))
     if proj:

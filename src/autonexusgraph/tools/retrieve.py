@@ -13,9 +13,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from common.retrieve_base import DEFAULT_TOPK, HARD_TOPK, cap_topk as _cap
+from common.retrieve_base import DEFAULT_TOPK
+
 from ..db.postgres import get_pool
-from ..embeddings import EmbeddingError, get_embedding_client
+from ._vector_search import vector_search
 
 
 def _build_filter_clause(
@@ -97,71 +98,20 @@ def search_documents(
       id, corp_code, rcept_no, source, section, report_type, fiscal_year,
       chunk_idx, text, score(rerank_score 또는 cosine sim), token_count, reranked(bool)
     """
-    if not query or not query.strip():
-        return []
-
-    client = get_embedding_client()
-    try:
-        qvec = client.embed_one(query)
-    except EmbeddingError as e:
-        raise RuntimeError(
-            f"임베딩 호출 실패. BGE-M3 서버(EMBEDDING_URL) 가동 확인. {e}"
-        ) from e
-
     where, params = _build_filter_clause(
         corp_code, fiscal_year, fiscal_year_min, fiscal_year_max,
         source, section_contains, report_type,
         require_embedding=True,
     )
-    params["q"] = qvec
-    # rerank 활성 시 candidate pool 확장 — top_k 의 N 배 가져와 reranker 가 재정렬.
-    effective_k = _cap(top_k * rerank_candidate_multiplier if rerank else top_k)
-    params["k"] = effective_k
-
-    sql = f"""
-    SELECT id, corp_code, rcept_no, source, section, report_type,
-           fiscal_year, chunk_idx, text, token_count,
-           1 - (embedding <=> %(q)s::vector) AS score
-      FROM vec.chunks
-     WHERE {where}
-     ORDER BY embedding <=> %(q)s::vector
-     LIMIT %(k)s
-    """
-    pool = get_pool()
-    from pgvector.psycopg import register_vector
-    with pool.connection() as conn:
-        register_vector(conn)
-        with conn.cursor() as cur:
-            cur.execute(sql, params)
-            cols = [d.name for d in cur.description]
-            hits = [dict(zip(cols, row)) for row in cur.fetchall()]
-
-    # rerank 비활성 — vector 유사도 결과 그대로 top_k 잘라 반환.
-    if not rerank or not hits:
-        for h in hits[:_cap(top_k)]:
-            h["reranked"] = False
-        return hits[:_cap(top_k)]
-
-    # rerank 활성 — BGE-Reranker 호출. 실패 시 vector fallback (fail-soft).
-    texts = [(h.get("text") or "") for h in hits]
-    try:
-        ranked = client.rerank(query, texts, top_k=_cap(top_k))
-    except EmbeddingError:
-        # reranker 서버 다운 / 미가용 — vector 유사도 fallback.
-        for h in hits[:_cap(top_k)]:
-            h["reranked"] = False
-        return hits[:_cap(top_k)]
-    # ranked: list[RerankResult(index, score)] — index 는 원 candidate 위치.
-    out: list[dict] = []
-    for r in ranked:
-        idx = getattr(r, "index", None)
-        if idx is None or idx >= len(hits):
-            continue
-        row = dict(hits[idx])
-        row["score"] = float(getattr(r, "score", row.get("score", 0.0)))
-        row["reranked"] = True
-        out.append(row)
-    return out
+    # finance 청크는 anxg_vec.chunks 의 다수 — HNSW 기본 ef 로 충분 (ef_search=None).
+    return vector_search(
+        query=query, where=where, params=params,
+        select_columns=("id, corp_code, rcept_no, source, section, report_type, "
+                        "fiscal_year, chunk_idx, text, token_count"),
+        top_k=top_k, rerank=rerank,
+        rerank_candidate_multiplier=rerank_candidate_multiplier,
+        ef_search=None,
+    )
 
 
 def search_by_metadata(
@@ -187,7 +137,7 @@ def search_by_metadata(
     sql = f"""
     SELECT id, corp_code, rcept_no, source, section, report_type,
            fiscal_year, chunk_idx, text, token_count
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE {where}
      ORDER BY corp_code, fiscal_year DESC, chunk_idx
      LIMIT %(limit)s
@@ -196,7 +146,7 @@ def search_by_metadata(
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d.name for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
 
 def get_chunk(chunk_id: int) -> dict | None:
@@ -204,7 +154,7 @@ def get_chunk(chunk_id: int) -> dict | None:
     sql = """
     SELECT id, corp_code, rcept_no, source, section, report_type,
            fiscal_year, chunk_idx, text, token_count, metadata
-      FROM vec.chunks
+      FROM anxg_vec.chunks
      WHERE id = %s
     """
     pool = get_pool()
@@ -214,7 +164,7 @@ def get_chunk(chunk_id: int) -> dict | None:
         if not row:
             return None
         cols = [d.name for d in cur.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))
 
 
 __all__ = [

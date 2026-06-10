@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""KCGS ESG 등급 CSV → esg.ratings.
+"""KCGS ESG 등급 CSV → anxg_esg.ratings.
 
 KCGS 는 공식 API 없음. 매년 공시되는 등급표 CSV 를 수동 다운로드 후 적재.
 
@@ -26,9 +26,8 @@ from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import normalize_corp_name
 
-
 UPSERT_ESG = """
-INSERT INTO esg.ratings
+INSERT INTO anxg_esg.ratings
   (corp_code, year, source, e_grade, s_grade, g_grade, total_grade, raw)
 VALUES (%s, %s, 'kcgs', %s, %s, %s, %s, %s)
 ON CONFLICT (corp_code, year, source) DO UPDATE
@@ -87,13 +86,13 @@ def main() -> int:
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT em.id_value AS ticker, em.corp_code
-              FROM master.entity_map em
+              FROM anxg_master.entity_map em
              WHERE em.id_type = 'ticker'
         """)
         for t, cc in cur.fetchall():
             if t:
                 t2c[t.strip().zfill(6)] = cc
-        cur.execute("SELECT corp_code, corp_name FROM master.companies WHERE is_active=TRUE")
+        cur.execute("SELECT corp_code, corp_name FROM anxg_master.companies WHERE is_active=TRUE")
         for cc, nm in cur.fetchall():
             n2c[normalize_corp_name(nm)] = cc
 
@@ -137,7 +136,7 @@ def main() -> int:
 
     with pool.connection() as conn, conn.cursor() as cur:
         cur.executemany(UPSERT_ESG, rows)
-    print(f"[esg.ratings] upserted {len(rows)} rows for year={args.year}")
+    print(f"[anxg_esg.ratings] upserted {len(rows)} rows for year={args.year}")
 
     # Neo4j Company 속성에 등급 반영 (멱등 — SET).
     # Cypher 의 SET 은 dynamic property name 미지원 → APOC.create.setProperty 사용.
@@ -148,17 +147,17 @@ def main() -> int:
         for r in rows
     ]
     if neo_rows:
-        from autonexusgraph.db.neo4j import get_driver
+        from autonexusgraph.db.neo4j import get_session
         year_key = f"esg_{args.year}"
         cypher = f"""
         UNWIND $rows AS r
-        MATCH (c:Company {{corp_code: r.corp_code}})
+        MATCH (c:Anxg_Company {{corp_code: r.corp_code}})
         SET c.{year_key}_e     = r.e,
             c.{year_key}_s     = r.s,
             c.{year_key}_g     = r.g,
             c.{year_key}_total = r.total
         """
-        with get_driver().session() as session:
+        with get_session() as session:
             session.run(cypher, rows=neo_rows)
         print(f"[neo4j] Company.{year_key}_* 속성 {len(neo_rows)}개 노드에 SET")
     return 0

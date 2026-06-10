@@ -29,7 +29,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_pool
 from autonexusgraph.ingestion._common import (
-    CheckpointStore, fetch_with_retry, get_rate_limiter, save_raw,
+    CheckpointStore,
+    fetch_with_retry,
+    get_rate_limiter,
+    save_raw,
 )
 from autonexusgraph.ingestion.wikipedia_client import WikipediaClient
 
@@ -70,10 +73,10 @@ def _select_targets(lang: str) -> list[dict]:
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT c.corp_code, c.corp_name,
-                   (SELECT id_value FROM master.entity_map em
+                   (SELECT id_value FROM anxg_master.entity_map em
                      WHERE em.corp_code = c.corp_code AND em.id_type='wikidata_qid'
                      LIMIT 1) as qid
-              FROM master.companies c
+              FROM anxg_master.companies c
              WHERE c.is_active = TRUE
              ORDER BY c.corp_code
         """)
@@ -93,7 +96,7 @@ def main() -> int:
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
-    s = get_settings()
+    get_settings()
     targets = _select_targets(args.lang)
     if args.limit:
         targets = targets[: args.limit]
@@ -115,7 +118,7 @@ def main() -> int:
             limiter.acquire()
             try:
                 page = fetch_with_retry(
-                    lambda: wp.fetch(title, with_html=True, with_infobox=True),
+                    lambda title=title: wp.fetch(title, with_html=True, with_infobox=True),
                     max_tries=3,
                 )
                 if page is None and not t["wiki_title"]:
@@ -126,7 +129,7 @@ def main() -> int:
                         if "회사" in h.get("snippet", "") or "기업" in h.get("snippet", ""):
                             limiter.acquire()
                             page = fetch_with_retry(
-                                lambda: wp.fetch(h["title"], with_html=True, with_infobox=True),
+                                lambda h=h: wp.fetch(h["title"], with_html=True, with_infobox=True),
                                 max_tries=3,
                             )
                             if page:
@@ -156,7 +159,7 @@ def main() -> int:
                 if i % 20 == 0:
                     print(f"  [{i}/{len(targets)}] done={ckpt.stats.done} "
                           f"failed={ckpt.stats.failed}")
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_wikipedia] fail-soft 흡수 → 0 반환 (log 동반)
                 ckpt.mark_failed(corp_code, str(e))
 
     print(f"\n[wikipedia] done={ckpt.stats.done} failed={ckpt.stats.failed}")

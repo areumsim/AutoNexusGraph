@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -27,7 +26,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from autonexusgraph.config import get_settings
 from autonexusgraph.ingestion._common import save_raw
 from autonexusgraph.ingestion.ftc_client import FtcClient
-
 
 MANUAL_GUIDE = """
 [수동 다운로드 가이드 — FTC 기업집단]
@@ -79,7 +77,7 @@ def main() -> int:
         for year in years:
             try:
                 rows = cli.fetch_groups(year)
-            except Exception as e:
+            except Exception as e:   # noqa: BLE001 — [download_ftc_groups] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                 print(f"[FTC] {year} 실패: {e}")
                 continue
             save_raw("ftc", f"{year}/groups.json", rows)

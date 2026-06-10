@@ -23,9 +23,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
 RAW_DIR = ROOT / "data" / "raw" / "ip" / "uspto_odp"

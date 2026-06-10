@@ -24,7 +24,6 @@ sys.path.insert(0, str(_ROOT / "src"))
 from autonexusgraph.config import get_settings  # noqa: E402
 from autonexusgraph.ingestion.dart_client import DartClient  # noqa: E402
 
-
 REPRT_CODES = {
     "annual": "11011",       # 사업보고서 (Q4 누적)
     "Q3": "11014",
@@ -96,7 +95,7 @@ def main() -> int:
                             corp_code=cc, bsns_year=str(y),
                             reprt_code=rc, fs_div=args.fs_div,
                         )
-                    except Exception as e:
+                    except Exception as e:   # noqa: BLE001 — [download_financials] 1 unit 실패 흡수 → log + continue (부분 성공 보존)
                         print(f"[WARN] {cc}/{y}/{rc} 실패: {e}", file=sys.stderr)
                         continue
                     if not rows:

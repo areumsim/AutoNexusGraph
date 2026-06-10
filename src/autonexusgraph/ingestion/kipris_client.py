@@ -13,9 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
-
-
 KIPRIS_BASE = "http://plus.kipris.or.kr/openapi/rest"
 
 
@@ -43,7 +40,7 @@ class KiprisClient:
         from ._common import make_http_client
         self._client = make_http_client(timeout=timeout)
 
-    def __enter__(self) -> "KiprisClient":
+    def __enter__(self) -> KiprisClient:
         return self
 
     def __exit__(self, *_: Any) -> None:
@@ -56,7 +53,7 @@ class KiprisClient:
         endpoint 와 파라미터는 KIPRIS API spec 변경 가능 — 첫 호출 시 검증 필요.
         """
         url = f"{KIPRIS_BASE}/CorporationSearchService/getCorporationSearch"
-        params = {
+        params: dict[str, Any] = {
             "applicant": applicant_name,
             "startYear": year_from,
             "pageNo": page,

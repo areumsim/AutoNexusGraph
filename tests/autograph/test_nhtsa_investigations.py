@@ -5,13 +5,9 @@ DB / Neo4j / HTTP 모두 mock — 파서·매핑·zip iteration·SQL 호출 시�
 
 from __future__ import annotations
 
-import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 
 # ── ingestion 모듈 ─────────────────────────────────────────
@@ -25,7 +21,7 @@ def test_ingestion_module_importable():
 
 # ── loader 모듈 ────────────────────────────────────────────
 def test_loader_module_importable():
-    from autograph.loaders import load_auto_investigations as L
+    from autograph.loaders.recall import load_auto_investigations as L
     assert callable(L.load_investigations)
     assert L._SOURCE_KEY == "nhtsa_odi"
     assert L._CONFIDENCE == 0.95
@@ -37,14 +33,14 @@ def test_loader_module_importable():
 
 # ── _parse_date ────────────────────────────────────────────
 def test_parse_date_valid():
-    from autograph.loaders.load_auto_investigations import _parse_date
+    from autograph.loaders.recall.load_auto_investigations import _parse_date
     assert _parse_date("20240315") == "2024-03-15"
     assert _parse_date("19990101") == "1999-01-01"
     assert _parse_date(" 20231231 ") == "2023-12-31"
 
 
 def test_parse_date_invalid():
-    from autograph.loaders.load_auto_investigations import _parse_date
+    from autograph.loaders.recall.load_auto_investigations import _parse_date
     assert _parse_date(None) is None
     assert _parse_date("") is None
     assert _parse_date("2024") is None         # 짧음
@@ -56,14 +52,14 @@ def test_parse_date_invalid():
 
 
 def test_parse_year_valid():
-    from autograph.loaders.load_auto_investigations import _parse_year
+    from autograph.loaders.recall.load_auto_investigations import _parse_year
     assert _parse_year("2024") == 2024
     assert _parse_year(" 2023 ") == 2023
 
 
 def test_parse_year_sentinel():
     """YEAR=9999 는 '불명' 의미 → None."""
-    from autograph.loaders.load_auto_investigations import _parse_year
+    from autograph.loaders.recall.load_auto_investigations import _parse_year
     assert _parse_year("9999") is None
     assert _parse_year(None) is None
     assert _parse_year("") is None
@@ -75,7 +71,7 @@ def test_parse_year_sentinel():
 
 # ── _investigation_type ────────────────────────────────────
 def test_investigation_type_known_prefixes():
-    from autograph.loaders.load_auto_investigations import _investigation_type
+    from autograph.loaders.recall.load_auto_investigations import _investigation_type
     assert _investigation_type("PE12001") == "PE"
     assert _investigation_type("EA22002") == "EA"
     assert _investigation_type("RQ23003") == "RQ"
@@ -86,7 +82,7 @@ def test_investigation_type_known_prefixes():
 
 
 def test_investigation_type_unknown():
-    from autograph.loaders.load_auto_investigations import _investigation_type
+    from autograph.loaders.recall.load_auto_investigations import _investigation_type
     assert _investigation_type("") is None
     assert _investigation_type(None) is None
     assert _investigation_type("XX12345") is None     # 알 수 없는 prefix
@@ -103,7 +99,7 @@ def _make_flat_inv_zip(zip_path: Path, rows: list[list[str]],
 
 
 def test_iter_inv_rows_basic(tmp_path):
-    from autograph.loaders.load_auto_investigations import _iter_inv_rows
+    from autograph.loaders.recall.load_auto_investigations import _iter_inv_rows
 
     zip_path = tmp_path / "FLAT_INV.zip"
     _make_flat_inv_zip(zip_path, [
@@ -129,7 +125,7 @@ def test_iter_inv_rows_basic(tmp_path):
 
 def test_iter_inv_rows_truncated_row(tmp_path):
     """뒷 컬럼이 빠진 row 도 dict 으로 — 부족분은 빈 문자열."""
-    from autograph.loaders.load_auto_investigations import _iter_inv_rows
+    from autograph.loaders.recall.load_auto_investigations import _iter_inv_rows
     zip_path = tmp_path / "FLAT_INV.zip"
     _make_flat_inv_zip(zip_path, [
         # 5 컬럼만 있는 끊긴 row.
@@ -143,7 +139,7 @@ def test_iter_inv_rows_truncated_row(tmp_path):
 
 
 def test_iter_inv_rows_no_file(tmp_path):
-    from autograph.loaders.load_auto_investigations import _iter_inv_rows
+    from autograph.loaders.recall.load_auto_investigations import _iter_inv_rows
     rows = list(_iter_inv_rows(tmp_path / "missing.zip"))
     assert rows == []
 
@@ -152,12 +148,11 @@ def test_iter_inv_rows_no_file(tmp_path):
 def _make_cur_with_resolve(variant=None, model=None, mfr=None):
     """resolve 가 (mfr, model, variant) 반환하고 INSERT...RETURNING 도 mock."""
     cur = MagicMock()
-    state = {"step": 0}
 
     def fake_execute(sql, params=None):
-        if "FROM auto.master_manufacturers" in sql and "SELECT mm.manufacturer_id" in sql:
+        if "FROM anxg_auto.master_manufacturers" in sql and "SELECT mm.manufacturer_id" in sql:
             cur._row = (mfr, model, variant)
-        elif "INSERT INTO auto.events_investigations" in sql:
+        elif "INSERT INTO anxg_auto.events_investigations" in sql:
             cur._row = (12345, True)   # investigation_id, inserted=True
 
     def fake_fetchone():
@@ -169,8 +164,9 @@ def _make_cur_with_resolve(variant=None, model=None, mfr=None):
 
 
 def test_upsert_pg_matched_variant():
-    from autograph.loaders.load_auto_investigations import (
-        _upsert_pg, LoadStats,
+    from autograph.loaders.recall.load_auto_investigations import (
+        LoadStats,
+        _upsert_pg,
     )
     stats = LoadStats()
     cur = _make_cur_with_resolve(variant=42, model=7, mfr=1)
@@ -197,7 +193,7 @@ def test_upsert_pg_matched_variant():
 
 
 def test_upsert_pg_no_action_number_skips():
-    from autograph.loaders.load_auto_investigations import _upsert_pg, LoadStats
+    from autograph.loaders.recall.load_auto_investigations import LoadStats, _upsert_pg
     stats = LoadStats()
     cur = _make_cur_with_resolve()
     out = _upsert_pg(cur, {"NHTSA_ACTION_NUMBER": ""}, stats)
@@ -206,7 +202,7 @@ def test_upsert_pg_no_action_number_skips():
 
 def test_upsert_pg_unmatched_counts():
     """variant + model 둘 다 매칭 안 되면 rows_unmatched 증가."""
-    from autograph.loaders.load_auto_investigations import _upsert_pg, LoadStats
+    from autograph.loaders.recall.load_auto_investigations import LoadStats, _upsert_pg
     stats = LoadStats()
     cur = _make_cur_with_resolve(variant=None, model=None, mfr=None)
     out = _upsert_pg(cur, {
@@ -223,7 +219,7 @@ def test_upsert_pg_unmatched_counts():
 
 def test_upsert_pg_year_9999_treated_as_unknown():
     """YEAR='9999' → year=None → variant 매칭 skip."""
-    from autograph.loaders.load_auto_investigations import _upsert_pg, LoadStats
+    from autograph.loaders.recall.load_auto_investigations import LoadStats, _upsert_pg
     stats = LoadStats()
     cur = _make_cur_with_resolve(variant=None, model=5, mfr=2)
     out = _upsert_pg(cur, {
@@ -280,8 +276,8 @@ def test_planner_vehicle_recall_includes_investigations():
 # ── tool 함수 import ──────────────────────────────────────
 def test_tool_functions_exposed():
     from autograph.tools import (
-        list_investigations_affecting,
         get_investigation_recall_chain,
+        list_investigations_affecting,
     )
     assert callable(list_investigations_affecting)
     assert callable(get_investigation_recall_chain)
@@ -289,7 +285,7 @@ def test_tool_functions_exposed():
 
 # ── ontology 등록 ────────────────────────────────────────
 def test_ontology_has_investigation_entity():
-    from autograph.ontology import load_entities, entity_key_property
+    from autograph.ontology import entity_key_property, load_entities
     entities = load_entities()
     assert "Investigation" in entities
     assert entity_key_property("Investigation") == "id"

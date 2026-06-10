@@ -18,9 +18,9 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
-CREATE TABLE IF NOT EXISTS auto.events_oem_news (
+CREATE TABLE IF NOT EXISTS anxg_auto.events_oem_news (
     news_id           BIGSERIAL    PRIMARY KEY,
     oem               VARCHAR(20)  NOT NULL,        -- 'hyundai' | 'mobis' | 'kia'
     oem_corp_code     VARCHAR(8),                   -- DART corp_code (선택)
@@ -47,10 +47,10 @@ CREATE TABLE IF NOT EXISTS auto.events_oem_news (
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     UNIQUE (oem, url)
 );
-CREATE INDEX IF NOT EXISTS idx_oem_news_oem        ON auto.events_oem_news(oem);
-CREATE INDEX IF NOT EXISTS idx_oem_news_date       ON auto.events_oem_news(published_date);
-CREATE INDEX IF NOT EXISTS idx_oem_news_section    ON auto.events_oem_news(section);
-CREATE INDEX IF NOT EXISTS idx_oem_news_corp       ON auto.events_oem_news(oem_corp_code)
+CREATE INDEX IF NOT EXISTS idx_oem_news_oem        ON anxg_auto.events_oem_news(oem);
+CREATE INDEX IF NOT EXISTS idx_oem_news_date       ON anxg_auto.events_oem_news(published_date);
+CREATE INDEX IF NOT EXISTS idx_oem_news_section    ON anxg_auto.events_oem_news(section);
+CREATE INDEX IF NOT EXISTS idx_oem_news_corp       ON anxg_auto.events_oem_news(oem_corp_code)
     WHERE oem_corp_code IS NOT NULL;
 
 

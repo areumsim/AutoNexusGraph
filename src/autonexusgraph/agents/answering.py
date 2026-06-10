@@ -14,8 +14,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
-
 
 # ─── 관계명 한국어 ─────────────────────────────────────────
 # ontology/relations.yaml 의 관계 타입 → 사람 읽기 좋은 한국어
@@ -137,13 +137,13 @@ def _summarize_dict(d: dict, maxlen: int = 80) -> str:
     return s[:maxlen] + ("…" if len(s) > maxlen else "")
 
 
-def build_deterministic_brief(state: dict) -> str:
+def build_deterministic_brief(state: Mapping[str, Any]) -> str:
     """tool_results + evidence_chunks → LLM 없는 자연어 brief.
 
     Synthesizer 의 LLM 호출 실패 / 비용 초과 / Budget Exceeded 시 fallback.
     state 는 AgentState dict.
     """
-    q = state.get("question") or ""
+    state.get("question") or ""
     kind = state.get("question_kind") or "unknown"
     targets = state.get("target_companies") or []
 

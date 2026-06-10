@@ -2,16 +2,16 @@
 --
 -- PRD v2.2 §2.3 — 공정·라인·설비·원가 정형 부분 진입 (LLM 0%).
 -- 산단공 (한국산업단지공단) 공장등록 raw → 정규화 적재.
--- factoryon_registry.py 가 raw json 만 저장 — 본 SQL 의 ``auto.factoryon_registry``
+-- factoryon_registry.py 가 raw json 만 저장 — 본 SQL 의 ``anxg_auto.factoryon_registry``
 -- 가 1차 적재 대상.
 --
 -- 멱등 (IF NOT EXISTS).
 
 SET client_encoding = 'UTF8';
 
-CREATE SCHEMA IF NOT EXISTS auto;
+CREATE SCHEMA IF NOT EXISTS anxg_auto;
 
-CREATE TABLE IF NOT EXISTS auto.factoryon_registry (
+CREATE TABLE IF NOT EXISTS anxg_auto.factoryon_registry (
     factory_no        VARCHAR PRIMARY KEY,             -- 공장관리번호 (산단공 부여)
     company_name      VARCHAR NOT NULL,
     business_no       VARCHAR,                         -- 사업자등록번호
@@ -45,21 +45,21 @@ CREATE TABLE IF NOT EXISTS auto.factoryon_registry (
 
 -- 기존 DB 멱등 보강 — CREATE TABLE IF NOT EXISTS 는 컬럼을 추가하지 않으므로,
 -- 실측 필드(2026-06, getFctry*Service_v2) 기준 신규 컬럼을 개별 ADD.
-ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS industry_codes VARCHAR;
-ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS charge_org     VARCHAR;
-ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS tel            VARCHAR;
-ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS fax            VARCHAR;
-ALTER TABLE auto.factoryon_registry ADD COLUMN IF NOT EXISTS homepage       VARCHAR;
+ALTER TABLE anxg_auto.factoryon_registry ADD COLUMN IF NOT EXISTS industry_codes VARCHAR;
+ALTER TABLE anxg_auto.factoryon_registry ADD COLUMN IF NOT EXISTS charge_org     VARCHAR;
+ALTER TABLE anxg_auto.factoryon_registry ADD COLUMN IF NOT EXISTS tel            VARCHAR;
+ALTER TABLE anxg_auto.factoryon_registry ADD COLUMN IF NOT EXISTS fax            VARCHAR;
+ALTER TABLE anxg_auto.factoryon_registry ADD COLUMN IF NOT EXISTS homepage       VARCHAR;
 
 CREATE INDEX IF NOT EXISTS idx_factoryon_company
-    ON auto.factoryon_registry(company_name);
+    ON anxg_auto.factoryon_registry(company_name);
 CREATE INDEX IF NOT EXISTS idx_factoryon_business_no
-    ON auto.factoryon_registry(business_no) WHERE business_no IS NOT NULL;
+    ON anxg_auto.factoryon_registry(business_no) WHERE business_no IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_factoryon_corp
-    ON auto.factoryon_registry(corp_code) WHERE corp_code IS NOT NULL;
+    ON anxg_auto.factoryon_registry(corp_code) WHERE corp_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_factoryon_complex
-    ON auto.factoryon_registry(industrial_complex)
+    ON anxg_auto.factoryon_registry(industrial_complex)
     WHERE industrial_complex IS NOT NULL;
 
-COMMENT ON TABLE auto.factoryon_registry IS
+COMMENT ON TABLE anxg_auto.factoryon_registry IS
   '팩토리온 공장등록 (data.go.kr 15087611). 산단공 SSOT. corp_entity 브리지 진입점.';

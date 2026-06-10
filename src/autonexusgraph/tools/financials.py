@@ -9,12 +9,10 @@ READ-ONLY 쿼리만. PG 측에서도 read-only role 권장 (운영 시).
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
 from ..db.postgres import get_connection
-
 
 # ── 회사 식별 ────────────────────────────────────────────────────────
 
@@ -26,30 +24,57 @@ class CompanyRef:
     market: str | None
 
 
-def lookup_company(query: str, limit: int = 5) -> list[dict]:
+def lookup_company(query: str = "", limit: int = 5, *,
+                   corp_code: str | None = None) -> list[dict]:
     """이름·종목코드·corp_code 로 회사 식별.
 
     매칭 우선순위: corp_code 정확 → stock_code 정확 → name 정확 → name 부분일치
+
+    ``corp_code`` 는 LLM planner 가 회사를 corp_code 로 식별해 호출하는 경우를 위한
+    ``query`` 별칭이다 (SELECT 가 이미 ``corp_code = q`` 를 매칭하므로 값만 흘려보내면
+    충분). list 면 첫 요소 사용. ``query`` 가 있으면 그것이 우선.
     """
     q = (query or "").strip()
+    if not q and corp_code:
+        if isinstance(corp_code, (list, tuple)):
+            corp_code = corp_code[0] if corp_code else None
+        q = str(corp_code).strip() if corp_code else ""
     if not q:
         return []
     conn = get_connection()
     with conn.cursor() as cur:
-        # 정확 매치들 모두
+        # corp_name 직접 매치 + company_aliases 경유 매치(통칭 'SK하이닉스' 등).
+        # alias 정확=75(≥ triage 임계 60 → 채택), alias 부분=55(임계 미만 → 거름).
         cur.execute("""
-            SELECT corp_code, corp_name, stock_code, market,
-                   CASE WHEN corp_code = %(q)s THEN 100
-                        WHEN stock_code = %(q)s THEN 90
-                        WHEN corp_name = %(q)s THEN 80
-                        WHEN corp_name ILIKE %(q)s || '%%' THEN 60
-                        WHEN corp_name ILIKE '%%' || %(q)s || '%%' THEN 40
-                        ELSE 0 END AS score
-            FROM master.companies
-            WHERE corp_code = %(q)s
-               OR stock_code = %(q)s
-               OR corp_name ILIKE '%%' || %(q)s || '%%'
-            ORDER BY score DESC, corp_name ASC
+            SELECT c.corp_code, c.corp_name, c.stock_code, c.market,
+                   GREATEST(
+                     CASE WHEN c.corp_code = %(q)s THEN 100
+                          WHEN c.stock_code = %(q)s THEN 90
+                          WHEN c.corp_name = %(q)s THEN 80
+                          WHEN c.corp_name ILIKE %(q)s || '%%' THEN 60
+                          WHEN c.corp_name ILIKE '%%' || %(q)s || '%%' THEN 40
+                          ELSE 0 END,
+                     COALESCE((
+                        SELECT MAX(CASE WHEN a.alias = %(q)s OR a.alias_norm = %(q)s THEN 75
+                                        WHEN a.alias ILIKE '%%' || %(q)s || '%%'
+                                          OR a.alias_norm ILIKE '%%' || %(q)s || '%%' THEN 55
+                                        ELSE 0 END)
+                        FROM anxg_master.company_aliases a
+                        WHERE a.corp_code = c.corp_code), 0)
+                   ) AS score
+            FROM anxg_master.companies c
+            WHERE c.corp_code = %(q)s
+               OR c.stock_code = %(q)s
+               OR c.corp_name ILIKE '%%' || %(q)s || '%%'
+               OR EXISTS (SELECT 1 FROM anxg_master.company_aliases a
+                          WHERE a.corp_code = c.corp_code
+                            AND (a.alias ILIKE '%%' || %(q)s || '%%'
+                                 OR a.alias_norm ILIKE '%%' || %(q)s || '%%'))
+            -- 동점(예: alias 정확 75)일 때 corp_name 이 질의를 포함하는 회사를 우선.
+            -- (wikipedia 출처 등 잘못된 alias 가 의도 회사를 밀어내는 것을 방지.)
+            ORDER BY score DESC,
+                     (CASE WHEN c.corp_name ILIKE '%%' || %(q)s || '%%' THEN 0 ELSE 1 END),
+                     c.corp_name ASC
             LIMIT %(lim)s
         """, {"q": q, "lim": limit})
         rows = cur.fetchall()
@@ -67,7 +92,7 @@ def get_company_info(corp_code: str) -> dict | None:
         cur.execute("""
             SELECT corp_code, corp_name, stock_code, market, sector, industry,
                    listed_at, is_active, extra
-            FROM master.companies WHERE corp_code = %s
+            FROM anxg_master.companies WHERE corp_code = %s
         """, (corp_code,))
         r = cur.fetchone()
     conn.commit()
@@ -107,7 +132,7 @@ def _query_amount(
     with conn.cursor() as cur:
         cur.execute("""
             SELECT account_nm, thstrm_amount, frmtrm_amount, fs_div, sj_div, reprt_code
-            FROM fin.financials
+            FROM anxg_fin.financials
             WHERE corp_code = %s AND bsns_year = %s AND fs_div = %s AND sj_div = %s
               AND account_nm = ANY(%s)
               AND thstrm_amount IS NOT NULL
@@ -180,7 +205,7 @@ def compare_companies(
     with conn.cursor() as cur:
         # 1) 회사명 일괄 조회.
         cur.execute("""
-            SELECT corp_code, corp_name FROM master.companies
+            SELECT corp_code, corp_name FROM anxg_master.companies
              WHERE corp_code = ANY(%s)
         """, (list(corp_codes),))
         name_by_cc = {r[0]: r[1] for r in cur.fetchall()}
@@ -189,13 +214,13 @@ def compare_companies(
         cur.execute("""
             SELECT cc, account_nm, value FROM (
                 SELECT cc,
-                       (SELECT account_nm FROM fin.financials f
+                       (SELECT account_nm FROM anxg_fin.financials f
                          WHERE f.corp_code = cc AND f.bsns_year = %s
                            AND f.fs_div = %s AND f.sj_div = 'IS'
                            AND f.account_nm = ANY(%s)
                            AND f.thstrm_amount IS NOT NULL
                          ORDER BY ord NULLS LAST LIMIT 1) AS account_nm,
-                       (SELECT thstrm_amount FROM fin.financials f
+                       (SELECT thstrm_amount FROM anxg_fin.financials f
                          WHERE f.corp_code = cc AND f.bsns_year = %s
                            AND f.fs_div = %s AND f.sj_div = 'IS'
                            AND f.account_nm = ANY(%s)
@@ -231,7 +256,7 @@ def list_companies_by_market(market: str, limit: int = 50) -> list[dict]:
         cur.execute("""
             SELECT corp_code, corp_name, stock_code,
                    (extra->>'market_cap_krw')::numeric AS cap
-            FROM master.companies
+            FROM anxg_master.companies
             WHERE market = %s AND is_active = TRUE
             ORDER BY cap DESC NULLS LAST
             LIMIT %s

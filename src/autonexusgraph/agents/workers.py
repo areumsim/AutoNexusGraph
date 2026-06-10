@@ -118,7 +118,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
     submodule import 패턴 — 테스트에서 patch('autonexusgraph.tools.retrieve.search_documents')
     또는 patch('autograph.tools.retrieve.search_documents_auto') 가 정상 작동하도록.
     """
-    from ..tools.retrieve import search_documents, search_by_metadata, get_chunk
+    from ..tools.retrieve import get_chunk, search_by_metadata, search_documents
 
     intent = task.get("intent") or "search"
     args = resolve_arg_bindings(state, task.get("args"))   # (a) closed-loop 데이터 흐름
@@ -137,7 +137,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
             _record(state, task, status="done", result=out)
             if isinstance(out, list):
                 state.setdefault("evidence_chunks", []).extend(out)
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
             log.warning("[research:%s] %s failed: %s", domain, intent, exc)
             _record(state, task, status="failed", result={"error": str(exc)})
         return state
@@ -159,7 +159,7 @@ def research_worker(state: AgentState, task: dict) -> AgentState:
         _record(state, task, status="done", result=out)
         if isinstance(out, list):
             state.setdefault("evidence_chunks", []).extend(out)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[research] %s failed: %s", intent, exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -185,7 +185,7 @@ def graph_worker(state: AgentState, task: dict) -> AgentState:
         _record(state, task, status="done", result=out)
         if intent == "get_subgraph":
             state["graph_subgraph"] = out
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[graph] %s failed: %s", intent, exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -209,7 +209,7 @@ def sql_worker(state: AgentState, task: dict) -> AgentState:
     try:
         out = fn(**args)
         _record(state, task, status="done", result=out)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[sql] %s failed: %s", intent, exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -240,7 +240,7 @@ def calculator_worker(state: AgentState, task: dict) -> AgentState:
                 args.get("variables") or {},
             )
         _record(state, task, status="done", result={"value": result})
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — worker tool 호출 실패 흡수 → log + 다음 task 진행
         log.warning("[calculator] failed: %s", exc)
         _record(state, task, status="failed", result={"error": str(exc)})
     return state
@@ -258,7 +258,7 @@ def _safe_calculator(expr: str, variables: dict) -> float:
     if not _EXPR_ALLOWED_RE.match(expr):
         raise ValueError(f"허용되지 않은 문자 포함: {expr!r}")
     # 위험 키워드 차단
-    BAD = ("import", "exec", "eval", "open", "__", "lambda", "compile",
+    BAD = ("import", "exec", "eval", "open", "__", "lambda", "compile",  # noqa: N806 — 지역 상수(블랙리스트)
            "globals", "locals", "vars", "getattr", "setattr", "delattr",
            "type", "object", "subprocess", "os.")
     for w in BAD:
@@ -274,7 +274,7 @@ def _safe_calculator(expr: str, variables: dict) -> float:
         safe_vars[k] = float(v)
 
     try:
-        import numexpr   # type: ignore[import-not-found]
+        import numexpr  # type: ignore[import-not-found]
     except ImportError as e:
         raise RuntimeError(
             "calculator_worker 는 numexpr 의존 — `pip install numexpr` 필요. "

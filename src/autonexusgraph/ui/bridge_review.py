@@ -1,4 +1,4 @@
-"""Bridge candidate 검토 UI (Q-1) — name match candidate 를 ✓/✗ 라벨.
+"""Bridge candidate 검토 UI (Q-1) — name match candidate 를 승급/거부 라벨.
 
 기동 (chat UI 와 별도 — core 무변경):
     streamlit run src/autonexusgraph/ui/bridge_review.py
@@ -19,7 +19,7 @@ from autonexusgraph.bridge_review import (
 
 st.set_page_config(page_title="Bridge 검토 — AutoNexusGraph", layout="wide")
 st.title("Bridge candidate 검토 (Q-1)")
-st.caption("`bridge.corp_entity` 자동 매칭 후보를 사람이 ✓ 승급 / ✗ 거부. "
+st.caption("`anxg_bridge.corp_entity` 자동 매칭 후보를 사람이 승급 / 거부. "
            "검토자 id 와 시각이 기록됩니다.")
 
 reviewer = st.sidebar.text_input("검토자 id", value="reviewer")
@@ -28,7 +28,7 @@ st.sidebar.markdown("---")
 # ── 진행률 KPI ──────────────────────────────────────────────────────
 try:
     kpi = review_progress_kpi()
-except Exception as e:   # noqa: BLE001
+except Exception as e:   # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
     st.error(f"KPI 조회 실패 (DB 연결 확인): {e}")
     st.stop()
 
@@ -71,7 +71,7 @@ if not rows:
     st.success("검토 대기 후보 없음 (해당 필터).")
     st.stop()
 
-st.caption(f"{len(rows)}건 — confidence 낮은 / 오래된 후보 우선. ✓ 승급 · ✗ 거부.")
+st.caption(f"{len(rows)}건 — confidence 낮은 / 오래된 후보 우선. 승급 · 거부.")
 
 # ── 후보 라벨링 ──────────────────────────────────────────────────────
 for r in rows:
@@ -83,10 +83,10 @@ for r in rows:
             f"match=`{r['match_method']}`  conf=**{r['confidence_score']}**  "
             f"qid={r.get('wikidata_qid') or '—'}  대기 {r['age_days']}일"
         )
-    if cols[1].button("✓ 승급", key=f"ok-{r['id']}"):
+    if cols[1].button("승급", key=f"ok-{r['id']}"):
         set_review_status(r["id"], "reviewed", reviewer=reviewer)
         st.rerun()
-    if cols[2].button("✗ 거부", key=f"no-{r['id']}"):
+    if cols[2].button("거부", key=f"no-{r['id']}"):
         set_review_status(r["id"], "rejected", reviewer=reviewer)
         st.rerun()
     cols[3].caption(f"id={r['id']}")

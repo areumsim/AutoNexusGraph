@@ -1,9 +1,9 @@
-"""ip.assignee_corp_map PG → Neo4j ``(Assignee)-[:MAPPED_TO]->(Company)`` merge.
+"""anxg_ip.assignee_corp_map PG → Neo4j ``(Assignee)-[:MAPPED_TO]->(Company)`` merge.
 
-PG SSOT ``ip.assignee_corp_map`` (19_ipgraph_bridge.sql) 는 assignee_id ↔ corp_code
+PG SSOT ``anxg_ip.assignee_corp_map`` (19_ipgraph_bridge.sql) 는 assignee_id ↔ corp_code
 매핑을 hold. 본 loader 는 그 매핑을 Neo4j 의 cross-domain bridge 엣지로 동기화.
 
-PRD §12.5 / docs/ipgraph.md §4 (M-3): ``bridge.corp_entity`` 직접 변경 회피,
+PRD §12.5 / docs/ipgraph.md §4 (M-3): ``anxg_bridge.corp_entity`` 직접 변경 회피,
 ip 도메인 별도 join 테이블 + Neo4j 엣지로 표현.
 
 ontology/ip/relations.yaml 의 ``MAPPED_TO`` 정의 (Assignee → Company, main_hop,
@@ -32,7 +32,7 @@ _SCHEMA_VERSION_FALLBACK = "v2.2"
 
 
 def _fetch_rows(min_confidence: float) -> list[dict]:
-    """ip.assignee_corp_map PG 조회 — confidence 임계 이상만."""
+    """anxg_ip.assignee_corp_map PG 조회 — confidence 임계 이상만."""
     import psycopg
     env = {ln.split("=", 1)[0].strip(): ln.split("=", 1)[1].strip()
            for ln in open(ROOT / ".env")
@@ -47,7 +47,7 @@ def _fetch_rows(min_confidence: float) -> list[dict]:
             cur.execute("""
                 SELECT assignee_id, corp_code, match_type, confidence_score,
                        reviewed_status, schema_version
-                  FROM ip.assignee_corp_map
+                  FROM anxg_ip.assignee_corp_map
                  WHERE confidence_score >= %s
                    AND reviewed_status <> 'rejected'
                  ORDER BY assignee_id, corp_code
@@ -68,19 +68,19 @@ def _fetch_rows(min_confidence: float) -> list[dict]:
 
 
 def _merge_neo4j(rows: list[dict]) -> int:
-    """Neo4j ``(a:Assignee {assignee_id})-[:MAPPED_TO]->(c:Company {corp_code})`` merge."""
+    """Neo4j ``(a:Anxg_Assignee {assignee_id})-[:MAPPED_TO]->(c:Anxg_Company {corp_code})`` merge."""
     from autograph.loaders._neo4j_helpers import edge_meta_cypher, run_batched
-    from autonexusgraph.db.neo4j import get_driver
+    from autonexusgraph.db.neo4j import get_session
 
     cypher = f"""
     UNWIND $rows AS r
-    MATCH (a:Assignee {{assignee_id: r.assignee_id}})
-    MATCH (c:Company {{corp_code: r.corp_code}})
+    MATCH (a:Anxg_Assignee {{assignee_id: r.assignee_id}})
+    MATCH (c:Anxg_Company {{corp_code: r.corp_code}})
     MERGE (a)-[edge:MAPPED_TO]->(c)
     SET {edge_meta_cypher('edge')}
     """
-    driver = get_driver()
-    with driver.session() as session:
+
+    with get_session() as session:
         return run_batched(session, cypher, rows, batch=500)
 
 

@@ -6,8 +6,6 @@ SDK 설치 시에만 import 시도.
 
 from __future__ import annotations
 
-import inspect
-
 from autonexusgraph.mcp import ToolSpec, build_tool_manifest
 from autonexusgraph.mcp.discovery import (
     _annotation_to_schema,
@@ -26,8 +24,21 @@ def test_build_tool_manifest_all_has_tools():
 def test_build_tool_manifest_domain_filter():
     fin = build_tool_manifest("finance")
     auto = build_tool_manifest("auto")
+    ip = build_tool_manifest("ip")
     assert all(s.domain == "finance" for s in fin)
     assert all(s.domain == "auto" for s in auto)
+    assert all(s.domain == "ip" for s in ip)
+
+
+def test_ip_tools_present_in_all_manifest():
+    """ipgraph.tools 가 'all' manifest 에 포함 — typed pool 위 MCP 노출."""
+    specs = build_tool_manifest("all")
+    domains = {s.domain for s in specs}
+    assert "ip" in domains
+    ip_names = {s.name for s in specs if s.domain == "ip"}
+    # patents / graph / retrieve / bridge 대표 tool 노출 확인.
+    assert {"lookup_patent", "list_patents_in_cpc",
+            "bridge_assignee_to_corp"} <= ip_names
 
 
 def test_tool_function_extracts_docstring_first_line():
@@ -93,11 +104,17 @@ def test_specs_unique_by_name():
     assert len(names) == len(set(names))     # finance 와 auto 사이 중복 없음 보장
 
 
-def test_finance_lookup_company_required_query():
+def test_finance_lookup_company_accepts_query_or_corp_code():
+    """lookup_company 는 query 또는 corp_code(별칭) 로 회사 식별 — 둘 다 schema 노출.
+
+    (LLM planner 가 회사를 corp_code 로 식별해 호출하는 경로를 흡수하기 위해 corp_code
+    를 query 별칭으로 받는다. 따라서 query 는 더 이상 단독 required 가 아니다.)
+    """
     specs = {s.name: s for s in build_tool_manifest("finance")}
     if "lookup_company" in specs:
-        s = specs["lookup_company"]
-        assert "query" in s.input_schema.get("required", [])
+        props = specs["lookup_company"].input_schema.get("properties", {})
+        assert "query" in props
+        assert "corp_code" in props
 
 
 # ── fail-soft: server module SDK 미설치 시 ───────────────────────
@@ -105,7 +122,7 @@ def test_server_module_failsoft_on_sdk_missing():
     """mcp SDK 가 없을 때 ``autonexusgraph.mcp.build_mcp_server`` 는 None."""
     from autonexusgraph import mcp as mcp_pkg
     try:
-        import mcp   # noqa: F401
+        import mcp  # noqa: F401
     except ImportError:
         # SDK 미설치 — fail-soft 검증.
         assert mcp_pkg.build_mcp_server is None

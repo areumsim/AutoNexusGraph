@@ -1,6 +1,6 @@
 """IRRelationExtractor — OEM IR/뉴스룸 본문에서 plant/모델 관계 추출.
 
-대상 vec.chunks (source='oem_ir') 의 본문을 LLM 에 보내, prompt 'relation_extract_ir.yaml'
+대상 anxg_vec.chunks (source='oem_ir') 의 본문을 LLM 에 보내, prompt 'relation_extract_ir.yaml'
 가 정의한 두 관계만 추출:
 
     MANUFACTURED_AT  : (VehicleModel) ↔ (Plant)
@@ -8,7 +8,7 @@
 
 설계: auto_relation_extractor.AutoRelationExtractor 동일 패턴. metadata 에서 oem /
 section / title / url 추출하여 user_template 에 주입. 추출 결과는 staging_writer 가
-auto.staging_relations 에 적재 — 이후 cross_validate (P4) 가 DART production 표와
+anxg_auto.staging_relations 에 적재 — 이후 cross_validate (P4) 가 DART production 표와
 정합 검사 후 Neo4j MANUFACTURED_AT 보강.
 
 실제 LLM 호출은 run_p3_ir.py 가 budget_aware_client 경유. 본 클래스는 BaseExtractor
@@ -29,7 +29,6 @@ from autonexusgraph.extractors.base import (
     RunContext,
 )
 
-
 log = logging.getLogger(__name__)
 
 
@@ -41,7 +40,7 @@ def load_ir_prompt() -> dict[str, Any]:
 
 
 class IRRelationExtractor(BaseExtractor):
-    """vec.chunks (source='oem_ir') → MANUFACTURED_AT / CAPACITY_REPORTED 후보."""
+    """anxg_vec.chunks (source='oem_ir') → MANUFACTURED_AT / CAPACITY_REPORTED 후보."""
 
     name = "ir_relation_extractor"
     version = "p3-ir-v1"

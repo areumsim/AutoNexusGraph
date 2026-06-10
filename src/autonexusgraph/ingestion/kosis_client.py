@@ -15,9 +15,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
-
-
 KOSIS_BASE = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 
 
@@ -44,7 +41,7 @@ class KosisClient:
         from ._common import make_http_client
         self._client = make_http_client(timeout=timeout)
 
-    def __enter__(self) -> "KosisClient":
+    def __enter__(self) -> KosisClient:
         return self
 
     def __exit__(self, *_: Any) -> None:
@@ -90,7 +87,7 @@ class KosisClient:
         for r in raw_rows:
             try:
                 val_s = r.get("DT")
-                val = float(val_s) if val_s not in ("", None, "-") else None
+                val = float(val_s) if val_s is not None and val_s not in ("", "-") else None
             except (ValueError, TypeError):
                 val = None
             out.append(KosisRow(

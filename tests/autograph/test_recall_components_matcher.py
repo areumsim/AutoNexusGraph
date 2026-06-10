@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from autograph.loaders.load_recall_components import _match_one, _stem, _tokenize
+from autograph.loaders.recall.load_recall_components import _match_one, _stem, _tokenize
 
 
 def _comp(cid, name, aliases=()):

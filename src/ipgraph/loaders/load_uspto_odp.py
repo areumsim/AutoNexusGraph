@@ -61,13 +61,13 @@ _EDGE_META = {
 
 # Neo4j 인덱스/제약 — 멱등.
 _CONSTRAINTS = [
-    "CREATE CONSTRAINT patent_pub_no   IF NOT EXISTS FOR (p:Patent)   REQUIRE p.pub_no IS UNIQUE",
-    "CREATE CONSTRAINT assignee_id     IF NOT EXISTS FOR (a:Assignee) REQUIRE a.assignee_id IS UNIQUE",
-    "CREATE CONSTRAINT inventor_id     IF NOT EXISTS FOR (i:Inventor) REQUIRE i.inventor_id IS UNIQUE",
-    "CREATE INDEX patent_jurisdiction IF NOT EXISTS FOR (p:Patent) ON (p.jurisdiction)",
-    "CREATE INDEX patent_filing_date  IF NOT EXISTS FOR (p:Patent) ON (p.filing_date)",
-    "CREATE INDEX assignee_country    IF NOT EXISTS FOR (a:Assignee) ON (a.country)",
-    "CREATE INDEX assignee_qid        IF NOT EXISTS FOR (a:Assignee) ON (a.wikidata_qid)",
+    "CREATE CONSTRAINT patent_pub_no   IF NOT EXISTS FOR (p:Anxg_Patent)   REQUIRE p.pub_no IS UNIQUE",
+    "CREATE CONSTRAINT assignee_id     IF NOT EXISTS FOR (a:Anxg_Assignee) REQUIRE a.assignee_id IS UNIQUE",
+    "CREATE CONSTRAINT inventor_id     IF NOT EXISTS FOR (i:Anxg_Inventor) REQUIRE i.inventor_id IS UNIQUE",
+    "CREATE INDEX patent_jurisdiction IF NOT EXISTS FOR (p:Anxg_Patent) ON (p.jurisdiction)",
+    "CREATE INDEX patent_filing_date  IF NOT EXISTS FOR (p:Anxg_Patent) ON (p.filing_date)",
+    "CREATE INDEX assignee_country    IF NOT EXISTS FOR (a:Anxg_Assignee) ON (a.country)",
+    "CREATE INDEX assignee_qid        IF NOT EXISTS FOR (a:Anxg_Assignee) ON (a.wikidata_qid)",
 ]
 
 
@@ -144,17 +144,17 @@ def _upsert_patents(cur: Any, rows: list[dict]) -> dict[str, int]:
         cur.execute("SAVEPOINT sp_pat")
         try:
             cur.execute("""
-                INSERT INTO ip.patents
+                INSERT INTO anxg_ip.patents
                   (pub_no, app_no, title, abstract, filing_date, grant_date,
                    kind, jurisdiction, source, snapshot_year, schema_version)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (pub_no) DO UPDATE SET
-                  app_no       = COALESCE(EXCLUDED.app_no, ip.patents.app_no),
-                  title        = COALESCE(EXCLUDED.title, ip.patents.title),
-                  abstract     = COALESCE(EXCLUDED.abstract, ip.patents.abstract),
-                  filing_date  = COALESCE(EXCLUDED.filing_date, ip.patents.filing_date),
-                  grant_date   = COALESCE(EXCLUDED.grant_date, ip.patents.grant_date),
-                  kind         = COALESCE(EXCLUDED.kind, ip.patents.kind),
+                  app_no       = COALESCE(EXCLUDED.app_no, anxg_ip.patents.app_no),
+                  title        = COALESCE(EXCLUDED.title, anxg_ip.patents.title),
+                  abstract     = COALESCE(EXCLUDED.abstract, anxg_ip.patents.abstract),
+                  filing_date  = COALESCE(EXCLUDED.filing_date, anxg_ip.patents.filing_date),
+                  grant_date   = COALESCE(EXCLUDED.grant_date, anxg_ip.patents.grant_date),
+                  kind         = COALESCE(EXCLUDED.kind, anxg_ip.patents.kind),
                   snapshot_year = EXCLUDED.snapshot_year
                 RETURNING (xmax = 0) AS is_new
             """, (r["pub_no"], r.get("app_no"), r.get("title"), r.get("abstract"),
@@ -167,7 +167,7 @@ def _upsert_patents(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_pat")
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:patents] %s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_pat")
             log.warning("[uspto:pg:patents] %s fail: %s", r.get("pub_no"), exc)
             skip += 1
@@ -184,16 +184,16 @@ def _upsert_assignees(cur: Any, rows: list[dict]) -> dict[str, int]:
         cur.execute("SAVEPOINT sp_asn")
         try:
             cur.execute("""
-                INSERT INTO ip.assignees
+                INSERT INTO anxg_ip.assignees
                   (assignee_id, name, name_norm, country, type, wikidata_qid,
                    snapshot_year, schema_version)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (assignee_id) DO UPDATE SET
-                  name         = COALESCE(EXCLUDED.name, ip.assignees.name),
-                  name_norm    = COALESCE(EXCLUDED.name_norm, ip.assignees.name_norm),
-                  country      = COALESCE(EXCLUDED.country, ip.assignees.country),
-                  type         = COALESCE(EXCLUDED.type, ip.assignees.type),
-                  wikidata_qid = COALESCE(EXCLUDED.wikidata_qid, ip.assignees.wikidata_qid),
+                  name         = COALESCE(EXCLUDED.name, anxg_ip.assignees.name),
+                  name_norm    = COALESCE(EXCLUDED.name_norm, anxg_ip.assignees.name_norm),
+                  country      = COALESCE(EXCLUDED.country, anxg_ip.assignees.country),
+                  type         = COALESCE(EXCLUDED.type, anxg_ip.assignees.type),
+                  wikidata_qid = COALESCE(EXCLUDED.wikidata_qid, anxg_ip.assignees.wikidata_qid),
                   snapshot_year = EXCLUDED.snapshot_year
                 RETURNING (xmax = 0) AS is_new
             """, (r["assignee_id"], r.get("name"), r.get("name_norm"),
@@ -205,7 +205,7 @@ def _upsert_assignees(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_asn")
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:assignees] %s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_asn")
             log.warning("[uspto:pg:assignees] %s fail: %s", r.get("assignee_id"), exc)
             skip += 1
@@ -222,13 +222,13 @@ def _upsert_inventors(cur: Any, rows: list[dict]) -> dict[str, int]:
         cur.execute("SAVEPOINT sp_inv")
         try:
             cur.execute("""
-                INSERT INTO ip.inventors
+                INSERT INTO anxg_ip.inventors
                   (inventor_id, name, name_norm, country, schema_version)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (inventor_id) DO UPDATE SET
-                  name      = COALESCE(EXCLUDED.name, ip.inventors.name),
-                  name_norm = COALESCE(EXCLUDED.name_norm, ip.inventors.name_norm),
-                  country   = COALESCE(EXCLUDED.country, ip.inventors.country)
+                  name      = COALESCE(EXCLUDED.name, anxg_ip.inventors.name),
+                  name_norm = COALESCE(EXCLUDED.name_norm, anxg_ip.inventors.name_norm),
+                  country   = COALESCE(EXCLUDED.country, anxg_ip.inventors.country)
                 RETURNING (xmax = 0) AS is_new
             """, (r["inventor_id"], r.get("name"), r.get("name_norm"),
                   r.get("country"), r.get("schema_version", _SCHEMA_VERSION)))
@@ -237,7 +237,7 @@ def _upsert_inventors(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_inv")
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:inventors] %s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_inv")
             log.warning("[uspto:pg:inventors] %s fail: %s", r.get("inventor_id"), exc)
             skip += 1
@@ -257,12 +257,12 @@ def _upsert_link(cur: Any, table: str, pk: tuple[str, ...],
             cols = (*pk, *extra)
             placeholders = ",".join(["%s"] * len(cols))
             cur.execute(
-                f"INSERT INTO ip.{table} ({','.join(cols)}) "
+                f"INSERT INTO anxg_ip.{table} ({','.join(cols)}) "
                 f"VALUES ({placeholders}) ON CONFLICT DO NOTHING",
                 tuple(r.get(c) for c in cols),
             )
             cur.execute("RELEASE SAVEPOINT sp_link")
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:%s] %s fail 흡수 → {"inserted_or_updated": len... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_link")
             log.warning("[uspto:pg:%s] %s fail: %s", table, {k: r.get(k) for k in pk}, exc)
             skip += 1
@@ -279,11 +279,11 @@ def _upsert_citations(cur: Any, rows: list[dict]) -> dict[str, int]:
         cur.execute("SAVEPOINT sp_cit")
         try:
             cur.execute("""
-                INSERT INTO ip.citations
+                INSERT INTO anxg_ip.citations
                   (citing_pub_no, cited_pub_no, citation_type, snapshot_year, schema_version)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (citing_pub_no, cited_pub_no) DO UPDATE SET
-                  citation_type = COALESCE(EXCLUDED.citation_type, ip.citations.citation_type),
+                  citation_type = COALESCE(EXCLUDED.citation_type, anxg_ip.citations.citation_type),
                   snapshot_year = EXCLUDED.snapshot_year
                 RETURNING (xmax = 0) AS is_new
             """, (r["citing_pub_no"], r["cited_pub_no"], r.get("citation_type"),
@@ -294,7 +294,7 @@ def _upsert_citations(cur: Any, rows: list[dict]) -> dict[str, int]:
             else:
                 updated += 1
             cur.execute("RELEASE SAVEPOINT sp_cit")
-        except Exception as exc:   # noqa: BLE001
+        except Exception as exc:   # noqa: BLE001 — [uspto:pg:citations] %s→%s fail 흡수 → {"inserted": inserted, "upd... 반환
             cur.execute("ROLLBACK TO SAVEPOINT sp_cit")
             log.warning("[uspto:pg:citations] %s→%s fail: %s",
                         r.get("citing_pub_no"), r.get("cited_pub_no"), exc)
@@ -336,7 +336,7 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
     }
     batch = 1000
     try:
-        with drv.session() as s:
+        with drv.session(database=os.environ.get("NEO4J_DATABASE") or None) as s:
             for q in _CONSTRAINTS:
                 s.run(q)
 
@@ -345,7 +345,7 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = patents[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MERGE (p:Patent {pub_no: r.pub_no})
+                    MERGE (p:Anxg_Patent {pub_no: r.pub_no})
                     SET p.app_no       = r.app_no,
                         p.title        = r.title,
                         p.abstract     = r.abstract,
@@ -363,7 +363,7 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = assignees[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MERGE (a:Assignee {assignee_id: r.assignee_id})
+                    MERGE (a:Anxg_Assignee {assignee_id: r.assignee_id})
                     SET a.name         = r.name,
                         a.name_norm    = r.name_norm,
                         a.country      = r.country,
@@ -378,7 +378,7 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = inventors[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MERGE (i:Inventor {inventor_id: r.inventor_id})
+                    MERGE (i:Anxg_Inventor {inventor_id: r.inventor_id})
                     SET i.name       = r.name,
                         i.name_norm  = r.name_norm,
                         i.country    = r.country,
@@ -391,9 +391,9 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = patent_assignees[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MATCH (p:Patent {pub_no: r.pub_no})
+                    MATCH (p:Anxg_Patent {pub_no: r.pub_no})
                     WITH p, r
-                    MATCH (a:Assignee {assignee_id: r.assignee_id})
+                    MATCH (a:Anxg_Assignee {assignee_id: r.assignee_id})
                     MERGE (p)-[e:ASSIGNED_TO]->(a)
                     SET e.sequence         = r.sequence,
                         e.source_type      = $source_type,
@@ -412,9 +412,9 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = patent_inventors[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MATCH (p:Patent {pub_no: r.pub_no})
+                    MATCH (p:Anxg_Patent {pub_no: r.pub_no})
                     WITH p, r
-                    MATCH (i:Inventor {inventor_id: r.inventor_id})
+                    MATCH (i:Anxg_Inventor {inventor_id: r.inventor_id})
                     MERGE (i)-[e:INVENTED]->(p)
                     SET e.sequence         = r.sequence,
                         e.source_type      = $source_type,
@@ -434,9 +434,9 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = patent_cpc[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MATCH (p:Patent {pub_no: r.pub_no})
+                    MATCH (p:Anxg_Patent {pub_no: r.pub_no})
                     WITH p, r
-                    MATCH (c:CPCCode {code: r.cpc_code})
+                    MATCH (c:Anxg_CPCCode {code: r.cpc_code})
                     MERGE (p)-[e:CLASSIFIED_AS]->(c)
                     SET e.primary_flag     = r.primary_flag,
                         e.source_type      = $source_type,
@@ -455,9 +455,9 @@ def load_neo4j(*, patents: list[dict], assignees: list[dict], inventors: list[di
                 chunk = citations[i:i + batch]
                 s.run("""
                     UNWIND $rows AS r
-                    MATCH (citing:Patent {pub_no: r.citing_pub_no})
+                    MATCH (citing:Anxg_Patent {pub_no: r.citing_pub_no})
                     WITH citing, r
-                    MATCH (cited:Patent  {pub_no: r.cited_pub_no})
+                    MATCH (cited:Anxg_Patent  {pub_no: r.cited_pub_no})
                     MERGE (citing)-[e:CITES]->(cited)
                     SET e.citation_type    = r.citation_type,
                         e.source_type      = $source_type,

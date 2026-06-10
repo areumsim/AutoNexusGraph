@@ -13,11 +13,10 @@ from __future__ import annotations
 import pytest
 
 from autograph.extractors.dart_production_parser import (
-    PlantRow,
+    _extract_years_from_header,
+    _parse_number,
     parse_business_report,
     parse_section,
-    _parse_number,
-    _extract_years_from_header,
 )
 
 

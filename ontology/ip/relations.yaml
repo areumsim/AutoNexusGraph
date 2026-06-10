@@ -123,7 +123,22 @@ relations:
     provenance: deterministic
     pass: P2
     confidence_default: 0.90
-    enabled: false                   # OpenAlex 적재 후 활성
+    enabled: true                    # OpenAlex 적재 완료 (work_institution 638) → 활성
+
+  # ── Institution → Company (cross-domain bridge — ip ↔ finance/auto) ──
+  IS_ENTITY:
+    from: Institution
+    to: Company                      # finance/core Company (corp_entity) — cross-domain (MAPPED_TO 와 동일 패턴)
+    directed: true
+    cardinality: many-to-one         # 연구기관 1곳 → corp_code 1 기업
+    class: main_hop
+    provenance: deterministic        # OpenAlex institution.corp_code 정확 매칭
+    pass: P2
+    confidence_default: 0.95         # corp_code exact match grade A
+    enabled: true
+    notes: |
+      OpenAlex Institution (기업 R&D 기관) → corp_entity Company 매핑. corp_code 직접 매칭.
+      load_openalex.py 적재: ``(i:Anxg_Institution)-[:IS_ENTITY]->(c:Anxg_Company)`` (7키 메타).
 
   # ── 임베딩 유사도 (ablation — 본 PR 비활성) ──────────────────
   SIMILAR_TECH:

@@ -16,9 +16,9 @@ P2-(10) "이슈 추적" 단순 리스트 → 측정 가능 audit (사용자 cold
 
 판정:
     B6  : aihub_578/aihub_71347 component 매칭률 — 현재 모니터링만
-    B7  : auto.staging_relations (Wikidata P176) row > 0 = 해결
+    B7  : anxg_auto.staging_relations (Wikidata P176) row > 0 = 해결
     B10 : Neo4j :Supplier 중복 count (name_norm group_by, cnt > 1) = 0 = 해결
-    B11 : auto.events_complaints 의 missing component_text 비율 < 0.30 = 해결
+    B11 : anxg_auto.events_complaints 의 missing component_text 비율 < 0.30 = 해결
 """
 
 from __future__ import annotations
@@ -58,6 +58,7 @@ def _load_env_once() -> None:
 def _pg_conn():
     """psycopg2 connection — .env 또는 env override."""
     import os
+
     import psycopg2
     _load_env_once()
     dsn = os.environ.get("POSTGRES_DSN")
@@ -68,6 +69,7 @@ def _pg_conn():
 
 def _neo4j_driver():
     import os
+
     from neo4j import GraphDatabase
     _load_env_once()
     return GraphDatabase.driver(
@@ -79,7 +81,7 @@ def _neo4j_driver():
 
 # ── B6 — AI-Hub model name mismatch ─────────────────────────
 def check_b6() -> dict[str, Any]:
-    """auto.components AI-Hub source 분포. 모니터링만 — threshold 없음.
+    """anxg_auto.components AI-Hub source 분포. 모니터링만 — threshold 없음.
 
     현재 상태: 양호 (24 CONTAINS_COMPONENT edge OK). model 변경 시 routine 재실행.
     """
@@ -88,12 +90,12 @@ def check_b6() -> dict[str, Any]:
             cur.execute("""
                 SELECT source, count(*) AS n,
                        count(DISTINCT system_code) AS n_systems
-                  FROM auto.components
+                  FROM anxg_auto.components
                  WHERE source IN ('aihub_578', 'aihub_71347')
                  GROUP BY source ORDER BY source
             """)
             rows = cur.fetchall()
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B6", "status": "ERR... 반환
         return {"id": "B6", "status": "ERROR",
                 "reason": f"PG 조회 실패: {exc}"}
     return {
@@ -108,19 +110,19 @@ def check_b6() -> dict[str, Any]:
 
 # ── B7 — Wikidata P176 rate-limit / staging_relations 0 ────
 def check_b7() -> dict[str, Any]:
-    """auto.staging_relations 의 P176 (HAS_PART) row 수. > 0 = 해결.
+    """anxg_auto.staging_relations 의 P176 (HAS_PART) row 수. > 0 = 해결.
 
     staging_relations 스키마: source 컬럼 없음 — extractor_name 으로 wikidata 식별.
     """
     try:
         with _pg_conn() as c, c.cursor() as cur:
             cur.execute("""
-                SELECT count(*) FROM auto.staging_relations
+                SELECT count(*) FROM anxg_auto.staging_relations
                  WHERE extractor_name ILIKE '%wikidata%'
                     OR (relation_type = 'SUPPLIED_BY' AND extractor_name ILIKE '%p176%')
             """)
             n = cur.fetchone()[0] or 0
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B7", "status": "ERR... 반환
         return {"id": "B7", "status": "ERROR",
                 "reason": f"PG 조회 실패: {exc}"}
     status = "RESOLVED" if n > 0 else "ACTIVE"
@@ -141,9 +143,10 @@ def check_b10() -> dict[str, Any]:
     """Neo4j :Supplier 의 name_norm 중복 패턴. 0 = 해결."""
     try:
         drv = _neo4j_driver()
-        with drv.session() as s:
+        import os
+        with drv.session(database=os.environ.get("NEO4J_DATABASE") or None) as s:
             r = s.run("""
-                MATCH (s:Supplier)
+                MATCH (s:Anxg_Supplier)
                 WITH s.name_norm AS norm, count(*) AS cnt
                 WHERE norm IS NOT NULL AND cnt > 1
                 RETURN count(norm) AS dup_groups,
@@ -152,10 +155,10 @@ def check_b10() -> dict[str, Any]:
             dup_groups = (r or {}).get("dup_groups", 0)
             extra_nodes = (r or {}).get("extra_nodes", 0)
             total = s.run(
-                "MATCH (s:Supplier) RETURN count(s) AS n"
+                "MATCH (s:Anxg_Supplier) RETURN count(s) AS n"
             ).single()["n"]
         drv.close()
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B10", "status": "ER... 반환
         return {"id": "B10", "status": "ERROR",
                 "reason": f"Neo4j 조회 실패: {exc}"}
     extra_nodes = extra_nodes or 0
@@ -179,33 +182,50 @@ def check_b10() -> dict[str, Any]:
 
 # ── B11 — NHTSA complaint 짧은 카테고리 매칭 누락 ─────────────
 def check_b11() -> dict[str, Any]:
-    """events_complaints.components (ARRAY) 의 매칭 실패 비율. < 0.30 = 해결.
+    """events_complaints.components 의 미매칭 비율. < 0.30 = 해결.
 
-    실측 스키마: complaints.components = text[] (NHTSA categories) — unnest 후
-    components.canonical_name 와 비교.
+    NHTSA 카테고리는 L4 부품명이 아니라 **L3 시스템 수준** — comma 복합 분리 후 (a)
+    L4 ``components.canonical_name`` 또는 (b) L3 ``system_code``
+    (``ontology/auto/nhtsa_complaint_systems.yaml`` 매핑) 와 매칭한다.
+    'UNKNOWN OR OTHER' 류는 분류 불가 → 분모 제외.
     """
+    import yaml
+    try:
+        ydoc = yaml.safe_load(
+            (ROOT / "ontology" / "auto" / "nhtsa_complaint_systems.yaml").read_text("utf-8"))
+        nhtsa_map = {k.strip().upper(): str(v).lower()
+                     for k, v in (ydoc.get("mapping") or {}).items()}
+        excluded = {str(x).strip().upper() for x in (ydoc.get("excluded") or [])}
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B11", "status": "ER... 반환
+        return {"id": "B11", "status": "ERROR", "reason": f"매핑 로드 실패: {exc}"}
     try:
         with _pg_conn() as c, c.cursor() as cur:
-            cur.execute("""
-                WITH expanded AS (
-                  SELECT complaint_id, unnest(components) AS comp_text
-                    FROM auto.events_complaints
-                   WHERE components IS NOT NULL AND array_length(components, 1) > 0
-                )
-                SELECT
-                    count(*) AS total,
-                    count(*) FILTER (
-                        WHERE comp_text NOT IN
-                              (SELECT canonical_name FROM auto.components)
-                    ) AS unmatched
-                  FROM expanded
-            """)
-            row = cur.fetchone()
-            total = row[0] or 0
-            unmatched = row[1] or 0
-    except Exception as exc:   # noqa: BLE001
-        return {"id": "B11", "status": "ERROR",
-                "reason": f"PG 조회 실패: {exc}"}
+            cur.execute("SELECT DISTINCT upper(canonical_name) FROM anxg_auto.components "
+                        "WHERE canonical_name IS NOT NULL")
+            l4 = {r[0] for r in cur.fetchall()}
+            cur.execute("SELECT DISTINCT lower(system_code) FROM anxg_auto.components "
+                        "WHERE system_code IS NOT NULL")
+            sys_codes = {r[0] for r in cur.fetchall()}
+            cur.execute("SELECT components FROM anxg_auto.events_complaints "
+                        "WHERE components IS NOT NULL AND array_length(components, 1) > 0")
+            arrays = [r[0] for r in cur.fetchall()]
+    except Exception as exc:   # noqa: BLE001 — 호출 실패 흡수 → {"id": "B11", "status": "ER... 반환
+        return {"id": "B11", "status": "ERROR", "reason": f"PG 조회 실패: {exc}"}
+
+    total = matched = excl = 0
+    for arr in arrays:
+        for el in arr or []:
+            for part in str(el).split(","):       # NHTSA 복합 카테고리 분리.
+                pu = part.strip().upper()
+                if not pu:
+                    continue
+                if pu in excluded:                 # 분류 불가 → 분모 제외.
+                    excl += 1
+                    continue
+                total += 1
+                if pu in l4 or nhtsa_map.get(pu) in sys_codes:
+                    matched += 1
+    unmatched = total - matched
     ratio = (unmatched / total) if total else 0.0
     status = "RESOLVED" if ratio < 0.30 else "ACTIVE"
     return {
@@ -214,13 +234,14 @@ def check_b11() -> dict[str, Any]:
         "metric": "complaint_unmatched_ratio",
         "value":  round(ratio, 3),
         "detail": {
-            "total_complaints":    int(total),
-            "unmatched_component": int(unmatched),
+            "categorizable":    total,
+            "matched":          matched,
+            "unmatched":        unmatched,
+            "excluded_unknown": excl,
         },
         "threshold": "< 0.30",
-        "note":   ("L3 system 매칭 추가 (ontology/auto/relations.yaml COMPLAINT_OF "
-                    "target 확장) 또는 짧은 카테고리 components 등록 후 측정"
-                    if ratio >= 0.30 else "해결됨"),
+        "note":   ("L3 system 매핑(nhtsa_complaint_systems.yaml) 확장 필요"
+                    if ratio >= 0.30 else "해결됨 — comma 분리 + L4/L3 매칭, UNKNOWN 제외"),
     }
 
 

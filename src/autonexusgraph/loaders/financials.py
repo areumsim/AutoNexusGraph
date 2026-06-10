@@ -1,4 +1,4 @@
-"""fin.financials 적재 — DART XBRL fnlttSinglAcntAll.
+"""anxg_fin.financials 적재 — DART XBRL fnlttSinglAcntAll.
 
 원본:
 - data/raw/dart_bulk/corp/<corp_code>/financials/<year>_annual_CFS.jsonl
@@ -23,9 +23,8 @@ from pathlib import Path
 from ..config import get_settings
 from ._common import LoadStats, chunked, iter_jsonl, parse_amount, parse_int
 
-
 SQL_UPSERT = """
-INSERT INTO fin.financials
+INSERT INTO anxg_fin.financials
   (corp_code, bsns_year, reprt_code, fs_div, sj_div, account_id, account_nm,
    thstrm_amount, frmtrm_amount, bfefrmtrm_amount, ord, raw)
 VALUES
@@ -43,7 +42,7 @@ DO UPDATE SET
 
 
 def _build_row(corp_code: str, year: int, row: dict) -> dict | None:
-    """JSONL row → fin.financials row dict."""
+    """JSONL row → anxg_fin.financials row dict."""
     # UNIQUE 키 account_id 는 NULL 허용이지만 다른 컬럼과 함께 정합성 보장 위해 '' 대신 NULL 처리.
     account_nm = (row.get("account_nm") or "").strip()
     if not account_nm:
@@ -117,9 +116,11 @@ def load_financials(
     # 진행률 (필수 아님)
     try:
         from tqdm import tqdm
-        wrap = lambda it: tqdm(it, desc="financials", unit="batch") if progress else it
+        def wrap(it):
+            return tqdm(it, desc="financials", unit="batch") if progress else it
     except ImportError:
-        wrap = lambda it: it
+        def wrap(it):
+            return it
 
     from ..db.postgres import transaction
     with transaction() as conn:
@@ -129,7 +130,7 @@ def load_financials(
                     cur.executemany(SQL_UPSERT, batch)
                     stats.inserted += len(batch)
                     stats.batches += 1
-                except Exception:
+                except Exception:   # noqa: BLE001 — batch 실패 카운트 후 raise (트랜잭션 rollback)
                     stats.failed += len(batch)
                     raise
     return stats
