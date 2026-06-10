@@ -86,9 +86,9 @@ def _neo4j_counts() -> list[tuple[str, object]]:
                     continue
                 try:
                     out.append((name, s.run(q).single()["n"]))
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:  # noqa: BLE001 — 개별 쿼리 실패는 셀별 에러로 표시
                     out.append((name, f"(에러: {str(e)[:40]})"))
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — Neo4j 연결 실패는 전체 에러 행으로 표시
         out.append(("Neo4j 연결", f"(실패: {str(e)[:60]})"))
     return out
 
