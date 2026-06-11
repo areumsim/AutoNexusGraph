@@ -28,16 +28,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 _CHUNK_CHARS = 1200          # 페이지가 길면 ~1200자 윈도우로 분할
 _DOMAIN = "finance"
+# rcept_no NULL — Allganize 는 DART filing 이 아니라 filings FK 미적용(NULL 허용).
+# 문서 식별은 metadata.doc_id/file_name. 멱등은 ingest() 의 source='allganize' 사전삭제.
 _INSERT = """
 INSERT INTO anxg_vec.chunks
   (corp_code, rcept_no, section, chunk_idx, text, token_count, metadata,
    source, fiscal_year, report_type, embedding)
-VALUES (NULL, %(rcept_no)s, %(section)s, %(chunk_idx)s, %(text)s,
+VALUES (NULL, NULL, %(section)s, %(chunk_idx)s, %(text)s,
         %(token_count)s, %(metadata)s::jsonb, 'allganize', NULL,
         'allganize_external', %(embedding)s)
-ON CONFLICT (rcept_no, chunk_idx) DO UPDATE SET
-  text=EXCLUDED.text, section=EXCLUDED.section, metadata=EXCLUDED.metadata,
-  embedding=EXCLUDED.embedding
 """
 
 
@@ -112,32 +111,39 @@ def ingest(pdf_dir: Path, *, apply: bool) -> None:
     if not pdfs:
         print(f"[allganize] {pdf_dir} 에 PDF 없음 — --list 로 받을 문서 확인 후 수동 저장.")
         return
+    import hashlib
     client = conn = None
     if apply:
         from autonexusgraph.db.postgres import get_connection
         from autonexusgraph.embeddings import get_embedding_client
         client = get_embedding_client()
         conn = get_connection()
+        with conn.cursor() as cur:        # 멱등 — 기존 allganize chunk 제거 후 재적재
+            cur.execute("DELETE FROM anxg_vec.chunks WHERE source = 'allganize'")
+        conn.commit()
 
     total_chunks = 0
+    gidx = 0                              # 전역 chunk_idx (rcept_no NULL 이라 문서 간 충돌 무관)
     for pdf in pdfs:
         chunks = _extract_chunks(pdf)
-        rcept = f"alg-{_DOMAIN}-{_slug(pdf.name)}"
-        print(f"  {pdf.name}: {len(chunks)} chunks (rcept={rcept})")
+        doc_id = "ALG" + hashlib.md5(pdf.name.encode()).hexdigest()[:11]
+        print(f"  {pdf.name}: {len(chunks)} chunks (doc_id={doc_id})")
         total_chunks += len(chunks)
         if not apply:
             continue
         texts = [t for _, t in chunks]
         vecs = client.embed(texts)          # BGE-M3 1024-dim
         with conn.cursor() as cur:
-            for idx, ((section, text), vec) in enumerate(zip(chunks, vecs, strict=True)):
+            for (section, text), vec in zip(chunks, vecs, strict=True):
                 cur.execute(_INSERT, {
-                    "rcept_no": rcept, "section": section, "chunk_idx": idx,
+                    "section": section, "chunk_idx": gidx,
                     "text": text, "token_count": len(text.split()),
-                    "metadata": json.dumps({"file_name": pdf.name, "domain": _DOMAIN,
-                                            "benchmark": "allganize"}, ensure_ascii=False),
+                    "metadata": json.dumps({"doc_id": doc_id, "file_name": pdf.name,
+                                            "domain": _DOMAIN, "benchmark": "allganize"},
+                                           ensure_ascii=False),
                     "embedding": vec,
                 })
+                gidx += 1
         conn.commit()
     print(f"[allganize] {'적재 완료' if apply else 'dry-run'} — PDF {len(pdfs)}, chunk {total_chunks}"
           + ("" if apply else " (변경 없음, --apply 로 적재)"))
