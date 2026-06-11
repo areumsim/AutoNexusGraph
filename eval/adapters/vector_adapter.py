@@ -26,6 +26,7 @@ class VectorAdapter(AgentAdapter):
 
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — vector-only 는 도메인 무관.
         from autonexusgraph.tools.retrieve import search_documents
+
         from .base import synthesize
 
         t0 = time.monotonic()
