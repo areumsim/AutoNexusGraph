@@ -90,6 +90,7 @@ dev = [
 ocr = [
     "easyocr>=1.7",
     "pymupdf>=1.24",
+    "selenium>=4.0",   # KOFIA 등 JS 다운로드 사이트
 ]
 
 all = [

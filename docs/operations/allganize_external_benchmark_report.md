@@ -8,8 +8,8 @@
 ## 0. 한 줄 요약
 
 `allganize/RAG-Evaluation-Dataset-KO` finance **60 QA 흡수**(외부 큐레이터 비율 0%→26.7%) +
-원문 PDF **10건 스크래핑 → OCR → vec.chunks 98 chunks 적재 완료**. 해당 문서 기반 질문
-answerable. (KOFIA·KIF 4건은 사이트 제약으로 미확보 — 후속.)
+원문 PDF **12/14건 스크래핑(selenium 포함) → OCR → vec.chunks 374 chunks 적재 완료**. 해당 문서 기반 질문
+answerable. (KIF 2건만 레거시 Flash 뷰어로 미확보 — 후속.)
 
 **처리 흐름 (무엇을 → 어떻게):**
 
@@ -62,9 +62,9 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
   타깃 2건(통화신용정책 운영 13p / 향후 방향 21p) 확보.
 - **FSC** ✅(부분) — `/comm/getFile?srvcId=BBSTY1&upperNo=...&fileTy=ATTACH&fileSn=...` 패턴. 카테고리
   페이지서 8개 첨부 다운(보도자료 류, 정확 타깃 매칭은 불확실).
-- **KOFIA** ❌ — 다운로드가 JS 기반, 링크 미노출.
-- **KIF** ❌ — `flexer/viewer.jsp` 뷰어 래퍼, 직접 PDF 엔드포인트 미확보.
-- 결과: **15 PDF 다운로드** → 비타깃·거대(134p/44MB 등) 제거 후 **10건 유지**(BOK 2 + FSC 8).
+- **KOFIA** ✅(selenium) — `down.do?brd_id=www_default&seq=<N>&data_tp=A&file_seq=1` (selenium 으로 view 페이지 세션 쿠키 획득 후 다운). 증시콘서트 58p·퇴직연금 50p 확보.
+- **KIF** ❌ — `flexer/viewer.jsp` 레거시 Flash 뷰어, cid stale("Request Error") + 헤드리스 PDF 미로드. 미확보.
+- 결과: **17 PDF 다운로드**(BOK 7 + FSC 8 + KOFIA 2) → 비타깃·거대 제거 후 **12건 유지**(BOK 2 + FSC 8 + KOFIA 2).
 
 ### 2.4 OCR — 이미지 스캔 대응 (PR #79)
 - **결정적 발견**: 한국 금융 PDF 가 **이미지/스캔 기반**. 예: BOK 통화신용정책(13p, 41MB) →
@@ -91,19 +91,19 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 |---|---|
 | gold QA(Allganize finance) | **60 row** (`gold_qa_allganize_v0.jsonl`) |
 | 외부 큐레이터 비율 | **0% → 26.7%** (finance 66.7%) |
-| 적재 PDF | **10** (BOK 2 + FSC 8) |
-| `vec.chunks` (source='allganize') | **98 chunks** (전부 임베딩 BGE-M3 1024d) |
+| 적재 PDF | **12/14** (BOK 2 + FSC 8 + KOFIA 2) |
+| `vec.chunks` (source='allganize') | **374 chunks** (전부 임베딩 BGE-M3 1024d) |
 | └ BOK 통화신용정책 운영 | 23 chunks (**OCR**, 이미지스캔) |
 | └ BOK 향후 방향 | 39 chunks (**OCR**) |
 | └ FSC 보도자료 8건 | 36 chunks (텍스트) |
+| └ KOFIA 증시콘서트/퇴직연금 | 229 / ~145 chunks (**OCR**, selenium 확보) |
 | OCR 품질 | BOK 이미지 PDF서 한국어 정상 추출 (검증: "한국은행 자산... 주택매매 거래량... 부동산 PF 대출 잔액") |
 
 ---
 
 ## 4. 남은 것 (정직)
 
-1. **KOFIA(2)·KIF(2) PDF 미확보** — JS 다운로드 / 뷰어 래퍼. 사람 수동 다운로드 또는 브라우저
-   자동화(Selenium 등) 필요. → 10/14 finance 원문 확보(나머지 4 후속).
+1. **KIF(2) PDF 미확보** — 레거시 Flash 뷰어(`flexer`) + cid stale("Request Error"). 헤드리스 브라우저로도 PDF 미로드. → **12/14 finance 원문 확보**(KIF 2 후속, 수동/구버전 뷰어 필요).
 2. **FSC 정확 타깃 매칭 불확실** — 카테고리 페이지서 받은 8건이 정확히 4 타깃인지 미검증(이미지
    스파스 텍스트라 키워드 매칭 신뢰도 낮음). 도메인 관련 보도자료라 코퍼스엔 유효.
 3. **eval answerability 실측 미완** — 코퍼스는 적재됐으나 Allganize 60 QA 에 대한 실제 정답률
