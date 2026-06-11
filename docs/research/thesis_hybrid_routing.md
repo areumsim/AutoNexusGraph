@@ -51,7 +51,17 @@
 > em_status=ok) hybrid 0.40→0.60, vector 0.40 = +20.0%p — 반증(+0pp)에서 하이브리드 우세로 전환**
 > (목표 +30%p 미달, EM scorable 5 소표본 주의). hybrid '정보 부족' 24→17/30, evidence 115→165.
 > 단 hits 는 여전히 vector 우세(0.81 vs 0.44 — hybrid 정조준), #10.13 홉효율은 0.375→0.75 로
-> trade-off(탐색량↑). **결론: store-aware hybrid 가 정답률(EM)에선 vector 를 상회**(목표선엔 미달).
+> trade-off(탐색량↑).
+>
+> **2026-06-11 top_k 8 parity (정정 — EM 노이즈 확인)**: vector adapter(top_k=8)와 동등화 —
+> planner search_documents top_k 6→8 + `_build_context` ev[:6]→[:8] + number_guard cap 6→8.
+> 재측정: hybrid '정보 부족' 17→**16/30**(coverage 일관 개선), 그러나 **EM hybrid 0.60→0.40 =
+> vector 0.40 = +0.0%p** — 직전 +20pp 가 사라짐. **EM run별 진동 +0/+20/+0%p** ⇒ scorable 5문항은
+> hybrid>vector 를 robust 하게 세우기엔 **너무 작은 표본**(LLM 비결정성 + 1문항=20pp 양자화).
+> **정직한 결론: vector-floor/top_k fix 가 hybrid coverage 를 실측 개선(정보부족 24→16)했으나,
+> thesis EM 우위는 노이즈 내 동률 — +30%p 미지지, hits 는 vector 우세.** robust 판정엔 scorable
+> gold 대폭 확대(현재 데이터로는 multi-hop 11/16 이 data-blocked) 필요. 게이밍(우호 질문만 큐레이션)
+> 회피 원칙상 소표본 노이즈를 +30pp 로 포장하지 않는다.
 
 ---
 
