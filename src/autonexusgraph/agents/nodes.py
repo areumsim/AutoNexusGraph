@@ -378,7 +378,7 @@ def planner_node(state: AgentState) -> AgentState:
         tid += 1
         return f"{prefix}{tid}"
 
-    # ── factual: SQL ────────────────────────────────────────
+    # ── factual: SQL + vector 보강 ──────────────────────────
     if kind == "factual":
         for cc in targets:
             tasks.append(make_task(
@@ -388,6 +388,18 @@ def planner_node(state: AgentState) -> AgentState:
             tasks.append(make_task(
                 _next_id("sql_"), "sql", "get_operating_income",
                 {"corp_code": cc, "year": year_hint},
+            ))
+        # vector 보강 — SQL tool_result 만으론 synth 의 grounding(evidence_chunks 텍스트
+        # 요구)이 통과 못 해 '정보 부족' 으로 떨어진다(2026-06-10 hybrid<<vector 해부).
+        # vector adapter 와 동일 chunk 를 확보해 hybrid 이 SQL 값 + 본문 인용 둘 다 갖게 한다.
+        if q:
+            tasks.append(make_task(
+                _next_id("r_"), "research", "search_documents",
+                {
+                    "query": q, "top_k": 6,
+                    "corp_code": targets[0] if len(targets) == 1 else (targets or None),
+                    "fiscal_year": year_hint,
+                },
             ))
 
     # ── structural: Graph 다발 (회사별 병렬) ────────────────
