@@ -402,7 +402,7 @@ def planner_node(state: AgentState) -> AgentState:
                 },
             ))
 
-    # ── structural: Graph 다발 (회사별 병렬) ────────────────
+    # ── structural: Graph 다발 (회사별 병렬) + vector 보강 ───
     elif kind == "structural":
         for cc in targets:
             tasks.append(make_task(
@@ -416,6 +416,17 @@ def planner_node(state: AgentState) -> AgentState:
             tasks.append(make_task(
                 _next_id("g_"), "graph", "get_major_shareholders",
                 {"corp_code": cc, "limit": 10},
+            ))
+        # vector 보강 — graph 결과만으론 synth grounding(evidence_chunks 텍스트)이 부족할 수
+        # 있어 '정보 부족' 으로 떨어진다. 공시 본문에 구조 정보가 서술된 경우 보완 + grounding 확보.
+        if q:
+            tasks.append(make_task(
+                _next_id("r_"), "research", "search_documents",
+                {
+                    "query": q, "top_k": 6,
+                    "corp_code": targets[0] if len(targets) == 1 else (targets or None),
+                    "fiscal_year": year_hint,
+                },
             ))
 
     # ── narrative: Research ────────────────────────────────
