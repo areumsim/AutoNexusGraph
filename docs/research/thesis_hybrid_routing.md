@@ -34,6 +34,15 @@
 > 무효 0.0 아님.) 원인 가설(검증 대기): (a) multi-hop gold answer 1/16 → 측정 편향, (b) Neo4j 적재
 > sparse → graph reasoner 무력화, (c) router 가 vector-우세 question 에 graph 합성을 섞어 손실.
 > **결론 보류, 폐기 아님** — §4 gold 보강 + Neo4j 적재 후 재판정. 셀 결과 `data/reports/audit_eval_matrix_<ISO>.json`.
+>
+> **2026-06-10 per-question 해부 (실증)**: vector_fast_rerank1 vs hybrid_fast_rerank1 예측 비교 —
+> hybrid 이 **24/30 질문에서 "정보 부족"** (vector 0/30). 총 evidence **vector 240 (8/질문 일정) vs
+> hybrid 115**, hybrid_ev=0 인 케이스 다수(예: FIN-L1-001 삼성 매출 — vector 정답 300,870,903백만원,
+> hybrid evidence 0 → 정보 부족). 즉 가설 (c)보다 **agent 의 finance 검색 경로가 vector 보다 근거를
+> 적게 확보**하는 게 더 직접 원인 — SQL/structured 라우팅이 synth 에 닿는 usable evidence 가 vector
+> chunk 직접 검색보다 빈약. (조사 중 stale checkpoint[thread_id='default'] + mode0 LLM-free 경로가
+> 수동 재현을 교란 — 정밀 격리는 eval adapter 경로[LLM synth 강제]로 재현 필요.) 부수로 LLM-planner
+> 견고화: `lookup_company` 에 `corp_name` 별칭 추가(planner 동적 args 대비, corp_code 관례와 동형).
 
 ---
 

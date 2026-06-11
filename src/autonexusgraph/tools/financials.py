@@ -25,16 +25,17 @@ class CompanyRef:
 
 
 def lookup_company(query: str = "", limit: int = 5, *,
-                   corp_code: str | None = None) -> list[dict]:
+                   corp_code: str | None = None,
+                   corp_name: str | None = None) -> list[dict]:
     """이름·종목코드·corp_code 로 회사 식별.
 
     매칭 우선순위: corp_code 정확 → stock_code 정확 → name 정확 → name 부분일치
 
-    ``corp_code`` 는 LLM planner 가 회사를 corp_code 로 식별해 호출하는 경우를 위한
-    ``query`` 별칭이다 (SELECT 가 이미 ``corp_code = q`` 를 매칭하므로 값만 흘려보내면
-    충분). list 면 첫 요소 사용. ``query`` 가 있으면 그것이 우선.
+    ``corp_code``/``corp_name`` 은 planner 가 회사를 corp_code 또는 회사명으로 식별해
+    호출하는 경우를 위한 ``query`` 별칭이다 (SELECT 가 corp_code·corp_name 둘 다 매칭하므로
+    값만 흘려보내면 충분). list 면 첫 요소 사용. ``query`` 가 있으면 그것이 우선.
     """
-    q = (query or "").strip()
+    q = (query or corp_name or "").strip()
     if not q and corp_code:
         if isinstance(corp_code, (list, tuple)):
             corp_code = corp_code[0] if corp_code else None
