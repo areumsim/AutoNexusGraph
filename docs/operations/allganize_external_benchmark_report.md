@@ -108,8 +108,14 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 
 | 어댑터 | F1 | EM | faith | cost |
 |---|---|---|---|---|
-| **vector** | **0.271** | 0.000 | 0.503 | $0.28 |
+| vector (전체 코퍼스) | 0.271 | 0.000 | 0.503 | $0.28 |
+| **vector (source='allganize' 필터)** | **0.369** | 0.048 | 0.497 | $0.29 |
 | hybrid | 0.120 | 0.000 | 0.000 | $0.34 |
+
+> **source 필터로 +9.8pp (0.271→0.369, +36% 상대)** — allganize 374 chunk 를 DART 777k 에서
+> 분리하니 evidence 가 전부 allganize 출처로 바뀌고 정답률 상승. 희석 가설 입증
+> (`EVAL_VECTOR_SOURCE=allganize`, `VectorAdapter(source=)` → `search_documents(source=)`).
+> 잔여 "정보없음"은 FSC 문서 매칭 불확실 + OCR 표 손상(주가 등 수치 질문) — §4.
 
 - **answerability 확인**: vector 가 allganize 코퍼스를 retrieval 해 답함(예: ALG-FIN-002 "은행법…
   금융감독위원회 인가" = 적재한 은행 문서 내용 사용). 코퍼스가 실제로 쓰인다.
