@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-06-11 — v3.1: thesis 측정 정립 + hybrid 검색 보강 + 그래프/gold 데이터 정비 (PR #44–#72)
+
+도메인 문서 정합(코드 SSOT)부터 thesis 실측·hybrid 개선까지. 핵심: **store-aware hybrid 가
+vector 를 robust 하게 이기지 못함**을 정직하게 측정·기록(소표본 노이즈 명시), 그 과정의
+실제 버그·데이터 결함을 수정. [DoD §10.7/§10.13/§10.14]
+
+### Fixed
+- **OpenAI structured-output strict↔free-form object 비호환** → LLM planner 항상 실패하던
+  것 수정(`strict=False`). 축2 planner ablation 정상화. (PR #52)
+- **hybrid '정보 부족' 대량 발생** — planner 의 factual·structural 분기가 SQL/graph 만 생성해
+  synth grounding(evidence_chunks) 실패 → 모든 question kind 에 vector floor + top_k 8 parity.
+  hybrid 정보부족 24→16/30(coverage 개선). 단 thesis EM 우위는 소표본(5문항) 노이즈. (PR #69, #70)
+- `process_confidence.compute()` 구현 (PRD §3.5.1 수식). (PR #51)
+- `lookup_company`/`list_subsidiaries`/`list_parents` 에 planner 동적 args(corp_name/corp_code)
+  별칭. (PR #57, #63, #68)
+- CI: `cancel-in-progress` 가 main run 을 취소(실패처럼 표시)하던 것 — main 제외 + PR 단일 버전
+  가속. (PR #64, #66)
+
+### Changed (data)
+- **Person 중복 dedup 적용** — Neo4j 14,536→12,897(중복 1,639 제거, UNIQUE 제약), distinct 관계
+  무손실 검증. (PR #55, #61)
+- **회사 통칭 alias** — `lookup_company` 가 `company_aliases` 사용 + SK하이닉스/POSCO 등 6건. (PR #57)
+
+### Added (eval / gold)
+- **thesis EM 측정 가능** — gold multi-hop scorable 3→5, `em_status=ok`. 측정 SSOT =
+  `docs/research/thesis_hybrid_routing.md`. (PR #54, #59, #60)
+- **Allganize 외부 벤치 흡수** — finance 60 → 외부 큐레이터 비율 0%→26.7%(self-bias 완화).
+  원문 PDF 적재 파이프라인 `ingest_allganize_pdfs.py`(PDF 수동 확보 필요). (PR #71, #72)
+- 현황 대시보드 `ui/dashboard.py`(`make serve-dashboard`) + audit-docs 드리프트 가드. (PR #56, #21)
+
 ## 2026-06-04 — v2.3: 에이전트성(agency) 7축 폐회로 — open-loop→closed-loop + LLM 자율 planner (PR #9, #11)
 
 에이전트성 7축 진단에서 확정된 결함(replan=동일계획 재시도 · 도구결과 미반영 open-loop ·
