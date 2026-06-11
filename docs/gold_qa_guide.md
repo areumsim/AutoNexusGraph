@@ -16,7 +16,7 @@
 | `eval/qa_gold/gold_qa_auto_v0.jsonl` | auto | 56 | 100 (L1 30 / L2 40 / L3 30) | ✅ DB 적재 완료 | ✅ 대부분 답변 가능 (`:Part` 0 노드 라 L3 일부 sparse) |
 | `eval/qa_gold/gold_qa_cross_v0.jsonl` | cross_domain | 49 (qid prefix: CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + IP 결합 8 [CD-L3-IP 4 / CD-L4-IP 4] + CD-PROC 5) | 50+ | ✅ Bridge 적재 완료 | ⚠️ 일부 (CD-L4 시점 의존) 측정 미실시 |
 | `eval/qa_gold/gold_qa_ip_v0.jsonl` | ip | 30 | 100 (IP-L1/L2/L3 30 / 40 / 30) | ⚠️ **gold_answer_text 비어있음** — KIPRIS/USPTO 적재 후 채움 | ❌ 답변 측정 불가 (정답 미정) |
-| `eval/qa_gold/gold_qa_allganize_v0.example.jsonl` | finance (외부 벤치) | 1 (stub) | TBD | ❌ 미적재 | ❌ **외부 큐레이터 30% 정책 슬롯** — Allganize RAG-Evaluation-Dataset-KO 흡수 대기 |
+| `eval/qa_gold/gold_qa_allganize_v0.jsonl` | finance (외부 벤치) | **60** | single_entity | ✅ **적재 (2026-06-11)** — Allganize RAG-Evaluation-Dataset-KO HF `test` finance 60 흡수(`convert_allganize_gold.py`). 외부 큐레이터 비율 0%→**26.7%**. ⚠️ **답변 실행엔 Allganize 원문 PDF 의 vector 적재 필요**(우리 코퍼스=DART, 미보유) — QA 쌍은 외부 gold(self-bias 완화) 즉시 유효, 실측은 코퍼스 적재 후 |
 | `eval/qa_gold/gold_qa_v0.example.jsonl` | finance (테스트 픽스처) | 3 | — | 픽스처 | 패키지 동작 검증용, 데이터 의미 없음 |
 
 **총 적재 가능 row = 30 + 56 + 49 = 135 (finance + auto + cross)**. ip 30 은 wire-up 완료, 측정 대기 (전체 4 도메인 = 165).
@@ -31,7 +31,7 @@
 2. **paraphrase 3개 이상** — `gold_answer_text` 는 한국어 수기 작성 paraphrase 3개+. EM/F1 의 max 매칭.
 3. **출처 명시** — `evidence_corp_codes` / `evidence_doc_ids` 가 정답을 직접 뒷받침하는 ID. 추적 가능해야 함.
 4. **`is_answerable=false` 10% 포함** — DB 에 없는 사실 의도적 작성 → **refusal precision** 측정 (시스템이 모를 때 "정보 부족" 답하는가). **현재 실측 (2026-06-10 재계산)**: finance 3.3% (1/30) / auto 10.7% (6/56) / cross 14.3% (7/49) / ip 0% (0/30) — **전체 평균 8.5% (14/165)**. auto·cross 는 정책 10% 충족, finance·ip 는 미달 → finance/ip refusal row 보강 후보.
-5. **외부 큐레이터 30%** — 시스템 작성자가 아닌 외부인 (또는 별도 팀) 이 만든 row 30% 이상 — **자기충족 위험 완화** (mental_model §5.7). **현재 비율 = 0%** — Allganize 외부 벤치 흡수 P0 권장.
+5. **외부 큐레이터 30%** — 시스템 작성자가 아닌 외부인 (또는 별도 팀) 이 만든 row 30% 이상 — **자기충족 위험 완화** (mental_model §5.7). **현재 비율 = 26.7%** (60/225, Allganize finance 60 흡수 2026-06-11; finance 도메인 66.7%). 30% 까지 auto/cross/ip 외부 row 보강 잔여 (`external_curator_ratio.py`).
 
 ### 2.2 자기충족성 위험 — 왜 외부 큐레이터가 필요한가
 
@@ -44,7 +44,7 @@
 - **Allganize RAG-Evaluation-Dataset-KO** 같은 공개 외부 벤치 흡수 (`gold_qa_allganize_v0.example.jsonl` 슬롯)
 - LLM-as-judge 의 candidate LLM 과 judge LLM 을 **다른 family** 로 (예: Anthropic candidate vs OpenAI judge)
 
-**현재 상태 (정직 표기)**: 외부 큐레이터 30% **미실행**. 모든 seed (165 row = finance 30 + auto 56 + cross 49 + ip 30) 가 시스템 작성자 작성. 평가 점수는 sanity check 수준이며, 정량 증거로 활용할 때 본 한계 명시 필수.
+**현재 상태 (정직 표기)**: 외부 큐레이터 비율 **26.7%** (Allganize finance 60 흡수 2026-06-11 — 0%에서 개선, 30% 근접). 내부 seed 165 (finance 30 + auto 56 + cross 49 + ip 30) 는 여전히 시스템 작성자 작성. **단 Allganize 는 자체 PDF 코퍼스 기반이라, 그 문서를 우리 vector store 에 적재하기 전엔 답변 실측 불가**(QA 쌍의 self-bias 완화 가치는 즉시 유효). 30% 완성 + Allganize 코퍼스 적재(answerability) 는 잔여.
 
 ### 2.3 정답 무결성 — 시간이 지나면 답이 바뀐다
 
