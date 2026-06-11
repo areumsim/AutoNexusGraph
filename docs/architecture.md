@@ -544,3 +544,189 @@ python3 scripts/audit/data_channels.py
 # gold QA lint
 python3 scripts/audit/validate_gold_qa.py --no-db eval/qa_gold/*.jsonl
 ```
+
+## 10. 핵심 스키마·전략 (ER / Bridge / 추출 4-Pass / 엣지 7키 메타)
+
+> README §3 에서 이동(2026-06-11) — foundational 스키마·추출 전략의 구조 SSOT.
+
+### 10.1 Entity Resolution 마스터 (`anxg_master.entities`)
+
+`vehicle_id` 단일 중심 / `corp_code` 단일 중심으로는 자동차·특허·공정 도메인의 식별 체계를 다 담을 수 없다. **`entity_id` + `entity_type` 다형 키** 로 일반화:
+
+```sql
+CREATE TABLE anxg_master.entities (
+    entity_id        VARCHAR PRIMARY KEY,        -- 내부 통합 ID (prefix+seq 또는 UUID)
+    entity_type      VARCHAR NOT NULL,           -- manufacturer | supplier | vehicle_model
+                                                  -- | vehicle_variant | component | recall | standard | plant
+                                                  -- | (확장) process | process_step | material | mineral | patent | assignee
+    canonical_name   VARCHAR NOT NULL,
+    canonical_name_en VARCHAR,
+    -- 외부 식별자 (entity_type에 따라 일부만 채워짐)
+    wikidata_qid     VARCHAR,
+    lei              VARCHAR,                    -- 법인만
+    corp_code        VARCHAR,                    -- 한국 상장사만 (finance 연동 키)
+    business_no      VARCHAR,                    -- 한국 법인만
+    cik              VARCHAR,                    -- SEC 등록 법인만
+    nhtsa_model_id   VARCHAR,                    -- 차량 모델만
+    nhtsa_campaign_id VARCHAR,                   -- 리콜만
+    -- 메타
+    source_priority  INT,                        -- 1=primary, 2=alias, ...
+    confidence_score NUMERIC,
+    valid_from       DATE,
+    valid_to         DATE,
+    schema_version   VARCHAR,
+    created_at       TIMESTAMP DEFAULT NOW(),
+    updated_at       TIMESTAMP DEFAULT NOW()
+);
+```
+
+**엔티티 타입별 권장 식별자:**
+
+| 엔티티 타입 | 권장 식별자 |
+|---|---|
+| Manufacturer / Supplier | `entity_id`, `wikidata_qid`, `lei`, `corp_code` |
+| Vehicle Model | `entity_id`, `wikidata_qid`, `nhtsa_model_id` |
+| Vehicle Variant (Trim/Year) | `entity_id` (내부 생성) |
+| Component | `entity_id` (내부 생성) |
+| Recall | `entity_id`, `nhtsa_campaign_id`, `car_go_kr_id` |
+| Patent / Assignee (ip 보조축) | `entity_id`, `wikidata_qid` (`anxg_ip.patents` 외부 PK 별도) |
+
+**동명이인 인물:** `anxg_master.persons` 는 `(name, birth_year)` 분리 키. 충돌 빈도가 높은 이름은 `(name, birth_year, 회사)` 보조 키 (P1, §12.4).
+
+**finance 연동:** `entities.corp_code` 가 채워진 행이 곧 `anxg_bridge.corp_entity` 후보. 동일 corp_code 가 다양한 `entity_type` (manufacturer + supplier) 으로 동시에 등장 가능.
+
+#### 10.1.1 마이그레이션 1:1 매핑 (finance ↔ auto)
+
+`anxg_master.companies` 단일 중심에서 `anxg_master.entities` 다형으로 일반화하면서, finance 도메인 자산 ↔ auto 도메인 자산은 다음 1:1 매핑으로 통합:
+
+| finance (AutoNexusGraph 원본) | auto (AutoGraph 흡수) | 변경 정도 |
+|---|---|---|
+| `anxg_master.companies` | `anxg_master.entities` (entity_type='manufacturer') | **통합 ER 로 일반화** |
+| `anxg_master.persons` | `anxg_master.entities` (entity_type='supplier') 또는 별도 `anxg_master.persons` 유지 | 도메인 선택 |
+| `anxg_master.entity_map` | `anxg_master.entities` 안에 흡수 | **단일 테이블로 통합** |
+| `anxg_fin.financials` | `spec.measurements` | 시계열 구조 동일 |
+| `anxg_fin.filings` | `doc.manuals` | 메타 구조 동일 |
+| `anxg_news.articles` | `events.recalls` + `events.complaints` | 시점·멘션 구조 동일 |
+| `wiki.*` | `wiki.*` | **완전히 동일** |
+| `anxg_vec.chunks` | `anxg_vec.chunks` | **완전히 동일** (메타에 `entity_id`) |
+| Neo4j `Company` 노드 | `Manufacturer` + `VehicleModel` + `VehicleVariant` + `Component` + `Supplier` + `Recall` | 라벨 다양화 |
+| `SUBSIDIARY_OF` | `MANUFACTURES` / `CONTAINS_*` (계층 main_hop) | 메인 홉 등급 부여 |
+| `EXECUTIVE_OF` | `SUPPLIED_BY` / `MANUFACTURED_AT` | 인적 → 공급망 |
+
+**핵심 원칙:** 인프라(Docker/Neo4j/PG/pgvector) · LangGraph multi-agent · Safety guards · BGE-M3 임베딩 · LLM 어댑터는 **그대로**. 도메인별로 다른 것은 (a) 데이터 소스 (b) 핵심 엔티티 (c) 핵심 관계 (d) 정량 수치 (e) 이벤트 — 도메인 어댑터 패키지가 흡수. ip 보조축도 동일 패턴 (`src/ipgraph/` plug-in).
+
+### 10.2 Bridge 일반화 — `anxg_bridge.corp_entity`
+
+v0 의 `bridge.corp_manufacturer` (완성차 OEM 만) 는 부족하다. **실제 Cross-Domain 가치는 배터리사·반도체사·타이어사·ADAS 공급사·특허 assignee 까지 확장될 때 발현.** 일반화 구조:
+
+```sql
+CREATE TABLE anxg_bridge.corp_entity (
+    bridge_id         BIGSERIAL PRIMARY KEY,
+    corp_code         VARCHAR NOT NULL,         -- finance 키
+    entity_id         VARCHAR NOT NULL,         -- anxg_master.entities.entity_id
+    entity_type       VARCHAR NOT NULL,         -- manufacturer | supplier (battery/component/semi/tire/ADAS …)
+    -- 매칭에 사용된 식별자들 (감사·재현용)
+    wikidata_qid      VARCHAR,
+    lei               VARCHAR,
+    cik               VARCHAR,
+    business_no       VARCHAR,
+    -- 매칭 메타
+    match_method      VARCHAR NOT NULL,         -- qid_exact | lei_exact | business_no_exact
+                                                 --   | corp_code_exact | fuzzy_name | manual
+    confidence_score  NUMERIC NOT NULL,         -- 0.0 ~ 1.0
+    -- 시점
+    valid_from        DATE,
+    valid_to          DATE,
+    -- 거버넌스
+    source            VARCHAR,                  -- wikidata | gleif | manual | derived
+    reviewed_status   VARCHAR DEFAULT 'auto',   -- auto | reviewed | rejected
+    reviewed_by       VARCHAR,
+    reviewed_at       TIMESTAMP,
+    schema_version    VARCHAR,
+    created_at        TIMESTAMP DEFAULT NOW(),
+    UNIQUE(corp_code, entity_id, valid_from)
+);
+```
+
+**매칭 우선순위 (Confidence 산정):**
+1. `wikidata_qid` exact match → 0.95
+2. `lei` exact match → 0.93
+3. `business_no` exact match → 0.90
+4. `corp_code` direct (finance entity_map → auto 직접) → 0.95
+5. Fuzzy name match (한글·영문 normalize 후) → 0.60~0.75
+6. Manual → 1.00
+
+**Confidence < 0.7 자동 `needs_review` 큐.** `reviewed_status='rejected'` 자동 제외 (bridge tool 도 동일).
+
+**현황 (2026-06-01):** 4,806 row (manufacturer reviewed 11 / supplier candidate 4,792 / supplier reviewed 4 + 기타). strong_match (confidence ≥ 0.9) **15/15 = 100%** (manufacturer 11 + supplier 4). 4,792 supplier candidate 의 검토 운영 SOP 는 §12.4 (P1) 대기.
+
+**Bridge tool 시그니처** (`src/autograph/tools/bridge.py`):
+- `bridge_corp_to_entity(corp_code, *, entity_type=None, min_confidence=0.0, include_candidate=True)` → corp_code → 가능한 모든 entity (manufacturer/supplier/vehicle_model/variant). confidence 내림차순.
+- `bridge_entity_to_corp(entity_id, entity_type, *, include_candidate=True)` — `entity_type` 필수.
+- `bridge_sec_cik_to_entity(sec_cik, *, entity_type="manufacturer")` — 글로벌 OEM 진입점 (CIK 10자리 자동 zfill).
+- `bridge_entity_to_sec_cik(entity_id, entity_type="manufacturer")`.
+- `cross_query(...)` — finance↔auto join helper.
+
+**`VALID_ENTITY_TYPES`:** `("manufacturer", "supplier", "vehicle_model", "variant")` — 그 외는 `ValueError`.
+
+**ip 도메인 미러:** `src/ipgraph/tools/bridge.py` 의 `bridge_assignee_to_corp` / `bridge_corp_to_assignee` / `cross_query_ip`. **`anxg_bridge.corp_entity` 직접 변경 회피** — 별도 join 테이블 `anxg_ip.assignee_corp_map` 가 supplier candidate 운영 SOP 재사용. §10.12 코어 변경 <5% 보존.
+
+### 10.3 4-Pass + Bridge Pass 추출 전략
+
+| Pass | 입력 | 방식 | 산출물 | LLM 비중 |
+|---|---|---|---|---|
+| **P1 (Det)** | NHTSA vPIC / KNCAP / NCAP / EPA / DART XBRL | 직접 매핑 | `spec.measurements` · `anxg_fin.financials` | 0% |
+| **P2 (Det)** | 자동차리콜센터 정형 / 공개 BOM / DART 지배구조 | 직접 매핑 | Neo4j 계층 + AFFECTED_BY / SUBSIDIARY_OF | 0% |
+| **P3 (LLM)** | 매뉴얼·결함신고·IR 본문 | Schema-aware LLM 추출 (selective) | 관계 후보 (SUPPLIED_BY 등) | 100% (대상 한정) |
+| **P4 (Validate)** | P3 산출 + P1/P2 + 출처 등급 | confidence 산정 + cross-validate | validated 관계 (§4.0 정책) | 보조 |
+| **P5 (Bridge)** | `entities.wikidata_qid` ↔ finance entity_map | 직접 매핑 + fuzzy fallback | `anxg_bridge.corp_entity` | 0% |
+
+**Deterministic-first 원칙:** 재무·제원·지배구조·공정명·CPC 분류 같은 정형 데이터는 절대 LLM 이 생성하지 않는다. LLM 은 매뉴얼/IR/리콜본문 같은 비정형에서 "관계 후보" 만 뽑고, P4 에서 외부 출처와 cross-validate 후 승급.
+
+### 10.4 관계 엣지 필수 메타데이터 (7키)
+
+**필수 7키 — `EDGE_REQUIRED_META_KEYS` SSOT** (`src/autonexusgraph/ontology/schema.py:27-35`):
+
+1. **`source_type`** — `recall | ir_disclosure | manual | wikidata | wikipedia | llm_extraction | manual_curation | dart_*` 등
+2. **`source_id`** — `NHTSA-25V-001 | DART-20240315-... | chunk_id:...`
+3. **`confidence_score`** — `0.0 ~ 1.0` (할당값. fail 임계 0.5 와 구별, §4.0)
+4. **`validated_status`** — `candidate | validated | rejected | needs_review`
+5. **`snapshot_year`** — `2024` (해당 데이터의 측정·발표 연도)
+6. **`extraction_method`** — `deterministic | llm | hybrid | manual`
+7. **`schema_version`** — yaml 헤더의 ontology 스키마 버전 (`_helpers.ontology_schema_version()` 자동 부여)
+
+`ontology/<domain>/relations.yaml::edge_required_meta` 가 7키와 정확히 일치하지 않으면 `audit-ontology` fail (`scripts/audit/ontology_validate.py`).
+
+**옵션 키 (라이프타임 / 거버넌스 — 일부 관계만):**
+- `source_url` — 인용 URL (recall / wikipedia / IR 등)
+- `extractor_version` — `p2-v1 | p3-llm-v2 | ...`
+- `valid_from` / `valid_to` — **라이프타임 엣지에만** (`SUPPLIED_BY`, `MANUFACTURED_AT`, `COMPLIES_WITH` 등 시점 구간이 의미 있는 관계). 일회성 엣지 (예: `RECALL_OF`) 는 미사용.
+- `created_at` — 적재 시각 (`datetime()`)
+- `reviewed_by` — 수동 검토자 ID
+
+```cypher
+CREATE (a)-[r:SUPPLIED_BY {
+    // ── 필수 7키
+    source_type:        'manual_supplier_seed',
+    source_id:          'supplier_seed.yaml#row42',
+    confidence_score:   0.95,
+    validated_status:   'validated',
+    snapshot_year:      2024,
+    extraction_method:  'manual',
+    schema_version:     'v2.2',
+    // ── 라이프타임 (이 관계는 시점 구간이 있음)
+    valid_from:         date('2024-01-01'),
+    valid_to:           date('2024-12-31'),
+    // ── 거버넌스 (선택)
+    source_url:         'https://...',
+    created_at:         datetime(),
+    reviewed_by:        'admin'
+}]->(b)
+```
+
+**Validator Agent 강제 규칙** (코드 SSOT — `agents/validator.py:125-162`):
+- `validated_status='candidate'` 엣지는 답변 인용 시 "후보 정보" 명시
+- `validated_status='rejected'` 엣지는 쿼리 시 자동 제외 (bridge tool 도 동일)
+- `confidence_score < 0.5` 엣지는 단독 근거 금지 (`LOW_CONFIDENCE_THRESHOLD=0.5`). 전부 < 0.5 → `all_low` hard fail → replan. 일부만 → `some_low` soft warning.
+- 7키 invariant 검증은 `make audit-edge-meta --strict` (`scripts/audit/edge_meta_invariants.py`).
+
