@@ -495,3 +495,175 @@
 - [wey-gu/supplychain-dataset-gen (Apache 2.0)](https://github.com/wey-gu/supplychain-dataset-gen)
 - [lovit/namuwikitext (CC BY-NC-SA 2.0 KR)](https://github.com/lovit/namuwikitext)
 - [나무위키 DB Dumps (Internet Archive)](https://archive.org/details/namuwikidumps)
+
+## 13. 신뢰도 등급 + 도메인별 소스 상세 (README §4 migration)
+
+> README §4 에서 이동(2026-06-11) — 출처 신뢰도 거버넌스 + 도메인별 소스 목록.
+
+
+모든 데이터는 공개·합법 출처만 사용 (무단 크롤링·약관 위반 금지). 라이선스별 본문 저장 정책은 `src/autonexusgraph/ingestion/_license.py` 가 코드 레벨에서 강제.
+
+### 4.0 출처별 신뢰도 등급 (A/B/C)
+
+모든 그래프 엣지는 출처 등급에 따라 `confidence_score` **할당값**이 결정된다.
+
+> **두 개념을 구별 — 동일한 0.5 라는 숫자가 의미하는 바가 다르다:**
+> - **할당값 (`confidence_score`)** — ingestion·loader 가 엣지 생성 시점에 출처 등급에 따라 부여하는 신뢰도. LLM 추출(P3) 의 기본 할당값이 **0.50**.
+> - **fail 임계값 (`LOW_CONFIDENCE_THRESHOLD = 0.5`)** — `agents/validator.py:43` 의 답변 검증 게이트. 답변 근거 그래프 엣지의 `confidence_score < 0.5` 면 hard fail (`all_low`) 또는 soft warning (`some_low`). 단독 근거 금지.
+
+| 출처 | 신뢰도 등급 | 기본 confidence_score | 적용 관계 |
+|---|---|---|---|
+| NHTSA / 자동차리콜센터 공식 리콜 | **A (높음)** | 0.95 | `AFFECTED_BY`, `RECALL_OF` |
+| NHTSA vPIC | **A** | 0.95 | `MANUFACTURES`, `HAS_VARIANT` |
+| KNCAP / NCAP / Euro NCAP | **A** | 0.95 | `SAFETY_RATED_BY` |
+| DART 사업보고서 (XBRL · 지배구조) | **A** | 0.95 | `SUBSIDIARY_OF`, `EXECUTIVE_OF`, `MAJOR_SHAREHOLDER_OF` |
+| USGS Mineral Commodity Summaries | **A** | 0.95 | `DERIVED_FROM` |
+| 팩토리온 공장 등록 (data.go.kr 15087611) | **A** | 0.95 | `PERFORMED_AT` (회사 귀속 공정) |
+| KAMA 거시 생산 통계 | **A** | 0.95 | `macro.*` |
+| KOSIS 광공업동향 | **A** | 0.95 | `anxg_macro.kosis_series` |
+| Wikidata | **B (중간)** | 0.80 | 글로벌 ID 매핑, `MANUFACTURES` (보조) |
+| DART 사업보고서 III. 생산·설비 (가동률) | **B** | 0.80 | `MANUFACTURED_AT` (시점) |
+| Wikipedia | **B~C** | 0.70 | 설명 문서, 보조 근거 |
+| 부품사 IR (공식 공시) | **B** | 0.75 | `SUPPLIED_BY` (후보) |
+| 매뉴얼 / 브로셔 | **B** | 0.75 | `CONTAINS_*` (시스템·모듈) |
+| KAMP 제조AI 데이터셋 (data.go.kr 15089213) | **B (익명)** | 0.80 | `anxg_auto.process_metrics` (회사 비귀속) |
+| AI Hub 제조 멀티모달·품질 | **B (익명)** | 0.80 | `anxg_vec.chunks` + ProcessStep 통계 속성 (회사 비귀속) |
+| LLM 추출 (P3) | **C** | 0.50 | P4 cross-validate 필수. validator 임계와 같은 0.5 — 단독 근거 시 soft warning |
+| 산단공 합성 공정사전 (15151075) | **C (합성)** | 0.50 | `:Process` taxonomy 전용 (회사 귀속 엣지 hard-check 차단) |
+| 커뮤니티 / 분해 자료 | **C (낮음)** | 0.40 | 후보 추출만, 확정 관계 금지. validator 임계 미달 — hard fail 가능 |
+| 수동 검토 확정 | **A+** | 1.00 | 모든 관계 |
+
+**`validated_status='validated'` 승급 정책:**
+- `SUPPLIED_BY` 등 공급 관계는 **A 또는 B 출처 + P4 cross-validate 통과** 시에만 `validated`
+- 그 외는 `candidate` 또는 `needs_review`
+- C 등급 단독 출처는 절대 `validated` 금지
+- **회사 귀속 공정 엣지 (`PERFORMED_AT`)** 는 `load_performed_at.py` 의 source allowlist hard-check 로 DART / factoryon / manual_seed 만 허용 — 산단공 / KAMP / AI Hub 합성·익명 출처는 자동 차단
+
+> **⚠️ Calibration 미검증 (P1) — 실측 routine wired (2026-06-02)**: 본 표의 confidence 할당값 (A=0.95 / B=0.80 / C=0.50) 이 실제 정답률과 단조 관계인지 미실측 (LLM 키 부재로 gold QA 측정 결과 EM=0/120). 측정 인프라 완료: `scripts/audit/calibrate_confidence.py` — Platt scaling + 10-bin reliability diagram + overconfident/underconfident 자동 분류. `make audit-calibrate` 1줄 실행. **LLM 키 활성 후 `make eval-full` → `make audit-calibrate` 1회**.
+
+### 4.0.1 row 단위 동적 confidence 격상 (auto 공정 데이터 전용)
+
+§4.0 정적 등급표는 **데이터셋 단위 할당값**이다. 이와 별개로, 합성/LLM 등 **C 등급 출처의 row 도 외부 A/B 출처 시그널이 충분히 누적되면 row 단위로 0.80 (B) 까지 승급**할 수 있다 — 현 단계 운영 대상은 **`anxg_auto.processes` (산단공 합성 15151075, C 0.50) 단독**, 410 공정명 중 외부 매칭 가능한 row 한정 (예상 격상률 15~30%, 70~85% 는 C 유지).
+
+> 정적 등급표 행 추가가 **아닌** row 단위 동적 컬럼 갱신이므로 §4.0 본문·기존 SSOT (`src/autograph/ingestion/_confidence.py::SOURCE_TO_GRADE`) 무변경. `agents/validator.py:LOW_CONFIDENCE_THRESHOLD = 0.5` 도 무변경. 격상 후 row 가 validator 게이트를 자연 통과.
+
+**격상 시그널 (cross_validate 8 시그널 — `src/autograph/extractors/process_confidence.py` SSOT)**:
+
+| 시그널 | 매칭 후보 | 가중 w | grade boost |
+|---|---|---:|---|
+| M1 | NHTSA `:Module` taxonomy (KO-EN 사전 매핑) | 0.15 | A (1.00) |
+| M2 | DART 사업보고서 narrative BGE-M3 cos ≥ 0.78 | 0.15 | B (0.80) |
+| M3 | OEM IR/뉴스 본문 regex mention ≥ 1 | 0.10 | B (0.80) |
+| M4 | KSIC C30xxx 산업분류 직접 매핑 | 0.05 | A (1.00) |
+| M5 | DART `plant_capacity.product_name` 토큰 overlap ≥ 0.5 | 0.10 | B (0.80) |
+| M6 | NHTSA recall `component_text` + LLM P3 → `CAUSED_BY_PROCESS` (P4 검증 후) | 0.10 | A (0.95) |
+| M7 | KS X 9001 + ISO 18629 PSL manual seed 정확 매칭 | 0.05 | A (1.00) |
+| C1 | 충돌 시그널 (예: M1 매핑 component vs M6 무관 카테고리) | — | penalty −0.20 |
+
+**계산 식**:
+
+```
+conf = clip(0.50 + Σ w_i · s_i · grade_i − 0.20 · |conflicts|, 0.30, 1.00)
+```
+
+이론 max boost = +0.70 (clip 시 0.95). 평균 시나리오 (M1+M2+M3 일치): 0.50 + 0.15 + 0.12 + 0.08 = **0.85 → B 격상**.
+
+**승급 후 정책**:
+- `confidence_score ≥ 0.80` → row UPDATE 후 validator 게이트 자연 통과
+- `validated_status` 는 별도 — A/B 출처 + P4 통과 시에만 `validated`. **C 단독 격상은 `candidate` 유지** (§4.0 단독 근거 금지 원칙 보존).
+- 답변 인용 시 "산단공 합성 + 외부 N개 소스 cross-validated" 출처 표시 의무
+
+**SSOT 분리**:
+- 정적 등급: `src/autograph/ingestion/_confidence.py::SOURCE_TO_GRADE` (변경 없음)
+- 동적 격상: `src/autograph/extractors/process_confidence.py` — `compute()` 수식/clip/grade **구현 완료 + tested** (운영 wire-up 은 BACKLOG PG-3)
+- staging: `auto.staging_process_signals` (`infra/postgres/init/16_process_signals.sql`)
+- 운영: `scripts/upgrade_processes_confidence.py` (1회 풀런 ≤ $2 + GPU 1분, idempotent)
+
+---
+
+| 데이터 | 출처 | 라이선스 | 적재 위치 |
+|---|---|---|---|
+| 사업보고서·공시 | DART Open API | 공공 | `data/raw/dart_bulk/` → `anxg_vec.chunks` + `anxg_fin.filings` |
+| 재무제표 (XBRL) | DART | 공공 | `anxg_fin.financials` |
+| 지배구조 (자회사·임원·최대주주) | DART | 공공 | Neo4j SUBSIDIARY_OF / EXECUTIVE_OF / MAJOR_SHAREHOLDER_OF |
+| 상장사 마스터 | KRX | 공공 | `anxg_master.companies` |
+| 거시지표 | 한국은행 ECOS | 공공 | `anxg_macro.series` |
+| Wikipedia 본문·Infobox | ko.wikipedia.org | CC BY-SA | `anxg_wiki.wikipedia_pages` + `anxg_vec.chunks` (section=wikipedia_ko) |
+| Wikidata 글로벌 ID·CEO·자회사 | query.wikidata.org | CC0 | `anxg_wiki.wikidata_facts` + `anxg_master.entity_map` |
+| 연합뉴스 RSS | 연합뉴스 | 저작권 | `anxg_news.articles` (메타+요약만) |
+| SEC EDGAR (ADR) | sec.gov | 공공 | `anxg_sec.filings` |
+| GLEIF LEI | gleif.org | CC BY 4.0 | `anxg_sec.lei` + `anxg_master.entity_map` |
+| KCGS ESG 등급 | cgs.or.kr | 회원 (수동) | `anxg_esg.ratings` + Neo4j Company 속성 |
+| 공정위 기업집단 | data.go.kr | 공공 | (키 확보 후) Neo4j Group + BELONGS_TO_GROUP |
+| KOSIS 산업 통계 | kosis.kr | 공공 | (키 확보 후) `anxg_macro.kosis_series` |
+| LAW.go.kr 법령 | open.law.go.kr | 공공 | (키 확보 후) `anxg_law.laws` |
+| GLEIF ↔ OpenCorporates 관계 파일 | gleif.org (LEI↔OC 오픈소스 매핑) | CC0 / 오픈 | `anxg_sec.lei` + `anxg_master.entity_map` (LEI 매칭 보강) |
+| 글로벌 법인 식별자 (145 관할권 2.3억+) | OpenCorporates API | 오픈 (share-alike — `_license.py` 게이트) | `anxg_master.entity_map` (비상장 부품사·자회사 보강) |
+
+**수집 범위 (1차):** 코스피 200 + 코스닥 100 약 300개사, 최근 3개 회계연도.
+**제조 데이터 끝까지 채움 (wired, partial — 키 확보 대기):**
+- `DATA_GO_KR_API_KEY` → 팩토리온 [15087611](https://www.data.go.kr/data/15087611/openapi.do) (ingestion `factoryon_registry.py` + loader `load_factoryon.py` → `anxg_auto.factoryon_registry` PG `24_auto_factoryon.sql`. `make load-factoryon`)
+- 자동차 리콜 [3048950 (CSV)](https://www.data.go.kr/data/3048950/fileData.do) (구 오픈API 15089863 폐기) + 검사 [15155857](https://www.data.go.kr/data/15155857/fileData.do) (ingestion + `load_datagokr_*.py`)
+- DART 사업보고서 **가동률 표** 파서 — `dart_production_parser._parse_utilization_table` → `anxg_auto.plant_utilization` PG 적재 (`load_dart_production.py:199`). 완료.
+- KOSIS 산업 통계 — `kosis_client.py` + `load_kosis_industry.py` → `anxg_macro.kosis_series` (`make load-kosis`). KOSIS_API_KEY 필요.
+- Wikidata 배터리 셀 chem (cathode) — `wikidata_cell_chem.py` (CC0, 무인증). materials_seed.yaml 의 manual seed 보강. **회사단위 셀↔OEM 소싱은 grade C candidate 정직 표기** (§2.3).
+
+모두 정형 — LLM 0%. 라이선스: `public_domain` / `kogl_type1` (KOSIS / DATA_GO_KR).
+**범위 외 (Out-of-Scope):** 빅카인즈 본문, 나무위키(CC BY-NC-SA), 종목토론방, LinkedIn, Twitter.
+
+### AutoGraph 데이터 소스
+
+| 데이터 | 출처 | 라이선스 | 인증 | 적재 위치 |
+|---|---|---|---|---|
+| 차량 마스터·제원 (전 세계 vPIC) | NHTSA vPIC API | 공공 (US Gov) | 불필요 | `auto.master_*` |
+| 리콜 캠페인 | NHTSA Recalls API | 공공 | 불필요 | `anxg_auto.events_recalls` + Neo4j Recall |
+| 결함 신고 | NHTSA Complaints API | 공공 | 불필요 | `anxg_auto.events_complaints` + `anxg_vec.chunks` |
+| 제조사·모델·공급사 QID·LEI·사업자번호 | Wikidata SPARQL | CC0 | 불필요 (rate limit) | `auto.master_*` + `anxg_bridge.corp_entity` |
+| 자동차 리콜정보 (한국) | data.go.kr [3048950 (CSV)](https://www.data.go.kr/data/3048950/fileData.do) | 공공 | (무인증 CSV) | `anxg_auto.events_recalls` 941행 적재 (CSV 전량) |
+| 자동차검사관리 수리검사내역 (사고·침수·도난 차량 검사) | data.go.kr [15155857](https://www.data.go.kr/data/15155857/fileData.do) (파일 다운) | 공공 | 불필요 (파일) | `data/raw/datagokr/` → (적재 후) `anxg_auto.events_inspections` |
+| 시험인증 (KATRI / 부품 인증) | bigdata-tic.kr Open API | 공공 (회원) | OAuth `BIGDATA_TIC_CLIENT_ID/SECRET` | (키 확보 후) `auto.cert_*` |
+| 안전등급 (NCAP) | NHTSA SafetyRatings API | 공공 (US Gov) | 불필요 | `anxg_auto.spec_measurements` (safety.ncap.* / safety.feature.*) + Neo4j `(:VehicleVariant)-[:SAFETY_RATED_BY]->(:Standard {code:'NCAP_US'})` |
+| ODI 결함 조사 (리콜 전단계) | NHTSA Investigations bulk | 공공 (US Gov) | 불필요 | `anxg_auto.events_investigations` + Neo4j `(:VehicleModel)-[:INVESTIGATED_BY]->(:Investigation)` |
+| 차량 연비·엔진·배출 spec | EPA fueleconomy.gov bulk CSV | 공공 (US Gov) | 불필요 | `anxg_auto.spec_measurements` (spec.efficiency.* / spec.engine.* / spec.emissions.*) |
+| 글로벌 OEM 재무 (Ford/GM/Stellantis/Toyota/Honda/Tesla …) | SEC EDGAR Company Facts (XBRL) | 공공 | UA 필수 | `anxg_auto.oem_financials_sec` + `anxg_bridge.corp_entity.sec_cik` 강화 |
+| 제조사 통신문 / TSB | NHTSA Manufacturer Communications (수동 zip) | 공공 (US Gov) | 불필요 | `anxg_vec.chunks` (source='nhtsa_tsb') |
+| 안전등급 (KNCAP) | car.go.kr (수동 / 별도 API) | 공공 | (지정 채널) | (후속) `anxg_auto.spec_measurements` + `:Standard {code:'KNCAP'}` |
+| Euro NCAP / IIHS (옵션) | euroncap.com / iihs.org | 공공 (사용 약관) | 불필요 | (후속) `anxg_auto.spec_measurements` + `:Standard` (Euro NCAP / IIHS TSP) |
+| 제조 공정·생산능력 (제조 도메인) | DART 사업보고서 본문 파서 | 공공 | DART 키 (finance 와 공유) | `auto.production_*` (LLM 0% — 정규식 + 표 파서) |
+| 산단공 합성 공정데이터 (15151075) | data.go.kr (수동 CSV) | 공공 | 불필요 (파일) | `anxg_auto.processes` + Neo4j `:Process` 410 / `:ProcessStep` 550 / `PRECEDES`·`INSTANTIATES` (BoP routing, grade C). SSOT [docs/process_graph.md](./docs/process_graph.md) |
+| 공장 등록정보 (15087611) — 회사·공장번호·산단별 조회 | data.go.kr 팩토리온 (`apis.data.go.kr/B550624`) | 공공 | `DATA_GO_KR_API_KEY` (작동 확인) | `anxg_auto.factoryon_registry` 90행 적재 (OEM 5사 + tier-1) → MANUFACTURED_AT 보강 |
+
+> 인증 키 부재 시 ingestion 은 graceful skip — 코드 변경 없이 `.env` 만 채우면 활성화.
+
+### IPGraph 데이터 소스 (예정 — 본 PR outline · 후속 PR ingestion)
+
+> 상세 설계·온톨로지·gold QA SSOT 는 [docs/ipgraph.md](./docs/ipgraph.md). 배터리·소재 표는 본 절 아님 — auto 의 L5/L6 확장 (다음 표).
+
+| 데이터 | 출처 | 라이선스 | 인증 | 적재 위치 | 상태 |
+|---|---|---|---|---|---|
+| 한국 특허·출원 | KIPRIS Open API (공공데이터포털) | 공공 (검색·서지 무료 / **본문·대량은 KIPRISPLUS 회원·일부 비공개**) | `KIPRIS_API_KEY` | `anxg_ip.patents` + Neo4j Patent | (scaffold, 보조) |
+| 미국 특허·인용·assignee 정규화 | **USPTO Open Data Portal (data.uspto.gov)** — PatentsView 후속 | 공공 (US Gov) | **이관 완료 (2026-03-20)** — `search.patentsview.org` REST 종료(410 Gone), **ODP bulk dataset + Transition Guide** 채택 | `anxg_ip.patents` + `anxg_ip.citations` | (scaffold, 보조) |
+| CPC 분류 체계 (계층 depth ≥ 4) | CPC scheme bulk (USPTO / EPO) | 공공 | 불필요 | `anxg_ip.cpc_scheme` + Neo4j CPCCode/SUBCLASS_OF | ✅ **10,695 row 적재** (§1 IPGraph 현황표) |
+| 글로벌 논문·연구 (assignee↔institution↔author) | OpenAlex API | CC0 | **무료 키 필요 (하루 10만 크레딧, 2025-02 이후)** | `anxg_ip.works` + Neo4j Work/Institution/Author | ✅ **629 row 적재** — 특허×논문 cross 승격은 institution↔corp_entity 매핑 후속 |
+
+### 배터리·소재 보완 (auto 의 L5/L6 확장 — 예정)
+
+> ip 도메인이 아님. `(:Module {배터리팩})-[:CONTAINS_MODULE]->(:Cell)-[:MADE_OF]->(:Material {NCM811})-[:DERIVED_FROM]->(:Mineral {Ni})` BOM 하향. 상세는 [docs/autograph.md](./docs/autograph.md) §2.5.4.
+
+| 데이터 | 출처 | 라이선스 | 적재 위치 | 상태 |
+|---|---|---|---|---|
+| 배터리 화학조성 (NCM/LFP 등 셀 chem) | Wikidata + 셀 제조사 공개 IR PDF | CC0 / 공공 | `auto.master_materials` | (예정) |
+| 핵심광물 (Li/Ni/Co/Mn/흑연) 세계·미국 통계 | USGS Mineral Commodity Summaries (MCS 2025 PDF) | 공공 (US Gov) | `anxg_auto.master_minerals` + Neo4j `:Mineral` / `:Material` / `:DERIVED_FROM` | ✅ **2024 estimate 5종 적재** — Li/Ni/Co/Mn/Graphite, 6 Material × 5 Mineral × 17 DERIVED_FROM (7-key 100%) |
+| 광물 수입 통계 (한국) | 관세청 무역통계 / 무역협회 K-stat | 공공 | `macro.trade_minerals` | (예정) |
+| 회사단위 소싱 (셀 ↔ OEM) | 공개 IR 부분 — grade C candidate | 공공 (sparse — 정직 표기) | `anxg_auto.staging_relations` (candidate) | (예정, 한계 명시) |
+
+### EV 충전 인프라 (auto 의 EV 확장 — 예정)
+
+> Operator(운영기관) → `anxg_bridge.corp_entity` 로 "충전 인프라 운영사 ↔ 재무" cross-domain. 이미 보유한 `DATA_GO_KR_API_KEY` 재사용.
+
+| 데이터 | 출처 | 라이선스 | 인증 | 적재 위치 | 상태 |
+|---|---|---|---|---|---|
+| 전국 충전소 위치·운영정보 (운영기관·충전기타입·충전용량·설치년도) | data.go.kr 한국환경공단 (`apis.data.go.kr/B552584/EvCharger`) | 공공 | `DATA_GO_KR_API_KEY` | `anxg_auto.ev_chargers` + Neo4j `:ChargingStation` | (예정) |
+| 지역별 급속충전기 설치현황·실제 이용량 | data.go.kr 한국에너지공단 (`apis.data.go.kr/B553530/TRANSPORTATION/ELECTRIC_CHARGING`) | 공공 | `DATA_GO_KR_API_KEY` | `anxg_auto.ev_charger_usage` | (예정) |
+
+---
