@@ -85,10 +85,14 @@ def test_s1_single_hop_factual():
     planner_node(state)
     intents = [t["intent"] for t in state["tasks"]]
     assert "get_revenue" in intents and "get_operating_income" in intents
+    # factual 은 SQL + vector floor(search_documents) — grounding 보강용. mock 필요.
+    assert "search_documents" in intents
     with patch.object(toolbox, "get_revenue",
                       lambda **kw: {"value": 258_000_000_000_000}, create=True), \
          patch.object(toolbox, "get_operating_income",
-                      lambda **kw: {"value": 6_000_000_000_000}, create=True):
+                      lambda **kw: {"value": 6_000_000_000_000}, create=True), \
+         patch("autonexusgraph.tools.retrieve.search_documents",
+               lambda **kw: [], create=True):
         supervisor_node(state)
     assert all(t["status"] == "done" for t in state["tasks"])
 
