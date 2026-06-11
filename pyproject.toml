@@ -86,6 +86,12 @@ dev = [
     "ipykernel>=6.29",
 ]
 
+# OCR (이미지/스캔 PDF — 외부 벤치 Allganize 등) — easyocr 한국어 + pymupdf 렌더
+ocr = [
+    "easyocr>=1.7",
+    "pymupdf>=1.24",
+]
+
 all = [
     "autonexusgraph[ingest,llm,db,agent,mcp,ui,dev]",
 ]
