@@ -15,9 +15,14 @@ class VectorAdapter(AgentAdapter):
     version = "0.1"
 
     def __init__(self, top_k: int = 8, *,
-                 rerank: bool = True, llm_tier: str = "fast") -> None:
+                 rerank: bool = True, llm_tier: str = "fast",
+                 source: str | None = None) -> None:
         super().__init__(rerank=rerank, llm_tier=llm_tier)
         self.top_k = top_k
+        # source 필터 — 별도 코퍼스(외부 벤치 등)를 메인 코퍼스 희석 없이 평가.
+        # 생성자 인자 우선, 없으면 env EVAL_VECTOR_SOURCE.
+        import os
+        self.source = source or os.getenv("EVAL_VECTOR_SOURCE") or None
 
     def query(self, question: str, *, domain: str | None = None) -> AgentResponse:  # noqa: ARG002 — vector-only 는 도메인 무관.
         from autonexusgraph.tools.retrieve import search_documents
@@ -25,7 +30,8 @@ class VectorAdapter(AgentAdapter):
 
         t0 = time.monotonic()
         try:
-            hits = search_documents(question, top_k=self.top_k, rerank=self.rerank)
+            hits = search_documents(question, top_k=self.top_k, rerank=self.rerank,
+                                    source=self.source)
         except Exception as e:
             return AgentResponse(
                 refused=True, refusal_reason=f"retrieve_failed:{e}",
