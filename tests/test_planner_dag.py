@@ -29,12 +29,15 @@ def test_structural_produces_graph_tasks_parallel():
     s = _state("structural", targets=["00126380"])
     planner_node(s)
     tasks = s["tasks"]
-    # 3 intent × 1 회사 = 3 task, 의존성 없음
-    assert len(tasks) == 3
-    assert all(t["agent"] == "graph" for t in tasks)
-    assert all(not t["depends_on"] for t in tasks)
-    intents = {t["intent"] for t in tasks}
-    assert intents == {"list_subsidiaries", "get_executives", "get_major_shareholders"}
+    # 3 graph intent × 1 회사 = 3 graph task, 의존성 없음
+    graph_tasks = [t for t in tasks if t["agent"] == "graph"]
+    assert len(graph_tasks) == 3
+    assert all(not t["depends_on"] for t in graph_tasks)
+    assert {t["intent"] for t in graph_tasks} == {
+        "list_subsidiaries", "get_executives", "get_major_shareholders"}
+    # + vector floor 1 task — graph-only 면 synth grounding(evidence_chunks) 실패로
+    # '정보 부족' 추락하던 것을 보완 (2026-06-10 hybrid<<vector fix).
+    assert any(t["intent"] == "search_documents" for t in tasks)
 
 
 def test_narrative_produces_one_research_task():

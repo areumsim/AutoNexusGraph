@@ -43,6 +43,15 @@
 > chunk 직접 검색보다 빈약. (조사 중 stale checkpoint[thread_id='default'] + mode0 LLM-free 경로가
 > 수동 재현을 교란 — 정밀 격리는 eval adapter 경로[LLM synth 강제]로 재현 필요.) 부수로 LLM-planner
 > 견고화: `lookup_company` 에 `corp_name` 별칭 추가(planner 동적 args 대비, corp_code 관례와 동형).
+>
+> **2026-06-11 vector-floor fix (개선 + 실측)**: 위 진단대로 planner 의 factual·structural 분기가
+> SQL/graph 만 생성 → synth grounding(evidence_chunks 텍스트 요구) 실패 → '정보 부족'. **모든
+> question kind(factual/structural/narrative/multi_hop/unknown)에 `search_documents`(vector) floor
+> 추가**(회사 targets 있을 때) → hybrid 이 SQL 값 + 본문 인용 둘 다 확보. 재측정 결과: **EM(primary,
+> em_status=ok) hybrid 0.40→0.60, vector 0.40 = +20.0%p — 반증(+0pp)에서 하이브리드 우세로 전환**
+> (목표 +30%p 미달, EM scorable 5 소표본 주의). hybrid '정보 부족' 24→17/30, evidence 115→165.
+> 단 hits 는 여전히 vector 우세(0.81 vs 0.44 — hybrid 정조준), #10.13 홉효율은 0.375→0.75 로
+> trade-off(탐색량↑). **결론: store-aware hybrid 가 정답률(EM)에선 vector 를 상회**(목표선엔 미달).
 
 ---
 
