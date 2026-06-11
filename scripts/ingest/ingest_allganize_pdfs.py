@@ -56,17 +56,54 @@ def list_documents() -> list[dict]:
             if (r.get("domain") or "").strip() == _DOMAIN]
 
 
+_OCR_MIN_CHARS = 100        # 페이지 추출 텍스트가 이보다 적으면 OCR fallback (이미지 스캔 PDF)
+_MAX_PAGES = 60             # PDF 당 처리 상한 (거대 스캔 PDF 시간 바운드)
+_ocr_reader = None
+
+
+def _get_ocr_reader():
+    """easyocr 한국어+영어 Reader (lazy, GPU). 미설치면 None."""
+    global _ocr_reader
+    if _ocr_reader is None:
+        try:
+            import easyocr
+            _ocr_reader = easyocr.Reader(["ko", "en"], gpu=True)
+        except Exception:   # noqa: BLE001 — OCR 엔진 부재/로드 실패 → OCR 생략(텍스트 PDF 만)
+            _ocr_reader = False
+    return _ocr_reader or None
+
+
+def _ocr_page(fitz_doc, pno: int) -> str:
+    """fitz 페이지 렌더(200dpi) → easyocr 한국어 OCR."""
+    import numpy as np
+    reader = _get_ocr_reader()
+    if reader is None:
+        return ""
+    pix = fitz_doc[pno].get_pixmap(dpi=200)
+    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+    if pix.n == 4:
+        img = img[:, :, :3]
+    return "\n".join(reader.readtext(img, detail=0, paragraph=True)).strip()
+
+
 def _extract_chunks(pdf_path: Path) -> list[tuple[str, str]]:
-    """PDF → [(section, text)] (페이지 단위, 긴 페이지는 윈도우 분할)."""
+    """PDF → [(section, text)]. 텍스트층 우선, 이미지 스캔 페이지는 OCR fallback."""
+    import fitz
     import pdfplumber
     out: list[tuple[str, str]] = []
+    fdoc = fitz.open(pdf_path)
     with pdfplumber.open(pdf_path) as pdf:
-        for pno, page in enumerate(pdf.pages, 1):
+        for pno, page in enumerate(pdf.pages[:_MAX_PAGES], 1):
             txt = (page.extract_text() or "").strip()
+            if len(txt) < _OCR_MIN_CHARS:           # 이미지 스캔 → OCR
+                ocr = _ocr_page(fdoc, pno - 1)
+                if len(ocr) > len(txt):
+                    txt = ocr
             if not txt:
                 continue
             for i in range(0, len(txt), _CHUNK_CHARS):
                 out.append((f"p{pno}", txt[i:i + _CHUNK_CHARS]))
+    fdoc.close()
     return out
 
 
