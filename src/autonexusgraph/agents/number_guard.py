@@ -60,13 +60,13 @@ def sanitize_evidence_for_synth(
     evidence_chunks: list[dict] | tuple[dict, ...],
     approved: set[str],
     *,
-    cap: int = 6,
+    cap: int = 8,
     text_max: int = 400,
 ) -> list[dict]:
     """evidence chunks 의 본문에서 미승인 숫자를 [검증불가:NUM] 으로 치환.
 
     원본 chunks 는 건드리지 않고 새 list 반환. cap / text_max 는 synthesizer
-    가 컨텍스트에 사용하는 값과 동일.
+    가 컨텍스트에 사용하는 값과 동일 (vector adapter top_k=8 parity → cap=8).
     """
     out: list[dict] = []
     for ch in (evidence_chunks or [])[:cap]:
