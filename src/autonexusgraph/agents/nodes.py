@@ -283,7 +283,7 @@ def _apply_replan_widen(state: AgentState) -> None:
         if not isinstance(t, dict) or t.get("agent") != "research":
             continue
         args = t.setdefault("args", {})
-        cur = int(args.get("top_k") or 6)
+        cur = int(args.get("top_k") or 8)
         args["top_k"] = min(cur + 4 * n, 20)
 
 
@@ -392,11 +392,11 @@ def planner_node(state: AgentState) -> AgentState:
         # vector 보강 — SQL tool_result 만으론 synth 의 grounding(evidence_chunks 텍스트
         # 요구)이 통과 못 해 '정보 부족' 으로 떨어진다(2026-06-10 hybrid<<vector 해부).
         # vector adapter 와 동일 chunk 를 확보해 hybrid 이 SQL 값 + 본문 인용 둘 다 갖게 한다.
-        if q:
+        if q and targets:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
                 {
-                    "query": q, "top_k": 6,
+                    "query": q, "top_k": 8,
                     "corp_code": targets[0] if len(targets) == 1 else (targets or None),
                     "fiscal_year": year_hint,
                 },
@@ -419,11 +419,11 @@ def planner_node(state: AgentState) -> AgentState:
             ))
         # vector 보강 — graph 결과만으론 synth grounding(evidence_chunks 텍스트)이 부족할 수
         # 있어 '정보 부족' 으로 떨어진다. 공시 본문에 구조 정보가 서술된 경우 보완 + grounding 확보.
-        if q:
+        if q and targets:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
                 {
-                    "query": q, "top_k": 6,
+                    "query": q, "top_k": 8,
                     "corp_code": targets[0] if len(targets) == 1 else (targets or None),
                     "fiscal_year": year_hint,
                 },
@@ -435,7 +435,7 @@ def planner_node(state: AgentState) -> AgentState:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
                 {
-                    "query": q, "top_k": 6,
+                    "query": q, "top_k": 8,
                     "corp_code": targets[0] if len(targets) == 1 else (targets or None),
                     "fiscal_year": year_hint,
                 },
@@ -484,7 +484,7 @@ def planner_node(state: AgentState) -> AgentState:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
                 {
-                    "query": q, "top_k": 6,
+                    "query": q, "top_k": 8,
                     "corp_code": targets[0] if len(targets) == 1 else (targets or None),
                     "fiscal_year": year_hint,
                 },
@@ -495,7 +495,7 @@ def planner_node(state: AgentState) -> AgentState:
         if q:
             tasks.append(make_task(
                 _next_id("r_"), "research", "search_documents",
-                {"query": q, "top_k": 6,
+                {"query": q, "top_k": 8,
                  "corp_code": targets[0] if len(targets) == 1 else (targets or None)},
             ))
 
@@ -650,7 +650,7 @@ def _attempt_fallback_recovery(state: AgentState) -> bool:
         fb_fn = getattr(toolbox, "search_documents", None)
         targets = state.get("target_companies") or []
         fb_args = {
-            "query": q_text, "top_k": 6,
+            "query": q_text, "top_k": 8,
             "corp_code": targets[0] if len(targets) == 1 else (targets or None),
         }
         log.info("[recovery] all empty → fallback search_documents (finance)")
@@ -985,7 +985,7 @@ def _build_context(state: AgentState, *,
     ev = sanitized_evidence if sanitized_evidence is not None else (state.get("evidence_chunks") or [])
     if ev:
         parts.append("[본문 인용]")
-        for c in ev[:6]:
+        for c in ev[:8]:
             score = c.get('score')
             score_s = f"{score:.3f}" if isinstance(score, (int, float)) else "?"
             parts.append(
