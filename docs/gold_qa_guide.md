@@ -16,7 +16,7 @@
 | `eval/qa_gold/gold_qa_auto_v0.jsonl` | auto | 56 | 100 (L1 30 / L2 40 / L3 30) | ✅ DB 적재 완료 | ✅ 대부분 답변 가능 (`:Part` 0 노드 라 L3 일부 sparse) |
 | `eval/qa_gold/gold_qa_cross_v0.jsonl` | cross_domain | 49 (qid prefix: CD-L1 10 / CD-L2 8 / CD-L3 11 / CD-L4 7 + IP 결합 8 [CD-L3-IP 4 / CD-L4-IP 4] + CD-PROC 5) | 50+ | ✅ Bridge 적재 완료 | ⚠️ 일부 (CD-L4 시점 의존) 측정 미실시 |
 | `eval/qa_gold/gold_qa_ip_v0.jsonl` | ip | 30 | 100 (IP-L1/L2/L3 30 / 40 / 30) | ⚠️ **gold_answer_text 비어있음** — KIPRIS/USPTO 적재 후 채움 | ❌ 답변 측정 불가 (정답 미정) |
-| `eval/qa_gold/gold_qa_allganize_v0.jsonl` | finance (외부 벤치) | **60** | single_entity | ✅ **적재 (2026-06-11)** — Allganize RAG-Evaluation-Dataset-KO HF `test` finance 60 흡수(`convert_allganize_gold.py`). 외부 큐레이터 비율 0%→**26.7%**. **코퍼스 적재 완료 (2026-06-11)**: 원문 PDF 10건(BOK 통화신용정책·FSC 보도자료) 스크래핑 → OCR(이미지스캔, easyocr) → `vec.chunks` 98 chunks(`source='allganize'`, `ingest_allganize_pdfs.py`). 해당 문서 기반 질문 answerable. (KOFIA·KIF 4건은 JS/viewer 미확보) |
+| `eval/qa_gold/gold_qa_allganize_v0.jsonl` | finance (외부 벤치) | **60** | single_entity | ✅ **적재 (2026-06-11)** — Allganize RAG-Evaluation-Dataset-KO HF `test` finance 60 흡수(`convert_allganize_gold.py`). 외부 큐레이터 비율 0%→**26.7%**. **코퍼스 적재 완료 (2026-06-11)**: 원문 PDF 12/14건(BOK·FSC·KOFIA, selenium 포함) 스크래핑 → OCR(easyocr) → `vec.chunks` 374 chunks(`source='allganize'`, `ingest_allganize_pdfs.py`). 해당 문서 기반 질문 answerable. (KIF 2건만 레거시 Flash 뷰어로 미확보) |
 | `eval/qa_gold/gold_qa_v0.example.jsonl` | finance (테스트 픽스처) | 3 | — | 픽스처 | 패키지 동작 검증용, 데이터 의미 없음 |
 
 **총 적재 가능 row = 30 + 56 + 49 = 135 (finance + auto + cross)**. ip 30 은 wire-up 완료, 측정 대기 (전체 4 도메인 = 165).
