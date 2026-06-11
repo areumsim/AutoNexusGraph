@@ -1068,89 +1068,9 @@ BoP **뼈대(taxonomy + routing, grade C, #18)** 는 완성. **회사 귀속 공
 >
 > **§12.1 상용 신호 백로그 (P0+) 가 가장 우선.** 기존 §12.2~§12.7 (운영·보안·배포·CI 등) 는 PoC → MVP → 상용 화살표의 후반부로 의도적 강등. **도메인3 (ip) + ProcessGraph + 축소 평가 매트릭스 + MCP·관측가능성** 이 우선.
 
-### 12.1 상용 신호 (Service-Grade Signals, P0+) — 신설
+### 12.1~12.7 핵심 백로그 — [BACKLOG.md](./BACKLOG.md) SSOT
 
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **MCP 래퍼** | **(wired)** — `src/autonexusgraph/mcp/{__init__,discovery,server,__main__}.py`. 78 tools (finance 21 + auto 38 + ip 19) 자동 discovery + type hint→JSON Schema + `ListToolsRequest` 핸들러 round-trip 실측 PASS. `make audit-mcp` 가 SDK 미설치 시 SKIPPED, 설치 시 server boot + handler round-trip 검증 | `pip install -e ".[mcp]"` (`[all]` extras 에도 포함) → `python -m autonexusgraph.mcp` 로 stdio 서버 부팅. Claude Desktop / Cline 등이 .mcp.json 으로 본 서버 등록 후 호출 |
-| **Langfuse 실측 ON** | **(wired)** — Langfuse 4.x OTEL native + ContextVar 격리 + `meta JSONB` 적재. `make audit-trace` 자동 검증, DoD #17 (b) dashboard 자동 반영 | `.env` 의 `TRACE_BACKEND=langfuse` + `LANGFUSE_*` 키 설정. simulation 모드 (LLM 비용 0) 또는 `--full` (실 agent run). 향후 보강: per-replan 이벤트 emit, replan ROI 정량화 |
-| **온톨로지 SHACL/pydantic 검증** | **(wired)** — `src/autonexusgraph/ontology/` pydantic v2 strict 모델. `make audit-ontology` 자동 검증. SHACL/rdflib 회피 (LPG 그래프 conceptual mismatch + 무거운 dep) | yaml 로드 시점에 extra='forbid' + enum 정합 + relation.from/to cross-check + edge_required_meta 7키 SoT 강제. `schema_version` 헤더 1곳 SoT. 향후 보강: extractors.yaml / system_taxonomy.yaml / plants.yaml 등 보조 yaml 도 별도 모델 추가 |
-| **축소 평가 매트릭스 실측** | **(wired)** — `AgentAdapter(rerank, llm_tier)` 1급 매트릭스 변수 + `eval/runners/run_matrix_smoke.py` 8 cells enumerate + thesis headline 자동 계산. `make audit-eval-matrix` simulation 모드 wire-up 검증 완료 (LLM 비용 0). DoD #17 (d) dashboard 자동 반영 | full LLM 측정은 `make audit-eval-matrix --full` (Sonnet 4.6 / GPT-4o-mini / Gemini Flash 중 1종) — Allganize 외부 gold (`eval/qa_gold/gold_qa_allganize_v0.jsonl` stub) 채워 thesis (§10.7) headline 실측 |
-| **§10.12 baseline reset 정책** | dod_audit baseline `4049caf856` 고정, 정책은 §11.5 에만 산재 | **§10.12 본문 승격** + `make audit-dod` 출력에 baseline commit + 누적 reset 이력 + "도메인 추가 마다 reset" 명시 |
-| **스택 업그레이드 경로 박음** | BGE-M3 / LangGraph 1.x 현행, 교체 금지 | 1줄 명시: Qwen3-Embedding-8B / Jina-rerank-v3 후보 + 기존 wired BGE-Reranker on/off ablation 활용 |
-| **Bridge 품질 강화 (무료)** | anxg_sec.lei.corp_code **128** / `anxg_master.entity_map(lei)` **128** / bridge supplier strong-match **4** (confidence ≥ 0.9 reviewed) | ✅ GLEIF API `registeredAs` (business_no 10자리 / jurir_no 13자리) → corp_code 매칭. OC 매핑 파일은 form-gated → KR 한정 시나리오라 GLEIF API 단독으로 충분. OpenCorporates `_license.py` cc_by_sa 게이트 + `require_share_alike()` helper 추가 |
-
-### 12.2 운영·보안 (P1 — 강등)
-
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **API 인증** | ✅ **구현** (`api/auth.py`) — `/chat` `/chat/stream` `/chat/resume` `/threads/{id}` 에 `Depends(authenticate)`. `X-API-Key` / `Authorization: Bearer` 헤더 + `API_KEYS` env (`token:user_id`). **thread_id ↔ user_id 바인딩** — 타인 히스토리 조회 403. `API_KEYS` 미설정 시 open 모드 (dev, 1회 경고). `/health` 는 인증 없음 | (잔여) OAuth2/OIDC 발급기관 연동 + 토큰 회전. 외부 IdP 통합은 reverse proxy 권장 |
-| **Rate limit** | ✅ **구현** — per-identity (user_id / open 모드 IP) sliding-window, `API_RATE_LIMIT_PER_MIN`. **in-memory (단일 인스턴스)** | (잔여) multi-instance 분산 — reverse proxy / redis (§12.3) |
-| **PII / 민감정보 정책** | 미정의 | 임원 인물·뉴스 본문에 이름·생년 포함 (`anxg_master.persons` 9,948 / (name, birth_year) 동명이인 분리). GDPR-style 삭제 권리 처리 / log redaction 정책 미문서화 |
-| **`data/cost_log.jsonl` 회전** | 영속 append, size 무제한 (gitignored 확인 완료) | 일·주별 rotate + 보존 기간 정책 + 누계 집계 cron (`python -m autonexusgraph.llm.cost_history`) |
-| **Secrets 관리** | `.env` 한 곳 | prod 는 vault / k8s secret 분리. `.env.example` 의 dev placeholder 와 prod 키 흐름 분리 절차 없음 |
-| **TLS** | uvicorn http 만 | reverse proxy (nginx/caddy) + HSTS + cert renewal — Quickstart 에 없음 |
-
-### 12.3 Production 배포 (P1 — 강등)
-
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **배포 가이드** | ✅ **작성** — [docs/operations/production_deploy.md](./docs/operations/production_deploy.md) + `infra/Dockerfile` + `docker-compose.prod.yml` (실행 가능) | k8s/compose prod 오버레이 / health probe / reverse proxy·TLS / blue-green / canary / 멀티 인스턴스 주의점 완료 |
-| **백업·DR** | ✅ **구현 (O-3)** — `make backup`/`restore` (`scripts/ops/`) + [backup_dr.md](./docs/operations/backup_dr.md). PG `pg_dump -Fc`(임베딩 포함) + Neo4j community STOP→dump→START + 보존 prune. RPO≤24h / RTO 수분(dump 보유)·수시간(재앙: raw 재적재+재임베딩) | 잔여: off-site 동기화 + 분기 복원 드릴 RTO 실측 |
-| **모니터링·알람** | ✅ **구현 (O-5)** — Prometheus exporter (`make metrics`/`serve-metrics`, `metrics_exporter.py`) + `infra/monitoring/`(prometheus/alerts 6/grafana 8패널) + compose prod 서비스 ([monitoring.md](./docs/operations/monitoring.md)). Langfuse(turn trace)와 보완 | 잔여: Alertmanager 발송 채널 |
-| **Multi-instance scaling** | PG checkpointer 공유 가능 — 검증 안 됨 | uvicorn worker N + checkpointer concurrent write 검증 + LLM rate limit 분산 |
-| **CI/CD** | ✅ **구현 (O-4)** — `.github/workflows/ci.yml`: `make smoke-e2e` keyless 게이트 (py3.10/3.11/3.12) + lint/mypy informational + DoD dashboard artifact | 잔여: `audit-dod --strict` (§10.7/§10.13 LLM eval 필요) + ephemeral PG/Neo4j 통합테스트 → LLM 키 / self-hosted runner 후 |
-| **Integration test 마커** | `pytest -m integration` 0 케이스 | `tests/integration/*` 신설 — load_auto_all / extract_p3+p4 / cross_query 실제 DB end-to-end |
-
-### 12.4 데이터 품질·운영 (P1)
-
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **Bridge candidate 검토 SOP** | 4,792 supplier candidate 영속 누적 — 검토 UI / 정책 없음 | (1) Streamlit 검토 페이지 — name match candidate 를 reviewer 가 ✓/✗ 라벨. (2) 6개월 미검토 candidate 자동 `rejected` 정책. (3) 검토 진행률 KPI |
-| **confidence_score calibration** | 미수행 — A(0.95) / B(0.80) / C(0.50) 가 실제 정답률과 단조 미검증 | gold QA 100+ 실측 후 `eval/metrics/confidence_weighted.py` 로 calibration plot. 필요 시 출처별 confidence 재조정 |
-| **`anxg_master.persons` 동명·동년생 충돌** | ✅ **측정 routine (Q-3)** — `make persons-collision` (`persons_collision.py`): NULL birth_year 비율 / 동명 다중 row / 병합의심 후보 | 실측 후 충돌률 높으면 (name, birth_year, 회사) 보조 키 도입 |
-| **embedding backfill 진행률 가시화** | ✅ **구현 (Q-4)** — `make embed-status` (source별 embedded/total/pct/pending) | 잔여: 누락 청크 자동 재시도 cron (`make embed-chunks` 반복) |
-| **데이터 freshness 모니터링** | ✅ **구현 (Q-5)** — `make freshness` (`freshness.py`): 8 소스 ingest·content 시각 + stale 판정, stale/error 시 exit 1 (cron 알람) | cron 등록 + `--stale-days` 튜닝 |
-| **Schema 마이그레이션 버전 추적** | `infra/postgres/init/01~16.sql` 멱등 | Alembic 같은 versioned migration. 현재 `make migrate-schema-pg MIGRATE_FILE=...` 는 사용자가 무엇이 적용됐는지 추적 안 함 |
-
-### 12.5 추출·그래프 완성도 (P1)
-
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **USES_PROCESS / MADE_OF (L6)** | **USES_PROCESS 189 적재** (Module.system_code→공정, candidate) / `:Material` 6 + MADE_OF | (1) ✅ Module→Process `load_uses_process.py` (2) 산단공 part_id deterministic 격상 (3) Wikidata P186 staging |
-| **DART 사업보고서 가동률 표** | 완료 (2026-06-01) | `_parse_utilization_table` 표 컬럼 정규화 + `anxg_auto.plant_utilization` 53 row 적재 |
-| **부품사 IR cross-reference** | 미구현 | DART finance 의 현대모비스/한온/만도 사업보고서 → auto 도메인 SUPPLIED_BY/MANUFACTURED_AT 보강 (reverse-direction Bridge) |
-| **NHTSA TSB / Manufacturer Communications** | 수동 zip 다운로드 모드만 | URL 자동 다운 routine (NHTSA URL 변경 추적) |
-| **KNCAP / Euro NCAP / IIHS** | 인터페이스만 (KNCAP) / 미구현 (Euro/IIHS) | PDF 파서 + Standard 노드 매핑 |
-| **Cypher 템플릿 추가** | finance **22** + auto **27** + ip **25** (총 74) | 새 use case (recall 전파·공급 집중도·시점 정합 cross) 별 템플릿 — 자유 Cypher 금지 원칙 유지 |
-| **HITL `sensitive_decision`** | wired + 활성 (trigger=키워드 휴리스틱 / fallback=거절) | 고위험 답변 (투자 자문 / 법적 조언 / 주가 예측 인접) 키워드 자동 감지 + synthesizer 직후 게이트. SENSITIVE_KEYWORDS 보수 10종으로 시작 — 누적 false-positive 기반 정정 |
-| **P3 LLM 4종 활성화** | `enabled:false` (COMPETES_WITH / MANUFACTURED_AT(LLM) / CONTAINS_MODULE / CONTAINS_PART) | 비용·환각 위험 검증 후 selectively 활성. validation gate 강화 |
-| **N-domain bridge 일반화** | `anxg_bridge.corp_entity` 만 (2-domain 가정) | 3번째 도메인 추가 시 `bridge.drug_entity` / `bridge.component_entity` 등 다리 추가. 또는 `bridge.cross` 다형 1 테이블 |
-
-### 12.6 평가·신뢰성 (P1)
-
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **12 조합 매트릭스 실측** | 인프라 완성, LLM 키 필요 | `make eval-full / eval-auto / eval-cross` 풀 실행 + `eval/reports/<run>/summary.md` PR 첨부 |
-| **gold QA 확장** | finance 30 / auto 56 / cross 49 / ip 30 seed (165 total) | 각각 100 row + CD-L1~L4 라벨 + 외부 큐레이터 30% (자기충족성 완화 — `docs/mental_model.md §5.7`) |
-| **§10.12 baseline 이동 정책** | dod_audit 가 baseline (`4049caf856`) 고정. 실제 코어 변경량은 baseline 갱신 시점에 reset | "baseline 은 도메인 추가 마다 reset" 또는 "월 단위 reset" 같은 명시 정책 + 누적 차분 표 |
-| **§10.13/14 trace 메트릭** | ✅ **구현 (E-3)** — `agents/hop_metrics.py` 가 per-turn cypher hop 수 + tool 호출 sequence 를 trace(Langfuse + PG `agent_trace`)에 기록 + eval pred_row `hop_count` + `main_hop_efficiency` 실제 hop 경로(`hybrid_vs_vector_hops`) | §10.13 ✅ 전환은 LLM eval 1회 실행 후 (현재 manifest 는 simulation) |
-| **답변 사용자 피드백 루프** | UI 에 👍/👎/📝 wiring, 저장소 정의 없음 | `anxg_chat.feedback` 스키마 + 저주파 retraining loop |
-| **Vector RAG 공정성 검증** | 매트릭스 내 Vector adapter 단독 측정 | gold QA 의 "Vector 도 풀 수 있는 질문" 비율 측정 — 작성자 편향 완화 |
-
-### 12.7 문서·개발자 경험 (P2)
-
-| 항목 | 현재 | 필요 작업 |
-|---|---|---|
-| **CONTRIBUTING.md / SECURITY.md** | ✅ **작성** ([CONTRIBUTING.md](./CONTRIBUTING.md) / [SECURITY.md](./SECURITY.md)) | 개발환경·smoke-e2e 게이트·도메인 불변식 8항·PR 절차 / 비공개 보고 채널·구현 통제·알려진 한계 정직표기 |
-| **`docs/design/` ADR** | ✅ **작성 (F-3)** — ADR 4건 (LangGraph StateGraph / DomainHandler plug-in / Bridge 분리 테이블 / P1~P4 추출) + index ([docs/design/](./docs/design/)) | diagram 이미지는 후속 |
-| **`_legacy/` 정책** | 보존 (v1/v2 KGQA Agent) | (a) deprecate notice + 일정 (b) 마이그레이션 가이드 (c) 또는 archived branch 로 이동 |
-| **architecture diagram 통합** | `docs/autograph.md §2.5` mermaid 만 | README 본문에 1장 핵심 다이어그램 (현재 텍스트 박스만) |
-| **performance benchmark** | PRD 목표만 | 실측 latency p50/p95/p99 + 평균 토큰/turn + 평균 cost/turn dashboard |
-| **TROUBLESHOOTING.md** | ✅ **작성 (F-2)** — `docs/faq.md`(Q1~Q7) SSOT + 루트 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) 포인터. LLM rate limit·pgvector·Neo4j auth·DART/data.go.kr 키 만료 진단 보강 | — |
-| **changelog** | git log + `_legacy/CHANGELOG.md` | repo root `CHANGELOG.md` keepachangelog 형식 |
-| **GitHub Issue/PR template** | ✅ **작성 (F-4)** — `.github/ISSUE_TEMPLATE/{bug_report,feature_request,data_source}.md` + `config.yml`(보안 advisory·BACKLOG 링크) + `pull_request_template.md`(smoke-e2e·7키·LICENSE·BACKLOG 체크리스트) | — |
-| **README 다이어그램·스크린샷** | 텍스트 박스만 | Streamlit UI 캡처 + Neo4j Browser cross-domain 결과 캡처 |
+P0+ 상용 신호(ip·ProcessGraph·평가매트릭스·MCP/관측) → P1 운영·보안·배포·데이터품질·추출완성도·평가신뢰성 → P2 문서·DX 순. **전수 83 항목·15 카테고리·활성화 트리거는 BACKLOG.md 가 SSOT** — 여기 요약은 중복 제거(2026-06-11).
 
 ### 12.8 한 줄 요약 — "eval 실측 → ProcessGraph → 상용 신호 → production" 순서
 
