@@ -101,6 +101,26 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 
 ---
 
+## 3.5. eval 실측 (2026-06-11, KIF 18문항 제외 → 42문항)
+
+`run_qa_eval --gold gold_qa_allganize_noKIF.jsonl --adapters vector,hybrid`. 프로즈 정답이라
+**F1(토큰 overlap)** 이 지표(EM 은 0 — 산문 정답에 exact-match 불가).
+
+| 어댑터 | F1 | EM | faith | cost |
+|---|---|---|---|---|
+| **vector** | **0.271** | 0.000 | 0.503 | $0.28 |
+| hybrid | 0.120 | 0.000 | 0.000 | $0.34 |
+
+- **answerability 확인**: vector 가 allganize 코퍼스를 retrieval 해 답함(예: ALG-FIN-002 "은행법…
+  금융감독위원회 인가" = 적재한 은행 문서 내용 사용). 코퍼스가 실제로 쓰인다.
+- **hybrid < vector**: 문서-RAG 질문(회사·그래프 없음)엔 agent 라우팅이 부적합(faith 0).
+- **F1 0.271 의 한계(정직)**: ① OCR 노이즈(스캔 PDF) ② FSC 8건이 정확 타깃 4건인지 불확실 →
+  특정 질문의 출처 문서 부재 시 "정보 없음" ③ allganize 374 chunk 가 DART 777k chunk 에 희석
+  (검색이 무관 DART chunk 를 끌어옴) ④ F1 은 LLM-judge 보다 과소평가(Allganize 리더보드는 judge
+  기준 0.6~0.85). 즉 0.271 은 **하한** — 코퍼스 유효성은 입증, 정밀도는 위 4요인으로 제한.
+
+---
+
 ## 4. 남은 것 (정직)
 
 1. **KIF(2) PDF 미확보** — 레거시 Flash 뷰어(`flexer`) + cid stale("Request Error"). 헤드리스 브라우저로도 PDF 미로드. → **12/14 finance 원문 확보**(KIF 2 후속, 수동/구버전 뷰어 필요).
