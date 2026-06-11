@@ -301,6 +301,9 @@ Triage → Planner(DAG) → Supervisor(Send 병렬) → Workers(4종) → Synthe
 
 ## 3. 현재 구조 — 지금 어떻게 구성돼 있는가 (Architecture)
 
+> **구조 사실 SSOT = [docs/architecture.md](./architecture.md)**. 본 절은 같은 구조를 **결정 관점**(확정/잠정/미정 라벨 + 트레이드오프)으로 본다 — 구조 자체의 권위 기술은 architecture.md, 여기선 '왜·무엇이 잠정인가'에 집중.
+
+
 이 절은 **architecture 본문**이다. 컨테이너·데이터·코드·라우팅·외부 의존을 한 번에 본다. 다이어그램은 `docs/autograph.md §2.5` 의 mermaid 가 충분히 상세하므로 여기선 텍스트 위주 + 위치 근거.
 
 ### 3.1 패키지 구조와 책임

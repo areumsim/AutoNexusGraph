@@ -327,6 +327,9 @@ finance 의 `anxg_master.companies.corp_code` 와 auto 의 `anxg_master.entities
 
 ## 3. 아키텍처 — 3-Store + Multi-Agent
 
+> **구조 사실 SSOT = [docs/architecture.md](./architecture.md)** (패키지 토폴로지·LangGraph 노드·AgentState 매트릭스·plug-in·§10 ER/Bridge/4-Pass/7키). 본 절은 그 구조를 **세미나 발표 관점**(왜 이 구조인가 + 코드 짚기)으로 재서술 — 정확한 시그니처·필드 수는 architecture.md 우선.
+
+
 ### 3.1 3-Store 책임 분담
 
 | 저장소 | 책임 | 예시 질의 | 코드 진입점 |
