@@ -1,6 +1,7 @@
 # Allganize 외부 벤치 흡수·코퍼스 적재 보고서
 
-> 작성: 2026-06-11 · 관련 PR: #71 (QA 흡수) · #72 (적재 파이프라인) · #79 (OCR fallback) · #80 (적재 완료) · #84 (vector source 필터) · (b·재적재) OCR 표 재구성 + 정확 9건 재적재
+> 작성: 2026-06-11 · 갱신: 2026-06-12 (KIF 2건 확보 → **14/14 finance 원문 전수**, full 60 eval)
+> 관련 PR: #71 (QA 흡수) · #72 (적재 파이프라인) · #79 (OCR fallback) · #80 (적재 완료) · #84 (vector source 필터) · #86 (OCR 표 재구성 + hybrid source 필터) · #87 (보고서 b)
 > 목적: gold QA self-bias 완화(외부 큐레이터 30% 정책) + 외부 벤치 answerability 확보.
 
 ---
@@ -8,12 +9,16 @@
 ## 0. 한 줄 요약
 
 `allganize/RAG-Evaluation-Dataset-KO` finance **60 QA 흡수**(외부 큐레이터 비율 0%→26.7%) +
-원문 PDF **정확 9건 확보(selenium 포함) → OCR(표 행/열 재구성) → vec.chunks 418 chunks 적재 완료**. 해당 문서 기반 질문
-answerable. (KIF 2건만 레거시 Flash 뷰어로 미확보 — 후속.)
+원문 PDF **14/14 전수 확보 → OCR(표 행/열 재구성) → vec.chunks 554 chunks 적재 완료**(11 PDF 파일).
+**full 60문항 answerable** — vector F1 **0.467**, hybrid F1 **0.352**.
 
-> **갱신(2026-06-11 b)**: 초기 FSC 8건이 2026 오답으로 판명 → WebSearch 로 2024 정확 타깃 재확보(9건).
-> OCR 을 `paragraph=True`(표 뭉갬) → `detail=1` bbox 행(y)그룹화 + 열(x)정렬 "셀 \| 셀" 재구성 + `pdfplumber.extract_tables()` 로 교체.
-> 재적재 374→**418 chunks**(표 마커 `[표]` 47청크). **vector F1 0.369→0.442 (+7.3pp)**, **hybrid 0.120→0.282 (+16.2pp, source 필터를 agent 경로에도 부여)**.
+> **연혁:**
+> - **(b, 2026-06-11)**: 초기 FSC 8건이 2026 오답으로 판명 → WebSearch 로 2024 정확 타깃 재확보. OCR 을
+>   `paragraph=True`(표 뭉갬) → `detail=1` 행(y)그룹화 + 열(x)정렬 "셀 \| 셀" 재구성 + `pdfplumber.extract_tables()` 로 교체.
+>   374→418 chunks. noKIF 42문항: vector 0.369→**0.442**, hybrid 0.120→**0.282**.
+> - **(KIF, 2026-06-12)**: 마지막 미확보 2건(KIF 연구논문)을 flexer 뷰어 **페이지이미지 OCR** 로 확보 →
+>   **14/14 전수**, 418→**554 chunks**(KIF 136). full 60문항 측정 가능: vector **0.467**, hybrid **0.352**.
+>   **KIF 18문항 자체 F1 = vector 0.516 / hybrid 0.495 (전 구간 최고)** — 페이지이미지 OCR 코퍼스가 매우 answerable.
 
 **처리 흐름 (무엇을 → 어떻게):**
 
@@ -67,8 +72,9 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 - **FSC** ✅(부분) — `/comm/getFile?srvcId=BBSTY1&upperNo=...&fileTy=ATTACH&fileSn=...` 패턴. 카테고리
   페이지서 8개 첨부 다운(보도자료 류, 정확 타깃 매칭은 불확실).
 - **KOFIA** ✅(selenium) — `down.do?brd_id=www_default&seq=<N>&data_tp=A&file_seq=1` (selenium 으로 view 페이지 세션 쿠키 획득 후 다운). 증시콘서트 58p·퇴직연금 50p 확보.
-- **KIF** ❌ — `flexer/viewer.jsp` 레거시 Flash 뷰어, cid stale("Request Error") + 헤드리스 PDF 미로드. 미확보.
-- 결과: **17 PDF 다운로드**(BOK 7 + FSC 8 + KOFIA 2) → 비타깃·거대 제거 후 **12건 유지**(BOK 2 + FSC 8 + KOFIA 2).
+- **KIF** ✅(2026-06-12, 페이지이미지 OCR — §2.6) — `flexer/viewer.jsp` 레거시 뷰어가 원본 PDF 대신
+  페이지이미지(PNG)만 서빙. 이미지를 전수 다운로드 → OCR 로 확보.
+- 결과: 최종 **14/14 finance 원문 전수 확보**(BOK 2 + FSC 5파일 + KOFIA 2 + KIF 2).
 
 ### 2.4 OCR — 이미지 스캔 대응 (PR #79)
 - **결정적 발견**: 한국 금융 PDF 가 **이미지/스캔 기반**. 예: BOK 통화신용정책(13p, 41MB) →
@@ -87,6 +93,22 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 | `ForeignKeyViolation chunks_rcept_no_fkey` | `chunks.rcept_no` 가 `anxg_fin.filings` FK — Allganize 는 DART filing 없음 | **rcept_no=NULL**(nullable, FK NULL 허용). 문서식별 = `metadata.doc_id/file_name`. 멱등 = `source='allganize'` 사전삭제 |
 | **원격 PG 서버 다운** | 호스트 uid/소유권 변경으로 PG 데이터 디렉토리 권한 깨짐(`base/16384: Permission denied`) — 인프라 이슈(git "dubious ownership"와 동일 근원) | 사용자가 호스트서 `chown -R 999:999 .../postgres` + restart 로 복구 |
 
+### 2.6 KIF 2건 — 페이지이미지 OCR 확보 (2026-06-12)
+
+마지막 미확보 2건(KIF 연구논문: `KIFVIP2013-10` 일본 고령화 55p, `WP22-05` 69p)은 `vwserver.kif.re.kr/flexer/viewer.jsp`
+레거시 뷰어가 **원본 PDF 를 노출하지 않고 페이지이미지(PNG)로 변환 서빙**한다. 뷰어 JS 를 역설계해 확보:
+
+| 단계 | 방법 |
+|---|---|
+| 뷰어 구조 규명 | `viewer.jsp` raw JS 에서 `g_docname='/KM/<numericId>_<name>.pdf'` + 이미지 URL 패턴 `/html/KM/<docname>.pdf.files/<00001>.png`(5자리 zero-pad). 페이지수는 `…/pdf.txt`(plaintext "55"/"69") |
+| 이미지 다운로드 | Referer=`/flexer/` 헤더로 124장(55+69) 전수 다운(0 실패). 검증: PNG 1231×1720(D1)·1062×1552(D2) RGB |
+| PDF 조립 | `fitz` 로 무손실 조립 — 페이지 크기를 `px×72/200` pt 로 설정해 `get_pixmap(dpi=200)` 시 native 해상도 보존(OCR 품질↑) → `finance_pdfs/kif_*.pdf` |
+| OCR 적재 | 메인 파이프라인(`--apply`)에 합류 → 11 PDF 전수 재적재. `_MAX_PAGES` 60→80(WP22-05 69p 수용) |
+
+- **성능 함정(기록)**: easyocr 가 `CUDA_VISIBLE_DEVICES` 미지정 시 GPU 미사용(CPU 폴백, ~54s/page) → 무한 지연.
+  `CUDA_VISIBLE_DEVICES=1`(임베딩 서버는 GPU0 별도 HTTP 프로세스) 로 GPU OCR(~13s/page) 강제 → KIF 124p ~24분.
+- **footgun 회피**: KIF PDF 를 `finance_pdfs/` 에 두어 메인 `--apply` 가 항상 재생성(별도 append 시 다음 적재가 `source='allganize'` 전체 삭제로 KIF 유실).
+
 ---
 
 ## 3. 최종 결과 (실측)
@@ -95,59 +117,119 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 |---|---|
 | gold QA(Allganize finance) | **60 row** (`gold_qa_allganize_v0.jsonl`) |
 | 외부 큐레이터 비율 | **0% → 26.7%** (finance 66.7%) |
-| 적재 PDF | **정확 9건** (BOK 2 + FSC 5 + KOFIA 2; 초기 8 FSC = 2026 오답 → 2024 타깃 재확보) |
-| `vec.chunks` (source='allganize') | **418 chunks** (전부 임베딩 BGE-M3 1024d, 표 마커 `[표]` 47청크) |
-| └ BOK 통화신용정책 운영(bok_3) | 23 chunks (**OCR**, 이미지스캔) |
-| └ BOK 향후 방향(bok_4) | 40 chunks (**OCR**) |
-| └ FSC 지방은행 전환(별첨 포함) | 7 + 17 chunks |
-| └ FSC 상생금융 / 핀테크 2건 | 9 + 7 + 7 chunks |
+| 적재 PDF | **14/14 전수** (BOK 2 + FSC 5파일 + KOFIA 2 + KIF 2) — 11 PDF 파일 |
+| `vec.chunks` (source='allganize') | **554 chunks** (전부 임베딩 BGE-M3 1024d, 표 마커 `[표]` 47청크) |
+| └ BOK 통화신용정책 운영(bok_3) / 향후 방향(bok_4) | 23 / 40 chunks (**OCR**, 이미지스캔) |
+| └ FSC 지방은행 전환(+별첨) / 상생금융 / 핀테크 2건 | 7+17 / 9 / 7+7 chunks |
 | └ KOFIA 증시콘서트 / 한-호주 퇴직연금 | 257 / 51 chunks (**OCR**, selenium 확보) |
-| OCR 품질 | BOK 이미지 PDF서 한국어 정상 추출. 표지·표 페이지는 행(y)그룹화 + 열(x)정렬로 "셀 \| 셀" 복원(예: `지방은행의 \| 시중은행 \| 전환시`) |
+| └ **KIF KIFVIP2013-10(55p) / WP22-05(69p)** | **59 / 77 chunks** (**페이지이미지 OCR**, §2.6) |
+| OCR 품질 | BOK·KIF 이미지 PDF서 한국어 정상 추출. 표지·표 페이지는 행(y)그룹화 + 열(x)정렬로 "셀 \| 셀" 복원(예: `지방은행의 \| 시중은행 \| 전환시`) |
 
 ---
 
-## 3.5. eval 실측 (2026-06-11, KIF 18문항 제외 → 42문항)
+## 3.5. eval 실측 — 정량 평가
 
-`run_qa_eval --gold gold_qa_allganize_noKIF.jsonl --adapters vector,hybrid`. 프로즈 정답이라
-**F1(토큰 overlap)** 이 지표(EM 은 0 — 산문 정답에 exact-match 불가).
+`run_qa_eval --gold gold_qa_allganize_v0.jsonl --adapters vector|hybrid` (`EVAL_VECTOR_SOURCE=allganize`).
+프로즈 정답이라 **F1(토큰 overlap)** 이 1차 지표(EM 은 ≈0 — 산문 정답에 exact-match 불가).
+임베딩/리랭커 = 자체 호스팅 BGE-M3 / BGE-Reranker-v2-m3, 합성 LLM = Claude(fast tier).
 
-| 어댑터 | F1 | EM | faith | cost | 비고 |
-|---|---|---|---|---|---|
-| vector (전체 코퍼스) | 0.271 | 0.000 | 0.503 | $0.28 | 초기(374 chunk, 희석) |
-| vector (source 필터) | 0.369 | 0.048 | 0.497 | $0.29 | 초기(374 chunk, 2026 오답 FSC) |
-| hybrid (source 미적용) | 0.120 | 0.000 | 0.000 | $0.34 | 초기 |
-| **vector (source 필터, b)** | **0.442** | 0.048 | 0.631 | $0.30 | **정확 9건 + 표 OCR** |
-| **hybrid (source 필터, b)** | **0.282** | 0.024 | 0.000 | $0.29 | **agent 경로 source 필터 신규** |
+### 3.5.1 전 구간 (full 60문항, 2026-06-12 — KIF 포함 14/14)
 
-> **(b) 갱신 — 정확 9건 재적재 + OCR 표 재구성 + hybrid source 필터:**
-> - **vector 0.369 → 0.442 (+7.3pp, +20% 상대)**: 초기 8 FSC 가 2026 오답이었음을 발견 → 2024 정확
->   타깃 9건 재확보 + OCR `paragraph=True`(표 뭉갬)를 `detail=1` 행/열 재구성으로 교체. 정확한 출처
->   문서 + 표 보존이 답변 overlap 을 끌어올림.
-> - **hybrid 0.120 → 0.282 (+16.2pp, 2.3배)**: source 필터를 vector 뿐 아니라 **agent 경로에도** 부여
->   (`run_agent(source=)` → `research_worker` → `search_documents(source=)`, rerank 와 동일 주입 패턴).
->   메인 DART 코퍼스 희석이 제거돼 doc-RAG 질문에서도 의미 있게 상승.
-> - **vector > hybrid 여전(0.442 > 0.282)**: 회사·그래프 없는 단일 문서 질문엔 multi-hop agent 라우팅이
->   과잉 — 단순 vector retrieval 이 적합. hybrid faith 0.000 은 agent citation 경로가 외부 코퍼스에
->   evidence_text 를 채우지 않아 구조적(점수 미산정)이며 정답 부재 의미는 아님.
-> - 명령: `EVAL_VECTOR_SOURCE=allganize` (vector·hybrid 어댑터 공통 적용).
+| 어댑터 | n | F1 | EM | faith | latency(avg/p95) | cost | conf_avg |
+|---|---|---|---|---|---|---|---|
+| **vector** | 60 | **0.467** | 0.033 | 0.631 | 2.36s / 3.92s | $0.43 | 0.357 |
+| **hybrid** | 60 | **0.352** | 0.017 | 0.000 | 2.30s / 4.52s | $0.45 | 0.486 |
 
-- **answerability 확인**: vector 가 allganize 코퍼스를 retrieval 해 답함(예: ALG-FIN-002 "은행법…
-  금융감독위원회 인가" = 적재한 은행 문서 내용 사용). 코퍼스가 실제로 쓰인다.
-- **F1 0.442 의 한계(정직)**: ① easyocr 잔여 오인식(스캔 표 라벨) ② 코퍼스 9건 외 질문은 출처 문서
-  부재 시 "정보 없음" ③ F1 은 LLM-judge 보다 과소평가(Allganize 리더보드는 judge 기준 0.6~0.85). 즉
-  0.442 는 **하한** — 코퍼스 유효성·source 필터·표 OCR 효과는 입증, 정밀도는 위 요인으로 제한.
+- latency 도메인 내 목표(<8s) **100% 충족**(vector·hybrid 모두). refusal/false_refusal = 0.
+- **F1 분포(vector)**: min 0.08 · p25 0.29 · **median 0.48** · p75 0.60 · max 1.00 — 중앙값이 평균(0.467)보다
+  높아, 소수의 저득점(주가 수치·포맷 불일치)이 평균을 끌어내림.
+
+### 3.5.2 KIF 효과 — 하위그룹 층화
+
+| 하위그룹 | n | vector F1 | hybrid F1 |
+|---|---|---|---|
+| **KIF 18문항** (ALG-FIN-013~030) | 18 | **0.516** | **0.495** |
+| non-KIF 42문항 | 42 | 0.446 | 0.291 |
+| 전체 | 60 | 0.467 | 0.352 |
+
+> **KIF 확보가 최대 기여**: KIF 18문항 자체가 **전 구간 최고 F1**(vector 0.516 > non-KIF 0.446). 페이지이미지
+> OCR 로 적재한 일본 고령화·연금 논문이 매우 answerable. 전체 vector F1 을 noKIF 0.442 → full **0.467** 로 끌어올림.
+> hybrid 도 KIF 0.495 로 non-KIF(0.291) 대비 크게 높음 — KIF 질문이 단일 문서 fact-lookup 형이라 검색이 잘 맞음.
+
+### 3.5.3 연혁 (코퍼스/필터 개선에 따른 추이, noKIF 42 기준)
+
+| 단계 | vector F1 | hybrid F1 | 비고 |
+|---|---|---|---|
+| 전체 코퍼스(희석) | 0.271 | — | DART 777k 에 allganize 374 희석 |
+| + source 필터 | 0.369 | 0.120 | 초기(374 chunk, 2026 오답 FSC) |
+| **+ 정확 9건 + 표 OCR (b)** | **0.442** | **0.282** | OCR `paragraph` → 행/열 재구성, hybrid agent 경로 source 필터 |
+| **+ KIF (full 60 기준)** | **0.467** | **0.352** | 14/14 전수, KIF 18문항 추가 |
+
+- **source 필터 효과**: 0.271→0.369 (+9.8pp). allganize chunk 를 메인 코퍼스에서 분리해 희석 제거.
+- **표 OCR 재구성 효과**: 0.369→0.442 (+7.3pp). `detail=1` 행/열 복원으로 표·수치 인접성 보존.
+- **hybrid agent 경로 source 필터**: 0.120→0.282 (2.3배). `run_agent(source=)`→`search_documents(source=)`.
+- **vector > hybrid 일관**: 회사·그래프 없는 단일 문서 질문엔 multi-hop agent 라우팅이 과잉 — 단순 vector
+  retrieval 이 적합(thesis 의 store-aware routing 주장과 정합: 문서-RAG 질문은 vector 라우팅이 정답).
+  hybrid `faith 0.000` 은 agent citation 경로가 외부 코퍼스에 `evidence_text` 를 채우지 않아 **구조적 점수 미산정**
+  (정답 부재 의미 아님 — F1 0.352 가 실제 답변 품질).
+
+## 3.6. eval 실측 — 정성 평가
+
+### 3.6.1 성공 사례 (코퍼스·OCR 이 실제로 작동)
+
+| qid | F1 | 질문(요약) | 시스템 답변(발췌) | 근거 |
+|---|---|---|---|---|
+| ALG-FIN-019 (KIF) | **0.89** | 간병종사자 처우개선법 제정시기·법률번호 | "2008년 5월 28일 제정, 법률 제44호" | KIF 페이지이미지 OCR 정확 추출 |
+| ALG-FIN-016 (KIF) | **0.80** | 2012→2025 지급비 증가·의료비 비율(**수치**) | "39.4조 엔 증가, 의료비 18.9%" | 표/수치 OCR 대응 성공 |
+| ALG-FIN-001 | 0.55 | 시중/지방/인터넷은행 인가요건 차이 | "최저자본금 1,000억/250억, 비금융주력자 한도 4%/15%…" | FSC 지방은행 전환 문서 |
+| ALG-FIN-002 | 0.34 | 은행 대주주 요건·제출서류 | "비금융주력자 아님 증명서류, 출자능력·재무상태·사회적신용" | 은행법 문서, 부분 일치 |
+
+### 3.6.2 실패 사례 (오류 유형 분류)
+
+| qid | F1 | 유형 | 원인 |
+|---|---|---|---|
+| ALG-FIN-006 | 0.24 | **표/수치 OCR 한계** | "셀트리온·현대차·삼성전자… 주가변동률 정보 없음". KOFIA 증시콘서트 **차트/그래프 내 수치**는 OCR 이 텍스트로 복원 못함 |
+| ALG-FIN-018 (KIF) | 0.12 | **OCR 누락/스파스** | "2005년 일본 고령화대책법… 근거에 없음". 해당 페이지 OCR 품질·청크 매칭 실패 |
+| ALG-FIN-007 | 0.08 | **포맷 불일치(F1 과소)** | 미·중·한 시장 전망을 서술형으로 정확히 답했으나, gold 의 "선호 순서" 토큰과 overlap 낮아 F1 저평가 |
+
+- **"정보 없음" 응답**: 60문항 중 **4건**(6.7%) — 코퍼스에 근거가 없거나 OCR 이 해당 수치를 복원 못한 경우.
+  hallucination 대신 정직하게 abstain(=신뢰성↑).
+- **OCR 노이즈 실측 예**(KIF 일본 고령화 논문): `고령화→고렇화`, `52%→5296`, `211.7→211.79` 등 스캔 인식
+  오류 잔존. 본문 검색·문맥엔 충분하나 정밀 수치 질문(ALG-FIN-006)엔 직접 한계.
+
+### 3.6.3 F1 지표의 구조적 과소평가 (정직)
+
+prose 정답에 대한 토큰 overlap F1 은 **의미상 정답도 표현이 다르면 저평가**한다(ALG-FIN-007 이 전형).
+Allganize 공식 리더보드는 **LLM-as-judge** 기준 0.6~0.85 대를 보고하므로, 본 F1 **0.467 은 하한**으로 해석해야 한다.
+즉 코퍼스 유효성·source 필터·표 OCR·KIF 확보의 효과는 입증되었고, 절대 정밀도는 ① OCR 노이즈 ② 차트수치
+미복원 ③ F1 과소평가 세 요인으로 제한된다.
 
 ---
 
-## 4. 남은 것 (정직)
+## 4. 보완점 — 한계와 개선 과제
 
-1. **KIF(2) PDF 미확보** — 레거시 Flash 뷰어(`flexer`)가 PDF 를 페이지이미지로만 서빙(원본 비노출).
-   정확 URL param = `cno/fk/ftype=pdf`. 확보하려면 124 페이지이미지 OCR(큰 우회) → 보류. noKIF 42문항으로 측정.
-2. ~~**FSC 정확 타깃 매칭 불확실**~~ — **(b) 해소**: 초기 8건이 2026 오답임을 발견 → WebSearch 로 2024
-   정확 타깃(지방은행 전환+별첨·상생금융·핀테크) 재확보. 9건 모두 의도 문서와 일치.
-3. ~~**eval answerability 실측 미완**~~ — **해소**: §3.5 에 vector F1 0.442 / hybrid 0.282 (noKIF 42문항) 실측.
-4. **OCR 잔여 노이즈** — (b) 에서 표는 행/열 재구성으로 구조 보존(`[표]` 47청크). 다만 easyocr 가 스캔
-   표·차트 라벨 일부 오인식(예: "금융"→"금움")은 잔존 — 정밀 수치 질문엔 여전히 한계.
+### 4.1 해소된 항목
+
+| 항목 | 상태 |
+|---|---|
+| ~~KIF 2건 미확보~~ | ✅ **해소(2026-06-12)** — flexer 페이지이미지 OCR 로 확보. **14/14 전수**(§2.6). |
+| ~~FSC 정확 타깃 불확실~~ | ✅ **해소(b)** — 초기 8건이 2026 오답 → WebSearch 로 2024 정확 타깃 재확보. |
+| ~~eval answerability 미측정~~ | ✅ **해소** — full 60 vector F1 0.467 / hybrid 0.352 (§3.5). |
+| ~~메인 코퍼스 희석~~ | ✅ **해소(#84·#86)** — `source='allganize'` 필터를 vector·hybrid 양 경로에 부여. |
+
+### 4.2 남은 한계 → 개선 과제 (우선순위順)
+
+| # | 한계 (현 상태) | 보완 방향 (구체) | 기대효과 |
+|---|---|---|---|
+| 1 | **차트/그래프 내 수치 미복원** — ALG-FIN-006(주가 변동률 등) 처럼 시각 차트의 수치는 OCR 이 텍스트로 못 뽑음 | 차트 영역 탐지 후 (a) VLM(예: vision LLM)로 수치 추출, (b) 표/축 라벨 별도 파이프 | 수치 질문 정답률 직접 상승 |
+| 2 | **OCR 노이즈** — `고령화→고렇화` 등 스캔 인식 오류, 정밀 수치(`211.7→211.79`) 왜곡 | (a) easyocr → PaddleOCR/上용 OCR 비교, (b) 한국어 LM 기반 OCR 후처리 교정, (c) 렌더 dpi↑ | 정밀도·검색 recall 개선 |
+| 3 | **F1 지표 과소평가** — 의미 정답도 표현 다르면 저평가(ALG-FIN-007) | **LLM-as-judge** 도입(Allganize 리더보드 정합) — F1 과 병기 | 절대 성능 정확 측정 |
+| 4 | **표 복원 부분적** — 이미지 스캔표는 OCR 행/열 휴리스틱, 복잡 병합셀은 한계 | `pdfplumber` 외 이미지 표 구조 인식(table transformer) 도입 | 표 질문 robust |
+| 5 | **표본·도메인** — finance 60문항 단일 도메인 | 외부 큐레이터 30% 목표(현 26.7%) 완성: auto/cross/ip 도메인 외부 벤치 흡수 | self-bias 추가 완화 |
+| 6 | **hybrid 점수 구조적 한계** — agent citation 경로가 외부 코퍼스 `evidence_text` 미충전(faith 0) | hybrid 어댑터가 외부 source 검색 결과의 본문을 citation 에 채우도록 보강 | hybrid faithfulness 측정 가능화 |
+
+> **핵심 보완 우선순위**: ①차트수치(VLM) → ②OCR 후처리 교정 → ③LLM-judge. 이 셋이 현 0.467(하한)과
+> 리더보드 judge 기준(0.6~0.85) 사이 갭의 주 원인.
 
 ---
 
@@ -164,9 +246,20 @@ python3 scripts/ingest/ingest_allganize_pdfs.py --list
 
 # 3. PDF 확보 후 (data/external/allganize/finance_pdfs/) OCR 적재
 pip install -e ".[ocr]"                                # easyocr + pymupdf
-make serve-dashboard &  # (또는 임베딩 서버 8080 기동)
-python3 scripts/ingest/ingest_allganize_pdfs.py \
-  --pdf-dir data/external/allganize/finance_pdfs --apply    # OCR + embed + vec.chunks
+python scripts/serve_embeddings.py --embed-port 8080 --rerank-port 8081 &   # BGE-M3/Reranker
+# GPU OCR 강제(필수) — CUDA_VISIBLE_DEVICES 미지정 시 CPU 폴백 ~54s/page (§2.6)
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY CUDA_VISIBLE_DEVICES=1 EMBEDDING_URL=http://127.0.0.1:8080 \
+  python3 scripts/ingest/ingest_allganize_pdfs.py \
+  --pdf-dir data/external/allganize/finance_pdfs --apply    # OCR + embed + vec.chunks (11 PDF → 554)
+
+# 3b. KIF 페이지이미지 확보 (flexer 뷰어 → PNG → fitz 무손실 PDF 조립 → finance_pdfs/)  ── §2.6
+#   이미지 URL: https://vwserver.kif.re.kr/html/KM/<numericId>_<name>.pdf.files/<00001>.png (Referer=/flexer/)
+
+# 4. eval (full 60, source 필터)
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY -u GOOGLE_API_KEY EVAL_VECTOR_SOURCE=allganize \
+  LLM_SESSION_HARD_LIMIT_USD=50 AGENT_TURN_BUDGET_USD=2.0 \
+  python3 -m eval.runners.run_qa_eval \
+  --gold eval/qa_gold/gold_qa_allganize_v0.jsonl --adapters vector,hybrid --run-id allganize_full
 ```
 
 ---
@@ -174,6 +267,10 @@ python3 scripts/ingest/ingest_allganize_pdfs.py \
 ## 6. 결론
 
 - **self-bias 완화의 가장 큰 구멍(외부 0%)을 26.7% 까지 메움** — 신뢰도 측면 핵심 진전.
-- **이미지 기반 외부 코퍼스를 OCR 로 vector store 에 적재** — 단순 텍스트 추출로는 불가했던
-  answerability 를 한국어 OCR 파이프라인으로 확보(BOK 통화신용정책 등 62 chunks).
-- 남은 4 PDF(KOFIA/KIF) + eval 실측 + 30% 완성(auto/cross/ip 외부)은 후속.
+- **이미지 기반 외부 코퍼스를 OCR 로 vector store 에 전수 적재** — 단순 텍스트 추출로는 불가했던
+  answerability 를 한국어 OCR 파이프라인으로 확보. **14/14 finance 원문 전수 → 554 chunks**.
+  마지막 KIF 2건은 레거시 뷰어의 **페이지이미지를 역설계·OCR** 해 확보(§2.6).
+- **실측 검증**: full 60 vector **F1 0.467** / hybrid 0.352. **KIF 18문항 자체가 0.516(최고)** — 확보 가치 입증.
+  단계별 개선(source 필터 +9.8pp → 표 OCR +7.3pp → KIF +KIF구간 0.516)이 모두 실측으로 누적 확인됨.
+- **다음**: 차트수치(VLM)·OCR 후처리 교정·LLM-judge 도입(§4.2)이 현 F1(하한 0.467)과 judge 기준(0.6~0.85)
+  갭의 핵심. 외부 큐레이터 30% 완성(auto/cross/ip 외부 벤치)은 별도 트랙.
