@@ -16,7 +16,7 @@ class HybridAdapter(AgentAdapter):
     version = "0.1"
 
     def __init__(self, *, rerank: bool = True, llm_tier: str = "fast",
-                 llm_planner: bool = False) -> None:
+                 llm_planner: bool = False, source: str | None = None) -> None:
         """Hybrid 어댑터 — 본 프로젝트의 production agent (Triage/Planner/Executor/Synth).
 
         rerank 토글은 ``run_agent(rerank=...)`` 로 전달되어 research_worker 가
@@ -25,8 +25,15 @@ class HybridAdapter(AgentAdapter):
 
         llm_planner 토글(축2 ablation)은 ``run_agent(llm_planner=...)`` 로 전달 →
         룰 planner vs LLM 자율 planner 셀(``_planner1``)을 실제 분리 측정.
+
+        source 필터는 ``run_agent(source=...)`` 로 전달되어 research_worker 가
+        ``search_documents(source=...)`` 까지 전파 → 외부 벤치(Allganize 등)를 메인
+        코퍼스 희석 없이 평가. vector 어댑터와 동일하게 생성자 인자 우선, 없으면 env
+        ``EVAL_VECTOR_SOURCE`` (같은 eval 명령이 두 어댑터에 동일 source 를 적용).
         """
         super().__init__(rerank=rerank, llm_tier=llm_tier, llm_planner=llm_planner)
+        import os
+        self.source = source or os.getenv("EVAL_VECTOR_SOURCE") or None
 
     def query(self, question: str, *,
               domain: str | None = None) -> AgentResponse:
@@ -38,7 +45,7 @@ class HybridAdapter(AgentAdapter):
             # bleed 방지. (기본 thread_id="default" 면 모든 eval 질문이 한 스레드를
             # 공유 → 이전 질문의 target_companies/history 가 누수돼 엉뚱한 회사로 답함.)
             state = run_agent(question, domain=domain, rerank=self.rerank,
-                              llm_planner=self.llm_planner,
+                              llm_planner=self.llm_planner, source=self.source,
                               thread_id=f"eval-{uuid.uuid4().hex}")
         except Exception as e:
             return AgentResponse(

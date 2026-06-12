@@ -72,8 +72,44 @@ def _get_ocr_reader():
     return _ocr_reader or None
 
 
+def _reconstruct_layout(results: list) -> str:
+    """easyocr detail=1 결과(bbox+text) → 행(y) 그룹화 + 열(x) 정렬로 표 구조 보존.
+
+    paragraph=True 는 열을 가로질러 문단으로 뭉쳐 표를 파괴한다(주가·수치 질문에서
+    셀-행 대응 상실). 대신 각 텍스트 박스의 y중심으로 같은 행을 묶고, 행 안에서 x좌측
+    으로 정렬해 "셀 | 셀" 로 복원 → 표의 행·열 인접성이 청크에 보존된다.
+    """
+    boxes = []
+    for box, text, *_conf in results:
+        t = (text or "").strip()
+        if not t:
+            continue
+        ys = [p[1] for p in box]
+        xs = [p[0] for p in box]
+        boxes.append((sum(ys) / len(ys), min(xs), max(ys) - min(ys), t))  # (y중심, x좌, 높이, 글자)
+    if not boxes:
+        return ""
+    boxes.sort(key=lambda b: (b[0], b[1]))
+    median_h = sorted(b[2] for b in boxes)[len(boxes) // 2] or 10
+    row_thresh = median_h * 0.6                  # y중심 차이가 글자높이 60% 이내면 동일 행
+    lines, cur = [], [boxes[0]]
+    for b in boxes[1:]:
+        cur_y = sum(x[0] for x in cur) / len(cur)
+        if abs(b[0] - cur_y) <= row_thresh:
+            cur.append(b)
+        else:
+            lines.append(cur)
+            cur = [b]
+    lines.append(cur)
+    out = []
+    for ln in lines:
+        ln.sort(key=lambda b: b[1])              # 행 내 좌→우
+        out.append(" | ".join(b[3] for b in ln) if len(ln) > 1 else ln[0][3])
+    return "\n".join(out).strip()
+
+
 def _ocr_page(fitz_doc, pno: int) -> str:
-    """fitz 페이지 렌더(200dpi) → easyocr 한국어 OCR."""
+    """fitz 페이지 렌더(200dpi) → easyocr 한국어 OCR (행/열 레이아웃 재구성)."""
     import numpy as np
     reader = _get_ocr_reader()
     if reader is None:
@@ -82,7 +118,26 @@ def _ocr_page(fitz_doc, pno: int) -> str:
     img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
     if pix.n == 4:
         img = img[:, :, :3]
-    return "\n".join(reader.readtext(img, detail=0, paragraph=True)).strip()
+    return _reconstruct_layout(reader.readtext(img, detail=1, paragraph=False))
+
+
+def _tables_text(page) -> str:
+    """pdfplumber 로 텍스트층 PDF 의 표를 "셀 | 셀" 행으로 추출 (디지털 표 대응).
+
+    extract_text() 는 표를 평탄화해 열 경계를 잃는다. extract_tables() 는 격자/공백
+    기반 표를 행렬로 복원 → 수치 질문(ALG-FIN-006 등)에서 행·값 대응을 보존한다.
+    """
+    try:
+        tables = page.extract_tables()
+    except Exception:   # noqa: BLE001 — 표 탐지 실패(복잡 레이아웃) → 표 없음으로 취급
+        return ""
+    rows = []
+    for tbl in tables or []:
+        for row in tbl:
+            cells = [(c or "").strip().replace("\n", " ") for c in row]
+            if any(cells):
+                rows.append(" | ".join(cells))
+    return "\n".join(rows)
 
 
 def _extract_chunks(pdf_path: Path) -> list[tuple[str, str]]:
@@ -94,10 +149,13 @@ def _extract_chunks(pdf_path: Path) -> list[tuple[str, str]]:
     with pdfplumber.open(pdf_path) as pdf:
         for pno, page in enumerate(pdf.pages[:_MAX_PAGES], 1):
             txt = (page.extract_text() or "").strip()
-            if len(txt) < _OCR_MIN_CHARS:           # 이미지 스캔 → OCR
+            if len(txt) < _OCR_MIN_CHARS:           # 이미지 스캔 → OCR (행/열 재구성)
                 ocr = _ocr_page(fdoc, pno - 1)
                 if len(ocr) > len(txt):
                     txt = ocr
+            tbl_txt = _tables_text(page)            # 텍스트층 디지털 표 → 구조 보존 추가
+            if tbl_txt:
+                txt = f"{txt}\n\n[표]\n{tbl_txt}".strip()
             if not txt:
                 continue
             for i in range(0, len(txt), _CHUNK_CHARS):

@@ -167,6 +167,10 @@ class AgentState(TypedDict, total=False):
     # 평가 매트릭스 (PRD §10 DoD #17 (d)) 의 rerank on/off ablation 셀이 이 값을
     # run_agent 인자로 주입 → research_worker 가 search_documents(rerank=...) 에 전파.
     rerank: Annotated[bool | None, _last_wins]
+    # 검색 source 필터 — entry 에서만 set. None=전체 코퍼스. 외부 벤치(Allganize 등) 평가 시
+    # 메인 코퍼스 희석 없이 해당 source 청크만 검색 → research_worker 가
+    # search_documents(source=...) 로 전파 (rerank 와 동일 주입 패턴).
+    source: Annotated[str | None, _last_wins]
     # 축2 LLM 자율 planner ablation — entry 에서만 set. None=config(AGENT_LLM_PLANNER) 기본,
     # True/False=이 turn 한정 override. 평가 매트릭스가 룰 vs LLM planner 셀 분리에 사용.
     llm_planner: Annotated[bool | None, _last_wins]

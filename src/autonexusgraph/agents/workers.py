@@ -92,23 +92,34 @@ def _allowed_intents(state: AgentState, kind: str) -> set[str]:
     return set()
 
 
-def _maybe_inject_rerank(state: AgentState, fn, args: dict) -> None:
-    """state['rerank'] (평가 매트릭스 ablation) → 검색 함수 args 에 전파.
+def _maybe_inject_param(state: AgentState, fn, args: dict, key: str) -> None:
+    """state[key] (평가 매트릭스 ablation/필터) → 검색 함수 args 에 전파.
 
-    None (기본 production) 이면 미주입 → 도구 자체 default(rerank=True) 사용.
-    함수가 ``rerank`` 파라미터를 받을 때만 주입 — get_chunk/search_by_metadata 등
-    rerank 없는 retrieve 함수에 TypeError 를 내지 않도록 inspect 로 가드.
-    args 에 이미 값이 있으면 보존(setdefault).
+    None (기본 production) 이면 미주입 → 도구 자체 default 사용.
+    함수가 ``key`` 파라미터를 받을 때만 주입 — 해당 인자 없는 retrieve 함수에
+    TypeError 를 내지 않도록 inspect 로 가드. args 에 이미 값이 있으면 보존(setdefault).
     """
-    rr = state.get("rerank")
-    if rr is None or fn is None:
+    val = state.get(key)
+    if val is None or fn is None:
         return
     try:
         import inspect
-        if "rerank" in inspect.signature(fn).parameters:
-            args.setdefault("rerank", rr)
+        if key in inspect.signature(fn).parameters:
+            args.setdefault(key, val)
     except (TypeError, ValueError):   # signature 추출 불가 — 안전하게 미주입.
         pass
+
+
+def _maybe_inject_rerank(state: AgentState, fn, args: dict) -> None:
+    """검색 args 에 평가 ablation override(rerank) + 외부 벤치 source 필터 전파.
+
+    - ``rerank``: 평가 매트릭스(PRD §10 DoD #17 (d)) on/off ablation 셀.
+    - ``source``: 외부 벤치(Allganize 등) 평가 시 해당 코퍼스만 검색 → 메인 코퍼스 희석
+      방지. vector 어댑터의 EVAL_VECTOR_SOURCE 와 동일 의도를 hybrid agent 경로에 부여.
+    둘 다 state 미설정(None) 이면 미주입 → production 기본 동작 보존.
+    """
+    _maybe_inject_param(state, fn, args, "rerank")
+    _maybe_inject_param(state, fn, args, "source")
 
 
 # ── Research worker ─────────────────────────────────────────
