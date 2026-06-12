@@ -140,8 +140,24 @@ def _tables_text(page) -> str:
     return "\n".join(rows)
 
 
+def _vlm_sidecar(pdf_path: Path) -> dict[str, str]:
+    """차트 VLM 추출 사이드카(`vlm_charts/<stem>.json`) — {page_idx: text}. 부재 시 {}.
+
+    `scripts/ingest/vlm_chart_extract.py` 가 오프라인 1회 생성(커밋). easyocr 이 못 뽑는
+    시각 차트 수치를 Claude vision 으로 복원한 텍스트라, 적재 시 `[차트]` 청크로 합류한다.
+    """
+    sc = pdf_path.parent.parent / "vlm_charts" / f"{pdf_path.stem}.json"
+    if not sc.exists():
+        return {}
+    try:
+        return json.loads(sc.read_text(encoding="utf-8"))
+    except Exception:   # noqa: BLE001 — 사이드카 손상 → 차트 보강 생략(본문 적재는 진행)
+        return {}
+
+
 def _extract_chunks(pdf_path: Path) -> list[tuple[str, str]]:
-    """PDF → [(section, text)]. 텍스트층 우선, 이미지 스캔 페이지는 OCR fallback."""
+    """PDF → [(section, text)]. 텍스트층 우선, 이미지 스캔 페이지는 OCR fallback,
+    차트 페이지는 VLM 사이드카(`vlm_charts/`)로 시각 수치 보강."""
     import fitz
     import pdfplumber
     out: list[tuple[str, str]] = []
@@ -161,6 +177,15 @@ def _extract_chunks(pdf_path: Path) -> list[tuple[str, str]]:
             for i in range(0, len(txt), _CHUNK_CHARS):
                 out.append((f"p{pno}", txt[i:i + _CHUNK_CHARS]))
     fdoc.close()
+    # VLM 차트 보강 — 시각 차트 수치(easyocr 미복원분)를 [차트] 청크로 추가
+    for idx_str, vtext in _vlm_sidecar(pdf_path).items():
+        vtext = (vtext or "").strip()
+        if not vtext or "수치 없음" in vtext[:30]:   # 차트 없는 페이지 스킵
+            continue
+        section = f"p{int(idx_str) + 1}-chart"
+        body = f"[차트]\n{vtext}"
+        for i in range(0, len(body), _CHUNK_CHARS):
+            out.append((section, body[i:i + _CHUNK_CHARS]))
     return out
 
 
