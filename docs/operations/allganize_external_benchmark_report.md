@@ -1,6 +1,6 @@
 # Allganize 외부 벤치 흡수·코퍼스 적재 보고서
 
-> 작성: 2026-06-11 · 관련 PR: #71 (QA 흡수) · #72 (적재 파이프라인) · #79 (OCR fallback) · #80 (적재 완료)
+> 작성: 2026-06-11 · 관련 PR: #71 (QA 흡수) · #72 (적재 파이프라인) · #79 (OCR fallback) · #80 (적재 완료) · #84 (vector source 필터) · (b·재적재) OCR 표 재구성 + 정확 9건 재적재
 > 목적: gold QA self-bias 완화(외부 큐레이터 30% 정책) + 외부 벤치 answerability 확보.
 
 ---
@@ -8,8 +8,12 @@
 ## 0. 한 줄 요약
 
 `allganize/RAG-Evaluation-Dataset-KO` finance **60 QA 흡수**(외부 큐레이터 비율 0%→26.7%) +
-원문 PDF **12/14건 스크래핑(selenium 포함) → OCR → vec.chunks 374 chunks 적재 완료**. 해당 문서 기반 질문
+원문 PDF **정확 9건 확보(selenium 포함) → OCR(표 행/열 재구성) → vec.chunks 418 chunks 적재 완료**. 해당 문서 기반 질문
 answerable. (KIF 2건만 레거시 Flash 뷰어로 미확보 — 후속.)
+
+> **갱신(2026-06-11 b)**: 초기 FSC 8건이 2026 오답으로 판명 → WebSearch 로 2024 정확 타깃 재확보(9건).
+> OCR 을 `paragraph=True`(표 뭉갬) → `detail=1` bbox 행(y)그룹화 + 열(x)정렬 "셀 \| 셀" 재구성 + `pdfplumber.extract_tables()` 로 교체.
+> 재적재 374→**418 chunks**(표 마커 `[표]` 47청크). **vector F1 0.369→0.442 (+7.3pp)**, **hybrid 0.120→0.282 (+16.2pp, source 필터를 agent 경로에도 부여)**.
 
 **처리 흐름 (무엇을 → 어떻게):**
 
@@ -91,13 +95,14 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 |---|---|
 | gold QA(Allganize finance) | **60 row** (`gold_qa_allganize_v0.jsonl`) |
 | 외부 큐레이터 비율 | **0% → 26.7%** (finance 66.7%) |
-| 적재 PDF | **12/14** (BOK 2 + FSC 8 + KOFIA 2) |
-| `vec.chunks` (source='allganize') | **374 chunks** (전부 임베딩 BGE-M3 1024d) |
-| └ BOK 통화신용정책 운영 | 23 chunks (**OCR**, 이미지스캔) |
-| └ BOK 향후 방향 | 39 chunks (**OCR**) |
-| └ FSC 보도자료 8건 | 36 chunks (텍스트) |
-| └ KOFIA 증시콘서트/퇴직연금 | 229 / ~145 chunks (**OCR**, selenium 확보) |
-| OCR 품질 | BOK 이미지 PDF서 한국어 정상 추출 (검증: "한국은행 자산... 주택매매 거래량... 부동산 PF 대출 잔액") |
+| 적재 PDF | **정확 9건** (BOK 2 + FSC 5 + KOFIA 2; 초기 8 FSC = 2026 오답 → 2024 타깃 재확보) |
+| `vec.chunks` (source='allganize') | **418 chunks** (전부 임베딩 BGE-M3 1024d, 표 마커 `[표]` 47청크) |
+| └ BOK 통화신용정책 운영(bok_3) | 23 chunks (**OCR**, 이미지스캔) |
+| └ BOK 향후 방향(bok_4) | 40 chunks (**OCR**) |
+| └ FSC 지방은행 전환(별첨 포함) | 7 + 17 chunks |
+| └ FSC 상생금융 / 핀테크 2건 | 9 + 7 + 7 chunks |
+| └ KOFIA 증시콘서트 / 한-호주 퇴직연금 | 257 / 51 chunks (**OCR**, selenium 확보) |
+| OCR 품질 | BOK 이미지 PDF서 한국어 정상 추출. 표지·표 페이지는 행(y)그룹화 + 열(x)정렬로 "셀 \| 셀" 복원(예: `지방은행의 \| 시중은행 \| 전환시`) |
 
 ---
 
@@ -106,36 +111,43 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 `run_qa_eval --gold gold_qa_allganize_noKIF.jsonl --adapters vector,hybrid`. 프로즈 정답이라
 **F1(토큰 overlap)** 이 지표(EM 은 0 — 산문 정답에 exact-match 불가).
 
-| 어댑터 | F1 | EM | faith | cost |
-|---|---|---|---|---|
-| vector (전체 코퍼스) | 0.271 | 0.000 | 0.503 | $0.28 |
-| **vector (source='allganize' 필터)** | **0.369** | 0.048 | 0.497 | $0.29 |
-| hybrid | 0.120 | 0.000 | 0.000 | $0.34 |
+| 어댑터 | F1 | EM | faith | cost | 비고 |
+|---|---|---|---|---|---|
+| vector (전체 코퍼스) | 0.271 | 0.000 | 0.503 | $0.28 | 초기(374 chunk, 희석) |
+| vector (source 필터) | 0.369 | 0.048 | 0.497 | $0.29 | 초기(374 chunk, 2026 오답 FSC) |
+| hybrid (source 미적용) | 0.120 | 0.000 | 0.000 | $0.34 | 초기 |
+| **vector (source 필터, b)** | **0.442** | 0.048 | 0.631 | $0.30 | **정확 9건 + 표 OCR** |
+| **hybrid (source 필터, b)** | **0.282** | 0.024 | 0.000 | $0.29 | **agent 경로 source 필터 신규** |
 
-> **source 필터로 +9.8pp (0.271→0.369, +36% 상대)** — allganize 374 chunk 를 DART 777k 에서
-> 분리하니 evidence 가 전부 allganize 출처로 바뀌고 정답률 상승. 희석 가설 입증
-> (`EVAL_VECTOR_SOURCE=allganize`, `VectorAdapter(source=)` → `search_documents(source=)`).
-> 잔여 "정보없음"은 FSC 문서 매칭 불확실 + OCR 표 손상(주가 등 수치 질문) — §4.
+> **(b) 갱신 — 정확 9건 재적재 + OCR 표 재구성 + hybrid source 필터:**
+> - **vector 0.369 → 0.442 (+7.3pp, +20% 상대)**: 초기 8 FSC 가 2026 오답이었음을 발견 → 2024 정확
+>   타깃 9건 재확보 + OCR `paragraph=True`(표 뭉갬)를 `detail=1` 행/열 재구성으로 교체. 정확한 출처
+>   문서 + 표 보존이 답변 overlap 을 끌어올림.
+> - **hybrid 0.120 → 0.282 (+16.2pp, 2.3배)**: source 필터를 vector 뿐 아니라 **agent 경로에도** 부여
+>   (`run_agent(source=)` → `research_worker` → `search_documents(source=)`, rerank 와 동일 주입 패턴).
+>   메인 DART 코퍼스 희석이 제거돼 doc-RAG 질문에서도 의미 있게 상승.
+> - **vector > hybrid 여전(0.442 > 0.282)**: 회사·그래프 없는 단일 문서 질문엔 multi-hop agent 라우팅이
+>   과잉 — 단순 vector retrieval 이 적합. hybrid faith 0.000 은 agent citation 경로가 외부 코퍼스에
+>   evidence_text 를 채우지 않아 구조적(점수 미산정)이며 정답 부재 의미는 아님.
+> - 명령: `EVAL_VECTOR_SOURCE=allganize` (vector·hybrid 어댑터 공통 적용).
 
 - **answerability 확인**: vector 가 allganize 코퍼스를 retrieval 해 답함(예: ALG-FIN-002 "은행법…
   금융감독위원회 인가" = 적재한 은행 문서 내용 사용). 코퍼스가 실제로 쓰인다.
-- **hybrid < vector**: 문서-RAG 질문(회사·그래프 없음)엔 agent 라우팅이 부적합(faith 0).
-- **F1 0.271 의 한계(정직)**: ① OCR 노이즈(스캔 PDF) ② FSC 8건이 정확 타깃 4건인지 불확실 →
-  특정 질문의 출처 문서 부재 시 "정보 없음" ③ allganize 374 chunk 가 DART 777k chunk 에 희석
-  (검색이 무관 DART chunk 를 끌어옴) ④ F1 은 LLM-judge 보다 과소평가(Allganize 리더보드는 judge
-  기준 0.6~0.85). 즉 0.271 은 **하한** — 코퍼스 유효성은 입증, 정밀도는 위 4요인으로 제한.
+- **F1 0.442 의 한계(정직)**: ① easyocr 잔여 오인식(스캔 표 라벨) ② 코퍼스 9건 외 질문은 출처 문서
+  부재 시 "정보 없음" ③ F1 은 LLM-judge 보다 과소평가(Allganize 리더보드는 judge 기준 0.6~0.85). 즉
+  0.442 는 **하한** — 코퍼스 유효성·source 필터·표 OCR 효과는 입증, 정밀도는 위 요인으로 제한.
 
 ---
 
 ## 4. 남은 것 (정직)
 
-1. **KIF(2) PDF 미확보** — 레거시 Flash 뷰어(`flexer`) + cid stale("Request Error"). 헤드리스 브라우저로도 PDF 미로드. → **12/14 finance 원문 확보**(KIF 2 후속, 수동/구버전 뷰어 필요).
-2. **FSC 정확 타깃 매칭 불확실** — 카테고리 페이지서 받은 8건이 정확히 4 타깃인지 미검증(이미지
-   스파스 텍스트라 키워드 매칭 신뢰도 낮음). 도메인 관련 보도자료라 코퍼스엔 유효.
-3. **eval answerability 실측 미완** — 코퍼스는 적재됐으나 Allganize 60 QA 에 대한 실제 정답률
-   측정은 별도(LLM eval, prose 정답이라 EM 대신 F1/judge 적합).
-4. **OCR 노이즈** — easyocr 가 표·차트 라벨에서 일부 오인식(예: "금융"→"금움"). 본문 검색엔 충분하나
-   정밀 수치 질문엔 한계.
+1. **KIF(2) PDF 미확보** — 레거시 Flash 뷰어(`flexer`)가 PDF 를 페이지이미지로만 서빙(원본 비노출).
+   정확 URL param = `cno/fk/ftype=pdf`. 확보하려면 124 페이지이미지 OCR(큰 우회) → 보류. noKIF 42문항으로 측정.
+2. ~~**FSC 정확 타깃 매칭 불확실**~~ — **(b) 해소**: 초기 8건이 2026 오답임을 발견 → WebSearch 로 2024
+   정확 타깃(지방은행 전환+별첨·상생금융·핀테크) 재확보. 9건 모두 의도 문서와 일치.
+3. ~~**eval answerability 실측 미완**~~ — **해소**: §3.5 에 vector F1 0.442 / hybrid 0.282 (noKIF 42문항) 실측.
+4. **OCR 잔여 노이즈** — (b) 에서 표는 행/열 재구성으로 구조 보존(`[표]` 47청크). 다만 easyocr 가 스캔
+   표·차트 라벨 일부 오인식(예: "금융"→"금움")은 잔존 — 정밀 수치 질문엔 여전히 한계.
 
 ---
 
