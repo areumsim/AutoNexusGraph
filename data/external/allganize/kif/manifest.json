@@ -1,0 +1,38 @@
+{
+  "dataset": "allganize/RAG-Evaluation-Dataset-KO (finance) — KIF 원문 2건",
+  "note": "KIF(한국금융연구원) 연구논문 제3자 저작물. 바이너리는 저작권·PUBLIC repo 정책상 미커밋. 본 매니페스트로 재현(재취득)한다.",
+  "acquired": "2026-06-12",
+  "source_host": "https://vwserver.kif.re.kr",
+  "viewer_note": "flexer 레거시 뷰어가 원본 PDF 를 노출하지 않고 페이지이미지(PNG)로 변환 서빙. viewer.jsp 의 JS 에서 g_docname + 이미지 URL 패턴을 역설계해 페이지이미지를 전수 취득 → fitz 로 무손실 PDF 조립.",
+  "image_url_pattern": "{source_host}/html/KM/{numeric_id}_{name}.pdf.files/{page:05d}.png  (Referer: {source_host}/flexer/)",
+  "page_count_probe": "{source_host}/html/KM/{numeric_id}_{name}.pdf.files/pdf.txt  (plaintext 페이지수)",
+  "documents": [
+    {
+      "name": "KIFVIP2013-10",
+      "topic": "일본 고령화·연금",
+      "pages": 55,
+      "numeric_id": "130292099630937500",
+      "viewer_url": "https://vwserver.kif.re.kr/flexer/viewer.jsp?dir=km&mid=10&cno=150310&fk=2013016987IQ&ft=0&ftype=pdf",
+      "image_base": "https://vwserver.kif.re.kr/html/KM/130292099630937500_KIFVIP2013-10.pdf.files/",
+      "assembled_pdf": "data/external/allganize/finance_pdfs/kif_KIFVIP2013-10_55p.pdf",
+      "assembled_pdf_sha256": "23e18c1ce59728c5d798d85507c5f2705faa38596be60e6a71e650df781fe08c",
+      "page_images_sha256": "45c96ad4c55d4c9386f1dd87b61686f233d22a06434c8b7acd4f1f4900f73f4e"
+    },
+    {
+      "name": "WP22-05",
+      "topic": "KIF working paper",
+      "pages": 69,
+      "numeric_id": "133178946057443204",
+      "viewer_url": "https://vwserver.kif.re.kr/flexer/viewer.jsp?dir=km&mid=15&cno=303581&fk=2023000455IM&ft=0&ftype=pdf",
+      "image_base": "https://vwserver.kif.re.kr/html/KM/133178946057443204_WP22-05.pdf.files/",
+      "assembled_pdf": "data/external/allganize/finance_pdfs/kif_WP22-05_69p.pdf",
+      "assembled_pdf_sha256": "c9a603079e7a7095bfba1ab2fdf0367b57df0deb29b0dda0ad8f08f2adeb53ea",
+      "page_images_sha256": "a0c34457056be02c8e9dff08fa2e7d32628cfdb202a694e4b62fe33cdddf2e84"
+    }
+  ],
+  "ingest": {
+    "loader": "scripts/ingest/ingest_allganize_pdfs.py --apply",
+    "result": "11 PDF → vec.chunks 554 (source='allganize'), KIF 136 (59+77)",
+    "ocr_note": "CUDA_VISIBLE_DEVICES=1 필수 (미지정 시 easyocr CPU 폴백 ~54s/page). 상세: docs/operations/allganize_external_benchmark_report.md §2.6"
+  }
+}

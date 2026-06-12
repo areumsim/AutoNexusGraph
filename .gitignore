@@ -42,6 +42,12 @@ data/interim/**
 data/state/**
 data/reports/**
 data/cost_log.jsonl
+# 외부 벤치 원본 바이너리(제3자 저작물) — 저작권·PUBLIC repo 정책상 git 제외.
+# 프로비넌스 매니페스트(.json/.md)만 추적 → data/external/allganize/kif/ 참조.
+data/external/**/*.pdf
+data/external/**/*.png
+data/external/**/*.jpg
+data/external/**/*.jpeg
 !data/README.md
 !data/**/.gitkeep
 
