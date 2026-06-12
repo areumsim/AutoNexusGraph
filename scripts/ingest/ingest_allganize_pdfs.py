@@ -56,7 +56,7 @@ def list_documents() -> list[dict]:
 
 
 _OCR_MIN_CHARS = 100        # 페이지 추출 텍스트가 이보다 적으면 OCR fallback (이미지 스캔 PDF)
-_MAX_PAGES = 60             # PDF 당 처리 상한 (거대 스캔 PDF 시간 바운드)
+_MAX_PAGES = 80             # PDF 당 처리 상한 (거대 스캔 PDF 시간 바운드; KIF WP22-05 69p 수용)
 _ocr_reader = None
 
 
