@@ -129,7 +129,8 @@ def _validate_tasks(state: AgentState, raw_tasks: list, catalog: dict[str, list[
 
 def try_llm_plan(state: AgentState, *, kind: str, targets: list,
                  year_hint: int | None, q: str,
-                 replan_hint: dict | None = None) -> list[dict] | None:
+                 replan_hint: dict | None = None,
+                 persons: list | None = None) -> list[dict] | None:
     """LLM 으로 task DAG 제안 → 검증된 tasks 또는 None(폴백).
 
     None 반환 조건: 비활성·budget 초과·LLM 실패·빈/전부무효·topological 위반.
@@ -142,6 +143,7 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
 
     catalog = _tool_catalog(state)
     targets_line = ", ".join(map(str, targets)) if targets else "(미식별)"
+    persons_line = ", ".join(map(str, persons)) if persons else "(없음)"
     hint_line = ""
     if replan_hint:
         issues = (replan_hint.get("prev_issues") or [])[:3]
@@ -161,6 +163,9 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
         f"[도메인] {state.get('domain') or 'finance'}\n"
         f"[질문유형(참고)] {kind}\n"
         f"[대상 회사 corp_code] {targets_line}\n"
+        f"[대상 인물(이름)] {persons_line} — 인물 출발 질문이면 graph `get_companies_of_person`"
+        f"(name=인물) 으로 소속 회사를 먼저 구하고, 후속 graph 도구의 corp_code 인자는"
+        f" `{{\"$from\":\"<해당 task id>\",\"field\":\"corp_code\"}}` 바인딩으로 연결하라.\n"
         f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
         f"[허용 도구]\n"
         f"{_enum_line('research')}\n"

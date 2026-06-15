@@ -186,6 +186,9 @@ class AgentState(TypedDict, total=False):
     # Triage / Planner 결정 — planner 한 번 set, worker read-only
     question_kind: Annotated[QuestionKind, _last_wins]
     target_companies: Annotated[list[str], _last_wins]
+    # 인물 타깃(이름) — graph-multihop 질문("김명균이 임원인 회사의 자회사는?")처럼 출발
+    # 엔티티가 회사가 아닌 인물일 때 triage 가 채움. planner 가 get_companies_of_person 라우팅.
+    target_persons: Annotated[list[str], _last_wins]
     session_carryover: Annotated[bool, _last_wins]
     plan: Annotated[list[dict], _last_wins]
     tasks: Annotated[list[dict], _last_wins]
