@@ -239,6 +239,49 @@ def test_s7_multiturn_memory_carryover_and_injection():
     session.clear()
 
 
+def test_s7_triage_neo4j_person_fallback():
+    """S-7 ① — PG·carry-over 실패 시 Neo4j 인물 폴백 → target_persons (GMI)."""
+    session.clear()
+    state = _base_state(
+        question="김명균이(가) 임원으로 재직하는 회사의 자회사는 무엇인가? 모두 답하라.",
+        question_rewritten="김명균이(가) 임원으로 재직하는 회사의 자회사는 무엇인가? 모두 답하라.",
+    )
+    with patch("autonexusgraph.tools.financials.lookup_company", lambda q, limit=5: []), \
+         patch("autonexusgraph.tools.graph.lookup_company_node", lambda q, limit=5: []), \
+         patch("autonexusgraph.tools.graph.lookup_person",
+               lambda name, limit=2: [{"name": "김명균"}] if name == "김명균" else []), \
+         patch("autonexusgraph.safety.is_high_risk_injection", return_value=False):
+        triage_node(state)
+    assert state.get("target_persons") == ["김명균"]
+    assert not state.get("target_company_names")
+    session.clear()
+
+
+def test_s7_triage_neo4j_subsidiary_name_fallback():
+    """S-7 ② — corp_code 없는 자회사 노드는 longest-match 로 target_company_names (GMH).
+
+    'ISU Petasys Corp' 다중 단어 회사명을 선두 n-gram exact 매치로 식별하는지 검증."""
+    session.clear()
+    state = _base_state(
+        question="ISU Petasys Corp의 모회사에서 임원으로 재직하는 사람의 이름을 답하라.",
+        question_rewritten="ISU Petasys Corp의 모회사에서 임원으로 재직하는 사람의 이름을 답하라.",
+    )
+
+    def fake_company_node(q, limit=5):
+        # corp_code 없는 자회사 노드 — exact 노드명만 반환.
+        return [{"name": "ISU Petasys Corp", "corp_code": None}] if q == "ISU Petasys Corp" else []
+
+    with patch("autonexusgraph.tools.financials.lookup_company", lambda q, limit=5: []), \
+         patch("autonexusgraph.tools.graph.lookup_company_node", fake_company_node), \
+         patch("autonexusgraph.tools.graph.lookup_person", lambda name, limit=2: []), \
+         patch("autonexusgraph.safety.is_high_risk_injection", return_value=False):
+        triage_node(state)
+    assert state.get("target_company_names") == ["ISU Petasys Corp"]
+    assert not state.get("target_companies")
+    assert not state.get("target_persons")
+    session.clear()
+
+
 # ── 보너스: replan 이 result-aware 인가 (b) — 폐회로 핵심 증거 ─
 def test_replan_is_result_aware_not_retry():
     """validator 실패 → mark_replan → planner 가 다른(승격된) 계획 생성. 동일계획 재시도 아님."""

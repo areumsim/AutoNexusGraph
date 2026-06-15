@@ -162,6 +162,13 @@ def plan_auto_tasks(*, question: str,
                 _next_id("g_"), "graph", "list_investigations_affecting",
                 {"model_id": mid, "limit": 20},
             ))
+        # S-7 ② (GMR): 차종/트림 식별 없이 제조사만 있을 때 — 제조사가 만든 차종 중
+        # 리콜 대상 모델명 2-hop(Manufacturer→Model→Recall). 임의 제조사에 일반 동작.
+        for make in target_makes:
+            tasks.append(make_task(
+                _next_id("g_"), "graph", "list_recalled_models_by_manufacturer",
+                {"make_name": make, "limit": 200},
+            ))
         tasks.append(make_task(
             _next_id("r_"), "research", "search_documents_auto",
             {"query": question, "top_k": 6,
@@ -355,6 +362,31 @@ def identify_auto_targets(state: dict, *,
                 if mfr_s not in seen_mk and len(target_makes) < max_total_makes:
                     target_makes.append(mfr_s)
                     seen_mk.add(mfr_s)
+
+    # S-7 ② (GMR): 제조사명 직접 식별 — 'FORD가 제조한 차종…'처럼 출발 엔티티가
+    # 차종이 아닌 :Manufacturer 일 때 lookup_vehicle 로는 안 잡힘. 단어별 exact
+    # 제조사 노드 lookup(대소문자 무시)으로 보강. exact 매치만 → 노이즈 회피.
+    try:
+        from .tools.graph import lookup_manufacturer
+        for word in q.split():
+            cand = word
+            for _suf in ("가", "는", "은", "이", "를", "을", "의", "와", "과", "도"):
+                if cand.endswith(_suf):
+                    cand = cand[:-1]
+                    break
+            cand = cand.strip()
+            if len(cand) < 2 or len(target_makes) >= max_total_makes:
+                continue
+            try:
+                mhits = lookup_manufacturer(cand, limit=1)
+            except Exception:   # noqa: BLE001 — 제조사 lookup 1건 실패 흡수
+                mhits = []
+            nm = (mhits[0].get("name") if mhits else "") or ""
+            if nm and nm not in seen_mk:
+                target_makes.append(nm)
+                seen_mk.add(nm)
+    except Exception:   # noqa: BLE001 — graph tool import/DB 전반 graceful (best-effort)
+        pass
 
     state["target_vehicles"] = target_vehicles
     state["target_models"]   = target_models

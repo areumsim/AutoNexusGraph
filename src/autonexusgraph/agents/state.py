@@ -189,6 +189,10 @@ class AgentState(TypedDict, total=False):
     # 인물 타깃(이름) — graph-multihop 질문("김명균이 임원인 회사의 자회사는?")처럼 출발
     # 엔티티가 회사가 아닌 인물일 때 triage 가 채움. planner 가 get_companies_of_person 라우팅.
     target_persons: Annotated[list[str], _last_wins]
+    # 회사명 타깃(corp_code 미상) — graph-only 자회사 노드("KCS의 모회사…")처럼 출발
+    # 엔티티가 corp_code 없는 :Company 노드일 때 triage 가 노드명을 채움. planner 가
+    # list_parents(child_corp_code_or_name=노드명) → 모회사 corp_code 로 후속 체이닝.
+    target_company_names: Annotated[list[str], _last_wins]
     session_carryover: Annotated[bool, _last_wins]
     plan: Annotated[list[dict], _last_wins]
     tasks: Annotated[list[dict], _last_wins]

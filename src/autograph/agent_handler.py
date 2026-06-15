@@ -40,9 +40,9 @@ log = logging.getLogger(__name__)
 
 # ── 도메인별 화이트리스트 (구 core 의 _AUTO_*_ALLOWED 가 여기로 이동) ──
 AUTO_GRAPH_ALLOWED = {
-    "lookup_vehicle_graph", "lookup_supplier",
+    "lookup_vehicle_graph", "lookup_supplier", "lookup_manufacturer",
     "list_components", "list_systems_of_model", "list_models_with_system",
-    "list_recalls_affecting",
+    "list_recalls_affecting", "list_recalled_models_by_manufacturer",
     "list_investigations_affecting", "get_investigation_recall_chain",
     "get_suppliers_of_component", "get_vehicles_using_component",
     "find_vehicle_component_paths",

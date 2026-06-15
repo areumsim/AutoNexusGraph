@@ -41,8 +41,10 @@ from .graph import (
     list_components,
     list_investigations_affecting,
     list_models_with_system,
+    list_recalled_models_by_manufacturer,
     list_recalls_affecting,
     list_systems_of_model,
+    lookup_manufacturer,
     lookup_supplier,
 )
 from .graph import lookup_vehicle as lookup_vehicle_graph
@@ -91,6 +93,8 @@ __all__ = [
     # graph
     "lookup_vehicle_graph",
     "lookup_supplier",
+    "lookup_manufacturer",
+    "list_recalled_models_by_manufacturer",
     "list_components",
     "list_systems_of_model",
     "list_models_with_system",

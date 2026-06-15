@@ -198,6 +198,9 @@ def test_identify_auto_targets_populates_state(monkeypatch):
         return []
 
     monkeypatch.setattr(spec, "lookup_vehicle", fake_lookup)
+    # S-7 ② 제조사 Neo4j 스캔은 본 테스트 범위 밖 — hermetic 유지 위해 빈 결과로 mock.
+    from autograph.tools import graph as auto_graph
+    monkeypatch.setattr(auto_graph, "lookup_manufacturer", lambda *a, **kw: [])
 
     state = {"question": "Tesla Model Y 2023 리콜"}
     p.identify_auto_targets(state, question=state["question"])
@@ -229,6 +232,10 @@ def test_identify_auto_targets_swallows_db_error(monkeypatch):
     def fail(*a, **kw):
         raise RuntimeError("postgres down")
     monkeypatch.setattr(spec, "lookup_vehicle", fail)
+    # S-7 ② 제조사 Neo4j 스캔도 동일하게 graceful 해야 함 — 실패 주입.
+    from autograph.tools import graph as auto_graph
+    monkeypatch.setattr(auto_graph, "lookup_manufacturer",
+                        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("neo4j down")))
 
     state = {"question": "Hyundai Sonata 2024"}
     # 예외 누출 없이 빈 결과로 끝나야 함.
@@ -236,6 +243,27 @@ def test_identify_auto_targets_swallows_db_error(monkeypatch):
     assert state["target_vehicles"] == []
     assert state["target_models"] == []
     assert state["target_makes"] == []
+
+
+def test_identify_auto_targets_resolves_manufacturer_name(monkeypatch):
+    """S-7 ② — 'FORD가 제조한…'처럼 출발 엔티티가 제조사일 때 target_makes 채움.
+
+    lookup_vehicle 은 제조사명에 매칭 안 됨(차종 아님) → Neo4j lookup_manufacturer
+    exact 매치로 보강하는 경로 검증."""
+    from autograph import policy as p
+    from autograph.tools import graph as auto_graph
+    from autograph.tools import spec
+
+    monkeypatch.setattr(spec, "lookup_vehicle", lambda *a, **kw: [])
+
+    def fake_mfr(name, *, limit=5):
+        # 'FORD'(조사 제거 후) 만 exact 매치, 자유 단어는 빈 결과.
+        return [{"manufacturer_id": 1, "name": "FORD"}] if name == "FORD" else []
+    monkeypatch.setattr(auto_graph, "lookup_manufacturer", fake_mfr)
+
+    state = {"question": "FORD가 제조한 차종 중 리콜 대상이 된 모델명을 모두 답하라."}
+    p.identify_auto_targets(state, question=state["question"])
+    assert state["target_makes"] == ["FORD"]
 
 
 def test_triage_node_populates_auto_targets_in_auto_domain(monkeypatch):

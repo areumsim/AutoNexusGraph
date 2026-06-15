@@ -52,6 +52,24 @@ def lookup_supplier(query: str, limit: int = 10) -> list[dict]:
     return _exec("auto_lookup_supplier", q=(query or "").strip(), limit=_cap(limit))
 
 
+def lookup_manufacturer(name: str, limit: int = 5) -> list[dict]:
+    """제조사 노드 식별 (이름 exact / 대소문자 무시). triage make 식별 보조."""
+    return _exec("auto_lookup_manufacturer", name=(name or "").strip(), limit=_cap(limit))
+
+
+def list_recalled_models_by_manufacturer(make_name: str = "", *,
+                                         make: str | None = None,
+                                         limit: int = DEFAULT_LIMIT) -> list[dict]:
+    """제조사가 만든 차종 중 리콜 대상이 된 모델명 (S-7 ② GMR 2-hop).
+
+    Manufacturer-[:MANUFACTURES]->VehicleModel-[:AFFECTED_BY]->Recall. ``make`` 는
+    LLM planner 가 make_name 대신 쓰는 별칭. 결과는 ``model_name`` 컬럼."""
+    mk = (make_name or make or "").strip()
+    if not mk:
+        return []
+    return _exec("auto_recalled_models_by_manufacturer", make=mk, limit=_cap(limit))
+
+
 # ── 부품 ────────────────────────────────────────────────────
 def list_components(*,
                     model_id: int | None = None,

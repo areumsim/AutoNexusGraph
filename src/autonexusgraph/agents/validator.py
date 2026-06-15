@@ -72,8 +72,10 @@ def validator_node(state: AgentState) -> AgentState:
         log.info("[validator] self-reported insufficient — passed without replan")
         return state
 
-    # 3) 한국어 비율 가드
-    ok_ko, ratio = check_korean(answer)
+    # 3) 한국어 비율 가드 — 데이터 유래 고유명(외래 entity 명) 은 제외하고 *서술* 의
+    #    한국어 비율 측정. 'FORD 가 제조한 차종…F-150, Transit…' 처럼 grounded 외래
+    #    모델명 다수 나열 답변이 오탐으로 hard-fail→파괴적 replan 되는 것 방지.
+    ok_ko, ratio = check_korean(answer, ignore_terms=_grounded_terms(state))
     if not ok_ko:
         issues.append(f"language_non_korean_{ratio:.2f}")
 
@@ -131,6 +133,27 @@ def validator_node(state: AgentState) -> AgentState:
         state["validation_status"] = "passed"
         log.info("[validator] passed clean")
     return state
+
+
+def _grounded_terms(state: AgentState) -> set[str]:
+    """tool_results 행의 문자열 값(데이터 유래 고유명) 수집 — 언어 가드 제외 목록.
+
+    graph/sql 도구가 반환한 entity 명(모델명·회사명·인물명 등)을 모아, 답변의
+    한국어 비율 측정 시 denom 에서 제외한다. 인용된 외래 고유명을 LLM 의 영어 응답과
+    혼동하지 않게 함 (모듈 docstring '고유명사 허용' 구현). 길이 2+ 문자열만.
+    """
+    terms: set[str] = set()
+    for r in (state.get("tool_results") or []):
+        result = r.get("result") if isinstance(r, dict) else None
+        rows = result if isinstance(result, list) else ([result] if result else [])
+        for row in rows:
+            if isinstance(row, dict):
+                for v in row.values():
+                    if isinstance(v, str) and len(v.strip()) >= 2:
+                        terms.add(v.strip())
+            elif isinstance(row, str) and len(row.strip()) >= 2:
+                terms.add(row.strip())
+    return terms
 
 
 def _check_edge_confidence(state: AgentState) -> str:
