@@ -335,7 +335,7 @@ gold_qa_v0.jsonl (finance 30)
    ├─→ hybrid_adapter      → predictions_hybrid.jsonl     → 점수 H
    └─→ sql_vec_adapter     → predictions_sql_vec.jsonl    → 점수 S
 
-README §10.7 = "Hybrid > Vector +30%p (multi-hop subset)" 가 thesis headline (⚠️ 단 1차 실측서 **반증** — vector > hybrid, README §10.7 / `docs/research/thesis_hybrid_routing.md` §1 참조. gold 보강 후 재측정 대기)
+README §10.7 = "Hybrid > Vector +30%p (multi-hop subset)" 가 thesis headline (✅ **CONFIRMED 2026-06-15** — graph-유래 진짜 multi-hop gold `gold_qa_graph_multihop_v0.jsonl`(62) + S-7 ①②③ fix 후 hybrid EM 0.710 > vector 0.048 = +66.2%p. 구 doc-RAG gold "반증" 은 측정타당성 결함으로 규명. README §10.7 / `docs/research/thesis_hybrid_routing.md` §1·§7 참조)
 ```
 
 축소 매트릭스 (DoD #17 (d)): 4 어댑터 × FAST tier 1종 × rerank{on/off} = **8 cells**. `make audit-eval-matrix simulation` 으로 cell wire-up 확인, `--full` 로 LLM 실측 (비용 발생).
