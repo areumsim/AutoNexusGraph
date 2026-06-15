@@ -102,6 +102,31 @@
 > (현 구현이 그래프 미활용) → **검증된 기여 = store-aware ROUTING**(doc-Q→vector[Allganize 입증],
 > graph-Q→graph[도구 입증]). 측정된 +%p CONFIRMED 는 **3계층 fix(BACKLOG S-7) 후 §7 재측정** 필요 —
 > core triage/도구/planner 를 건드리는 실질 작업이라 본 단계에서 미착수(회귀·gold-tailored gaming 회피).
+>
+> **★ S-7 ① fix 착수 후 재측정 — H1(a) CONFIRMED (primary EM, 2026-06-15)**: 3계층 중 ①②를 일부
+> 수정 후 재측정. **수정 내용(무결성 — gold-tailored 룰 하드코딩 없음)**: triage 에 Neo4j 엔티티
+> 식별 폴백(`lookup_company_node`+`lookup_person`, **PG 실패 시만 발동 → 무회귀**, 선두엔티티+stopword
+> 보수화) → `target_persons` 채움. LLM-planner 에 `target_persons` + `$from` 의존바인딩 문법을 **일반적으로
+> surface**(인물질문 룰 아님) → LLM 이 `get_companies_of_person → list_subsidiaries` 2-hop 을 **자율 체이닝**.
+> 회귀: smoke-e2e ✅ + agent 테스트 182 pass.
+>
+> | adapter | n | EM | hits@k |
+> |---|---|---|---|
+> | **hybrid (S-7 fix, LLM planner)** | 62 | **0.419** | 0.581 |
+> | vector (baseline) | 62 | 0.048 | 0.532 |
+> | hybrid (fix 전) | 62 | 0.000 | 0.419 |
+>
+> **hybrid − vector = EM +37.1%p (목표 +30%p 초과, §7 임계 +15%p 통과) → 판정: H1(a) CONFIRMED**
+> (primary metric=EM). hits +4.9%p(소폭). **그래프의 가치는 retrieval(hits 유사)이 아니라 computation
+> (EM)** — vector 는 청크를 찾지만 multi-hop 답을 계산 못 함(EM 0.048), hybrid 는 graph traverse 로 정확
+> 답(EM 0.419). 즉 **"vector > hybrid"는 아키텍처 실패가 아니라 agent 가 그래프를 안 쓴 것**이었음이 입증됨.
+>
+> **정직한 한계(과대주장 금지)**: ① CONFIRMED 는 **수정 가능했던 GMI(person→회사→자회사) 패턴 주도**
+> (GMI EM 0.65). **GMH(자회사 노드 corp_code=None) EM 0.0 · AUTO(제조사 미해결) EM 0.0 잔여** = 62 중
+> 22문항 미해결(레이어 ② 도구 name-key + auto handler 필요). ② gold 는 graph-유래(설계상 graph-우호,
+> 단 non-vector-triviality 필터로 vector-trivial 제외). ③ hits +4.9pp 는 소폭. → **H1(a) 는 해결 가능한
+> 패턴에서 +30pp 초과로 CONFIRMED**, 전 패턴 커버는 S-7 ②③ 후속. 게이밍 회피 위해 부분 CONFIRMED 를
+> 전면 입증으로 포장하지 않는다.
 
 ---
 
