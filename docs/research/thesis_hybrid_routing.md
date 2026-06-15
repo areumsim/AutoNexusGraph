@@ -62,6 +62,26 @@
 > thesis EM 우위는 노이즈 내 동률 — +30%p 미지지, hits 는 vector 우세.** robust 판정엔 scorable
 > gold 대폭 확대(현재 데이터로는 multi-hop 11/16 이 data-blocked) 필요. 게이밍(우호 질문만 큐레이션)
 > 회피 원칙상 소표본 노이즈를 +30pp 로 포장하지 않는다.
+>
+> **재판정 결과 — §7 프로토콜 (2026-06-15, pre-reg SHA `de6338e`, gold = `gold_qa_graph_multihop_v0.jsonl`
+> finance 57 + auto 5 = 62 genuine multi-hop, `run_qa_eval --adapters vector,graph,hybrid`, run-id `thesis_remeasure`)**:
+>
+> | adapter | n | EM | hits@k |
+> |---|---|---|---|
+> | vector | 62 | 0.048 | **0.532** |
+> | graph | 62 | 0.000 | 0.016 |
+> | hybrid | 62 | 0.000 | 0.419 |
+>
+> hybrid − vector = **hits −11.3%p, EM −4.8%p** (둘 다 ±15%p 이내) → **판정: INCONCLUSIVE → store-aware
+> ROUTING 재프레이밍** (§7 규칙). 단 **지배적 진단(실증)**: gold 은 진짜 graph-답가능(gold_cypher 가 정답
+> 반환 검증: `KCS의 모회사 임원` = 한무근·정재훈… ✓)인데 **graph 어댑터가 61/62 를 `no_company_identified`
+> 로 거부** — agent 의 **엔티티 식별(triage/identify_targets) front-end 가 질문의 대상 엔티티를 못 뽑아
+> graph traverse 를 시도조차 못 함**. hybrid 는 거부 0 이나 graph leg 무력 → vector 이하(hits 0.419<0.532).
+> 모든 어댑터 EM≈0 = **현 시스템은 진짜 multi-hop 을 사실상 못 답함**.
+> **핵심 결론**: 1차 반증의 원인은 데이터·gold·아키텍처(thesis premise)가 **아니라 agent 의 graph
+> entity-resolution 구현 결함**. thesis 는 *현 구현에선* 미입증이나 **반증도 아님** — graph leg 의
+> entity-id 를 고친 뒤 §7 재측정해야 진짜 판정 가능. (다음 레버 = triage/identify_targets 가 graph-multihop
+> 질문의 대상 엔티티를 surface → graph/hybrid 가 cypher 경로 도달.) INCONCLUSIVE 를 우위로 포장하지 않는다.
 
 ---
 
