@@ -24,10 +24,12 @@ PDF_DIR = Path("data/external/allganize/finance_pdfs")
 OUT_DIR = Path("data/external/allganize/vlm_charts")
 _MODEL = "claude-sonnet-4-6"
 
-# 차트-수치 질문이 가리키는 페이지(0-indexed). target_page_no(HF) + 2-slide/page 오프셋 보정.
+# 차트-수치 질문이 가리키는 페이지(0-indexed). HF target_page_no 가 이 덱의 슬라이드 번호와
+# 불일치(2슬라이드/page·오프셋)해 정밀 매핑 불가 → 차트 밀집 덱(증시콘서트)은 분석 구간을 넓게
+# 추출(수치 없는 페이지는 ingest 가 스킵). KOSPI 이익추이(010)·1995 S&P 표(009)는 idx 11·13.
 TARGETS: dict[str, list[int]] = {
-    # 증시콘서트(2슬라이드/page): KOSPI 성과·테마·채권·S&P 등 — ALG-FIN-006/007/009/010
-    "kofia__2019_제1회_증시콘서트_자료집_최종_.pdf": [6, 7, 8, 9, 10],
+    # 증시콘서트(2슬라이드/page): KOSPI 성과·테마·채권·S&P·이익추이 — ALG-FIN-006/007/009/010
+    "kofia__2019_제1회_증시콘서트_자료집_최종_.pdf": list(range(0, 26)),
     # KIF 일본 고령화(1슬라이드/page) — ALG-FIN-014/016
     "kif_KIFVIP2013-10_55p.pdf": [19, 20, 21, 36, 37, 38],
     # FSC 상생금융 보도자료 표 — ALG-FIN-045/046
