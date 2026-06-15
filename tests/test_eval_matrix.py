@@ -37,13 +37,23 @@ def test_adapter_smart_tier_label():
     assert a.label() == "hybrid_smart_rerank1"
 
 
-def test_all_4_adapters_support_rerank_toggle():
-    """4 구체 어댑터 모두 rerank 매트릭스 변수 수용."""
+def test_all_adapters_support_rerank_toggle():
+    """등록된 모든 구체 어댑터가 rerank 매트릭스 변수 수용 (iter_vector 포함)."""
     for name in ADAPTER_REGISTRY:
         for rerank in (True, False):
             a = get_adapter(name, rerank=rerank)
             assert a.rerank is rerank
             assert a.label() == f"{name}_fast_rerank{int(rerank)}"
+
+
+def test_iter_vector_adapter_registered():
+    """iter_vector(에이전트/반복검색 baseline) 등록 + 라벨. DEFAULT_ADAPTERS 엔 미포함."""
+    assert "iter_vector" in ADAPTER_REGISTRY
+    a = get_adapter("iter_vector", rerank=True)
+    assert a.name == "iter_vector"
+    assert a.label() == "iter_vector_fast_rerank1"
+    assert a.max_rounds >= 2          # 다회 라운드
+    assert "iter_vector" not in DEFAULT_ADAPTERS   # 표준 매트릭스 8셀 불변
 
 
 # ── 셀 enumerator ─────────────────────────────────────────────────
