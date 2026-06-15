@@ -6,7 +6,7 @@
 >
 > **갱신 주기**: PR 마지막 단계에서 항목 추가·이동·완료. `make audit-dod` 가 자동 반영하는 항목은 (자동) 라벨.
 >
-> **버전**: v1.2 (2026-06-05, eval matrix 실측 + 신규 런타임 버그 anchor — S-4/PG-2/E-1/E-3 결과 반영 + A-7/A-8/A-9 추가). **89 항목 / 15 카테고리 / P0+/P0/P1/P2/P3 트래픽라이트** (v1.1 86 항목 → +3 신규 / S-4 측정 완료 — thesis 반증 신호).
+> **버전**: v1.3 (2026-06-15, S-7 thesis 결판 — graph-reasoning 3계층 fix 후 **thesis H1(a) CONFIRMED** [hybrid EM 0.710 > vector 0.048 = +66.2%p, graph-유래 multi-hop gold 62]). **90 항목 / 15 카테고리 / P0+/P0/P1/P2/P3 트래픽라이트** (v1.2 89 항목 → +S-7 완료). 이전 "thesis 반증 신호" 는 측정타당성 결함[doc-RAG gold + agent 3계층 갭]으로 규명·해소.
 
 ---
 

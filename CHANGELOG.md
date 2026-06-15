@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-06-15 — v3.2: thesis 결판 CONFIRMED — store-aware hybrid > vector multi-hop (PR #102–#108)
+
+**핵심**: 구 doc-RAG gold 의 "vector ≫ hybrid 반증" 은 **측정타당성 결함**(2-hop 1/30 + agent
+graph-reasoning 3계층 갭)으로 규명. graph-유래 진짜 multi-hop gold + 3계층 fix 후 재측정에서
+**thesis H1(a) CONFIRMED**: hybrid EM **0.710** > vector 0.048 = **+66.2%p** (목표 +30%p 2배 초과).
+
+- **재판정 인프라** (PR #102/#103): graph-answerability audit(`scripts/audit/graph_answerability.py`)
+  + graph-유래 multi-hop gold 생성(`scripts/gold/gen_graph_multihop_gold.py` → `gold_qa_graph_multihop_v0.jsonl`
+  62문항, `gold_cypher` deterministic 답 + non-vector-triviality 필터). 사전등록 §7 프로토콜.
+- **S-7 ① (PR #105)** [DoD §10.7]: triage Neo4j 엔티티 폴백(`lookup_company_node`/`lookup_person`,
+  PG 실패 시만) + LLM-planner `target_persons`+`$from` 바인딩 surface(gold-tailored 룰 無) →
+  GMI(person→회사→자회사) EM 0.65. 재측정 +37.1%p, 단 GMH/AUTO 0.0.
+- **S-7 ②③ (PR #107)** [DoD §10.7]: ②a triage 선두 longest-match 로 corp_code 없는 자회사
+  노드명(다중 단어 포함) `target_company_names` surface → `list_parents(name)→get_executives($from)`.
+  ②b auto 제조사 Neo4j exact 식별 + 신규 일반 도구 `list_recalled_models_by_manufacturer`
+  (Manufacturer→Model→Recall) + rule planner 결정적 분기. ③ validator `language_non_korean`
+  오탐 수정 — `check_korean(ignore_terms=)` 로 데이터 유래 고유명(외래 차종명) 제외 후 *서술* 의
+  한국어 비율 측정(외래명 다수 답변의 파괴적 replan 방지). → 전 패턴 해소 GMH 0.824·AUTO 1.000·
+  GMI 0.625, 405 가드 무회귀.
+- **docs (PR #104/#106/#108 + 본 정리)**: thesis SSOT §1 CONFIRMED, README §0·§10.7·DoD #7,
+  BACKLOG S-7 ✅, learning_guide·gold_qa_guide 정합. 정직한 한계 명시: gold graph-유래
+  (non-vector-triviality 필터 적용)·단일 도메인셋 n=62·AUTO 5 소표본 → 외부 타당성은 후속 과제.
+
+---
+
 ## 2026-06-11 — v3.1: thesis 측정 정립 + hybrid 검색 보강 + 그래프/gold 데이터 정비 (PR #44–#72)
 
 도메인 문서 정합(코드 SSOT)부터 thesis 실측·hybrid 개선까지. 핵심: **store-aware hybrid 가
