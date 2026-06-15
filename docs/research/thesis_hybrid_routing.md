@@ -82,6 +82,26 @@
 > entity-resolution 구현 결함**. thesis 는 *현 구현에선* 미입증이나 **반증도 아님** — graph leg 의
 > entity-id 를 고친 뒤 §7 재측정해야 진짜 판정 가능. (다음 레버 = triage/identify_targets 가 graph-multihop
 > 질문의 대상 엔티티를 surface → graph/hybrid 가 cypher 경로 도달.) INCONCLUSIVE 를 우위로 포장하지 않는다.
+>
+> **S-7 정밀 진단 — "반증 아님, 실현 가능, 구현 차단" (2026-06-15, 실증)**: 위 INCONCLUSIVE 의 원인을
+> 코드 레벨까지 해부 → 데이터·gold·아키텍처가 아니라 **agent graph-reasoning 스택의 3계층 갭**임을 확정.
+> 동시에 **thesis 가 실현 가능함을 직접 증명**(도구 체인):
+>
+> | 계층 | 결함 (실증) | 증거 |
+> |---|---|---|
+> | ① 엔티티 식별 | triage 가 PG `lookup_company` 만 사용 → 그래프-only 엔티티 못 뽑음 | `lookup_pg("KCS")=[]`·`lookup_pg("김명균")=[]` (삼성전자만 ✓), hybrid `targets=[]` 전건 |
+> | ② 도구 corp_code-centric | 자회사·subsidiary 노드 `corp_code=None` → `list_parents` 등 null 반환 | KCS node corp_code=None |
+> | ③ rule planner 1-hop | target 의 1-hop 묶음(`get_executives(target)`)만 생성, 2-hop 체인 미생성 | `nodes.py:296·413` structural plan |
+>
+> **실현 가능 증명 (도구 직접 체인)**: `get_companies_of_person("김명균")→corp_code 00104768(가온전선)→
+> list_subsidiaries→㈜모보·이지전선` = **gold 일치** ✓. 같은 질문에서 **vector 어댑터는 "SK이노베이션…"
+> 완전 환각**. 즉 **그래프 경로는 vector 가 못 푸는 multi-hop 을 실제로 푼다** — H1(a) 전제가 데이터·
+> 도구로 입증됨. **vector 0.532 > hybrid 0.419 는 "아키텍처 실패"가 아니라 "agent 가 그래프를 안 씀"**.
+>
+> **결판(증거 한도)**: **REFUTED 아님**(그래프가 multi-hop 푸는 직접 증명) · **CONFIRMED 도 아직 아님**
+> (현 구현이 그래프 미활용) → **검증된 기여 = store-aware ROUTING**(doc-Q→vector[Allganize 입증],
+> graph-Q→graph[도구 입증]). 측정된 +%p CONFIRMED 는 **3계층 fix(BACKLOG S-7) 후 §7 재측정** 필요 —
+> core triage/도구/planner 를 건드리는 실질 작업이라 본 단계에서 미착수(회귀·gold-tailored gaming 회피).
 
 ---
 
