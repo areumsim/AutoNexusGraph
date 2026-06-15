@@ -195,3 +195,28 @@ def test_check_korean_short_text_skipped():
     """측정 문자 수 부족 시 보류 (ok=True)."""
     ok, _ = check_korean("ABC")
     assert ok
+
+
+def test_check_korean_ignores_grounded_entity_names():
+    """S-7 ② — 데이터 유래 외래 고유명(차종명) 다수 나열은 오탐 안 함.
+
+    같은 답변이 ignore_terms 없으면 fail(영어 비율 높음), tool 결과의 모델명을
+    제외하면 *서술* 이 한국어라 pass — '고유명사 허용' 원칙 구현 검증."""
+    ans = ("FORD가 제조한 차종 중 리콜 대상이 된 모델명은 다음과 같습니다: "
+           "Bronco, F-150, F-250, F-350, Transit Connect, Explorer, Escape, "
+           "Mustang, Maverick, Ranger, Edge, Expedition, Fusion, Ecosport.")
+    ok_no, _ = check_korean(ans)
+    assert not ok_no   # 고유명 미제외 → 영어 과다로 fail
+    terms = ["Bronco", "F-150", "F-250", "F-350", "Transit Connect", "Explorer",
+             "Escape", "Mustang", "Maverick", "Ranger", "Edge", "Expedition",
+             "Fusion", "Ecosport"]
+    ok_yes, _ = check_korean(ans, ignore_terms=terms)
+    assert ok_yes      # 데이터 유래 고유명 제외 → 서술은 한국어 → pass
+
+
+def test_check_korean_english_prose_still_fails_with_ignore_terms():
+    """ignore_terms 가 있어도 *서술* 자체가 영어면 여전히 fail — 가드 우회 방지."""
+    ans = ("The recalled models manufactured by FORD include the following "
+           "vehicles with serious safety defects reported to NHTSA.")
+    ok, _ = check_korean(ans, ignore_terms=["FORD", "NHTSA"])
+    assert not ok

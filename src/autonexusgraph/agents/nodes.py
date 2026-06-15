@@ -198,35 +198,57 @@ def triage_node(state: AgentState) -> AgentState:
     if not targets:
         from ..tools.graph import lookup_company_node, lookup_person
         persons: list[str] = []
-        for word in q.split()[:6]:
-            # 말미 dual-josa 괄호('김명균이(가)' → '김명균이') 제거 후 조사 제거.
-            # 회사명의 '(주)'·'㈜' 는 말미가 아니므로 보존.
-            cand = word
+        company_names: list[str] = []
+        words = q.split()
+
+        def _strip_tail(c: str) -> str:
+            """말미 dual-josa 괄호('…이(가)' → '…이') 제거 후 조사 제거.
+            회사명의 '(주)'·'㈜' 는 말미가 아니므로 보존."""
             for _suf in ("(가)", "(이)", "(을)", "(를)", "(은)", "(는)", "(와)", "(과)"):
-                if cand.endswith(_suf):
-                    cand = cand[:-len(_suf)]
-                    break
-            cand = _strip_josa(cand)
+                if c.endswith(_suf):
+                    return _strip_josa(c[:-len(_suf)])
+            return _strip_josa(c)
+
+        # ① 선두 longest-match (GMH 다중 단어 회사명 'ISU Petasys Corp' 대응) —
+        # 출발 엔티티는 질문 subject(선두). 선두 n-gram(길이 6→1)을 exact 노드명에
+        # 사전 longest-match. exact 매치만 채택 → 'A의 모회사' 같은 span 은 노드 부재로
+        # 자연 탈락(안전 가드). corp_code 있으면 targets, 없으면(자회사) name surface.
+        for length in range(min(6, len(words)), 0, -1):
+            cand = _strip_tail(" ".join(words[:length]))
             if len(cand) < 2 or cand in _ENTITY_STOPWORDS:
                 continue
             try:
                 cnodes = lookup_company_node(cand, limit=1)
             except Exception:   # noqa: BLE001 — Neo4j 회사 lookup 실패 흡수
                 cnodes = []
-            cc = str((cnodes[0].get("corp_code") if cnodes else "") or "")
             nm0 = (cnodes[0].get("name") if cnodes else "") or ""
-            if cc and (cand in nm0 or nm0 in cand):     # 노드명-후보 일치 가드
+            cc = str((cnodes[0].get("corp_code") if cnodes else "") or "")
+            if nm0 != cand:                     # exact 노드명 매치만(longest-match)
+                continue
+            if cc:
                 targets.append(cc)
-                break
-            try:
-                pnodes = lookup_person(cand, limit=2)
-            except Exception:   # noqa: BLE001 — Neo4j 인물 lookup 실패 흡수
-                pnodes = []
-            if len(pnodes) == 1 and pnodes[0].get("name") == cand:
-                persons.append(cand)
-                break
+            else:                               # corp_code 없는 자회사 노드 → name-key
+                company_names.append(nm0)
+            break
+
+        # ② 선두에서 회사 미식별이면 per-word 인물 스캔 (GMI '김명균이…' 대응) —
+        # 비모호(정확 1명·완전일치)만, 공통어 오매치 회피.
+        if not targets and not company_names:
+            for word in words[:6]:
+                cand = _strip_tail(word)
+                if len(cand) < 2 or cand in _ENTITY_STOPWORDS:
+                    continue
+                try:
+                    pnodes = lookup_person(cand, limit=2)
+                except Exception:   # noqa: BLE001 — Neo4j 인물 lookup 실패 흡수
+                    pnodes = []
+                if len(pnodes) == 1 and pnodes[0].get("name") == cand:
+                    persons.append(cand)
+                    break
         if persons:
             state["target_persons"] = persons
+        if company_names:
+            state["target_company_names"] = company_names
 
     state["target_companies"] = targets
 
@@ -390,7 +412,9 @@ def planner_node(state: AgentState) -> AgentState:
         from .llm_planner import try_llm_plan
         llm_tasks = try_llm_plan(state, kind=kind, targets=targets,
                                  year_hint=year_hint, q=q, replan_hint=replan_hint,
-                                 persons=state.get("target_persons") or [])
+                                 persons=state.get("target_persons") or [],
+                                 company_names=state.get("target_company_names") or [],
+                                 makes=state.get("target_makes") or [])
         if llm_tasks:
             state["tasks"] = llm_tasks
             state["plan"] = [

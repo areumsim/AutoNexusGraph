@@ -222,6 +222,35 @@ AUTO_TEMPLATES: dict[str, dict] = {
         },
     },
 
+    # 제조사 노드 식별 (이름 exact / 대소문자 무시) — triage make 식별 보조.
+    "auto_lookup_manufacturer": {
+        "cypher": """
+        MATCH (mm:Anxg_Manufacturer)
+        WHERE mm.name = $name OR toUpper(mm.name) = toUpper($name)
+        RETURN mm.id AS manufacturer_id, mm.name AS name
+        ORDER BY mm.name
+        LIMIT $limit
+        """,
+        "required_params": ["name", "limit"],
+        "param_schema": {"name": (str, None), "limit": _LIMIT_500},
+    },
+
+    # 제조사 → 제조 차종 중 리콜 대상 모델명 (S-7 ② GMR 2-hop:
+    # Manufacturer-[:MANUFACTURES]->VehicleModel-[:AFFECTED_BY]->Recall).
+    # gold_qa_graph_multihop_v0 의 GMR 패턴과 동일 경로(model-direct AFFECTED_BY).
+    "auto_recalled_models_by_manufacturer": {
+        "cypher": """
+        MATCH (mm:Anxg_Manufacturer)-[:MANUFACTURES]->(v:Anxg_VehicleModel)
+              -[:AFFECTED_BY]->(:Anxg_Recall)
+        WHERE mm.name = $make OR toUpper(mm.name) = toUpper($make)
+        RETURN DISTINCT v.name AS model_name
+        ORDER BY v.name
+        LIMIT $limit
+        """,
+        "required_params": ["make", "limit"],
+        "param_schema": {"make": (str, None), "limit": _LIMIT_500},
+    },
+
     "auto_recalls_for_component": {        # Module 또는 Part 에 영향을 준 리콜
         "cypher": """
         MATCH (rc:Anxg_Recall)-[rel:RECALL_OF]->(c)

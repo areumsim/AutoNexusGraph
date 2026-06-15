@@ -130,7 +130,9 @@ def _validate_tasks(state: AgentState, raw_tasks: list, catalog: dict[str, list[
 def try_llm_plan(state: AgentState, *, kind: str, targets: list,
                  year_hint: int | None, q: str,
                  replan_hint: dict | None = None,
-                 persons: list | None = None) -> list[dict] | None:
+                 persons: list | None = None,
+                 company_names: list | None = None,
+                 makes: list | None = None) -> list[dict] | None:
     """LLM 으로 task DAG 제안 → 검증된 tasks 또는 None(폴백).
 
     None 반환 조건: 비활성·budget 초과·LLM 실패·빈/전부무효·topological 위반.
@@ -144,6 +146,8 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
     catalog = _tool_catalog(state)
     targets_line = ", ".join(map(str, targets)) if targets else "(미식별)"
     persons_line = ", ".join(map(str, persons)) if persons else "(없음)"
+    company_names_line = ", ".join(map(str, company_names)) if company_names else "(없음)"
+    makes_line = ", ".join(map(str, makes)) if makes else "(없음)"
     hint_line = ""
     if replan_hint:
         issues = (replan_hint.get("prev_issues") or [])[:3]
@@ -166,6 +170,13 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
         f"[대상 인물(이름)] {persons_line} — 인물 출발 질문이면 graph `get_companies_of_person`"
         f"(name=인물) 으로 소속 회사를 먼저 구하고, 후속 graph 도구의 corp_code 인자는"
         f" `{{\"$from\":\"<해당 task id>\",\"field\":\"corp_code\"}}` 바인딩으로 연결하라.\n"
+        f"[대상 회사명(corp_code 미상)] {company_names_line} — corp_code 가 없는 출발 회사"
+        f"(자회사 등)다. '…의 모회사' 질문이면 graph `list_parents`"
+        f"(child_corp_code_or_name=회사명) 으로 모회사를 먼저 구하고, 후속 graph 도구"
+        f"(`get_executives` 등)의 corp_code 인자는 `{{\"$from\":\"<list_parents task id>\","
+        f"\"field\":\"parent_corp_code\"}}` 바인딩으로 연결하라.\n"
+        f"[대상 제조사] {makes_line} — '…가 제조한 차종 중 리콜' 류 질문이면 graph "
+        f"`list_recalled_models_by_manufacturer`(make_name=제조사) 한 번으로 리콜된 차종명을 구하라.\n"
         f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
         f"[허용 도구]\n"
         f"{_enum_line('research')}\n"
