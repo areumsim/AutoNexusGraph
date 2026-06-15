@@ -41,6 +41,15 @@ _KO_JOSA: tuple[str, ...] = (
 # 공통명사('자회사'·'반도체')가 회사명 일부와 substring(40) 으로 오매치되는 것을 거른다.
 _COMPANY_MIN_SCORE = 60
 
+# S-7 ① Neo4j 폴백 — graph-multihop 질문의 구조어(엔티티 아님). 대형 그래프에서 흔한
+# 단어가 노드명에 오매치되는 것을 차단. 선두-엔티티 휴리스틱과 병행.
+_ENTITY_STOPWORDS = frozenset({
+    "모회사", "모기업", "자회사", "계열사", "관계회사", "회사", "기업",
+    "임원", "등기임원", "대주주", "주요주주", "최대주주", "사람", "이름",
+    "제조", "차종", "모델", "리콜", "재직", "누구", "무엇", "모두", "답하라",
+    "대상", "중에", "그중", "각각",
+})
+
 
 def _strip_josa(word: str) -> str:
     """어절 끝 조사 1개 제거. 어간이 2자 미만이 되면 원형 유지(과다 절단 방지)."""
@@ -174,11 +183,50 @@ def triage_node(state: AgentState) -> AgentState:
 
     # 세션 entity carry-over — 이번 turn 에 회사가 식별 안 되고 multi-turn 이면
     # 이전 세션의 target_companies/persons 를 borrow (PRD §7.6.2).
+    # (Neo4j 폴백보다 우선 — 멀티턴 기억이 새 추측보다 신뢰됨.)
     prev = session.get(thread_id) if thread_id else None
     if not targets and prev and prev.target_companies:
         targets = list(prev.target_companies)
         state["session_carryover"] = True
         log.info("[triage] carry-over targets from session: %s", targets)
+
+    # Neo4j 폴백 (S-7 ①) — PG·carry-over 모두 회사를 못 찾았을 때만 발동(회귀 가드:
+    # 기존 통과 질문은 PG/carry-over 로 이미 식별되어 본 분기 미진입). graph-multihop
+    # 질문("KCS의 모회사…", "김명균이…")의 출발 엔티티(자회사/인물)를 그래프에서 식별.
+    # 보수화: 선두부(질문 subject) + 구조어 stopword + 회사는 노드명-후보 일치 + corp_code
+    # 보유 시만, 인물은 비모호(정확 1명·완전일치)만 — 공통어 오매치 회피.
+    if not targets:
+        from ..tools.graph import lookup_company_node, lookup_person
+        persons: list[str] = []
+        for word in q.split()[:6]:
+            # 말미 dual-josa 괄호('김명균이(가)' → '김명균이') 제거 후 조사 제거.
+            # 회사명의 '(주)'·'㈜' 는 말미가 아니므로 보존.
+            cand = word
+            for _suf in ("(가)", "(이)", "(을)", "(를)", "(은)", "(는)", "(와)", "(과)"):
+                if cand.endswith(_suf):
+                    cand = cand[:-len(_suf)]
+                    break
+            cand = _strip_josa(cand)
+            if len(cand) < 2 or cand in _ENTITY_STOPWORDS:
+                continue
+            try:
+                cnodes = lookup_company_node(cand, limit=1)
+            except Exception:   # noqa: BLE001 — Neo4j 회사 lookup 실패 흡수
+                cnodes = []
+            cc = str((cnodes[0].get("corp_code") if cnodes else "") or "")
+            nm0 = (cnodes[0].get("name") if cnodes else "") or ""
+            if cc and (cand in nm0 or nm0 in cand):     # 노드명-후보 일치 가드
+                targets.append(cc)
+                break
+            try:
+                pnodes = lookup_person(cand, limit=2)
+            except Exception:   # noqa: BLE001 — Neo4j 인물 lookup 실패 흡수
+                pnodes = []
+            if len(pnodes) == 1 and pnodes[0].get("name") == cand:
+                persons.append(cand)
+                break
+        if persons:
+            state["target_persons"] = persons
 
     state["target_companies"] = targets
 
@@ -341,7 +389,8 @@ def planner_node(state: AgentState) -> AgentState:
     if _llm_planner_enabled(state):
         from .llm_planner import try_llm_plan
         llm_tasks = try_llm_plan(state, kind=kind, targets=targets,
-                                 year_hint=year_hint, q=q, replan_hint=replan_hint)
+                                 year_hint=year_hint, q=q, replan_hint=replan_hint,
+                                 persons=state.get("target_persons") or [])
         if llm_tasks:
             state["tasks"] = llm_tasks
             state["plan"] = [
