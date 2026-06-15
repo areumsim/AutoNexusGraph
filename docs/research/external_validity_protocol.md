@@ -58,8 +58,25 @@ V3(read-only $0) → V1(~$0.3) → V2(~$0.2) → V4(~$0.3). 총 ~$1.
 - 단발 vector(top_k=8) 의 **정답-엔티티 검색 recall = 5.8%** (GMH 7/17 부분·10/17 부재, GMI
   39/40 부재, AUTO 3/5 검색). 즉 답변 문서가 store 엔 있으나 **단발 semantic 검색이 multi-hop
   답변 문서를 구조적으로 못 찾음** — 이것이 graph 우위의 기전.
-- **판정: T4 기각** (데이터 부재 아님 = 공정). **caveat**: 비교 대상이 *단발* vector — 에이전트/
-  반복 검색(query 확장) vector ceiling 은 미측정(향후 baseline).
+- **판정: T4 기각** (데이터 부재 아님 = 공정).
+
+### V6 — iterative(agentic) vector ceiling (V3 caveat 해소, T4 강화)
+단발 vector 대신 **반복검색 vector**(`IterVectorAdapter`, PR #111): graph/SQL 없이 LLM 이 검색
+결과를 보고 후속 sub-query 생성(Self-Ask/IRCoT, 평균 2.1 라운드). "vector 가 할 수 있는 최선".
+
+| subset | single-V | **iter-V** | hybrid | H−iterV |
+|---|---|---|---|---|
+| GMH | 0.000 | **0.000** | 0.824 | +82.4pp |
+| GMI | 0.000 | **0.000** | 0.625 | +62.5pp |
+| AUTO | 0.000 | 0.600 | 1.000 | +40.0pp |
+| **ALL** | 0.000 | **0.048** | 0.710 | **+66.1pp** |
+| (novel sibling) | 0.500 | **0.833** | 0.750 | −8.3pp |
+
+- **판정: T4 강하게 기각** — GMH/GMI(공시 표에 묻힌 비검색성 관계)에서 **iter-vector = single-vector
+  = 0.000**: 다회 검색·질의 재구성도 무효 → **그래프의 명시적 관계는 반복검색으로 대체 불가**.
+- **경계(정직)**: 답이 co-located·중간 hop 검색가능이면 iter-vector 가 따라잡거나 역전 — AUTO 0.600
+  (single 0.000), novel sibling **0.833 > hybrid 0.750**. → **정밀화된 thesis**: hybrid 우위는 관계가
+  **non-local AND 비검색성**일 때 결정적(+62~82pp), 검색가능 prose 면 iter-vector 가 ceiling 도달.
 
 ### V1 — paraphrase 견고성 (T2)
 | subset | orig hybrid EM | para hybrid | para vector | hybrid−vector |
@@ -89,16 +106,17 @@ V3(read-only $0) → V1(~$0.3) → V2(~$0.2) → V4(~$0.3). 총 ~$1.
 
 | 위협 | 검증 | 결과 | 판정 |
 |---|---|---|---|
-| T4 데이터 가용성 | V3 | 출처 store 존재, vector recall 5.8% | ✅ 기각 (단발 vector 한정) |
+| T4 데이터 가용성 | V3 + **V6 iter-vector** | 출처 store 존재; **반복검색 ceiling 도 GMH/GMI 0.000** | ✅ 강하게 기각 |
 | T2 템플릿 artifact | V1 paraphrase | +59.7pp | ✅ 기각 (AUTO n=5 제외) |
 | T3 EM 포맷 편향 | V2 judge | +55.0pp | ✅ 기각 (동일 family caveat) |
 | T1 graph-circularity | V4 신규 구조 | +25.0pp | 🟡 부분 기각 |
-| T5 소표본·도메인 | V1/V4 | finance 견고, AUTO 약함 | 🟡 부분 |
+| T5 소표본·도메인 | V1/V4/V6 | finance 견고, AUTO 약함 | 🟡 부분 |
 
-**결론**: thesis +66.2pp 는 **주요 측정 artifact(paraphrase·EM 포맷·데이터 가용성)에 견고**하고
-**신규 구조로 일반화**된다. 우위의 **크기는 답의 non-locality 에 비례**(gold 의존) — 순수 multi-hop
-+60~76pp. **정직한 잔여 한계**: (a) AUTO recall 약함·소표본(n=5, vector co-locate), (b) 완전한 T1
-기각엔 human/document-first gold 필요(신규 템플릿만으론 부분), (c) 단발 vector 만 비교(에이전트
-vector ceiling 미측정), (d) 단일 family judge. → **store-aware hybrid 의 multi-hop 우위는 외부
-타당성 검증을 (한계 명시 하에) 통과**.
+**결론**: thesis +66.2pp 는 **주요 측정 artifact(paraphrase·EM 포맷·데이터 가용성)에 견고**하고,
+**반복검색 vector ceiling 으로도 GMH/GMI 에서 격차 불변(+62~82pp)** — 우위는 "검색량" 이 아니라
+**그래프의 명시적·비검색성 관계**에서 온다. **정밀화된 thesis**: hybrid 우위는 관계가 **non-local
+AND 비검색성**일 때 결정적, **검색가능 prose(co-located answer + retrievable intermediate)면
+iter-vector 가 ceiling 도달/역전**(AUTO 0.600·sibling 0.833). **정직한 잔여 한계**: (a) AUTO recall
+약함·소표본(n=5), (b) 완전한 T1 기각엔 human/document-first gold 필요, (c) 단일 family judge. →
+**store-aware hybrid 의 multi-hop 우위는 외부 타당성 검증을 (한계 명시 하에) 통과**.
 
