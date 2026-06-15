@@ -25,9 +25,14 @@
 
 > **▶ 현재 결론 (2026-06-15, SSOT): H1(a) CONFIRMED.** graph-유래 진짜 multi-hop gold(62문항)에서
 > S-7 ①②③ fix 후 **hybrid EM 0.710 vs vector 0.048 = +66.2%p**(목표 +30%p 2배 초과). 전 패턴 해소
-> (GMH 0.824 · AUTO 1.000 · GMI 0.625). 상세 측정·한계는 아래 ★/★★ 블록. 외부 타당성(타 도메인·규모)은
-> 후속 과제 — 아래 "정직한 한계" 참조. (이전 2026-06-10 "반증" 신호는 측정타당성 결함[doc-RAG gold 의
-> 2-hop 1/30 + agent 3계층 갭]으로 규명·해소됨.)
+> (GMH 0.824 · AUTO 1.000 · GMI 0.625). 상세 측정·한계는 아래 ★/★★ 블록. (이전 2026-06-10 "반증" 신호는
+> 측정타당성 결함[doc-RAG gold 의 2-hop 1/30 + agent 3계층 갭]으로 규명·해소됨.)
+>
+> **외부 타당성 검증 통과 (한계 명시 하)** — 사전등록 [external_validity_protocol.md](./external_validity_protocol.md)
+> (SHA `2f0cc1f`): V1 paraphrase 견고성 **+59.7pp**(T2 기각) · V2 judge 재채점 **+55.0pp**(T3 기각) ·
+> V3 vector-fairness(출처 store 존재, 단발 vector recall 5.8% — T4 기각) · V4 신규 구조(sibling 자회사)
+> **+25.0pp**(T1 부분 기각). 우위 크기는 **답의 non-locality 에 비례**. 잔여 한계: AUTO 약함·소표본,
+> 완전한 T1(human/document-first gold)·에이전트 vector ceiling·다-family judge 는 후속.
 
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
 > BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =

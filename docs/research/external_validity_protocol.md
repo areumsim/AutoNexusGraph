@@ -51,6 +51,54 @@ graph-multihop 생성기로 n 확대 + variance/CI 보고. (V1/V4 와 병행)
 
 V3(read-only $0) → V1(~$0.3) → V2(~$0.2) → V4(~$0.3). 총 ~$1.
 
-## 4. 결과
+## 4. 결과 (2026-06-15, pre-reg SHA `2f0cc1f`)
 
-(측정 후 기재 — 각 V 의 판정 + 종합 외부 타당성 verdict)
+### V3 — vector-fairness 감사 (T4)
+- 출처 문서 **store 에 존재**: `anxg_vec.chunks` 778K (dart 747K + nhtsa/kotsa recall + …).
+- 단발 vector(top_k=8) 의 **정답-엔티티 검색 recall = 5.8%** (GMH 7/17 부분·10/17 부재, GMI
+  39/40 부재, AUTO 3/5 검색). 즉 답변 문서가 store 엔 있으나 **단발 semantic 검색이 multi-hop
+  답변 문서를 구조적으로 못 찾음** — 이것이 graph 우위의 기전.
+- **판정: T4 기각** (데이터 부재 아님 = 공정). **caveat**: 비교 대상이 *단발* vector — 에이전트/
+  반복 검색(query 확장) vector ceiling 은 미측정(향후 baseline).
+
+### V1 — paraphrase 견고성 (T2)
+| subset | orig hybrid EM | para hybrid | para vector | hybrid−vector |
+|---|---|---|---|---|
+| GMH | 0.824 | 0.824 | 0.059 | **+76.5pp** |
+| GMI | 0.625 | 0.625 | 0.000 | **+62.5pp** |
+| AUTO | 1.000 | 0.800 | 1.000 | −20.0pp |
+| **ALL** | 0.710 | 0.694 | 0.097 | **+59.7pp** |
+- **판정: T2 기각** (ALL +59.7pp ≥ +30pp — 템플릿 표면형 제거 후에도 견고). **단 AUTO(n=5) 역전**:
+  recall 문서가 제조사+모델을 co-locate → vector 도 답 가능. AUTO 는 약한·소표본 패턴(정직 기재).
+
+### V2 — judge 재채점 (T3)
+- judge correctness(의미 일치, EM 아님): hybrid 0.581 vs vector **0.031** = **+55.0pp**
+  (GMH +64.9 · AUTO +62.0 · GMI +50.0). vector 는 의미적으로도 거의 다 틀림.
+- **판정: T3 기각** (EM 포맷 편향 아님). **caveat**: judge=gpt-4o / candidate=gpt-4o-mini 동일 family.
+
+### V4 — provenance-independent gold / 신규 구조 (T1)
+- 원 3 템플릿(GMH/GMI/AUTO)에 **없던 신규 구조** = sibling 자회사(X→모회사→다른 자회사) 12문항,
+  다양한 모회사(BNK·JB·LG·녹십자·메리츠 등), DB 검증 정답.
+- hybrid EM 0.750 vs vector 0.500 = **+25.0pp** (hits 동률 0.750).
+- **판정: T1 부분 기각** (신규 구조로 일반화 — 우위 유지). 단 **+15~30pp 구간**: sibling 구조는
+  모회사 공시가 자회사를 한 문서에 co-locate → 부분 vector-친화(non-vector-triviality 필터 미적용).
+  **일관된 기전**: graph 우위는 답의 **non-locality 에 비례** — 순수 비국소(GMH/GMI) +60~76pp,
+  부분 co-located(sibling) +25pp. **완전한 T1 기각**(human/document-first gold)은 잔여.
+
+### 종합 외부 타당성 verdict
+
+| 위협 | 검증 | 결과 | 판정 |
+|---|---|---|---|
+| T4 데이터 가용성 | V3 | 출처 store 존재, vector recall 5.8% | ✅ 기각 (단발 vector 한정) |
+| T2 템플릿 artifact | V1 paraphrase | +59.7pp | ✅ 기각 (AUTO n=5 제외) |
+| T3 EM 포맷 편향 | V2 judge | +55.0pp | ✅ 기각 (동일 family caveat) |
+| T1 graph-circularity | V4 신규 구조 | +25.0pp | 🟡 부분 기각 |
+| T5 소표본·도메인 | V1/V4 | finance 견고, AUTO 약함 | 🟡 부분 |
+
+**결론**: thesis +66.2pp 는 **주요 측정 artifact(paraphrase·EM 포맷·데이터 가용성)에 견고**하고
+**신규 구조로 일반화**된다. 우위의 **크기는 답의 non-locality 에 비례**(gold 의존) — 순수 multi-hop
++60~76pp. **정직한 잔여 한계**: (a) AUTO recall 약함·소표본(n=5, vector co-locate), (b) 완전한 T1
+기각엔 human/document-first gold 필요(신규 템플릿만으론 부분), (c) 단발 vector 만 비교(에이전트
+vector ceiling 미측정), (d) 단일 family judge. → **store-aware hybrid 의 multi-hop 우위는 외부
+타당성 검증을 (한계 명시 하에) 통과**.
+
