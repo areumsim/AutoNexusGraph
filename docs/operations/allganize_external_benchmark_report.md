@@ -138,8 +138,11 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 | 어댑터 | n | F1 | EM | faith | latency(avg/p95) | cost | conf_avg |
 |---|---|---|---|---|---|---|---|
 | **vector** | 60 | **0.467** | 0.033 | 0.631 | 2.36s / 3.92s | $0.43 | 0.357 |
-| **hybrid** | 60 | **0.352** | 0.017 | 0.000 | 2.30s / 4.52s | $0.45 | 0.486 |
+| **hybrid** | 60 | **0.352** | 0.017 | 0.000→**0.430** | 2.30s / 4.52s | $0.45 | 0.486 |
 
+- **hybrid faith 0.000 은 구조적 미산정이었음 → 해소(§4.2 #6)**: hybrid 어댑터가 citation 에 `evidence_text` 를
+  채우지 않아 faithfulness 가 항상 0. 검색 풀 `evidence_chunks`(id→text)에서 매핑하도록 수정 → **0.430**(실값).
+  (VLM 차트 코퍼스 적용 후 hybrid F1 도 0.352→0.381 동반 상승.)
 - latency 도메인 내 목표(<8s) **100% 충족**(vector·hybrid 모두). refusal/false_refusal = 0.
 - **F1 분포(vector)**: min 0.08 · p25 0.29 · **median 0.48** · p75 0.60 · max 1.00 — 중앙값이 평균(0.467)보다
   높아, 소수의 저득점(주가 수치·포맷 불일치)이 평균을 끌어내림.
@@ -170,8 +173,8 @@ documents.csv   → 원문 10 PDF 위치(랜딩페이지 url)
 - **hybrid agent 경로 source 필터**: 0.120→0.282 (2.3배). `run_agent(source=)`→`search_documents(source=)`.
 - **vector > hybrid 일관**: 회사·그래프 없는 단일 문서 질문엔 multi-hop agent 라우팅이 과잉 — 단순 vector
   retrieval 이 적합(thesis 의 store-aware routing 주장과 정합: 문서-RAG 질문은 vector 라우팅이 정답).
-  hybrid `faith 0.000` 은 agent citation 경로가 외부 코퍼스에 `evidence_text` 를 채우지 않아 **구조적 점수 미산정**
-  (정답 부재 의미 아님 — F1 0.352 가 실제 답변 품질).
+  hybrid `faith 0.000` 은 agent citation 경로가 `evidence_text` 미충전이라 구조적 미산정이었음 → **§4.2 #6 에서
+  수정**(검색 풀에서 매핑)해 **faith 0.430** 측정. F1 0.352(→VLM 후 0.381)가 실제 답변 품질.
 
 ## 3.6. eval 실측 — 정성 평가
 
@@ -313,6 +316,7 @@ KOSPI 성과표·테마 막대그래프). 해당 차트 페이지를 Claude visi
 | ~~메인 코퍼스 희석~~ | ✅ **해소(#84·#86)** — `source='allganize'` 필터를 vector·hybrid 양 경로에 부여. |
 | ~~F1 과소평가 미보정~~ | ✅ **해소(2026-06-12)** — LLM-judge(Claude Sonnet) 병기. vector correctness **0.575** (§3.7). |
 | ~~차트/그래프 수치 미복원~~ | ✅ **해소(2026-06-12)** — Claude vision 차트 추출. 006·010 judge 0.0→1.0, 차트9 correctness 0.367→**0.889**, 전체 **0.711** (§3.8). |
+| ~~hybrid faithfulness 구조적 미산정~~ | ✅ **해소(2026-06-15)** — hybrid 어댑터 `evidence_text` 매핑. faith **0.000→0.430** (§3.5.1 / §4.2 #6). |
 
 ### 4.2 남은 한계 → 개선 과제 (우선순위順)
 
@@ -323,7 +327,7 @@ KOSPI 성과표·테마 막대그래프). 해당 차트 페이지를 Claude visi
 | 3 | ~~**F1 지표 과소평가**~~ → ✅ **해소(§3.7)** — LLM-judge 병기, vector correctness 0.575 | (잔여) judge 관대편향 교정 위해 다중 judge 합의·rubric 정교화 | 측정 신뢰도 |
 | 4 | **표 복원 부분적** — 이미지 스캔표는 OCR 행/열 휴리스틱, 복잡 병합셀은 한계 | `pdfplumber` 외 이미지 표 구조 인식(table transformer) 도입 | 표 질문 robust |
 | 5 | **표본·도메인** — finance 60문항 단일 도메인 | 외부 큐레이터 30% 목표(현 26.7%) 완성: auto/cross/ip 도메인 외부 벤치 흡수 | self-bias 추가 완화 |
-| 6 | **hybrid 점수 구조적 한계** — agent citation 경로가 외부 코퍼스 `evidence_text` 미충전(faith 0) | hybrid 어댑터가 외부 source 검색 결과의 본문을 citation 에 채우도록 보강 | hybrid faithfulness 측정 가능화 |
+| 6 | ~~**hybrid 점수 구조적 한계**~~ → ✅ **해소** — hybrid 어댑터가 `evidence_chunks`(id→text)에서 `evidence_text` 매핑 → **faith 0.000→0.430** 측정 | — | hybrid faithfulness 측정 가능화(달성) |
 
 > **핵심 보완 우선순위**: ③LLM-judge(§3.7)·①차트수치 VLM(§3.8) 완료로 correctness **0.575→0.711**(리더보드 대 진입).
 > ②OCR 후처리 교정은 검증 결과 **무효과(§3.9)** → 미채택. 잔여는 ④표 구조인식·⑤도메인 확대(auto/cross/ip)가
