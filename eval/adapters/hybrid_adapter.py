@@ -53,6 +53,10 @@ class HybridAdapter(AgentAdapter):
                 latency_sec=time.monotonic() - t0,
             )
 
+        # citations 는 본문 text 를 담지 않으므로(nodes.py:854), 검색 풀
+        # evidence_chunks(id→{text,source})에서 매핑해 evidence_text 를 채운다.
+        # 이게 없으면 faithfulness(answer∩evidence 토큰)가 항상 0.000 으로 측정됨.
+        ev_by_id = {ch.get("id"): ch for ch in (state.get("evidence_chunks") or [])}
         evidence = [
             Evidence(
                 rank=i + 1, chunk_id=c.get("chunk_id", 0),
@@ -60,8 +64,8 @@ class HybridAdapter(AgentAdapter):
                 rcept_no=c.get("rcept_no", "") or "",
                 section=c.get("section", "") or "",
                 fiscal_year=c.get("fiscal_year"),
-                source="",
-                evidence_text="",
+                source=(ev_by_id.get(c.get("chunk_id"), {}).get("source") or ""),
+                evidence_text=(ev_by_id.get(c.get("chunk_id"), {}).get("text") or "")[:600],
                 score=float(c.get("score") or 0.0),
             )
             for i, c in enumerate(state.get("citations") or [])
