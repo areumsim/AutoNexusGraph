@@ -1,6 +1,6 @@
 # AutoNexusGraph — README + PRD 통합 SSOT v3.0
 
-> **자동차/제조 (auto + BoP 공정) + 한국 상장사 재무·지배구조 (finance) 를 그래프·정형·벡터 하이브리드로 추론하고, `anxg_bridge.corp_entity` + `anxg_ip.assignee_corp_map` 로 특허(ip 보조축) 까지 한 turn 안에 묶는 산업·기업 인텔리전스 그래프.** 벡터 단독 RAG 가 풀지 못하는 **멀티홉 / Cross-Domain / 시점 포함 공급망 / BoM ⟂ BoP 직교 추론** 을 **Neo4j (관계) + PostgreSQL (수치·메타) + pgvector (의미)** 하이브리드 + **LangGraph multi-agent (StateGraph 11 노드)** 로 해결한다. LLM Provider 는 ENV 한 줄로 OpenAI / Anthropic / Google / 로컬 교체.
+> **자동차/제조 (auto + BoP 공정) + 한국 상장사 재무·지배구조 (finance) 를 그래프·정형·벡터 하이브리드로 추론하고, `anxg_bridge.corp_entity` + `anxg_ip.assignee_corp_map` 로 특허(ip 보조축) 까지 한 turn 안에 묶는 산업·기업 인텔리전스 그래프.** 벡터 단독 RAG 가 풀지 못하는 **멀티홉 / Cross-Domain / 시점 포함 공급망 / BoM ⟂ BoP 직교 추론** 을 **Neo4j (관계) + PostgreSQL (수치·메타) + pgvector (의미)** 하이브리드 + **LangGraph multi-agent (StateGraph 11 노드)** 로 추론하는 것을 **목표(제안)** 로 한다. ⚠️ 단일 store 대비 hybrid 의 multi-hop 우위는 **1차 실측 반증 신호 → 미입증** (graph-유래 진짜 multi-hop gold 로 재판정 진행 중 — SSOT = [docs/research/thesis_hybrid_routing.md](./docs/research/thesis_hybrid_routing.md) §1·§7). LLM Provider 는 ENV 한 줄로 OpenAI / Anthropic / Google / 로컬 교체.
 
 **본 문서 = 단일 SSOT (v3.0, 2026-06-02).** README(소개·현황·Quickstart) + PRD(요구사항·DoD·로드맵·의사결정 로그) 가 하나로 통합됨 — 두 문서 간 버전·DoD 항수·수치 drift 영구 해소. 도메인 상세 설계는 분리 SSOT 위임: 자동차 [docs/autograph.md](./docs/autograph.md) · **제조 공정(BoP) [docs/process_graph.md](./docs/process_graph.md)** · 특허(보조) [docs/ipgraph.md](./docs/ipgraph.md).
 
