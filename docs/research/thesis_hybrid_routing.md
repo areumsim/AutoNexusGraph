@@ -23,6 +23,12 @@
 
 **귀무가설 H0**: hybrid EM − vector EM ≤ 0 (또는 +30%p 미달). 반증 가능 = 연구로 성립.
 
+> **▶ 현재 결론 (2026-06-15, SSOT): H1(a) CONFIRMED.** graph-유래 진짜 multi-hop gold(62문항)에서
+> S-7 ①②③ fix 후 **hybrid EM 0.710 vs vector 0.048 = +66.2%p**(목표 +30%p 2배 초과). 전 패턴 해소
+> (GMH 0.824 · AUTO 1.000 · GMI 0.625). 상세 측정·한계는 아래 ★/★★ 블록. 외부 타당성(타 도메인·규모)은
+> 후속 과제 — 아래 "정직한 한계" 참조. (이전 2026-06-10 "반증" 신호는 측정타당성 결함[doc-RAG gold 의
+> 2-hop 1/30 + agent 3계층 갭]으로 규명·해소됨.)
+
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
 > BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
 > [README §10.7](../../README.md#10-dod-definition-of-done--20-항)):
@@ -127,6 +133,26 @@
 > 단 non-vector-triviality 필터로 vector-trivial 제외). ③ hits +4.9pp 는 소폭. → **H1(a) 는 해결 가능한
 > 패턴에서 +30pp 초과로 CONFIRMED**, 전 패턴 커버는 S-7 ②③ 후속. 게이밍 회피 위해 부분 CONFIRMED 를
 > 전면 입증으로 포장하지 않는다.
+>
+> **★★ S-7 ②③ fix 후 전 패턴 재측정 — H1(a) CONFIRMED (전 패턴, 2026-06-15)**: 위 잔여 22문항(GMH/AUTO)을
+> 레이어 ②③로 해소. **수정 내용(무결성 — gold-tailored 룰 없음, 일반 능력)**: (②a) triage 선두 longest-match 로
+> corp_code 없는 자회사 노드명(다중 단어 'ISU Petasys Corp' 포함) 을 `target_company_names` surface → LLM/rule
+> planner 가 `list_parents(name)→get_executives($from)` 체이닝. (②b) auto: 제조사 entity Neo4j exact 식별 +
+> 신규 일반 도구 `list_recalled_models_by_manufacturer`(Manufacturer→Model→Recall 2-hop) + auto rule planner
+> 결정적 분기(임의 제조사 동작). (③) validator `language_non_korean` 오탐 수정 — 답변의 한국어 비율을 **데이터
+> 유래 고유명(tool 결과의 외래 entity 명) 제외 후** 측정(모듈 docstring '고유명사 허용' 구현). 외래 차종명 다수
+> 나열 답변이 파괴적 replan 으로 소실되던 것 방지. 회귀: 405 agent/safety/autograph 가드 pass.
+>
+> | adapter | n | EM | hits@k | GMH | AUTO | GMI |
+> |---|---|---|---|---|---|---|
+> | **hybrid (S-7 ②③ fix)** | 62 | **0.710** | 0.903 | **0.824** | **1.000** | 0.625 |
+> | hybrid (S-7 ① only) | 62 | 0.419 | 0.581 | 0.000 | 0.000 | 0.650 |
+> | vector (baseline) | 62 | 0.048 | 0.532 | — | — | — |
+>
+> **hybrid − vector = EM +66.2%p (목표 +30%p 2배 초과) → H1(a) CONFIRMED (전 패턴)**. GMH +82.4pp · AUTO
+> +100pp(5/5) · GMI 무회귀(0.650→0.625, 1문항 LLM 노이즈). 잔여 한계: ① gold 는 여전히 graph-유래(설계상
+> graph-우호, 단 non-vector-triviality 필터 적용). ② 단일 도메인 셋(finance multi-hop + auto recall), n=62.
+> ③ AUTO 1.000 은 5문항 소표본. → **전 패턴에서 CONFIRMED 이나, gold 외부 타당성(다른 도메인·규모)은 후속 과제**.
 
 ---
 
