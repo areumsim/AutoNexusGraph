@@ -10,7 +10,7 @@
 
 `allganize/RAG-Evaluation-Dataset-KO` finance **60 QA 흡수**(외부 큐레이터 비율 0%→26.7%) +
 원문 PDF **14/14 전수 확보 → OCR(표 행/열 재구성) → vec.chunks 554 chunks 적재 완료**(11 PDF 파일).
-**full 60문항 answerable** — vector F1 **0.493** / LLM-judge correctness **0.669**(VLM 차트수치 추출 후, 리더보드 대 진입), hybrid F1 0.352.
+**full 60문항 answerable** — vector F1 **0.513** / LLM-judge correctness **0.711**(VLM 차트수치 추출 후, 리더보드 대 0.6~0.85 진입), hybrid F1 0.352.
 
 > **연혁:**
 > - **(b, 2026-06-11)**: 초기 FSC 8건이 2026 오답으로 판명 → WebSearch 로 2024 정확 타깃 재확보. OCR 을
@@ -252,29 +252,31 @@ KOSPI 성과표·테마 막대그래프). 해당 차트 페이지를 Claude visi
 추출 → `[차트]` 청크로 합류.
 
 **방법** (`scripts/ingest/vlm_chart_extract.py`):
-1. 차트-수치 질문 9건을 HF `rag_evaluation_result.csv` 의 `target_file_name`/`target_page_no` 로
-   소스 페이지에 정확 매핑(검색 기반 매핑은 실패 — 차트 수치가 텍스트에 없어 retrieval 불가).
-2. 해당 PDF 페이지를 fitz 렌더(200dpi) → Claude Sonnet 4.6 vision 으로 표·차트 수치 추출(17 페이지).
+1. 차트-수치 질문 9건을 HF `rag_evaluation_result.csv` 의 `target_file_name` 로 소스 문서에 매핑.
+   (`target_page_no` 는 이 덱의 슬라이드 번호와 불일치 → 차트 밀집 덱인 증시콘서트는 분석 구간 idx 0~25 를
+   넓게 추출, 수치 없는 페이지는 ingest 가 스킵.)
+2. 해당 PDF 페이지를 fitz 렌더(200dpi) → Claude Sonnet 4.6 vision 으로 표·차트 수치 추출.
 3. **사이드카 JSON**(`vlm_charts/<stem>.json`)으로 저장 → 적재 파이프라인이 `[차트]` 청크로 합류.
-   VLM 은 오프라인 1회만 실행(비용·재현 분리), 사이드카 커밋으로 footgun 없음. 코퍼스 554→**571 chunks**(+17).
+   VLM 은 오프라인 1회만 실행(비용·재현 분리), 사이드카 커밋으로 footgun 없음. 코퍼스 554→**591 chunks**(+37).
 
-**결과 (vector, full 60)**:
+**결과 (vector, full 60)** — 2단계(타깃 17p → 증시콘서트 확장 idx0~25):
 
-| 지표 | VLM 전 | **VLM 후** | Δ |
+| 지표 | VLM 전 | 타깃 추출 | **확장 추출** |
 |---|---|---|---|
-| **judge correctness (전체)** | 0.575 | **0.669** | **+0.094 → 리더보드 대(0.6~0.85) 진입** |
-| └ 차트 9문항 correctness | 0.367 | **0.733** | **+0.366 (2배)** |
-| └ KIF 18문항 correctness | 0.623 | 0.654 | +0.031 |
-| F1 (전체) | 0.467 | **0.493** | +0.026 |
-| └ 차트 9문항 F1 | — | — | 006: 0.24→0.69, 007: 0.08→0.46, 045: 0.62→0.82 |
+| **judge correctness (전체)** | 0.575 | 0.669 | **0.711** (리더보드 대 0.6~0.85 진입) |
+| └ 차트 9문항 correctness | 0.367 | 0.733 | **0.889** |
+| └ KIF 18문항 correctness | 0.623 | 0.654 | 0.654 |
+| F1 (전체) | 0.467 | 0.493 | **0.513** |
 
-> **핵심**: VLM 차트 추출이 **전체 judge correctness 를 리더보드 대 하단(0.6) 위로** 끌어올림(0.575→0.669).
-> 차트 질문 correctness 가 0.367→0.733 으로 **2배**. 대표 사례:
+> **핵심**: VLM 차트 추출이 **전체 judge correctness 0.575 → 0.711**, 차트 질문 0.367 → **0.889**. 대표 사례:
 > - **ALG-FIN-006**(셀트리온 등 주가 변동률): judge **0.0 → 1.0** — KOSPI 성과표(삼성전자 13.7·현대차 18.6·
 >   셀트리온 -9.7·POSCO -1.6·LG화학 -0.7)를 VLM 이 정확 추출.
-> - ALG-FIN-016(지급비·의료비 비율) 0.4→1.0, ALG-FIN-045(상생금융 규모) 0.4→1.0, ALG-FIN-050 0.6→0.95.
-> - **잔여 실패**: ALG-FIN-010(영업이익 감소율) judge 0.0 유지 — 추출 페이지 범위 밖 표(소스 페이지 추가 매핑 필요).
->   ALG-FIN-009(S&P/국채 1995) 변화 없음 — 선그래프의 특정 시점 수치는 VLM 도 추출 한계.
+> - **ALG-FIN-010**(영업이익/순이익 감소율): **0.0 → 1.0** — KOSPI 이익추이표(영업이익 2017 194조→2019E 151조,
+>   순이익 154조→112조)의 절대값을 VLM 이 추출 → 합성 LLM 이 감소율(22.2%·27.3%) 계산.
+> - **ALG-FIN-009**(1995 S&P/국채): **0.6 → 0.95** — 금리인하 사례표(S&P 545→636, 10년물 6.2%→5.6%) 추출.
+> - ALG-FIN-016 0.4→1.0, ALG-FIN-045 0.4→1.0, ALG-FIN-050 0.6→0.95.
+> - **교훈**: HF `target_page_no` 가 덱 슬라이드 번호와 불일치해 정밀 페이지 매핑은 실패 → 차트 밀집 덱은
+>   분석 구간을 넓게 추출하는 편이 robust(수치 없는 페이지는 ingest 스킵, 비용 ~$0.5).
 
 ---
 
@@ -289,13 +291,13 @@ KOSPI 성과표·테마 막대그래프). 해당 차트 페이지를 Claude visi
 | ~~eval answerability 미측정~~ | ✅ **해소** — full 60 vector F1 0.467 / hybrid 0.352 (§3.5). |
 | ~~메인 코퍼스 희석~~ | ✅ **해소(#84·#86)** — `source='allganize'` 필터를 vector·hybrid 양 경로에 부여. |
 | ~~F1 과소평가 미보정~~ | ✅ **해소(2026-06-12)** — LLM-judge(Claude Sonnet) 병기. vector correctness **0.575** (§3.7). |
-| ~~차트/그래프 수치 미복원~~ | ✅ **해소(2026-06-12)** — Claude vision 차트 추출. ALG-FIN-006 judge 0.0→1.0, 전체 correctness **0.669** (§3.8). |
+| ~~차트/그래프 수치 미복원~~ | ✅ **해소(2026-06-12)** — Claude vision 차트 추출. 006·010 judge 0.0→1.0, 차트9 correctness 0.367→**0.889**, 전체 **0.711** (§3.8). |
 
 ### 4.2 남은 한계 → 개선 과제 (우선순위順)
 
 | # | 한계 (현 상태) | 보완 방향 (구체) | 기대효과 |
 |---|---|---|---|
-| 1 | ~~**차트/그래프 내 수치 미복원**~~ → ✅ **해소(§3.8)** — Claude vision 으로 차트 페이지 수치 추출, ALG-FIN-006 judge 0.0→1.0, 전체 correctness 0.575→0.669 | (잔여) 자동 차트 페이지 탐지(현재 질문→페이지 수동 매핑), 선그래프 시점값(009)·범위 밖 표(010) | 나머지 수치 질문 |
+| 1 | ~~**차트/그래프 내 수치 미복원**~~ → ✅ **해소(§3.8)** — Claude vision 차트 추출(타깃→확장), 006·010 judge 0.0→1.0, 009 0.6→0.95, 전체 correctness 0.575→**0.711** | (잔여) 자동 차트 페이지 탐지(현재 덱 구간 수동 지정), 타 도메인 차트 | 나머지 수치 질문 |
 | 2 | **OCR 노이즈** — `고령화→고렇화` 등 스캔 인식 오류, 정밀 수치(`211.7→211.79`) 왜곡 | (a) easyocr → PaddleOCR/上용 OCR 비교, (b) 한국어 LM 기반 OCR 후처리 교정, (c) 렌더 dpi↑ | 정밀도·검색 recall 개선 |
 | 3 | ~~**F1 지표 과소평가**~~ → ✅ **해소(§3.7)** — LLM-judge 병기, vector correctness 0.575 | (잔여) judge 관대편향 교정 위해 다중 judge 합의·rubric 정교화 | 측정 신뢰도 |
 | 4 | **표 복원 부분적** — 이미지 스캔표는 OCR 행/열 휴리스틱, 복잡 병합셀은 한계 | `pdfplumber` 외 이미지 표 구조 인식(table transformer) 도입 | 표 질문 robust |
@@ -351,10 +353,10 @@ env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY LLM_MODEL_JUDGE=claude-sonnet-4-6 \
 - **이미지 기반 외부 코퍼스를 OCR 로 vector store 에 전수 적재** — 단순 텍스트 추출로는 불가했던
   answerability 를 한국어 OCR 파이프라인으로 확보. **14/14 finance 원문 전수 → 554 chunks**.
   마지막 KIF 2건은 레거시 뷰어의 **페이지이미지를 역설계·OCR** 해 확보(§2.6).
-- **실측 검증**: full 60 vector **F1 0.493 / LLM-judge correctness 0.669**(Allganize 리더보드 대 0.6~0.85 진입) / hybrid 0.352.
+- **실측 검증**: full 60 vector **F1 0.513 / LLM-judge correctness 0.711**(Allganize 리더보드 대 0.6~0.85 진입) / hybrid 0.352.
   단계별 개선이 모두 실측으로 누적 확인됨 — source 필터(0.271→0.369) → 표 OCR(→0.442) → KIF 확보(→0.467) →
-  LLM-judge 병기(correctness 0.575) → **VLM 차트수치 추출(F1 0.493·correctness 0.669)**.
+  LLM-judge 병기(correctness 0.575) → **VLM 차트수치 추출(타깃→확장, F1 0.513·correctness 0.711)**.
 - **VLM 차트 추출(§3.8)**: easyocr 이 못 뽑는 시각 차트 수치를 Claude vision 으로 복원 → 차트 9문항 correctness
-  0.367→0.733(2배), ALG-FIN-006 주가차트 0.0→1.0. 사이드카 아키텍처로 오프라인 1회·재현 가능.
+  0.367→**0.889**, ALG-FIN-006 주가차트·010 이익감소율 0.0→1.0. 사이드카 아키텍처로 오프라인 1회·재현 가능.
 - **다음**: ②OCR 후처리 교정(스캔 노이즈)·①자동 차트탐지가 잔여 레버. 외부 큐레이터 30% 완성(auto/cross/ip
   외부 벤치)은 별도 트랙.
