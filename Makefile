@@ -669,6 +669,16 @@ audit-eval-matrix-full:
 	# 산출 JSON 의 thesis(hybrid−vector) + planner_ablation(LLM−룰) 두 headline 확인.
 	PYTHONPATH=src:. $(PYTHON) scripts/audit/eval_matrix_smoke.py --full
 
+audit-graph-answerability:
+	# thesis 재판정 선결 게이트 — Neo4j 가 진짜 multi-hop 질문에 답할 수 있는지(경로 실재)
+	# 패턴별 instantiation 수로 판정. data-blocked(희소) vs answerable 분리. read-only.
+	PYTHONPATH=src:. $(PYTHON) scripts/audit/graph_answerability.py
+
+gen-graph-multihop-gold:
+	# thesis 재판정용 진짜 multi-hop gold 생성 (Pillar B) — answerable 패턴 traverse →
+	# 결정적 정답(gold_cypher) + non-vector-triviality 필터. 임베딩 서버(8080) 필요.
+	PYTHONPATH=src:. $(PYTHON) scripts/gold/gen_graph_multihop_gold.py
+
 audit-mcp:
 	# PRD §10 DoD #17 (a) — MCP 래퍼 wire-up.
 	# mcp SDK 미설치 시 SKIPPED + tool discovery 78건 검증 (finance 21 + auto 38 + ip 19).
