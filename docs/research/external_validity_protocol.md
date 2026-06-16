@@ -161,6 +161,15 @@ all_empty=False → vector fallback 미발동했음(`_has_usable_result` = done+
   (57문항)가 여전히 주축. 도메인 일반화(타 산업·대규모 gold)는 잔여. 단 **graph+numeric multi-store
   우위는 명확히 실증**(vector 0.000 vs hybrid 0.786).
 
+#### AUTO non-local 패턴 추가 (PR #119, `gold_qa_auto_defect_v0.jsonl` 4문항)
+기존 AUTO(GMR '제조사 리콜 차종')는 NHTSA 문서가 제조사+모델 co-locate → vector 도 답(V1 paraphrase
+시 vector 1.000 역전). 진짜 **non-local** 패턴 추가: Manufacturer→Model→Recall→**DefectType**(4-hop).
+DefectType 은 derived 분류 노드 → vector 정답 recall **0/N**(검증), 진짜 multi-hop. 신규 도구
+`list_defect_types_by_manufacturer`(결함 키워드 게이트).
+- **judge correctness: hybrid 0.375 vs vector 0.050 = +32.5pp** (EM 부적합 — DefectType 이 cryptic
+  영문 ID `adas_sensor_misalignment...` 인데 synthesizer 가 한국어 번역 → EM 표면불일치. 도구는 정확
+  retrieve). → **AUTO 도 non-local multi-hop 존재하고 hybrid 우위**, 기존 co-located GMR 약점 보완.
+
 ### 종합 외부 타당성 verdict
 
 | 위협 | 검증 | 결과 | 판정 |
