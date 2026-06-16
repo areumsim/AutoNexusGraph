@@ -46,9 +46,21 @@
 > vector 원천 불가, multi-store 우위의 가장 직접적 실증. **단 게이트 단서(중요)**: 이 +78.6pp 는 해당 질문
 > 형태(`person_revenue_rank`) 전용 `compare_companies` 랭킹-키워드 게이트가 켜졌을 때만 나온다 — **게이트
 > 없는 기본 hybrid 는 cross-store 에서 0.062 < vector 0.125**(`eval/reports/cross_store`), 게이트를 전
-> 질문에 노출하면 main −24pp 회귀. 즉 패턴-특이적 planner 힌트에 의존하는 좁고 깨지기 쉬운 win 이며,
-> 일반 라우팅으로의 흡수는 잔여 과제. thesis 는 정확한 scope 하에 CONFIRMED, 경계도
-> 측정·수정까지 기록. 잔여: 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
+> 질문에 노출하면 main −24pp 회귀. 즉 패턴-특이적 planner 힌트에 의존하는 좁고 깨지기 쉬운 win 이었다.
+> **▶ 게이트 일반화 측정·해소 (2026-06-16, T-G1/T-G2 CONFIRMED)**: flat 최상급 키워드 게이트를
+> **구조적 2-신호 감지**(비교·서열 구조 ∧ 수치 metric, `policy.detect_cross_store_ranking`)로 교체 +
+> gated 힌트 강화. 사전등록 [external_validity_protocol.md](./external_validity_protocol.md) §V8.
+> 키워드 게이트의 브리틀성을 패러프레이즈 견고성 셋(랭킹 14문항을 '1위/순위/큰 순/더 많은' 등 리터럴
+> 키워드 회피 표현으로 변환, `gold_qa_cross_store_paraphrase_v0.jsonl`)으로 실증: **keyword 게이트는
+> 리터럴 0.357 → 패러프레이즈 0.000 으로 완전 붕괴**(EM-contains, n=14). **structural 게이트는
+> 패러프레이즈를 0.500 으로 회복**(+50.0pp, baseline≥) — **T-G1(재현율 +30pp) 통과**. **T-G2(비회귀)**:
+> structural × main-multihop 62 = **EM 0.726 ≥ keyword 0.710**, 게이트는 main 62 문항에 **0/62 발화**
+> (정밀도 = metric 토큰 요구). default 를 keyword→structural 플립(`ANXG_RANK_GATE`). **단 honest scope**:
+> 절대 EM 은 소표본(n=14)·drift 로 baseline 자체가 0.357(과거 0.750 아님)이고, 잔여 실패는 LLM-planner
+> 의 패러프레이즈 민감(`fallback_used` 체인 미생성)·데이터 아티팩트(매출=1 shell) — 완전 결정화(rule-plan)는
+> 잔여. 즉 **게이트(라우팅 결정)는 일반화 실증, 다운스트림 LLM planner/synth 견고화는 후속**.
+> thesis 는 정확한 scope 하에 CONFIRMED, 경계도 측정·수정까지 기록. 잔여: cross-store 다운스트림 결정화
+> (rule-plan + synth max/min 명시), 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
 
 ---
 

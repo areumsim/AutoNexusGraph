@@ -162,7 +162,39 @@ all_empty=False → vector fallback 미발동했음(`_has_usable_result` = done+
   우위는 명확히 실증**(vector 0.000 vs hybrid 0.786). **게이트 의존 단서(중요)**: 이 win 은 `compare_companies`
   랭킹-키워드 게이트가 켜졌을 때만 — **게이트 OFF 기본 hybrid 는 cross-store 0.062 < vector 0.125**
   (`eval/reports/cross_store` 대 `eval/reports/cross_gated`). 즉 패턴-특이적 planner 힌트에 의존하는 좁고
-  깨지기 쉬운 win 이며, 일반 라우팅 흡수 전까지 헤드라인은 이 단서와 함께 인용해야 한다.
+  깨지기 쉬운 win 이었다 → **V8 에서 게이트 일반화로 해소**.
+
+### V8 — cross-store 게이트 일반화 (V5 단서 해소, 사전등록 T-G1/T-G2)
+
+**문제(V5 단서)**: cross-store win 이 flat 최상급 키워드 게이트(`"가장 큰"`·`"최대"`…)에 의존 — 패러프레이즈
+(`"매출 1위"`·`"순위가 가장 높은"`·`"매출이 더 많은"`)엔 발화 안 돼 win 상실. **일반화 = 라우팅이 표면
+어휘가 아니라 구조에 반응하는가**.
+
+**수정**: flat 키워드 게이트 → **구조적 2-신호 감지**(`policy.detect_cross_store_ranking`):
+Signal A(비교·서열·최상급 구조: 최상급 ∪ 서수 `\d+위`/순위/상위/하위 ∪ 비교급 더·보다·큰 순) ∧
+Signal B(수치 metric 어휘 = `KW_FINANCIAL` 확장). **metric 요구가 정밀도를 지킨다**(비-수치 multi-hop 비발화).
++ gated 힌트 강화(임의 표현 → compare_companies 체인 강제). env `ANXG_RANK_GATE`(off/keyword/structural,
+default=structural). 측정 토글 재현 가능.
+
+**사전등록 셋**: `gold_qa_cross_store_paraphrase_v0.jsonl` — CDN 랭킹 14문항을 (i) gold_answer 보존
+(ii) 10개 리터럴 키워드 토큰 전부 회피 (iii) 자연 서수/비교급/순서 표현으로 결정적 변환(작성자 편향 차단).
+
+**사전등록 가설 + 결과**(hybrid_fast_rerank1_planner1, EM-contains, gpt-4o-mini, 강화 hint 동일조건):
+
+| 조건 | EM | n | |
+|---|---|---|---|
+| keyword × **리터럴** | **0.357** | 14 | 현 baseline win (과거 0.750 아님 — drift) |
+| keyword × **패러프레이즈** | **0.000** | 14 | 키워드 게이트 **완전 붕괴**(브리틀 실증) |
+| structural × **패러프레이즈** | **0.500** | 14 | 일반화 **회복**(baseline≥) |
+
+- **T-G1(재현율, 사전등록 ≥ +30pp)**: structural − keyword(패러프레이즈) = **+50.0pp ✅ 기각**(브리틀 가설).
+- **T-G2(정밀도/비회귀, structural ≥ keyword − 5pp)**: structural × **main-multihop 62 = EM 0.726 ≥ keyword
+  0.710 ✅**. 게이트는 main 62 에 **0/62 발화**(구조적 guard `test_main62_gold_zero_false_fire`) → 힌트 미노출 →
+  회귀 불가. default keyword→structural 플립.
+- **honest scope**: 절대 EM 은 소표본(n=14)·model/data drift 로 baseline 자체가 0.357. 잔여 실패는 LLM-planner
+  패러프레이즈 민감(`fallback_used` 체인 미생성)·데이터 아티팩트(매출=1 shell co.). **게이트(라우팅 결정)는
+  일반화 실증, 다운스트림 결정화(rule-plan + synth max/min 명시)는 후속**. 리포트: `eval/reports/{cs_para_*,
+  cs_literal_keyword_v2,main62_structural}`.
 
 ### 종합 외부 타당성 verdict
 
@@ -172,7 +204,7 @@ all_empty=False → vector fallback 미발동했음(`_has_usable_result` = done+
 | T2 템플릿 artifact | V1 paraphrase | +59.7pp | ✅ 기각 (AUTO n=5 제외) |
 | T3 EM 포맷 편향 | V2 judge | +55.0pp | ✅ 기각 (동일 family caveat) |
 | T1 graph-circularity | V4 신규 구조 +25pp · V7 document-first −15.4pp **→ fallback fix 후 +15.4pp(PR #114)** | 모델·비-모델 관계 **모두 hybrid ≥ vector** | ✅ **기각(수정 후)** |
-| T5 소표본·도메인 | V1/V4/V6/V7 + **V5 cross-store** | **graph+numeric multi-store hybrid +78.6pp**(vector 0.000); 단 cross-domain 데이터 sparse | 🟡 부분(multi-store 우위 실증, 도메인 일반화 잔여) |
+| T5 소표본·도메인 | V1/V4/V6/V7 + **V5 cross-store** + **V8 게이트 일반화** | **graph+numeric multi-store hybrid +78.6pp**(vector 0.000); **게이트 brittleness 해소**(keyword 패러프레이즈 0.000 → structural +50.0pp, main 0/62 비회귀); 단 cross-domain 데이터 sparse | 🟡 부분(multi-store 우위 + 라우팅 일반화 실증, 다운스트림 결정화·도메인 일반화 잔여) |
 
 **결론(정밀화)**: store-aware hybrid 의 multi-hop 우위는 **질문이 모델링된 graph 관계(SUBSIDIARY_OF·
 EXECUTIVE_OF·MAJOR_SHAREHOLDER_OF)의 non-local·비검색성 체인으로 환원될 때 가장 큼**(+62~82pp,
