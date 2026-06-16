@@ -139,7 +139,7 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
     """
     if not q:
         return None
-    from .policy import turn_budget_exceeded
+    from .policy import is_cross_store_ranking, turn_budget_exceeded
     if turn_budget_exceeded(state):
         return None
 
@@ -147,11 +147,12 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
     targets_line = ", ".join(map(str, targets)) if targets else "(미식별)"
     persons_line = ", ".join(map(str, persons)) if persons else "(없음)"
     # 수치 랭킹 힌트는 랭킹 질문에만 노출 — 비-랭킹 질문(GMH/GMI 등)에 길게 실으면
-    # planner 가 compare_companies 로 오라우팅돼 회귀(main 62 −24pp 관측). 키워드 게이트.
+    # planner 가 compare_companies 로 오라우팅돼 회귀(main 62 −24pp 관측). 게이트 필수.
+    # 게이트 판정은 `policy.is_cross_store_ranking` 으로 위임 — env `ANXG_RANK_GATE`
+    # (off|keyword|structural) 모드 디스패치. structural = 비교·서열 구조 ∧ 수치 metric
+    # 으로 패러프레이즈("매출 1위"·"순위가 가장 높은")까지 일반화(thesis §1 잔여 과제).
     _q_rank = q or ""
-    _is_ranking = any(k in _q_rank for k in (
-        "가장 큰", "가장 작은", "가장 높은", "가장 낮은", "최대", "최소",
-        "가장 많은", "가장 적은", "최고", "최저"))
+    _is_ranking = is_cross_store_ranking(q)
     # 관계기업·공동기업(지분법 피투자, 5~50%) 질문 — RELATED_TO. 자회사(SUBSIDIARY_OF)와 구분.
     _is_related = any(k in _q_rank for k in (
         "관계기업", "공동기업", "피투자", "지분법", "유의적인 영향력", "공동지배"))
@@ -190,13 +191,17 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
             "회사를 묻는 질문이다. graph `list_related_companies`(corp_code=대상회사) 로 구하라 — "
             "`list_subsidiaries`(자회사=50%+)와 구분된다.\n") if _is_related else "")
         + ((
-            "[수치 랭킹 — graph+SQL cross-store] 여러 회사를 수치로 비교·랭킹하는 질문이다. "
-            "① 먼저 graph 로 후보 회사들을 구하고(예: `get_companies_of_person`·`list_subsidiaries`) "
+            "[수치 랭킹 — graph+SQL cross-store] 여러 회사를 수치로 비교·랭킹하는 질문이다 — "
+            "표현이 '가장 큰/작은' 이든 '1위/순위/상위/하위' 든 '큰 순/작은 순' 이든 '더 많은/더 적은' "
+            "이든 '최하위' 든 **모두 동일한 수치 랭킹**이다. **반드시 아래 2-task 체인을 생성하라 "
+            "— research/search_documents 단독으로 대체하면 오답이다.** "
+            "① 먼저 graph 로 후보 회사들을 구한다: 인물 출발이면 `get_companies_of_person`(name=인물), "
+            "모회사·그룹 출발이면 `list_subsidiaries`(parent_corp_code=대상). "
             "② sql `compare_companies` 한 번으로 `corp_codes` 인자에 "
             "`{\"$from\":\"<graph task id>\",\"field\":\"corp_code\",\"collect\":true}` "
             "(collect=true 로 후보 전체를 리스트 전달) + year + metric('revenue'|'operating_income') 을 "
             "넣어 전 회사 값을 한 번에 받아라 — get_revenue 를 회사마다 따로 만들지 말 것(fan-out 미지원). "
-            "calculator 도 만들지 말 것 — 최대/최소 선택은 합성 단계가 처리한다.\n"
+            "calculator 도 만들지 말 것 — 최대/최소 선택은 합성 단계가 질문 방향대로 처리한다.\n"
         ) if _is_ranking else "")
         + f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
         f"[허용 도구]\n"

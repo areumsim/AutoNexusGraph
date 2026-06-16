@@ -12,6 +12,7 @@ cost guard:
 
 from __future__ import annotations
 
+import os
 import re
 
 from .state import AgentState, QuestionKind
@@ -79,7 +80,72 @@ def select_tools(kind: QuestionKind) -> list[str]:
     return ["lookup_company", "search_documents"]
 
 
+# ── Cross-store 수치 랭킹 게이트 (V5 일반화) ──────────────────────────
+# 인물·자회사 등 graph 후보 → SQL `compare_companies` 수치 랭킹의 cross-store 라우팅.
+# 기존엔 flat 최상급 키워드(_RANK_KEYWORD_LEGACY)만으로 게이트해 패러프레이즈
+# ("매출 1위"·"순위가 가장 높은"·"매출이 더 많은")에 발화 안 돼 win 상실(thesis §1).
+# structural 모드 = 비교·서열·최상급 구조(Signal A) ∧ 수치 metric(Signal B) 의 곱.
+# metric 요구가 정밀도를 지킨다(비-수치 multi-hop 은 B 부재 → 비발화 → main 비회귀).
+
+# legacy 키워드 — keyword 모드에서 현 동작 보존용 (llm_planner 인라인 리스트와 동일).
+_RANK_KEYWORD_LEGACY = (
+    "가장 큰", "가장 작은", "가장 높은", "가장 낮은", "최대", "최소",
+    "가장 많은", "가장 적은", "최고", "최저",
+)
+
+# Signal A: 비교·서열·최상급 구조 (패러프레이즈 견고).
+_RANK_STRUCT_SUBSTR = (
+    "가장", "최대", "최소", "최고", "최저",                 # 최상급
+    "순위", "상위", "하위", "순으로",                       # 서열
+    "더 큰", "더 작은", "더 많은", "더 적은", "더 높은", "더 낮은",   # 비교급
+    "큰 순", "작은 순", "높은 순", "낮은 순", "많은 순", "적은 순",
+    "보다 큰", "보다 작은", "보다 많은", "보다 적은", "보다 높은", "보다 낮은",
+)
+_RANK_ORDINAL_RE = re.compile(r"\d+\s*위")   # "1위", "3 위"
+
+# Signal B: 수치 metric 어휘 (KW_FINANCIAL 확장).
+KW_NUMERIC_METRIC = KW_FINANCIAL + (
+    "당기순이익", "자본", "시가총액", "시총", "직원", "종업원", "고용",
+)
+
+
+def detect_cross_store_ranking(q: str) -> bool:
+    """구조적 cross-store 수치 랭킹 감지 — Signal A(비교·서열 구조) ∧ B(수치 metric).
+
+    flat 최상급 키워드보다 넓은 패러프레이즈(서수 'N위'·비교급 '더 많은'·'순위')를
+    포착하면서, metric 토큰 요구로 비-수치 multi-hop 질문의 오발화를 차단한다.
+    결정적·LLM 불요·지연 0. → `llm_planner` 가 sql `compare_companies` 힌트 노출 여부 결정.
+    """
+    s = q or ""
+    a = any(k in s for k in _RANK_STRUCT_SUBSTR) or bool(_RANK_ORDINAL_RE.search(s))
+    if not a:
+        return False
+    return any(m in s for m in KW_NUMERIC_METRIC)
+
+
+def rank_gate_mode() -> str:
+    """cross-store 랭킹 게이트 모드 — env `ANXG_RANK_GATE`.
+
+    "off"(힌트 비노출) / "keyword"(legacy flat 키워드) / "structural"(`detect_cross_store_ranking`).
+    **default=structural** — 측정으로 T-G1(패러프레이즈 재현율 +50.0pp)·T-G2(main 비회귀,
+    0/62 발화) 확인 후 keyword→structural 플립(thesis §1, 2026-06-16). 3-way 재현 측정용 토글.
+    """
+    mode = (os.getenv("ANXG_RANK_GATE") or "structural").strip().lower()
+    return mode if mode in ("off", "keyword", "structural") else "structural"
+
+
+def is_cross_store_ranking(q: str) -> bool:
+    """현재 게이트 모드에 따른 cross-store 랭킹 판정 — `llm_planner` 진입점."""
+    mode = rank_gate_mode()
+    if mode == "off":
+        return False
+    if mode == "structural":
+        return detect_cross_store_ranking(q)
+    return any(k in (q or "") for k in _RANK_KEYWORD_LEGACY)   # keyword (default)
+
+
 __all__ = [
     "classify_question", "turn_budget_remaining", "turn_budget_exceeded",
     "select_tools",
+    "detect_cross_store_ranking", "rank_gate_mode", "is_cross_store_ranking",
 ]
