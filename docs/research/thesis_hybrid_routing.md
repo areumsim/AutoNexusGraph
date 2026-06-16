@@ -30,9 +30,11 @@
 >
 > **외부 타당성 검증 통과 (한계 명시 하)** — 사전등록 [external_validity_protocol.md](./external_validity_protocol.md)
 > (SHA `2f0cc1f`): V1 paraphrase 견고성 **+59.7pp**(T2 기각) · V2 judge 재채점 **+55.0pp**(T3 기각) ·
-> V3 vector-fairness(출처 store 존재, 단발 vector recall 5.8% — T4 기각) · V4 신규 구조(sibling 자회사)
-> **+25.0pp**(T1 부분 기각). 우위 크기는 **답의 non-locality 에 비례**. 잔여 한계: AUTO 약함·소표본,
-> 완전한 T1(human/document-first gold)·에이전트 vector ceiling·다-family judge 는 후속.
+> V3+V6 vector-fairness/**iter-vector ceiling**(반복검색 vector 도 GMH/GMI **0.000** → hybrid +66.1pp,
+> T4 강하게 기각) · V4 신규 구조(sibling 자회사) **+25.0pp**(T1 부분 기각). **정밀화**: hybrid 우위는
+> 관계가 **non-local AND 비검색성**일 때 결정적(+62~82pp), 검색가능 co-located prose 면 iter-vector 가
+> ceiling 도달/역전(AUTO 0.600·sibling 0.833). 잔여 한계: AUTO 약함·소표본, 완전한 T1(human gold)·
+> 다-family judge 는 후속.
 
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
 > BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
