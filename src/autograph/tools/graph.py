@@ -70,6 +70,19 @@ def list_recalled_models_by_manufacturer(make_name: str = "", *,
     return _exec("auto_recalled_models_by_manufacturer", make=mk, limit=_cap(limit))
 
 
+def list_defect_types_by_manufacturer(make_name: str = "", *,
+                                      make: str | None = None,
+                                      limit: int = DEFAULT_LIMIT) -> list[dict]:
+    """제조사 차종 리콜의 결함유형 (4-hop non-local: Manufacturer→Model→Recall→DefectType).
+
+    DefectType 은 derived 분류 노드라 문서에 co-located 안 됨 → vector 원천 불가, 진짜
+    multi-hop. validated 엣지만. 결과는 ``defect_type`` 컬럼. ``make`` 는 별칭."""
+    mk = (make_name or make or "").strip()
+    if not mk:
+        return []
+    return _exec("auto_defect_types_by_manufacturer", make=mk, limit=_cap(limit))
+
+
 # ── 부품 ────────────────────────────────────────────────────
 def list_components(*,
                     model_id: int | None = None,

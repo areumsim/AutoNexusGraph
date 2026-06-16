@@ -155,6 +155,8 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
     # 관계기업·공동기업(지분법 피투자, 5~50%) 질문 — RELATED_TO. 자회사(SUBSIDIARY_OF)와 구분.
     _is_related = any(k in _q_rank for k in (
         "관계기업", "공동기업", "피투자", "지분법", "유의적인 영향력", "공동지배"))
+    # 제조사 리콜 결함유형(auto 4-hop non-local) — Manufacturer→Model→Recall→DefectType.
+    _is_defect = any(k in _q_rank for k in ("결함 유형", "결함유형", "결함 종류", "결함종류"))
     company_names_line = ", ".join(map(str, company_names)) if company_names else "(없음)"
     makes_line = ", ".join(map(str, makes)) if makes else "(없음)"
     hint_line = ""
@@ -186,6 +188,9 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
         f"\"field\":\"parent_corp_code\"}}` 바인딩으로 연결하라.\n"
         f"[대상 제조사] {makes_line} — '…가 제조한 차종 중 리콜' 류 질문이면 graph "
         f"`list_recalled_models_by_manufacturer`(make_name=제조사) 한 번으로 리콜된 차종명을 구하라.\n"
+        + (("[제조사 리콜 결함유형] '…제조사 차종 리콜의 결함 유형' 질문이면 graph "
+            "`list_defect_types_by_manufacturer`(make_name=제조사) 한 번으로 결함유형을 구하라.\n")
+           if _is_defect else "")
         + (("[관계기업·공동기업] '…의 관계기업/공동기업/피투자회사' 처럼 지분법 피투자(5~50%) "
             "회사를 묻는 질문이다. graph `list_related_companies`(corp_code=대상회사) 로 구하라 — "
             "`list_subsidiaries`(자회사=50%+)와 구분된다.\n") if _is_related else "")

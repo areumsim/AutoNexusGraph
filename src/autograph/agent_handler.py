@@ -43,6 +43,7 @@ AUTO_GRAPH_ALLOWED = {
     "lookup_vehicle_graph", "lookup_supplier", "lookup_manufacturer",
     "list_components", "list_systems_of_model", "list_models_with_system",
     "list_recalls_affecting", "list_recalled_models_by_manufacturer",
+    "list_defect_types_by_manufacturer",
     "list_investigations_affecting", "get_investigation_recall_chain",
     "get_suppliers_of_component", "get_vehicles_using_component",
     "find_vehicle_component_paths",
