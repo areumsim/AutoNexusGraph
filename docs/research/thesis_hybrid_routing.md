@@ -31,10 +31,13 @@
 > **외부 타당성 검증 통과 (한계 명시 하)** — 사전등록 [external_validity_protocol.md](./external_validity_protocol.md)
 > (SHA `2f0cc1f`): V1 paraphrase 견고성 **+59.7pp**(T2 기각) · V2 judge 재채점 **+55.0pp**(T3 기각) ·
 > V3+V6 vector-fairness/**iter-vector ceiling**(반복검색 vector 도 GMH/GMI **0.000** → hybrid +66.1pp,
-> T4 강하게 기각) · V4 신규 구조(sibling 자회사) **+25.0pp**(T1 부분 기각). **정밀화**: hybrid 우위는
-> 관계가 **non-local AND 비검색성**일 때 결정적(+62~82pp), 검색가능 co-located prose 면 iter-vector 가
-> ceiling 도달/역전(AUTO 0.600·sibling 0.833). 잔여 한계: AUTO 약함·소표본, 완전한 T1(human gold)·
-> 다-family judge 는 후속.
+> T4 강하게 기각) · V4 신규 구조(sibling 자회사) **+25.0pp** · **V7 document-first −15.4pp(음성)**.
+> **scope 확정(중요)**: hybrid 우위는 질문이 **모델링된 graph 관계(SUBSIDIARY_OF·EXECUTIVE_OF·
+> MAJOR_SHAREHOLDER_OF)의 non-local·비검색성 체인으로 환원될 때만 결정적**(+62~82pp). **graph 스키마에
+> 없는 문서-공시 관계**(대손충당금·배당금·용역계약 등, V7)나 **co-located prose**(AUTO·sibling)에서는
+> vector 가 동률/역전 → **단일 hybrid 무조건 우위가 아니라 store-aware ROUTING 의 실증**. thesis 는
+> 정확한 scope 하에 CONFIRMED 이며 그 경계도 측정·기록. 후속: hybrid graph-leg-빈결과 fallback 결함
+> 수정, 비-모델 관계 graph 흡수, AUTO 소표본·다-family judge.
 
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
 > BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
