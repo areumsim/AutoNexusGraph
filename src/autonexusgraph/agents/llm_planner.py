@@ -146,6 +146,12 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
     catalog = _tool_catalog(state)
     targets_line = ", ".join(map(str, targets)) if targets else "(미식별)"
     persons_line = ", ".join(map(str, persons)) if persons else "(없음)"
+    # 수치 랭킹 힌트는 랭킹 질문에만 노출 — 비-랭킹 질문(GMH/GMI 등)에 길게 실으면
+    # planner 가 compare_companies 로 오라우팅돼 회귀(main 62 −24pp 관측). 키워드 게이트.
+    _q_rank = q or ""
+    _is_ranking = any(k in _q_rank for k in (
+        "가장 큰", "가장 작은", "가장 높은", "가장 낮은", "최대", "최소",
+        "가장 많은", "가장 적은", "최고", "최저"))
     company_names_line = ", ".join(map(str, company_names)) if company_names else "(없음)"
     makes_line = ", ".join(map(str, makes)) if makes else "(없음)"
     hint_line = ""
@@ -177,7 +183,16 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
         f"\"field\":\"parent_corp_code\"}}` 바인딩으로 연결하라.\n"
         f"[대상 제조사] {makes_line} — '…가 제조한 차종 중 리콜' 류 질문이면 graph "
         f"`list_recalled_models_by_manufacturer`(make_name=제조사) 한 번으로 리콜된 차종명을 구하라.\n"
-        f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
+        + ((
+            "[수치 랭킹 — graph+SQL cross-store] 여러 회사를 수치로 비교·랭킹하는 질문이다. "
+            "① 먼저 graph 로 후보 회사들을 구하고(예: `get_companies_of_person`·`list_subsidiaries`) "
+            "② sql `compare_companies` 한 번으로 `corp_codes` 인자에 "
+            "`{\"$from\":\"<graph task id>\",\"field\":\"corp_code\",\"collect\":true}` "
+            "(collect=true 로 후보 전체를 리스트 전달) + year + metric('revenue'|'operating_income') 을 "
+            "넣어 전 회사 값을 한 번에 받아라 — get_revenue 를 회사마다 따로 만들지 말 것(fan-out 미지원). "
+            "calculator 도 만들지 말 것 — 최대/최소 선택은 합성 단계가 처리한다.\n"
+        ) if _is_ranking else "")
+        + f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
         f"[허용 도구]\n"
         f"{_enum_line('research')}\n"
         f"{_enum_line('graph')}\n"
