@@ -174,6 +174,44 @@ def test_s4_empty_results_recovery():
     assert state["synth_status"]["ok"] is True   # 회복 후 LLM 합성 성공
 
 
+def test_s4b_failed_tasks_trigger_fallback():
+    """V7 결함 회귀 가드 — 실패(error dict)·skip task 는 '근거 있음' 으로 오인되면 안 됨.
+
+    LLM planner 가 sql/graph 로만 라우팅 → 전부 실패/skip → 이전엔 error dict 가 truthy
+    라 all_empty=False → vector fallback 미발동 → '정보 부족'. 이제 실패/skip 은 빈 것으로
+    취급해 회복 검색이 발동해야 한다."""
+    state = _base_state(
+        question="비-모델 관계 질의", question_rewritten="비-모델 관계 질의",
+        question_kind="multi_hop", target_companies=["01390344"],
+        tool_results=[
+            {"tool": "get_balance_sheet_item", "result": {"error": "bad arg"},
+             "status": "failed"},
+            {"tool": "list_cooccurring", "result": None, "status": "skipped"},
+        ],
+        evidence_chunks=[],
+    )
+    with patch.object(toolbox, "search_documents",
+                      lambda **kw: [{"id": "c9", "text": "fallback 으로 회복된 공시 본문"}],
+                      create=True), \
+         fake_llm("회복 근거 기반 충분히 긴 한국어 답변입니다. [출처: 01390344]"):
+        synthesizer_node(state)
+    assert state.get("fallback_used") is True     # 실패/skip → fallback 발동
+    assert state.get("evidence_chunks")
+    assert state["synth_status"]["ok"] is True
+
+
+def test_has_usable_result_treats_failed_as_empty():
+    """_has_usable_result — done+비어있지않음+에러아님만 usable."""
+    from autonexusgraph.agents.nodes import _has_usable_result
+    assert _has_usable_result({"status": "done", "result": [{"x": 1}]}) is True
+    assert _has_usable_result({"status": "failed", "result": {"error": "e"}}) is False
+    assert _has_usable_result({"status": "skipped", "result": None}) is False
+    assert _has_usable_result({"status": "done", "result": {"error": "e"}}) is False
+    assert _has_usable_result({"status": "done", "result": []}) is False
+    # status 미기록(legacy) + truthy 결과 → usable
+    assert _has_usable_result({"result": [{"x": 1}]}) is True
+
+
 # ── 시나리오 5: 모호 회사명 → clarification (폴백 자동해소) ──
 def test_s5_ambiguous_company_clarification():
     """모호 회사 → interrupt 미지원 환경에서 1순위 자동선택 + safety_signal 기록."""

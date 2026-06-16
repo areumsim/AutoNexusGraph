@@ -684,6 +684,25 @@ def _planner_cost_gate(state: AgentState, kind: str, targets: list,
 
 
 # ── (d) 공통 빈결과 회복 — executor(legacy) + synthesizer(DAG) 양 경로 대칭 ──
+def _has_usable_result(r: dict) -> bool:
+    """tool_results 항목이 합성에 쓸 실질 근거를 담았는가.
+
+    usable = status 'done' + 결과 비어있지 않음 + 에러 dict 아님. 실패/skip/에러는
+    "근거 없음" 으로 취급(fallback 판정용). status 미기록(legacy) 항목은 결과 truthy 면 usable.
+    """
+    if not isinstance(r, dict):
+        return False
+    status = r.get("status")
+    if status in ("failed", "skipped"):
+        return False
+    res = r.get("result")
+    if not res:
+        return False
+    if isinstance(res, dict) and "error" in res:
+        return False
+    return True
+
+
 def _attempt_fallback_recovery(state: AgentState) -> bool:
     """모든 도구가 빈 결과 + 검색 미수행 → 도메인 인식 fallback 검색으로 회복.
 
@@ -700,7 +719,11 @@ def _attempt_fallback_recovery(state: AgentState) -> bool:
     if state.get("evidence_chunks"):
         return False   # 이미 본문 근거 확보 — 회복 불필요
     results = state.get("tool_results") or []
-    all_empty = all(not (r.get("result")) for r in results) if results else True
+    # 실패(status=failed)·에러 dict({"error":…})·skip 은 "근거 없음" 으로 취급 — 이전엔
+    # 실패 결과 dict 가 truthy 라 all_empty=False 가 돼 vector fallback 이 미발동했고, graph/
+    # SQL 만 라우팅된 비-모델 관계 질문(V7)에서 "정보 부족" 으로 떨어졌다. usable 결과(완료+
+    # 비어있지 않음+에러 아님)가 0 이면 회복 검색 발동.
+    all_empty = not any(_has_usable_result(r) for r in results)
     searched_tools = {"search_documents", "search_documents_auto"}
     already_searched = any(r.get("tool") in searched_tools for r in results)
     if not all_empty or already_searched or not state.get("question"):
