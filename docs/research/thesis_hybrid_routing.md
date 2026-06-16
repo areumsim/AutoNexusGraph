@@ -24,9 +24,14 @@
 **귀무가설 H0**: hybrid EM − vector EM ≤ 0 (또는 +30%p 미달). 반증 가능 = 연구로 성립.
 
 > **▶ 현재 결론 (2026-06-15, SSOT): H1(a) CONFIRMED.** graph-유래 진짜 multi-hop gold(62문항)에서
-> S-7 ①②③ fix 후 **hybrid EM 0.710 vs vector 0.048 = +66.2%p**(목표 +30%p 2배 초과). 전 패턴 해소
+> S-7 ①②③ fix 후 **hybrid EM-contains 0.710 vs vector 0.048 = +66.2%p**(목표 +30%p 2배 초과). 전 패턴 해소
 > (GMH 0.824 · AUTO 1.000 · GMI 0.625). 상세 측정·한계는 아래 ★/★★ 블록. (이전 2026-06-10 "반증" 신호는
 > 측정타당성 결함[doc-RAG gold 의 2-hop 1/30 + agent 3계층 갭]으로 규명·해소됨.)
+> **metric 정직성**: 헤드라인 EM 은 `exact_match_contains`(답변 산문에 gold 엔티티가 ≥1 부분문자열로
+> 포함되면 1.0 — `eval/metrics/em_f1.py:24`) 로, **"정확 일치"가 아니라 store 간 델타 측정용 관대 지표**다.
+> 같은 run 의 **F1 0.123 · faithfulness 0.018** 은 절대 grounding 품질 자체가 낮음을 보여준다. 따라서
+> +66.2%p 는 *동일 metric 을 양측에 적용한 델타*(vector 가 multi-hop 답을 거의 못 냄 0.048)이지
+> "절대 정확도 71%" 가 아니다. 절대 품질(F1·faith) 개선은 잔여 과제.
 >
 > **외부 타당성 검증 통과 (한계 명시 하)** — 사전등록 [external_validity_protocol.md](./external_validity_protocol.md)
 > (SHA `2f0cc1f`): V1 paraphrase 견고성 **+59.7pp**(T2 기각) · V2 judge 재채점 **+55.0pp**(T3 기각) ·
@@ -37,8 +42,12 @@
 > (+62~82pp). **graph 스키마에 없는 문서-공시 관계(V7)는 fallback fix 후 vector 로 폴백해 ≥ vector** →
 > hybrid 가 두 store 의 상한을 취함. co-located prose(AUTO·sibling)는 vector 가 따라옴(동률대). → **단일
 > hybrid 가 store-aware 동작으로 모델·비-모델 관계 모두에서 vector 이상**. **V5 cross-store(graph+numeric:
-> 인물→회사→매출 랭킹) hybrid +78.6pp(vector·iter_vector 0.000, PR #116)** — graph traverse + 수치 랭킹은
-> vector 원천 불가, multi-store 우위의 가장 직접적 실증. thesis 는 정확한 scope 하에 CONFIRMED, 경계도
+> 인물→회사→매출 랭킹, n=14) hybrid +78.6pp(vector·iter_vector 0.000, PR #116)** — graph traverse + 수치 랭킹은
+> vector 원천 불가, multi-store 우위의 가장 직접적 실증. **단 게이트 단서(중요)**: 이 +78.6pp 는 해당 질문
+> 형태(`person_revenue_rank`) 전용 `compare_companies` 랭킹-키워드 게이트가 켜졌을 때만 나온다 — **게이트
+> 없는 기본 hybrid 는 cross-store 에서 0.062 < vector 0.125**(`eval/reports/cross_store`), 게이트를 전
+> 질문에 노출하면 main −24pp 회귀. 즉 패턴-특이적 planner 힌트에 의존하는 좁고 깨지기 쉬운 win 이며,
+> 일반 라우팅으로의 흡수는 잔여 과제. thesis 는 정확한 scope 하에 CONFIRMED, 경계도
 > 측정·수정까지 기록. 잔여: 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
 
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
@@ -164,7 +173,9 @@
 > **hybrid − vector = EM +66.2%p (목표 +30%p 2배 초과) → H1(a) CONFIRMED (전 패턴)**. GMH +82.4pp · AUTO
 > +100pp(5/5) · GMI 무회귀(0.650→0.625, 1문항 LLM 노이즈). 잔여 한계: ① gold 는 여전히 graph-유래(설계상
 > graph-우호, 단 non-vector-triviality 필터 적용). ② 단일 도메인 셋(finance multi-hop + auto recall), n=62.
-> ③ AUTO 1.000 은 5문항 소표본. → **전 패턴에서 CONFIRMED 이나, gold 외부 타당성(다른 도메인·규모)은 후속 과제**.
+> ③ AUTO 1.000 은 5문항 소표본. ④ **EM=`exact_match_contains`**(gold 엔티티 ≥1 포함 = 1.0, 관대 지표);
+> 같은 run F1 0.123·faithfulness 0.018 로 절대 grounding 품질은 낮고 +66.2%p 는 *델타*이지 절대 정확도 아님.
+> → **전 패턴에서 CONFIRMED 이나, gold 외부 타당성(다른 도메인·규모) + 절대 품질(F1·faith) 은 후속 과제**.
 
 ---
 

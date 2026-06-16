@@ -159,7 +159,10 @@ all_empty=False → vector fallback 미발동했음(`_has_usable_result` = done+
 - **CDB(bridge)**: vector 승 — NHTSA 리콜 문서가 OEM+모델 co-locate(검색가능), bridge 불필요. n=2 소표본.
 - **T5 정직한 한계**: cross-domain 데이터 sparse(bridge 2 OEM·인물-상장사 매출쌍 7) — finance 모델관계
   (57문항)가 여전히 주축. 도메인 일반화(타 산업·대규모 gold)는 잔여. 단 **graph+numeric multi-store
-  우위는 명확히 실증**(vector 0.000 vs hybrid 0.786).
+  우위는 명확히 실증**(vector 0.000 vs hybrid 0.786). **게이트 의존 단서(중요)**: 이 win 은 `compare_companies`
+  랭킹-키워드 게이트가 켜졌을 때만 — **게이트 OFF 기본 hybrid 는 cross-store 0.062 < vector 0.125**
+  (`eval/reports/cross_store` 대 `eval/reports/cross_gated`). 즉 패턴-특이적 planner 힌트에 의존하는 좁고
+  깨지기 쉬운 win 이며, 일반 라우팅 흡수 전까지 헤드라인은 이 단서와 함께 인용해야 한다.
 
 ### 종합 외부 타당성 verdict
 
