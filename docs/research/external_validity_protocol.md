@@ -102,6 +102,30 @@ V3(read-only $0) → V1(~$0.3) → V2(~$0.2) → V4(~$0.3). 총 ~$1.
   **일관된 기전**: graph 우위는 답의 **non-locality 에 비례** — 순수 비국소(GMH/GMI) +60~76pp,
   부분 co-located(sibling) +25pp. **완전한 T1 기각**(human/document-first gold)은 잔여.
 
+### V7 — document-first gold (T1 완전 검증, **음성 결과 — 정직 보고**)
+graph traversal 이 아닌 **문서-우선** 작성: LLM 이 13개 상장사의 **실제 DART 공시 발췌**만 읽고
+(cypher/스키마 blind) 자연 multi-hop 질문+답 작성 → 답은 Neo4j 2-hop 으로 독립 검증
+(`gold_qa_graph_multihop_docfirst_v0.jsonl`). 질문이 graph 구조에서 안 나오므로 T1 circularity 차단.
+
+| adapter | EM | hits@k |
+|---|---|---|
+| vector | **0.308** | 0.308 |
+| iter_vector | **0.308** | 0.231 |
+| **hybrid** | 0.154 | 0.154 |
+
+- **판정: 이 분포에서 hybrid 가 vector 에 −15.4pp 패배** (음성). **진단(실증)**: V7 질문 13개는 LLM 이
+  공시를 읽고 만들다 보니 **graph 스키마에 없는 관계**(대손충당금·배당금 수령·용역위탁계약·교육 참석·
+  공동기업/관계기업)를 물음 — 정답 엔티티는 SUBSIDIARY_OF 로 2-hop 연결돼 검증되나, **질문이 묻는
+  관계 자체가 graph edge 가 아님**(모델링된 SUBSIDIARY_OF/EXECUTIVE_OF/MAJOR_SHAREHOLDER_OF 외).
+  → hybrid 의 graph leg 무력 + **graph 노이즈가 합성을 희석해 순수 vector 보다 나쁨**(단순 패배 아닌
+  fallback 결함도 노출).
+- **함의 (thesis 경계 — 중요)**: hybrid 우위는 **질문이 모델링된 graph 관계로 환원될 때만** 성립.
+  문서로만 공시된 비-모델 관계는 vector 가 이김. → **T1 부분 검증**: +66pp 는 gold 가 모델 관계 기반
+  (graph-유래가 이를 보장)임에 의존. **이는 thesis 반증이 아니라 정확한 scope 확정** — store-aware
+  **ROUTING** 의 직접 근거(모델-관계 질문→graph, 텍스트-관계 질문→vector).
+- **후속 액션**: (a) hybrid 가 graph leg 빈 결과 시 clean vector 로 fallback(현재 vector 이하 = 결함),
+  (b) document-disclosed 관계를 graph 스키마로 흡수(대손충당금·관계기업 등 edge 추가).
+
 ### 종합 외부 타당성 verdict
 
 | 위협 | 검증 | 결과 | 판정 |
@@ -109,14 +133,14 @@ V3(read-only $0) → V1(~$0.3) → V2(~$0.2) → V4(~$0.3). 총 ~$1.
 | T4 데이터 가용성 | V3 + **V6 iter-vector** | 출처 store 존재; **반복검색 ceiling 도 GMH/GMI 0.000** | ✅ 강하게 기각 |
 | T2 템플릿 artifact | V1 paraphrase | +59.7pp | ✅ 기각 (AUTO n=5 제외) |
 | T3 EM 포맷 편향 | V2 judge | +55.0pp | ✅ 기각 (동일 family caveat) |
-| T1 graph-circularity | V4 신규 구조 | +25.0pp | 🟡 부분 기각 |
-| T5 소표본·도메인 | V1/V4/V6 | finance 견고, AUTO 약함 | 🟡 부분 |
+| T1 graph-circularity | V4 신규 구조 +25pp · **V7 document-first −15.4pp** | 우위는 **모델 관계로 환원 가능할 때만** | 🟡 **scope 확정** (반증 아님) |
+| T5 소표본·도메인 | V1/V4/V6/V7 | finance 모델-관계 견고, 비-모델·AUTO 약함 | 🟡 부분 |
 
-**결론**: thesis +66.2pp 는 **주요 측정 artifact(paraphrase·EM 포맷·데이터 가용성)에 견고**하고,
-**반복검색 vector ceiling 으로도 GMH/GMI 에서 격차 불변(+62~82pp)** — 우위는 "검색량" 이 아니라
-**그래프의 명시적·비검색성 관계**에서 온다. **정밀화된 thesis**: hybrid 우위는 관계가 **non-local
-AND 비검색성**일 때 결정적, **검색가능 prose(co-located answer + retrievable intermediate)면
-iter-vector 가 ceiling 도달/역전**(AUTO 0.600·sibling 0.833). **정직한 잔여 한계**: (a) AUTO recall
-약함·소표본(n=5), (b) 완전한 T1 기각엔 human/document-first gold 필요, (c) 단일 family judge. →
-**store-aware hybrid 의 multi-hop 우위는 외부 타당성 검증을 (한계 명시 하에) 통과**.
+**결론(정밀화)**: store-aware hybrid 의 multi-hop 우위는 **질문이 모델링된 graph 관계(SUBSIDIARY_OF·
+EXECUTIVE_OF·MAJOR_SHAREHOLDER_OF)의 non-local·비검색성 체인으로 환원될 때 결정적**(+62~82pp,
+반복검색 ceiling 도 못 따라옴). **반대로 ① co-located/검색가능 prose(AUTO·sibling) ② graph 스키마에
+없는 문서-공시 관계(V7)** 에서는 vector 가 동률/역전. → 이는 **단일 hybrid 의 무조건 우위가 아니라
+store-aware ROUTING** (질문의 관계 유형에 따라 store 선택) 의 실증. **thesis 는 정확한 scope 하에
+CONFIRMED 이며, 그 경계(V7)도 정직하게 측정·기록**. 잔여 한계: AUTO 소표본, hybrid fallback 결함,
+단일 family judge.
 
