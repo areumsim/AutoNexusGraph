@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 # finance 도메인 화이트리스트 — core 의 SSOT. auto 화이트리스트는 외부 패키지
 # (autograph) 가 자기 handler 에 보유. core 는 인지하지 않음 (PRD §10.12).
 FIN_GRAPH_ALLOWED = {
-    "list_subsidiaries", "list_parents", "get_executives",
+    "list_subsidiaries", "list_parents", "list_related_companies", "get_executives",
     "get_companies_of_person", "get_major_shareholders",
     "find_paths", "get_subgraph", "list_mentioning_news",
     "list_cooccurring", "list_group_members", "lookup_person",

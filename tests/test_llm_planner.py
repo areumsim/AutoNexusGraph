@@ -124,6 +124,15 @@ def test_ranking_hint_only_on_ranking_questions():
     assert "수치 랭킹" not in _capture_prompt(plain_q)       # 비-랭킹 → 미노출(main 회귀 방지)
 
 
+def test_related_companies_hint_only_on_associate_questions():
+    """관계기업·공동기업 힌트는 관계 키워드 질문에만 — 자회사(GMH) 질문엔 미노출."""
+    # 'list_related_companies' 는 graph intent 카탈로그에 항상 등장 → 힌트 마커('[관계기업·공동기업]')로 검증.
+    rel_q = "엘지디스플레이가 유의적인 영향력을 가지고 있는 피투자회사는 누구인가?"
+    sub_q = "KCS의 모회사에서 임원으로 재직하는 사람은 누구인가?"
+    assert "[관계기업·공동기업]" in _capture_prompt(rel_q)       # 관계기업 → 힌트 노출
+    assert "[관계기업·공동기업]" not in _capture_prompt(sub_q)   # 비-관계기업 → 미노출
+
+
 def test_llm_plan_budget_guard():
     """예산 초과 시 LLM 호출 없이 None (룰 폴백)."""
     def _boom(*a, **k):

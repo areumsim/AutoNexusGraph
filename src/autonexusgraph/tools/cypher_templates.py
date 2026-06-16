@@ -211,6 +211,25 @@ TEMPLATES: dict[str, dict] = {
         },
     },
 
+    # 관계기업·공동기업 (지분법 피투자, 지분 5~50%) — DART 타법인출자현황에서 적재된
+    # RELATED_TO 엣지. '…의 관계기업/공동기업/피투자회사' 질문용 (자회사=SUBSIDIARY_OF 와 구분).
+    "list_related_companies": {
+        "cypher": """
+        MATCH (child:Anxg_Company)-[r:RELATED_TO]->(parent:Anxg_Company {corp_code: $cc})
+        RETURN child.corp_code AS related_corp_code,
+               child.name      AS related_name,
+               r.ownership_pct AS ownership_pct,
+               r.snapshot_date AS snapshot_date
+        ORDER BY r.ownership_pct DESC
+        LIMIT $limit
+        """,
+        "required_params": ["cc", "limit"],
+        "param_schema": {
+            "cc": (str, ("regex", r"^\d{8}$")),
+            "limit": (int, ("range", 1, 500)),
+        },
+    },
+
     # ── 임원 ──
     "get_executives": {
         "cypher": """
