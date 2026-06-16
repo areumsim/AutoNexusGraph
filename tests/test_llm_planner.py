@@ -90,6 +90,40 @@ def test_llm_plan_strips_orphan_dependency():
     assert tasks[0]["depends_on"] == []
 
 
+class _CaptureClient:
+    """user_msg 캡처용 — chat_json 메시지를 보관."""
+    model = "fake"
+
+    def __init__(self):
+        self.last_user = ""
+
+    def chat_json(self, messages, schema, **kw):
+        self.last_user = next((m["content"] for m in messages if m["role"] == "user"), "")
+        return {"tasks": []}
+
+
+def _capture_prompt(q):
+    cap = _CaptureClient()
+    state = {"domain": "finance", "question": q, "question_rewritten": q, "llm_usage_usd": 0.0}
+    with patch("autonexusgraph.llm.base.get_llm_client", return_value=cap), \
+         patch("autonexusgraph.llm.budget_aware.budget_aware_client",
+               side_effect=lambda c, **kw: c), \
+         patch("autonexusgraph.config.turn_budget_for_domain", return_value=100.0):
+        try_llm_plan(state, kind="ranking", targets=[], year_hint=2023, q=q, persons=["김영규"])
+    return cap.last_user
+
+
+def test_ranking_hint_only_on_ranking_questions():
+    """수치 랭킹 힌트는 랭킹 키워드 질문에만 — 비-랭킹(GMH/GMI)엔 미노출(main 회귀 방지)."""
+    # 'compare_companies' 는 SQL intent 카탈로그에 항상 등장 → 힌트 마커('수치 랭킹')로 게이팅 검증.
+    rank_q = "김영규이 임원으로 재직하는 회사 중 2023년 매출이 가장 큰 회사는?"
+    plain_q = "김영규이 임원으로 재직하는 회사의 자회사는 무엇인가?"
+    rank_prompt = _capture_prompt(rank_q)
+    assert "수치 랭킹" in rank_prompt                       # 랭킹 → 힌트 노출
+    assert "collect" in rank_prompt                          # collect 바인딩 지침 포함
+    assert "수치 랭킹" not in _capture_prompt(plain_q)       # 비-랭킹 → 미노출(main 회귀 방지)
+
+
 def test_llm_plan_budget_guard():
     """예산 초과 시 LLM 호출 없이 None (룰 폴백)."""
     def _boom(*a, **k):
