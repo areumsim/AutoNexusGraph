@@ -126,6 +126,19 @@ graph traversal 이 아닌 **문서-우선** 작성: LLM 이 13개 상장사의 
 - **후속 액션**: (a) hybrid 가 graph leg 빈 결과 시 clean vector 로 fallback(현재 vector 이하 = 결함),
   (b) document-disclosed 관계를 graph 스키마로 흡수(대손충당금·관계기업 등 edge 추가).
 
+#### V7 후속 — fallback 결함 수정 (PR #114): 음성 결과 해소
+위 (a) 결함 수정: `_attempt_fallback_recovery` 가 **실패(error dict)·skip task 를 truthy 로 오인**해
+all_empty=False → vector fallback 미발동했음(`_has_usable_result` = done+비어있지않음+에러아님만 usable).
+
+| gold | hybrid EM 전 | **후** |
+|---|---|---|
+| **V7 document-first** | 0.154 | **0.462** (vector 0.308 → **+15.4pp 역전**) |
+| MAIN 62 (모델 관계) | 0.710 | **0.742** (무회귀) |
+
+- **수정 후 판정: T1 음성 해소** — hybrid 가 비-모델 관계에서도 vector 를 이김(0.462>0.308). **V7 음성은
+  근본 한계가 아니라 fallback 버그**였음. hybrid 의 store-aware 동작(graph 무력 시 clean vector 폴백)이
+  비로소 제대로 작동 → **단일 hybrid 가 모델·비-모델 관계 모두에서 ≥ vector** (store-aware routing 실증).
+
 ### 종합 외부 타당성 verdict
 
 | 위협 | 검증 | 결과 | 판정 |
@@ -133,14 +146,14 @@ graph traversal 이 아닌 **문서-우선** 작성: LLM 이 13개 상장사의 
 | T4 데이터 가용성 | V3 + **V6 iter-vector** | 출처 store 존재; **반복검색 ceiling 도 GMH/GMI 0.000** | ✅ 강하게 기각 |
 | T2 템플릿 artifact | V1 paraphrase | +59.7pp | ✅ 기각 (AUTO n=5 제외) |
 | T3 EM 포맷 편향 | V2 judge | +55.0pp | ✅ 기각 (동일 family caveat) |
-| T1 graph-circularity | V4 신규 구조 +25pp · **V7 document-first −15.4pp** | 우위는 **모델 관계로 환원 가능할 때만** | 🟡 **scope 확정** (반증 아님) |
-| T5 소표본·도메인 | V1/V4/V6/V7 | finance 모델-관계 견고, 비-모델·AUTO 약함 | 🟡 부분 |
+| T1 graph-circularity | V4 신규 구조 +25pp · V7 document-first −15.4pp **→ fallback fix 후 +15.4pp(PR #114)** | 모델·비-모델 관계 **모두 hybrid ≥ vector** | ✅ **기각(수정 후)** |
+| T5 소표본·도메인 | V1/V4/V6/V7 | finance 모델-관계 견고, 비-모델 회복, AUTO 소표본 | 🟡 부분 |
 
 **결론(정밀화)**: store-aware hybrid 의 multi-hop 우위는 **질문이 모델링된 graph 관계(SUBSIDIARY_OF·
-EXECUTIVE_OF·MAJOR_SHAREHOLDER_OF)의 non-local·비검색성 체인으로 환원될 때 결정적**(+62~82pp,
-반복검색 ceiling 도 못 따라옴). **반대로 ① co-located/검색가능 prose(AUTO·sibling) ② graph 스키마에
-없는 문서-공시 관계(V7)** 에서는 vector 가 동률/역전. → 이는 **단일 hybrid 의 무조건 우위가 아니라
-store-aware ROUTING** (질문의 관계 유형에 따라 store 선택) 의 실증. **thesis 는 정확한 scope 하에
-CONFIRMED 이며, 그 경계(V7)도 정직하게 측정·기록**. 잔여 한계: AUTO 소표본, hybrid fallback 결함,
-단일 family judge.
+EXECUTIVE_OF·MAJOR_SHAREHOLDER_OF)의 non-local·비검색성 체인으로 환원될 때 가장 큼**(+62~82pp,
+반복검색 ceiling 도 못 따라옴). **graph 스키마에 없는 문서-공시 관계(V7)에서는 fallback fix 후 vector 로
+폴백해 ≥ vector(+15.4pp)** — 즉 hybrid 가 **두 store 의 상한**을 취함. co-located prose(AUTO·sibling)는
+여전히 vector 가 따라옴(동률대). → **store-aware ROUTING 의 실증이자, fallback 견고화로 단일 hybrid 가
+모델·비-모델 관계 모두에서 vector 이상**. **thesis 는 정확한 scope 하에 CONFIRMED, 경계(V7)도 측정·
+수정까지 기록**. 잔여 한계: AUTO 소표본, 단일 family judge, 비-모델 관계 graph 흡수(후속 P1).
 
