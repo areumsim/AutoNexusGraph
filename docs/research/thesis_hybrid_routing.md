@@ -36,8 +36,10 @@
 > (SUBSIDIARY_OF·EXECUTIVE_OF·MAJOR_SHAREHOLDER_OF)의 non-local·비검색성 체인으로 환원될 때 가장 큼**
 > (+62~82pp). **graph 스키마에 없는 문서-공시 관계(V7)는 fallback fix 후 vector 로 폴백해 ≥ vector** →
 > hybrid 가 두 store 의 상한을 취함. co-located prose(AUTO·sibling)는 vector 가 따라옴(동률대). → **단일
-> hybrid 가 store-aware 동작으로 모델·비-모델 관계 모두에서 vector 이상**. thesis 는 정확한 scope 하에
-> CONFIRMED, 경계도 측정·수정까지 기록. 잔여: 비-모델 관계 graph 흡수, AUTO 소표본·다-family judge.
+> hybrid 가 store-aware 동작으로 모델·비-모델 관계 모두에서 vector 이상**. **V5 cross-store(graph+numeric:
+> 인물→회사→매출 랭킹) hybrid +78.6pp(vector·iter_vector 0.000, PR #116)** — graph traverse + 수치 랭킹은
+> vector 원천 불가, multi-store 우위의 가장 직접적 실증. thesis 는 정확한 scope 하에 CONFIRMED, 경계도
+> 측정·수정까지 기록. 잔여: 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
 
 > **측정 현황 — H1(a) 반증 [있음]** (정식 실측 **2026-06-10**, 10 cells × 30 finance, GPT-4o,
 > BGE-M3 임베딩+리랭커 기동 + LLM-planner schema fix(PR #52) + 예산 헤드룸, ~$1.25 · 결과 SSOT =
