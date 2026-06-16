@@ -105,6 +105,17 @@ def list_parents(child_corp_code_or_name: str = "", *,
     return _exec("list_parents", k=child, limit=_cap(limit))
 
 
+def list_related_companies(corp_code: str = "", *,
+                           parent_corp_code: str | None = None,
+                           limit: int = DEFAULT_LIMIT) -> list[dict]:
+    """회사의 관계기업·공동기업 (지분법 피투자, 지분 5~50% = RELATED_TO).
+
+    '…의 관계기업/공동기업/피투자회사' 질문용 — 자회사(`list_subsidiaries`, ≥50%)와 구분.
+    ``parent_corp_code`` 는 corp_code 별칭."""
+    cc = corp_code or parent_corp_code or ""
+    return _exec("list_related_companies", cc=cc, limit=_cap(limit))
+
+
 def get_executives(corp_code: str, *,
                    role_contains: str | None = None,
                    snapshot_year: int | None = None,
@@ -202,7 +213,7 @@ def list_group_members(group_name: str, *,
 
 __all__ = [
     "lookup_company", "lookup_person",
-    "list_subsidiaries", "list_parents",
+    "list_subsidiaries", "list_parents", "list_related_companies",
     "get_executives", "get_companies_of_person",
     "get_major_shareholders",
     "find_paths", "get_subgraph",
