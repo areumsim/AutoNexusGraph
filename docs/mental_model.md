@@ -18,7 +18,7 @@
 | **설계 의도와 그 트레이드오프 / 대안** | 데이터 소스 라이선스 전수 표 → `README §4`, `docs/data_sources.md` |
 | **확정 / 잠정 / 미정** 의 명시적 구분 | autograph 도메인 단독 가이드 → `docs/autograph.md` / ipgraph (도메인3) → `docs/ipgraph.md` |
 | 열린 질문·숨은 가정·위험 | 완전한 요구사항·DoD 트래픽라이트 → [README §10 DoD 20항](../README.md#10-dod-definition-of-done--20-항) |
-| (결정 카탈로그 — *무엇이* 어디에 왜) | 평가 결과 / 비교 매트릭스 실측값 → `eval/reports/*` / 이론 교재 → `docs/learning_guide.md` |
+| (결정 카탈로그 — *무엇이* 어디에 왜) | 평가 결과 / 비교 매트릭스 실측값 → `eval/reports/*` / 통독 교재 → `docs/LEARNING.md` |
 
 ### 0.2 라벨 컨벤션 (가장 중요)
 
@@ -935,13 +935,13 @@ manufactured_at_seed (46)     ──→   :MANUFACTURED_AT
 
 ## 6. 다음 한 걸음 — 심화 고민용 출발점
 
-> 이론적 설명·아키텍처·예상 청중 질문은 별도 문서 `docs/learning_guide.md` (심화 세미나 가이드) 에 정리. 이 절은 코드 진입점·체크리스트·세미나 질문만 짧게.
+> 이론적 설명·아키텍처·예상 청중 질문은 별도 문서 `docs/LEARNING.md` (통독 세미나 교재) 에 정리. 이 절은 코드 진입점·체크리스트·세미나 질문만 짧게.
 
 ### 6.1 코드 읽기 추천 순서
 
 새로 합류한 사람이 멘탈 모델을 잡는 최단 경로:
 
-1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **36 필드**, 라인 156-225).
+1. `src/autonexusgraph/agents/state.py` — 한 turn 의 모든 필드 (TypedDict **42 필드**, 라인 155-241).
 2. `src/autonexusgraph/agents/_domain_handler.py` — DomainHandler Protocol + 라우터 + ENV `AUTONEXUSGRAPH_DOMAIN_PLUGINS` soft-import.
 3. `src/autograph/agent_handler.py` — auto/cross_domain 구현체.
 4. `src/autograph/policy.py:1-100` (10분) — 키워드 라우팅 / question kind 분류.

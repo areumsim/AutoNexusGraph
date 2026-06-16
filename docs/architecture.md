@@ -318,7 +318,7 @@ flowchart TD
     finalize --> END((END))
 ```
 
-**노드 책임 + AgentState 36 필드 read/write 매트릭스** (`agents/state.py:156-225`):
+**노드 책임 + AgentState 42 필드 read/write 매트릭스** (`agents/state.py:155-241`):
 
 | 노드 | 책임 | read 필드 (entry-only / 누적) | write 필드 |
 |---|---|---|---|
@@ -334,21 +334,21 @@ flowchart TD
 | `validator` | 6 검사 (length / self-report bypass / language / grounding / hallucinated_numbers / edge_confidence) + replan 트리거 | `answer` / `tool_results` / `evidence_chunks` / `graph_subgraph` / `n_replans` | `validation_status` / `validation_issues` / `grounding` / `n_replans` (replan 시 증가) / `replan_hint` (mark_replan) |
 | `finalize` | 실패 응답 패키징 (`⚠️ 검증 실패 (replan n/MAX 후)` 프리픽스) | `validation_status` / `validation_issues` / `answer` / `n_replans` | `answer` (프리픽스 추가) |
 
-**AgentState 36 필드 그룹** (state.py:156-225 의 `Annotated[..., _last_wins|_list_extend|...]` 필드):
+**AgentState 42 필드 그룹** (state.py:155-241 의 `Annotated[..., _last_wins|_list_extend|...]` 필드):
 
 | 그룹 | 필드 수 | 필드 이름 | 채우는 노드 |
 |---|---:|---|---|
 | **입력** | 7 | `thread_id`, `question`, `history`, `domain`, `target_vehicles`, `target_models`, `target_makes` | 외부 호출자 / `run_agent` |
-| **전처리·평가 메타** | 5 | `rerank`, `llm_planner`, `question_rewritten`, `temporal_audit`, `rewrite_audit` | `rerank`/`llm_planner` 는 entry-only (run_agent ablation 토글) + 나머지 triage |
+| **전처리·평가 메타** | 6 | `rerank`, `llm_planner`, `source`, `question_rewritten`, `temporal_audit`, `rewrite_audit` | `rerank`/`llm_planner`/`source` 는 entry-only (run_agent ablation·eval 토글) + 나머지 triage |
 | **안전 신호** | 1 | `safety_signals` (reducer: `_list_extend`) | 모든 노드 누적 |
-| **Triage·Planner 산출** | 5 | `question_kind`, `target_companies`, `session_carryover`, `plan`, `tasks` | triage(부분) + planner |
+| **Triage·Planner 산출** | 7 | `question_kind`, `target_companies`, `target_persons`, `target_company_names`, `session_carryover`, `plan`, `tasks` | triage(부분) + planner |
 | **Worker 누적** | 5 | `task_results`, `tool_results`, `evidence_chunks`, `graph_subgraph`, `fallback_used` | research / graph / sql / calculator + executor_legacy |
-| **합성** | 3 | `answer`, `citations`, `visualizations` | synthesizer |
+| **합성** | 4 | `answer`, `citations`, `visualizations`, `synth_status` | synthesizer |
 | **검증** | 4 | `validation_status`, `validation_issues`, `grounding`, `replan_hint` | validator / mark_replan |
 | **HITL** | 3 | `pending_interrupt`, `interrupt_response`, `interrupt_handled` | triage(clarification) / planner(cost) / synthesizer(sensitive) |
-| **메타** | 3 | `llm_usage_usd`, `n_replans`, `aborted_reason` | tracing / validator / 모든 노드 |
+| **메타** | 5 | `llm_usage_usd`, `llm_tokens_used`, `n_replans`, `aborted_reason`, `sensitive_blocked` | tracing / validator / 모든 노드 |
 
-→ 합 7+5+1+5+5+3+4+3+3 = **36 필드**. 안전 신호만 `_list_extend`, 누적 채널 (`task_results`/`tool_results`/`evidence_chunks`) 은 dedup-merge reducer, 나머지는 `_last_wins` reducer (병렬 worker 의 entry-only 필드 충돌 회피).
+→ 합 7+6+1+7+5+4+4+3+5 = **42 필드**. 안전 신호만 `_list_extend`, 누적 채널 (`task_results`/`tool_results`/`evidence_chunks`) 은 dedup-merge reducer, 나머지는 `_last_wins` reducer (병렬 worker 의 entry-only 필드 충돌 회피).
 
 **replan 사이클** — `validator` 실패 → `mark_replan()` 이 `tool_results / evidence_chunks / plan / tasks / answer` 초기화 + `n_replans += 1` → `planner` 재진입 (`validator.py:187-195`). `n_replans >= MAX_REPLANS (=2)` 면 `finalize` 로.
 
@@ -484,7 +484,7 @@ flowchart TD
 | 도메인2-심화 (process BoP, 주요 축) | [docs/process_graph.md](process_graph.md) | PR 와 동기 |
 | 도메인3 (ip 보조축) 상세 | [docs/ipgraph.md](ipgraph.md) | PR 와 동기 |
 | 결정·트레이드오프·열린 질문 | [docs/mental_model.md](mental_model.md) | 결정 시 confirmed/잠정/미정 라벨 |
-| 이론·알고리즘 (BGE-M3, HNSW, LangGraph 등) | [docs/learning_guide.md](learning_guide.md) | 변경 적음 |
+| 이론·알고리즘 (BGE-M3, HNSW, LangGraph 등) | [docs/LEARNING.md](LEARNING.md) | 변경 적음 |
 | 외부 데이터 소스 카탈로그 | [docs/data_sources.md](data_sources.md) | 신규 채널 도입 시 |
 | 운영 절차 (마이그레이션·docker·MCP) | [docs/operations/](operations/) | 절차 변경 시 |
 | 온톨로지 schema_version | `ontology/<domain>/relations.yaml` 헤더 | yaml 한 곳 |
@@ -510,7 +510,7 @@ flowchart TD
 | docs/process_graph.md | ~115 | 도메인2-심화 (process BoP, 주요 축) 단독 SSOT |
 | docs/ipgraph.md | ~285 | 도메인3 (ip 보조축) 단독 SSOT |
 | docs/mental_model.md | ~1150 | 결정·트레이드오프·열린 질문 |
-| docs/learning_guide.md | ~1940 | 이론 (BGE/HNSW/LangGraph/리랭커) + 세미나 Q&A |
+| docs/LEARNING.md | ~600 | **통독 세미나 교재** — 예시 추적·이론적 유도·코드 구조·운영 (구 learning_guide 흡수) |
 | docs/data_sources.md | ~495 | 외부 데이터 소스 카탈로그 |
 | docs/operations/* | — | 운영 절차 (migrations / docker / agents / rag_tools) |
 
