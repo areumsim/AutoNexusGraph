@@ -69,15 +69,21 @@ def _fetch_rows(min_confidence: float) -> list[dict]:
 
 def _merge_neo4j(rows: list[dict]) -> int:
     """Neo4j ``(a:Anxg_Assignee {assignee_id})-[:MAPPED_TO]->(c:Anxg_Company {corp_code})`` merge."""
-    from autograph.loaders._neo4j_helpers import edge_meta_cypher, run_batched
+    # common SSOT 에 ip 도메인 ontology(meta keys + schema_version)를 바인딩 —
+    # autograph private 헬퍼 cross-import 금지(ip 엣지는 ip 헤더 fallback 을 받아야 함).
+    from common.neo4j_loader import edge_meta_cypher, run_batched
+    from ipgraph.ontology import load_edge_required_meta, ontology_schema_version
+
     from autonexusgraph.db.neo4j import get_session
 
+    meta_set = edge_meta_cypher(
+        load_edge_required_meta(), ontology_schema_version(), "edge")
     cypher = f"""
     UNWIND $rows AS r
     MATCH (a:Anxg_Assignee {{assignee_id: r.assignee_id}})
     MATCH (c:Anxg_Company {{corp_code: r.corp_code}})
     MERGE (a)-[edge:MAPPED_TO]->(c)
-    SET {edge_meta_cypher('edge')}
+    SET {meta_set}
     """
 
     with get_session() as session:
