@@ -46,9 +46,31 @@
 > vector 원천 불가, multi-store 우위의 가장 직접적 실증. **단 게이트 단서(중요)**: 이 +78.6pp 는 해당 질문
 > 형태(`person_revenue_rank`) 전용 `compare_companies` 랭킹-키워드 게이트가 켜졌을 때만 나온다 — **게이트
 > 없는 기본 hybrid 는 cross-store 에서 0.062 < vector 0.125**(`eval/reports/cross_store`), 게이트를 전
-> 질문에 노출하면 main −24pp 회귀. 즉 패턴-특이적 planner 힌트에 의존하는 좁고 깨지기 쉬운 win 이며,
-> 일반 라우팅으로의 흡수는 잔여 과제. thesis 는 정확한 scope 하에 CONFIRMED, 경계도
-> 측정·수정까지 기록. 잔여: 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
+> 질문에 노출하면 main −24pp 회귀. 즉 패턴-특이적 planner 힌트에 의존하는 좁고 깨지기 쉬운 win 이었다.
+> **▶ 게이트 일반화 측정·해소 (2026-06-16, T-G1/T-G2 CONFIRMED)**: flat 최상급 키워드 게이트를
+> **구조적 2-신호 감지**(비교·서열 구조 ∧ 수치 metric, `policy.detect_cross_store_ranking`)로 교체 +
+> gated 힌트 강화. 사전등록 [external_validity_protocol.md](./external_validity_protocol.md) §V8.
+> 키워드 게이트의 브리틀성을 패러프레이즈 견고성 셋(랭킹 14문항을 '1위/순위/큰 순/더 많은' 등 리터럴
+> 키워드 회피 표현으로 변환, `gold_qa_cross_store_paraphrase_v0.jsonl`)으로 실증: **keyword 게이트는
+> 리터럴 0.357 → 패러프레이즈 0.000 으로 완전 붕괴**(EM-contains, n=14). **structural 게이트는
+> 패러프레이즈를 0.500 으로 회복**(+50.0pp, baseline≥) — **T-G1(재현율 +30pp) 통과**. **T-G2(비회귀)**:
+> structural × main-multihop 62 = **EM 0.726 ≥ keyword 0.710**, 게이트는 main 62 문항에 **0/62 발화**
+> (정밀도 = metric 토큰 요구). default 를 keyword→structural 플립(`ANXG_RANK_GATE`). **단 honest scope**:
+> 절대 EM 은 소표본(n=14)·drift 로 baseline 자체가 0.357(과거 0.750 아님)이고, 잔여 실패는 LLM-planner
+> 의 패러프레이즈 민감(`fallback_used` 체인 미생성)·데이터 아티팩트(매출=1 shell) — 완전 결정화(rule-plan)는
+> 잔여. 즉 **게이트(라우팅 결정)는 일반화 실증, 다운스트림 LLM planner/synth 견고화는 후속**.
+> **▶ 다운스트림 결정화 완결 (2026-06-17, 실측)**: 위 "다운스트림 견고화" 잔여를 해소. ① 게이트
+> metric seam: Signal-B 를 `compare_companies` 지원 metric(`policy._METRIC_TRIGGERS` SSOT)으로
+> 한정(미지원 metric over-fire→revenue 조용한 치환 차단). ② 결정적 라우팅(`ANXG_RANK_ROUTE=deterministic`,
+> default): 게이트 발화 시 룰이 graph(get_companies_of_person, dual-josa `_extract_lead_person`)→
+> compare_companies 체인 직접 구성 → LLM 라우팅 비결정성(paraphrase EM 0.214/0.500/0.714, 변동 0.50)
+> 제거 → 0.857. ③ synth max/min 결정화(`compare_companies(direction=)`+`rank_direction`+결측 None 마지막,
+> 구 −1 sentinel 차단) → 변동 0. ④ synth 구조 evidence 인정(`_build_context`) → '정보 부족' 오거부 완화
+> → **cross-store paraphrase 0.929**, main-62 비회귀 0.726~0.758, false_refusal 0.000
+> (`eval/reports/{B_det_v2,A1_dir,A1b_cs,A2_paired_thesis}_*`). paired eval-full = **hybrid 0.726 vs
+> vector 0.048 = +67.7pp**(단일 run). 잔여 MIN007 = gold 동명이인(김병훈 5명, 코드 결함 아님).
+> thesis 는 정확한 scope 하에 CONFIRMED, 경계도 측정·수정까지 기록. 잔여: synth grounding 의 graph 결과
+> 일반화(A-1c 부분), 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
 
 ---
 
