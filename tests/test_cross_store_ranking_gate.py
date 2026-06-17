@@ -36,12 +36,24 @@ _LEGACY_FIRE = (
     "영업이익이 가장 높은 자회사는?",
 )
 # legacy 키워드는 없지만 의미상 cross-store 수치 랭킹인 패러프레이즈 — structural 만 발화.
+# metric 은 모두 compare_companies 지원(revenue/operating_income/net_income)이어야 한다 —
+# 미지원 metric(시가총액 등)은 _UNSUPPORTED_METRIC_NO_FIRE 로 분리(게이트=다운스트림 능력).
 _PARAPHRASE_FIRE = (
-    "매출액 기준 1위인 회사는?",                  # 서수 'N위'
-    "영업이익이 더 많은 회사는?",                  # 비교급 '더 많은'
-    "매출 순위가 상위인 회사는?",                  # 서열 '순위/상위'
-    "당기순이익을 큰 순으로 정렬했을 때 첫 회사는?",   # '큰 순' + 확장 metric
-    "시가총액이 더 높은 회사는?",                  # 확장 metric '시가총액'
+    "매출액 기준 1위인 회사는?",                  # 서수 'N위' (revenue)
+    "영업이익이 더 많은 회사는?",                  # 비교급 '더 많은' (operating_income)
+    "매출 순위가 상위인 회사는?",                  # 서열 '순위/상위' (revenue)
+    "당기순이익을 큰 순으로 정렬했을 때 첫 회사는?",   # '큰 순' + net_income(지원 metric)
+)
+
+# Signal A(구조)는 있으나 metric 이 compare_companies 미지원(시가총액·자산·직원·부채 등)
+# → 비발화. 게이트가 발화하면 _infer_compare_metric 이 revenue 로 조용히 치환해 오답이
+# 되던 seam 차단(게이트=다운스트림 능력 일치). 확장하려면 financials._METRIC_ACCOUNTS +
+# policy._METRIC_TRIGGERS 를 동시 확장해야 본 가드가 통과한다.
+_UNSUPPORTED_METRIC_NO_FIRE = (
+    "시가총액이 더 높은 회사는?",
+    "자산이 가장 많은 회사는?",
+    "직원 수가 가장 많은 회사는?",
+    "부채가 가장 적은 회사는?",
 )
 # 비-랭킹 / 비-수치 multi-hop — 어느 모드에서도 발화 금지(main 비회귀 정밀도 근거).
 _NEVER_FIRE = (
@@ -81,6 +93,43 @@ def test_metric_requirement_is_necessary() -> None:
     assert not detect_cross_store_ranking("리콜이 가장 많이 발생한 모델은?")  # metric 없음
     # metric 추가 시 발화로 전환.
     assert detect_cross_store_ranking("매출이 가장 큰 회사는 어디인가?")
+
+
+def test_unsupported_metric_does_not_fire() -> None:
+    """미지원 metric(시가총액·자산·직원·부채…)은 Signal A 가 있어도 비발화.
+
+    게이트가 compare_companies 능력 밖 metric 에 over-fire → _infer_compare_metric 이
+    revenue 로 조용히 치환 → 매출로 랭킹한 오답이 되던 seam 차단(다운스트림 능력 일치).
+    """
+    for q in _UNSUPPORTED_METRIC_NO_FIRE:
+        assert not detect_cross_store_ranking(q), f"미지원 metric over-fire(seam): {q}"
+
+
+def test_metric_triggers_subset_of_supported() -> None:
+    """SSOT 정합 — policy._METRIC_TRIGGERS 의 metric 은 모두 compare_companies 지원 ⊆."""
+    from autonexusgraph.agents.policy import _METRIC_TRIGGERS
+    from autonexusgraph.tools.financials import _METRIC_ACCOUNTS
+    for _word, metric in _METRIC_TRIGGERS:
+        assert metric in _METRIC_ACCOUNTS, f"게이트 trigger 가 미지원 metric: {metric}"
+
+
+def test_gate_fire_implies_supported_metric_seam() -> None:
+    """통합 seam 가드 — 게이트가 발화하는 모든 질문은 compare_companies 가 실제
+    랭킹 가능한 metric 으로 귀결돼야 한다(두 단위 테스트[게이트 발화·metric ValueError]가
+    각자 통과하지만 놓치던 통합 불변식).
+
+    - policy.infer_compare_metric ≠ None ∧ financials._METRIC_ACCOUNTS 키
+    - nodes._infer_compare_metric(rule-plan glue)도 동일 metric 반환(조용한 revenue 치환 없음)
+    """
+    from autonexusgraph.agents.nodes import _infer_compare_metric
+    from autonexusgraph.agents.policy import infer_compare_metric
+    from autonexusgraph.tools.financials import _METRIC_ACCOUNTS
+
+    for q in _LEGACY_FIRE + _PARAPHRASE_FIRE:
+        m = infer_compare_metric(q)
+        assert m is not None, f"발화 질문인데 metric None: {q}"
+        assert m in _METRIC_ACCOUNTS, f"게이트 metric 이 compare_companies 미지원: {q}→{m}"
+        assert _infer_compare_metric(q) == m, f"rule-plan glue 가 게이트와 불일치: {q}"
 
 
 @pytest.mark.parametrize("mode,q,expected", [

@@ -191,10 +191,16 @@ _METRIC_ACCOUNTS: dict[str, tuple[str, ...]] = {
 
 def compare_companies(
     corp_codes: list[str], year: int, metric: str = "revenue", fs_div: str = "CFS",
+    direction: str = "desc",
 ) -> list[dict]:
-    """여러 회사 단일 지표 비교 (정렬 내림차순).
+    """여러 회사 단일 지표 비교 (랭킹).
 
     단일 PG round-trip — corp_codes ARRAY 로 names + 금액을 한 번에 조회.
+
+    direction='desc'(기본, 최대 우선) / 'asc'(최소 우선). **결측값(None)은 방향 무관 항상
+    마지막** — 미상은 극값이 아니다(이전 -1 sentinel 이 'asc(최소)'에서 결측사를 최소로
+    오정렬하던 결함 차단). cross-store 랭킹은 답이 첫 행에 오도록 direction 을 맞춰
+    다운스트림 synth 의 max/min 선택 비결정성을 제거(`policy.rank_direction`).
     """
     accounts = _METRIC_ACCOUNTS.get(metric)
     if accounts is None:
@@ -246,7 +252,14 @@ def compare_companies(
             "year":       year,
             "metric":     metric,
         })
-    results.sort(key=lambda r: r["value"] if r["value"] is not None else -1, reverse=True)
+    # 결측(None)은 방향 무관 항상 마지막; 그 외는 direction 대로. asc → 최소가 첫 행.
+    asc = str(direction).lower() == "asc"
+    def _rank_key(r: dict) -> tuple[int, float]:
+        v = r["value"]
+        if v is None:
+            return (1, 0.0)
+        return (0, float(v) if asc else -float(v))
+    results.sort(key=_rank_key)
     return results
 
 

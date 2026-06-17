@@ -103,24 +103,66 @@ _RANK_STRUCT_SUBSTR = (
 )
 _RANK_ORDINAL_RE = re.compile(r"\d+\s*위")   # "1위", "3 위"
 
-# Signal B: 수치 metric 어휘 (KW_FINANCIAL 확장).
-KW_NUMERIC_METRIC = KW_FINANCIAL + (
-    "당기순이익", "자본", "시가총액", "시총", "직원", "종업원", "고용",
+# Signal B: 수치 metric 어휘 — `compare_companies` 가 실제 랭킹 가능한 metric 으로 한정.
+# (이전엔 KW_FINANCIAL 확장[자산·부채·ROE·시가총액·직원…]까지 발화했으나, 다운스트림
+#  compare_companies 는 revenue/operating_income/net_income 3종만 지원 → 미지원 metric 은
+#  rule-plan `_infer_compare_metric`·LLM 힌트가 조용히 revenue 로 치환해 오답이 됐다.
+#  seam 차단: Signal B = `infer_compare_metric() is not None` 으로 다운스트림 능력과 일치.)
+
+# 비교 가능 metric SSOT — 한국어 트리거 → compare_companies metric.
+# `financials._METRIC_ACCOUNTS` 와 1:1 정합(test_cross_store_ranking_gate 가 가드).
+# 우선순위: 영업이익 > 당기순이익 > 순이익 > 매출 (더 구체적인 metric 우선).
+# 확장 시 본 표 + `financials._METRIC_ACCOUNTS` 둘만 갱신하면 게이트·planner 자동 정합.
+_METRIC_TRIGGERS: tuple[tuple[str, str], ...] = (
+    ("영업이익",   "operating_income"),
+    ("당기순이익", "net_income"),
+    ("순이익",     "net_income"),
+    ("매출",       "revenue"),
 )
 
 
+def infer_compare_metric(q: str) -> str | None:
+    """질문 → `compare_companies` 지원 metric. 지원 어휘 없으면 None.
+
+    None = "cross-store 수치 랭킹 라우팅 불가"(Signal B 부재) 신호 — 게이트 비발화
+    근거이자, 미지원 metric(시가총액·자산·직원 등)의 조용한 revenue 치환 차단점.
+    """
+    s = q or ""
+    for word, metric in _METRIC_TRIGGERS:
+        if word in s:
+            return metric
+    return None
+
+
+# 랭킹 방향 — 최소 우선 키워드(그 외 최대 우선). compare_companies direction 결정.
+_RANK_MIN_KEYWORDS = (
+    "작은", "낮은", "적은", "최소", "최저", "오름차순", "작을", "낮을", "적을",
+)
+
+
+def rank_direction(q: str) -> str:
+    """cross-store 랭킹 방향 — 'asc'(최소 우선) / 'desc'(최대 우선, 기본).
+
+    `compare_companies(direction=)` 에 전달해 **답이 첫 행에 오도록** 정렬 방향을 맞춘다 →
+    synth 의 max/min 선택 비결정성 제거. (측정: '가장 큰' 7/7 안정[desc-first] vs '가장
+    작은' 변동·실패 → min-first(asc) 로 동일 reliable 경로에 정렬.)
+    """
+    return "asc" if any(k in (q or "") for k in _RANK_MIN_KEYWORDS) else "desc"
+
+
 def detect_cross_store_ranking(q: str) -> bool:
-    """구조적 cross-store 수치 랭킹 감지 — Signal A(비교·서열 구조) ∧ B(수치 metric).
+    """구조적 cross-store 수치 랭킹 감지 — Signal A(비교·서열 구조) ∧ B(지원 metric).
 
     flat 최상급 키워드보다 넓은 패러프레이즈(서수 'N위'·비교급 '더 많은'·'순위')를
-    포착하면서, metric 토큰 요구로 비-수치 multi-hop 질문의 오발화를 차단한다.
+    포착하면서, Signal B 를 `compare_companies` 지원 metric 으로 한정해 (a) 비-수치
+    multi-hop 오발화 + (b) 미지원 metric over-fire(→revenue 조용한 치환) 둘 다 차단.
     결정적·LLM 불요·지연 0. → `llm_planner` 가 sql `compare_companies` 힌트 노출 여부 결정.
     """
     s = q or ""
     a = any(k in s for k in _RANK_STRUCT_SUBSTR) or bool(_RANK_ORDINAL_RE.search(s))
     if not a:
         return False
-    return any(m in s for m in KW_NUMERIC_METRIC)
+    return infer_compare_metric(s) is not None
 
 
 def rank_gate_mode() -> str:
@@ -144,8 +186,29 @@ def is_cross_store_ranking(q: str) -> bool:
     return any(k in (q or "") for k in _RANK_KEYWORD_LEGACY)   # keyword (default)
 
 
+def rank_route_mode() -> str:
+    """cross-store 랭킹 *라우팅* 모드 — env `ANXG_RANK_ROUTE` (게이트 발화 후 동작).
+
+    **default=deterministic** — 2026-06-17 실측으로 비회귀·우위 확인 후 llm→deterministic
+    플립(thesis §1). 측정(gold_qa_cross_store_paraphrase n=14):
+      - llm: EM 0.214/0.500/0.714 (동일코드 3-run 변동 0.50, floor 0.214)
+      - deterministic: EM 0.786/0.857 (변동 0.07, floor 0.786, 비용 −32%)
+      - main-62 비회귀: 0.742 == baseline (게이트 0-fire → B 미발화).
+
+    "deterministic"(기본) — 게이트 발화 시 룰이 graph→compare_companies 2-task 체인을
+        직접 구성(LLM 라우팅 우회). person/parent·year 부재면 None→LLM 폴백(안전).
+    "llm" — 구 동작(LLM planner 가 힌트 보고 emit). LLM 이 힌트를 비결정적으로 따라
+        (compare 체인 누락→search_documents 폴백) EM 이 흔들리던 결함의 출처(CSV 실증).
+        롤백·ablation 용으로 보존.
+    잔여: synth max/min 선택(0.786↔0.857)은 별도 LLM 단계 — 후속 결정화 대상.
+    """
+    mode = (os.getenv("ANXG_RANK_ROUTE") or "deterministic").strip().lower()
+    return mode if mode in ("llm", "deterministic") else "deterministic"
+
+
 __all__ = [
     "classify_question", "turn_budget_remaining", "turn_budget_exceeded",
     "select_tools",
-    "detect_cross_store_ranking", "rank_gate_mode", "is_cross_store_ranking",
+    "detect_cross_store_ranking", "infer_compare_metric", "rank_direction",
+    "rank_gate_mode", "is_cross_store_ranking", "rank_route_mode",
 ]
