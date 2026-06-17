@@ -97,5 +97,6 @@ class HybridAdapter(AgentAdapter):
             latency_sec=time.monotonic() - t0,
             cost_usd=float(state.get("llm_usage_usd") or 0.0),
             tokens_used=int(state.get("llm_tokens_used") or 0),
+            answer_confidence=state.get("answer_confidence"),
             diagnostics=diagnostics,
         )

@@ -157,7 +157,8 @@ TEMPLATES: dict[str, dict] = {
         "cypher": """
         MATCH (child:Anxg_Company)-[r:SUBSIDIARY_OF]->(parent:Anxg_Company {corp_code: $cc})
         WHERE $year IS NULL OR r.rcept_year = $year
-        RETURN child.corp_code AS child_corp_code,
+        RETURN r.confidence_score AS confidence,
+               child.corp_code AS child_corp_code,
                child.name      AS child_name,
                type(r)         AS relation,
                r.ownership_pct AS ownership_pct,
@@ -177,7 +178,8 @@ TEMPLATES: dict[str, dict] = {
         "cypher": """
         MATCH (child:Anxg_Company)-[r:SUBSIDIARY_OF|RELATED_TO]->(parent:Anxg_Company {corp_code: $cc})
         WHERE $year IS NULL OR r.rcept_year = $year
-        RETURN child.corp_code AS child_corp_code,
+        RETURN r.confidence_score AS confidence,
+               child.corp_code AS child_corp_code,
                child.name      AS child_name,
                type(r)         AS relation,
                r.ownership_pct AS ownership_pct,
@@ -197,7 +199,8 @@ TEMPLATES: dict[str, dict] = {
         "cypher": """
         MATCH (child:Anxg_Company)-[r:SUBSIDIARY_OF]->(parent:Anxg_Company)
         WHERE child.corp_code = $k OR child.name = $k
-        RETURN parent.corp_code AS parent_corp_code,
+        RETURN r.confidence_score AS confidence,
+               parent.corp_code AS parent_corp_code,
                parent.name      AS parent_name,
                r.ownership_pct  AS ownership_pct,
                r.snapshot_date  AS snapshot_date
@@ -216,7 +219,8 @@ TEMPLATES: dict[str, dict] = {
     "list_related_companies": {
         "cypher": """
         MATCH (child:Anxg_Company)-[r:RELATED_TO]->(parent:Anxg_Company {corp_code: $cc})
-        RETURN child.corp_code AS related_corp_code,
+        RETURN r.confidence_score AS confidence,
+               child.corp_code AS related_corp_code,
                child.name      AS related_name,
                r.ownership_pct AS ownership_pct,
                r.snapshot_date AS snapshot_date
@@ -238,7 +242,8 @@ TEMPLATES: dict[str, dict] = {
                OR r.role CONTAINS $role
                OR (r.duty IS NOT NULL AND r.duty CONTAINS $role))
           AND ($year IS NULL OR r.snapshot_year = $year)
-        RETURN p.name        AS name,
+        RETURN r.confidence_score AS confidence,
+               p.name        AS name,
                p.birth_year  AS birth_year,
                r.role        AS role,
                r.registered  AS registered,
@@ -261,7 +266,8 @@ TEMPLATES: dict[str, dict] = {
         "cypher": """
         MATCH (p:Anxg_Person {name: $name})-[r:EXECUTIVE_OF]->(c:Anxg_Company)
         WHERE $role IS NULL OR r.role CONTAINS $role
-        RETURN c.corp_code AS corp_code,
+        RETURN r.confidence_score AS confidence,
+               c.corp_code AS corp_code,
                c.name      AS company_name,
                r.role      AS role,
                r.snapshot_year AS snapshot_year
@@ -302,7 +308,8 @@ TEMPLATES: dict[str, dict] = {
         MATCH (h)-[r:MAJOR_SHAREHOLDER_OF]->(c:Anxg_Company {corp_code: $cc})
         WHERE r.ownership_pct >= $min_pct
           AND ($year IS NULL OR r.snapshot_year = $year)
-        RETURN labels(h)[0]   AS holder_kind,
+        RETURN r.confidence_score AS confidence,
+               labels(h)[0]   AS holder_kind,
                h.name         AS holder_name,
                h.corp_code    AS holder_corp_code,
                r.ownership_pct AS ownership_pct,

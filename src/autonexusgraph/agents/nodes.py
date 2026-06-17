@@ -967,6 +967,11 @@ def synthesizer_node(state: AgentState,
         })
     state["citations"] = cits[:10]
 
+    # answer confidence 전파 — 인용 엣지 등급(A/B/C) 또는 retrieval grounding 신뢰도.
+    # eval 예측 → calibrate_confidence.py 의 (confidence, em-correct) 분포 입력.
+    from .answering import compute_answer_confidence
+    state["answer_confidence"] = compute_answer_confidence(state)
+
     # 답변 grounding 검증 — LLM 답변이 evidence 와 일치하는지
     from .grounding import verify_answer_grounding
     grounding = verify_answer_grounding(

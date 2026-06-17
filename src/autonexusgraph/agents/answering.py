@@ -59,6 +59,40 @@ def avg_relation_confidence(items: list[dict]) -> float:
     return _clamp01(total / len(items))
 
 
+def compute_answer_confidence(state: Any) -> float | None:
+    """답변의 confidence 대표값 — 인용 evidence 의 grounding 신뢰도(0~1) 또는 None.
+
+    우선순위:
+      1. **graph 엣지 confidence** — tool_results row 가 ``confidence``(A/B/C 등급 =
+         confidence_score) 를 보유하면 그 **최소값**(답은 가장 약한 인용 엣지만큼만 신뢰).
+         cypher 템플릿이 ``r.confidence_score AS confidence`` 를 RETURN 할 때 활성.
+      2. **retrieval score 평균** — 인용 chunk 의 코사인 score 평균(검색 grounding 신뢰도).
+      3. 둘 다 없으면 None(구조 evidence 부재 — calibration 표본에서 제외).
+
+    `scripts/audit/calibrate_confidence.py` 가 (confidence, em-correct) 분포로 Platt
+    scaling + reliability diagram 을 산출 → README §4.0 A/B/C 매핑 reverse-feed.
+    """
+    edge_confs: list[float] = []
+    for tr in (state.get("tool_results") or []):
+        res = tr.get("result")
+        if not isinstance(res, list):
+            continue
+        for row in res:
+            if isinstance(row, dict) and row.get("confidence") is not None:
+                try:
+                    edge_confs.append(float(row["confidence"]))
+                except (TypeError, ValueError):
+                    continue
+    if edge_confs:
+        return _clamp01(min(edge_confs))
+
+    scores = [float(c["score"]) for c in (state.get("citations") or [])
+              if isinstance(c, dict) and c.get("score") is not None]
+    if scores:
+        return _clamp01(sum(scores) / len(scores))
+    return None
+
+
 def format_relation(rel: dict) -> str:
     """relation dict → 한국어 한 줄.
 
@@ -181,6 +215,6 @@ def build_deterministic_brief(state: Mapping[str, Any]) -> str:
 
 
 __all__ = [
-    "rel_type_kor", "avg_relation_confidence", "format_relation",
+    "rel_type_kor", "avg_relation_confidence", "compute_answer_confidence", "format_relation",
     "format_tool_result", "build_deterministic_brief",
 ]
