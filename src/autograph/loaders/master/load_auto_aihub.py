@@ -38,6 +38,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from autograph.loaders._pg_helpers import savepoint_guard
 from autograph.ontology import canonical_system_code
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.neo4j import get_driver
@@ -383,15 +384,13 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
     with conn.cursor() as cur:
         # 1) 컴포넌트 master UPSERT
         for (model, canonical, system_code, korean), classes in model_comp_classes.items():
-            cur.execute("SAVEPOINT sp_comp")
             try:
-                cid = _upsert_component(cur,
-                    canonical_name=canonical, system_code=system_code,
-                    aliases=[korean], source="aihub_71347")
-                cur.execute("RELEASE SAVEPOINT sp_comp")
+                with savepoint_guard(cur, "sp_comp"):
+                    cid = _upsert_component(cur,
+                        canonical_name=canonical, system_code=system_code,
+                        aliases=[korean], source="aihub_71347")
                 stats.components_inserted += 1
             except Exception as e:  # noqa: BLE001 — [load_auto_aihub] 1 unit 실패 흡수 → continue (부분 성공 보존)
-                cur.execute("ROLLBACK TO SAVEPOINT sp_comp")
                 stats.errors.append(f"71347 component {canonical}: {e}")
                 continue
 
@@ -399,24 +398,22 @@ def load_71347(*, dry_run: bool = False) -> LoadStats:
             mfr_id, model_id, resolved_name = _resolve_model(cur, model)
             text = _summary_text_71347(model, system_code, korean, classes)
             uniq = f"aihub_71347::{model}::{canonical}"
-            cur.execute("SAVEPOINT sp_chunk")
             try:
-                op = _upsert_chunk(cur,
-                    uniq=uniq, source="aihub_71347", text=text,
-                    manufacturer_id=mfr_id, model_id=model_id, variant_id=None,
-                    metadata={
-                        "uniq": uniq, "section": "auto.component_defect",
-                        "car_model": model, "component": canonical,
-                        "system_code": system_code, "class_counts": classes,
-                        "dataset_id": 71347,
-                    })
-                cur.execute("RELEASE SAVEPOINT sp_chunk")
+                with savepoint_guard(cur, "sp_chunk"):
+                    op = _upsert_chunk(cur,
+                        uniq=uniq, source="aihub_71347", text=text,
+                        manufacturer_id=mfr_id, model_id=model_id, variant_id=None,
+                        metadata={
+                            "uniq": uniq, "section": "auto.component_defect",
+                            "car_model": model, "component": canonical,
+                            "system_code": system_code, "class_counts": classes,
+                            "dataset_id": 71347,
+                        })
                 if op == "inserted":
                     stats.chunks_inserted += 1
                 elif op == "updated":
                     stats.chunks_updated += 1
             except Exception as e:  # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
-                cur.execute("ROLLBACK TO SAVEPOINT sp_chunk")
                 stats.errors.append(f"71347 chunk {uniq}: {e}")
 
             # 3) Neo4j edge 후보 — name prefix 매칭 (AI Hub 'IONIQ' → vPIC 'Ioniq', 'Ioniq 5'...).

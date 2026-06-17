@@ -127,6 +127,79 @@ def _validate_tasks(state: AgentState, raw_tasks: list, catalog: dict[str, list[
     return out
 
 
+# 한국어 조사/dual-josa(말미 '…이(가)') — 선두 인물 토큰 정규화용.
+_JOSA_SUFFIXES = (
+    "이(가)", "은(는)", "을(를)", "와(과)", "이(은)",
+    "가", "이", "은", "는", "을", "를", "와", "과", "의", "도", "만",
+)
+
+
+def _extract_lead_person(q: str) -> str | None:
+    """질문 선두 토큰에서 인물명 추출 — 조사/dual-josa 제거 후 lookup_person 검증.
+
+    triage 의 deterministic 추출은 동명이인(`len==1`)을 거부하지만, 본 추출은 *이름*만
+    필요(get_companies_of_person 가 동명이인 포함 traverse)하므로 ≥1 exact 매치면 채택.
+    cross-store gold 의 'PERSON이(가) 임원으로 재직' 형태(선두 subject) 대응. None 이면
+    B 가 LLM 경로로 안전 폴백.
+    """
+    from ..tools.graph import lookup_person
+    head = (q or "").strip().split()
+    if not head:
+        return None
+    cand = head[0]
+    for suf in _JOSA_SUFFIXES:
+        if cand.endswith(suf) and len(cand) > len(suf) + 1:
+            cand = cand[: -len(suf)]
+            break
+    cand = cand.strip()
+    if len(cand) < 2:
+        return None
+    try:
+        rows = lookup_person(cand, limit=3)
+    except Exception:   # noqa: BLE001 — Neo4j lookup 실패 → 폴백
+        return None
+    return cand if any((r.get("name") == cand) for r in rows) else None
+
+
+def _deterministic_cross_store_plan(
+    *, persons: list, targets: list, q: str, year_hint: int | None,
+) -> list[dict] | None:
+    """게이트 발화 cross-store 랭킹 → graph→compare_companies 결정적 2-task 체인.
+
+    출발 엔티티 우선순위: person(임원 재직 회사) > parent corp_code(자회사). field 바인딩
+    은 도구 반환 스키마 그대로 — get_companies_of_person→``corp_code`` /
+    list_subsidiaries→``child_corp_code``. metric 은 policy SSOT(`infer_compare_metric`).
+    compare_companies 는 year 필수 → year_hint 없으면 None(→LLM 폴백). 측정 gold(CDN-*)
+    는 person→get_companies_of_person→compare 형태라 본 결정적 경로가 전부 커버.
+    """
+    if not year_hint:
+        return None
+    from .policy import infer_compare_metric, rank_direction
+    metric = infer_compare_metric(q) or "revenue"
+    direction = rank_direction(q)   # 답이 첫 행에 오게 → synth max/min 결정화
+
+    # persons 가 triage 에서 비어있을 수 있다(동명이인 거부 등) — B-local 추출로 보강.
+    person = persons[0] if persons else _extract_lead_person(q)
+    if person:
+        graph = make_task("g_xstore", "graph", "get_companies_of_person",
+                          {"name": person})
+        field = "corp_code"
+    elif targets:
+        graph = make_task("g_xstore", "graph", "list_subsidiaries",
+                          {"parent_corp_code": targets[0]})
+        field = "child_corp_code"
+    else:
+        return None
+
+    rank = make_task(
+        "s_xstore", "sql", "compare_companies",
+        {"corp_codes": {"$from": "g_xstore", "field": field, "collect": True},
+         "year": year_hint, "metric": metric, "direction": direction},
+        depends_on=["g_xstore"],
+    )
+    return [graph, rank]
+
+
 def try_llm_plan(state: AgentState, *, kind: str, targets: list,
                  year_hint: int | None, q: str,
                  replan_hint: dict | None = None,
@@ -139,19 +212,37 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
     """
     if not q:
         return None
-    from .policy import turn_budget_exceeded
+    from .policy import (
+        is_cross_store_ranking,
+        rank_route_mode,
+        turn_budget_exceeded,
+    )
     if turn_budget_exceeded(state):
         return None
+
+    # ── B: 게이트 발화 cross-store 랭킹 → 결정적 라우팅(opt-in) ──────────────
+    # LLM 이 compare 힌트를 비결정적으로 따라 EM 0.214↔0.500 변동하던 결함 제거 —
+    # 게이트 발화 시 graph→compare_companies 2-task 체인을 룰이 직접 구성(LLM 우회).
+    # 빌드 불가(person/parent·year 부재)면 None → 기존 LLM 경로로 폴백(안전).
+    if rank_route_mode() == "deterministic" and is_cross_store_ranking(q):
+        det = _deterministic_cross_store_plan(
+            persons=persons or [], targets=targets or [],
+            q=q, year_hint=year_hint)
+        if det:
+            log.info("[llm_planner] 결정적 cross-store 라우팅 — tasks=%d (LLM 우회)",
+                     len(det))
+            return det
 
     catalog = _tool_catalog(state)
     targets_line = ", ".join(map(str, targets)) if targets else "(미식별)"
     persons_line = ", ".join(map(str, persons)) if persons else "(없음)"
     # 수치 랭킹 힌트는 랭킹 질문에만 노출 — 비-랭킹 질문(GMH/GMI 등)에 길게 실으면
-    # planner 가 compare_companies 로 오라우팅돼 회귀(main 62 −24pp 관측). 키워드 게이트.
+    # planner 가 compare_companies 로 오라우팅돼 회귀(main 62 −24pp 관측). 게이트 필수.
+    # 게이트 판정은 `policy.is_cross_store_ranking` 으로 위임 — env `ANXG_RANK_GATE`
+    # (off|keyword|structural) 모드 디스패치. structural = 비교·서열 구조 ∧ 수치 metric
+    # 으로 패러프레이즈("매출 1위"·"순위가 가장 높은")까지 일반화(thesis §1 잔여 과제).
     _q_rank = q or ""
-    _is_ranking = any(k in _q_rank for k in (
-        "가장 큰", "가장 작은", "가장 높은", "가장 낮은", "최대", "최소",
-        "가장 많은", "가장 적은", "최고", "최저"))
+    _is_ranking = is_cross_store_ranking(q)
     # 관계기업·공동기업(지분법 피투자, 5~50%) 질문 — RELATED_TO. 자회사(SUBSIDIARY_OF)와 구분.
     _is_related = any(k in _q_rank for k in (
         "관계기업", "공동기업", "피투자", "지분법", "유의적인 영향력", "공동지배"))
@@ -190,13 +281,19 @@ def try_llm_plan(state: AgentState, *, kind: str, targets: list,
             "회사를 묻는 질문이다. graph `list_related_companies`(corp_code=대상회사) 로 구하라 — "
             "`list_subsidiaries`(자회사=50%+)와 구분된다.\n") if _is_related else "")
         + ((
-            "[수치 랭킹 — graph+SQL cross-store] 여러 회사를 수치로 비교·랭킹하는 질문이다. "
-            "① 먼저 graph 로 후보 회사들을 구하고(예: `get_companies_of_person`·`list_subsidiaries`) "
+            "[수치 랭킹 — graph+SQL cross-store] 여러 회사를 수치로 비교·랭킹하는 질문이다 — "
+            "표현이 '가장 큰/작은' 이든 '1위/순위/상위/하위' 든 '큰 순/작은 순' 이든 '더 많은/더 적은' "
+            "이든 '최하위' 든 **모두 동일한 수치 랭킹**이다. **반드시 아래 2-task 체인을 생성하라 "
+            "— research/search_documents 단독으로 대체하면 오답이다.** "
+            "① 먼저 graph 로 후보 회사들을 구한다: 인물 출발이면 `get_companies_of_person`(name=인물), "
+            "모회사·그룹 출발이면 `list_subsidiaries`(parent_corp_code=대상). "
             "② sql `compare_companies` 한 번으로 `corp_codes` 인자에 "
             "`{\"$from\":\"<graph task id>\",\"field\":\"corp_code\",\"collect\":true}` "
-            "(collect=true 로 후보 전체를 리스트 전달) + year + metric('revenue'|'operating_income') 을 "
-            "넣어 전 회사 값을 한 번에 받아라 — get_revenue 를 회사마다 따로 만들지 말 것(fan-out 미지원). "
-            "calculator 도 만들지 말 것 — 최대/최소 선택은 합성 단계가 처리한다.\n"
+            "(collect=true 로 후보 전체를 리스트 전달) + year + "
+            "metric('revenue'=매출 | 'operating_income'=영업이익 | 'net_income'=순이익/당기순이익, "
+            "질문 어휘에 맞춰 하나) 을 넣어 전 회사 값을 한 번에 받아라 — get_revenue 를 "
+            "회사마다 따로 만들지 말 것(fan-out 미지원). "
+            "calculator 도 만들지 말 것 — 최대/최소 선택은 합성 단계가 질문 방향대로 처리한다.\n"
         ) if _is_ranking else "")
         + f"[연도 hint] {year_hint if year_hint else '(없음)'}\n\n"
         f"[허용 도구]\n"

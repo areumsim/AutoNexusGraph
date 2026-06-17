@@ -21,16 +21,21 @@ helper 가 합리적 기본값으로 보강 (year=현재, schema_version=ontolog
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+# 제네릭 로직은 common.neo4j_loader SSOT — 본 모듈은 **auto 도메인 ontology 바인딩**
+# (meta keys + schema_version) thin 어댑터. run_batched 는 도메인 무관이라 그대로 re-export.
+# (ipgraph 도 동일 패턴으로 common 을 자기 ontology 와 바인딩 — 이전의 ip→auto private
+#  cross-import + schema_version cross-domain fallback 결함 해소. common/neo4j_loader.py 참조.)
+from common.neo4j_loader import edge_meta_cypher as _edge_meta_cypher
+from common.neo4j_loader import run_batched  # noqa: F401 — 도메인 무관, 재노출
 
 from ..ontology import load_edge_required_meta, ontology_schema_version
 
-# 의무 메타 키 — ontology SSOT.
+# 의무 메타 키 — auto ontology SSOT.
 EDGE_META_KEYS: tuple[str, ...] = load_edge_required_meta()
 
 
 def default_schema_version() -> str:
-    """현재 적재 시점의 기본 schema_version — ontology 헤더 SoT.
+    """현재 적재 시점의 기본 schema_version — auto ontology 헤더 SoT.
 
     ontology/auto/relations.yaml 의 ``schema_version`` 헤더 값을 lazy 회수 (캐시).
     헤더 미설정 시 'v0' (legacy) 반환. 호출자가 row dict 에 schema_version 박지
@@ -46,41 +51,13 @@ DEFAULT_SCHEMA_VERSION = ontology_schema_version()
 
 
 def edge_meta_cypher(rel_var: str = "r") -> str:
-    """모든 의무 메타를 한 줄 SET 절로.
+    """auto 도메인 의무 메타를 한 줄 SET 절로 (auto ontology 바인딩).
 
     rows 의 각 dict 는 EDGE_META_KEYS 모두 포함해야 한다. ``snapshot_year`` 와
-    ``schema_version`` 만 누락 시 helper 가 보강 — schema_version 은 ontology
+    ``schema_version`` 만 누락 시 helper 가 보강 — schema_version 은 auto ontology
     헤더 (default_schema_version()) 자동 부여.
     """
-    sv = default_schema_version()
-    pieces: list[str] = []
-    for key in EDGE_META_KEYS:
-        if key == "snapshot_year":
-            pieces.append(f"{rel_var}.{key} = coalesce(r.{key}, date().year)")
-        elif key == "schema_version":
-            pieces.append(
-                f"{rel_var}.{key} = coalesce(r.{key}, '{sv}')"
-            )
-        else:
-            pieces.append(f"{rel_var}.{key} = r.{key}")
-    return ",\n      ".join(pieces)
-
-
-def run_batched(session, cypher: str, rows: Sequence[dict], batch: int = 500) -> int:
-    """``session.run(cypher, rows=chunk)`` 를 ``batch`` 단위로 반복.
-
-    rows 가 비어 있으면 0 반환. cypher 는 ``UNWIND $rows AS r`` 로 시작하는 것을 가정.
-    """
-    if not rows:
-        return 0
-    n = 0
-    for i in range(0, len(rows), batch):
-        chunk = rows[i:i + batch]
-        if not chunk:
-            continue
-        session.run(cypher, rows=chunk)
-        n += len(chunk)
-    return n
+    return _edge_meta_cypher(EDGE_META_KEYS, default_schema_version(), rel_var)
 
 
 __all__ = [

@@ -357,6 +357,15 @@ def _apply_replan_widen(state: AgentState) -> None:
         args["top_k"] = min(cur + 4 * n, 20)
 
 
+# compare_companies 수치 metric 추론 — SSOT 는 `policy.infer_compare_metric`(게이트와 공유).
+# 룰 planner 가 다회사 비교 task(자회사 매출 비교 등)를 만들 때 metric 을 질문에 맞춘다.
+# 미매칭은 revenue 기본 — 이 경로는 metric 이 암시적인 "자회사 비교" 컨텍스트라 안전.
+# (게이트는 policy 의 strict 버전[None 반환]을 써 미지원 metric 발화를 막는다 — 역할 분리.)
+def _infer_compare_metric(q: str) -> str:
+    from .policy import infer_compare_metric
+    return infer_compare_metric(q) or "revenue"
+
+
 # ── Planner ─────────────────────────────────────────────────
 def planner_node(state: AgentState) -> AgentState:
     """질문 유형 + 회사 → task DAG (PRD §7.5.2 / §7.5.3).
@@ -535,12 +544,13 @@ def planner_node(state: AgentState) -> AgentState:
         # graph 결과(child_corp_code)에서 **런타임 도출**. depends_on 이 선언만이 아니라
         # 실제 데이터가 흐른다. year 없으면 compare_companies 가 동작 못 하므로 생략.
         if year_hint:
+            metric = _infer_compare_metric(q)
             for gid in graph_ids:
                 tasks.append(make_task(
                     _next_id("sql_"), "sql", "compare_companies",
                     {"corp_codes": {"$from": gid, "field": "child_corp_code",
                                     "collect": True},
-                     "year": year_hint, "metric": "revenue"},
+                     "year": year_hint, "metric": metric},
                     depends_on=[gid],
                 ))
         # ReAct mid-execution fan-out: 발견된 자회사마다 영업이익을 개별 조회.
@@ -1074,8 +1084,18 @@ def _build_context(state: AgentState, *,
     if tools_out:
         parts.append("[도구 결과]")
         for t in tools_out:
-            preview = str(t.get("result"))[:1000]
+            res = t.get("result")
+            preview = str(res)[:1000]
             parts.append(f"- {t['tool']} ({t.get('purpose','')}): {preview}")
+            # 랭킹 결과(compare_companies)는 A-1 direction 정렬로 **첫 행이 질문 방향의 답**.
+            # synth 가 구조데이터-only 를 'no_evidence' 로 오인해 '정보 부족' 거부하던 결함
+            # (A-1b: MIN003/007, compare 는 정답 회수했으나 미서술) 방지 — 정답 명시.
+            if (t.get("tool") == "compare_companies"
+                    and isinstance(res, list) and res
+                    and isinstance(res[0], dict) and res[0].get("name")):
+                parts.append(
+                    f"  → 위 비교의 1위(질문 방향 기준 정답): {res[0]['name']} "
+                    f"— 구조화 도구 결과는 그 자체로 충분한 근거이니 '정보 부족' 으로 거부하지 말 것.")
         parts.append("")
 
     ev = sanitized_evidence if sanitized_evidence is not None else (state.get("evidence_chunks") or [])
@@ -1091,8 +1111,23 @@ def _build_context(state: AgentState, *,
             )
         parts.append("")
 
-    parts.append("위 근거만 사용해 한국어로 답변하고, 끝에 [출처:...] 인용을 남기세요. "
-                  "근거 부족 시 '정보 부족' 으로 답하세요.")
+    # A-1c: 사용 가능한 구조화 도구 결과(graph/sql, 검색 제외)가 있으면 그 자체로 충분한
+    # 근거 — 문서 인용 부재를 이유로 '정보 부족' 거부하던 결함(A-1b 를 compare_companies →
+    # graph 리스트 답[자회사·임원 등]까지 일반화). 빈/에러 결과만이면(usable 0) 보수 지시 유지
+    # → refusal 보존(추측 금지는 양쪽 공통).
+    _structured = any(
+        _has_usable_result(t)
+        and t.get("tool") not in ("search_documents", "search_documents_auto")
+        for t in tools_out
+    )
+    if _structured:
+        parts.append(
+            "위 [도구 결과]의 구조화 데이터(graph/sql)는 정확한 근거다 — 이를 토대로 답하고, "
+            "문서 인용이 없다는 이유로 '정보 부족' 으로 거부하지 말 것. 단 [도구 결과]·[본문 인용]에 "
+            "**없는 내용은 추측 금지**. 끝에 [출처:...] 인용을 남기세요.")
+    else:
+        parts.append("위 근거만 사용해 한국어로 답변하고, 끝에 [출처:...] 인용을 남기세요. "
+                     "근거 부족 시 '정보 부족' 으로 답하세요.")
     return "\n".join(parts)
 
 

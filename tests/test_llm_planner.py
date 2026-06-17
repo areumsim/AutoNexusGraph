@@ -113,8 +113,13 @@ def _capture_prompt(q):
     return cap.last_user
 
 
-def test_ranking_hint_only_on_ranking_questions():
-    """수치 랭킹 힌트는 랭킹 키워드 질문에만 — 비-랭킹(GMH/GMI)엔 미노출(main 회귀 방지)."""
+def test_ranking_hint_only_on_ranking_questions(monkeypatch):
+    """수치 랭킹 힌트는 랭킹 키워드 질문에만 — 비-랭킹(GMH/GMI)엔 미노출(main 회귀 방지).
+
+    힌트는 `ANXG_RANK_ROUTE=llm`(롤백·ablation) 경로 동작 — default=deterministic 은
+    게이트 발화 시 B 가 LLM 우회(힌트 미생성)하므로 본 가드는 llm 모드를 고정해 검증.
+    """
+    monkeypatch.setenv("ANXG_RANK_ROUTE", "llm")
     # 'compare_companies' 는 SQL intent 카탈로그에 항상 등장 → 힌트 마커('수치 랭킹')로 게이팅 검증.
     rank_q = "김영규이 임원으로 재직하는 회사 중 2023년 매출이 가장 큰 회사는?"
     plain_q = "김영규이 임원으로 재직하는 회사의 자회사는 무엇인가?"

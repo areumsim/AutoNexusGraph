@@ -5,8 +5,10 @@
 2. self-reported insufficient: 답변이 "정보 부족" / "데이터 없음" 자기 신고면 early pass
    (replan 의미 없음 — 데이터 자체가 없는 상황)
 3. language (language_non_korean): 한국어 비율이 너무 낮으면 fail (language_guard.check_korean)
-4. grounding overlap: token overlap < HARD_FAIL 이면 fail (verify_answer_grounding 사용).
-   narrative / multi_hop 질문은 grounding warning 만 추가 (hard fail 아님)
+4. grounding overlap: verify_answer_grounding 으로 token overlap 측정 — **soft 전용**(replan
+   유발 안 함). narrative / multi_hop 질문이 low-overlap 이면 grounding warning 만 추가하고,
+   factual / structural 은 grounding 검사를 하지 않는다(수치는 §5 number guard, 엣지는 §6
+   confidence 가 hard-fail 담당). 과거 hard-fail 은 파괴적 replan 유발로 soft 화됨(S-7).
 5. financial number safety (hallucinated_numbers): 답변에 등장한 큰 숫자가 도구 결과 / evidence
    에서 나온 수치인지 cross-check — 환각 방지 (PRD §7.3 "재무 수치는 절대 LLM 이 생성하지 않는다").
    number_guard 와 SSOT 공유 (_number_patterns.py)

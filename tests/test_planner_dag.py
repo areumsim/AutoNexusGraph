@@ -65,6 +65,26 @@ def test_multi_hop_chains_sql_after_graph():
     assert all(not t["depends_on"] for t in research_tasks)
 
 
+def test_infer_compare_metric_maps_question_vocab():
+    from autonexusgraph.agents.nodes import _infer_compare_metric
+    assert _infer_compare_metric("영업이익이 가장 큰 자회사") == "operating_income"
+    assert _infer_compare_metric("당기순이익 1위") == "net_income"
+    assert _infer_compare_metric("순이익 순위") == "net_income"
+    assert _infer_compare_metric("매출이 가장 큰 곳") == "revenue"
+    assert _infer_compare_metric("") == "revenue"   # 기본 보존
+
+
+def test_multi_hop_compare_companies_uses_inferred_metric():
+    # 연도 + '영업이익' → compare_companies 가 operating_income 으로 비교 (revenue 고정 해소).
+    s = _state("multi_hop", targets=["00126380"],
+               q="삼성전자 자회사 중 2023년 영업이익이 가장 큰 곳은?")
+    planner_node(s)
+    cmp_tasks = [t for t in s["tasks"]
+                 if t["agent"] == "sql" and t["intent"] == "compare_companies"]
+    assert cmp_tasks, "compare_companies task 가 생성돼야 함 (연도 존재)"
+    assert all(t["args"]["metric"] == "operating_income" for t in cmp_tasks)
+
+
 def test_unknown_falls_back_to_research():
     s = _state("unknown", q="모호한 질문")
     planner_node(s)

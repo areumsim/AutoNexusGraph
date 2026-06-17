@@ -92,17 +92,82 @@ def _read_latest_ipgraph_audit() -> tuple[dict, str] | None:
         return None
 
 
+def _live_tool_count() -> int | None:
+    """현행 MCP typed tool pool 길이 — 드리프트 자동 감지용 (DoD §10.17.a)."""
+    try:
+        from autonexusgraph.mcp.discovery import build_tool_manifest
+        return len(build_tool_manifest("all"))
+    except Exception:   # noqa: BLE001 — discovery 실패 시 cross-check 생략
+        return None
+
+
+def _thesis_from_authoritative_gold() -> dict[str, Any] | None:
+    """DoD §10.7 권위 출처 — 62문항 thesis gold(graph_multihop_v0)의 eval-full 실측.
+
+    matrix smoke(소형·잡음 gold — diff −87~+25%p 변동, n≤8)는 thesis 증거가 아니다.
+    실제 thesis 측정은 ``gold_qa_graph_multihop_v0`` (62문항) eval-full 의 hybrid·vector
+    multi_hop_em. 둘이 같은 run 에 없어도(S-7 fix 후 hybrid-only re-run, vector 는 안정
+    baseline) 각 최신 비-degenerate 실측을 합성한다 — 두 출처 run 을 detail 에 명시.
+    """
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2]
+    gold = "gold_qa_graph_multihop_v0"
+    runs = sorted((root / "eval" / "reports").glob("*/manifest.json"),
+                  key=lambda p: p.stat().st_mtime, reverse=True)
+    hybrid = vector = None   # 각 (em, run_name, sha)
+    for mpath in runs:
+        try:
+            with mpath.open() as f:
+                m = json.load(f)
+        except Exception:   # noqa: BLE001
+            continue
+        if gold not in (m.get("gold") or ""):
+            continue
+        sha = ((m.get("git") or {}).get("sha") or "")[:9]
+        run = mpath.parent.name
+        for label, s in (m.get("summary") or {}).items():
+            em = s.get("multi_hop_em")
+            if em is None:
+                continue
+            # hybrid==0.0 은 S-7 pre-fix degenerate(측정 결함) — 스킵.
+            if label.startswith("hybrid") and hybrid is None and em > 0.0:
+                hybrid = (em, run, sha)
+            elif label.startswith("vector") and vector is None:
+                vector = (em, run, sha)
+        if hybrid and vector:
+            break
+    if not (hybrid and vector):
+        return None
+    diff = (hybrid[0] - vector[0]) * 100.0
+    met = diff >= 30.0
+    same_run = hybrid[1] == vector[1]
+    prov = (f"{hybrid[1]}@{hybrid[2]} 동일 run" if same_run
+            else f"hybrid {hybrid[1]}@{hybrid[2]} + vector {vector[1]}@{vector[2]} 별도 run 합성")
+    return {
+        "status": "pass" if met else "fail",
+        "detail": (f"Hybrid−Vector multi-hop = {diff:+.1f}%p {'≥' if met else '<'} +30%p · "
+                   f"hybrid {hybrid[0]:.3f} vs vector {vector[0]:.3f} · "
+                   f"gold={gold} n=62 [eval-full 실측 · {prov}]"),
+    }
+
+
 def _collect_thesis_audit() -> dict[str, Any]:
     """DoD §10.7 — Hybrid vs Vector multi-hop +30%p 자동 측정.
 
     우선순위:
-      1. data/reports/audit_eval_matrix_*.json 의 ``thesis`` (run_matrix_smoke --full)
-      2. eval/reports/<latest>/manifest.json 의 ``hybrid_vs_vector`` (run_qa_eval)
+      1. 62문항 thesis gold(graph_multihop_v0) eval-full 실측 (권위 — _thesis_from_authoritative_gold)
+      2. data/reports/audit_eval_matrix_*.json 의 ``thesis`` (run_matrix_smoke --full, 소형 smoke)
+      3. eval/reports/<latest>/manifest.json 의 ``hybrid_vs_vector`` (run_qa_eval)
     """
     from pathlib import Path as _P
     root = _P(__file__).resolve().parents[2]
 
-    # 1순위 — audit_eval_matrix_*.json.
+    # 1순위 — 권위 thesis gold(62문항) eval-full 실측.
+    auth = _thesis_from_authoritative_gold()
+    if auth:
+        return auth
+
+    # 2순위 — audit_eval_matrix_*.json (소형 smoke gold — 잡음 큼).
     matrices = sorted((root / "data" / "reports").glob("audit_eval_matrix_*.json"))
     for matrix_path in reversed(matrices):
         try:
@@ -265,8 +330,10 @@ def _collect_mcp_audit() -> dict[str, Any]:
                 "detail": f"SDK 미설치 — wire-up only ({n_tools} tools discovered). pip install mcp 후 PASS ({latest.name})"}
     if payload.get("passed"):
         n_tools = payload.get("n_tools", 0)
+        live = _live_tool_count()
+        drift = f" · live={live}" if live is not None and live != n_tools else ""
         return {"id": "10.17.a", "status": "pass",
-                "detail": f"{n_tools} tools + server boot OK ({latest.name})"}
+                "detail": f"{n_tools} tools + server boot OK{drift} ({latest.name})"}
     return {"id": "10.17.a", "status": "fail",
             "detail": f"FAIL — {payload.get('reason', '?')} ({latest.name})"}
 
@@ -304,7 +371,8 @@ def _collect_eval_matrix_audit() -> dict[str, Any]:
     thesis = payload.get("thesis", {})
     if mode == "simulation":
         return {"id": "10.17.d", "status": "partial",
-                "detail": f"wire-up only ({n_cells} cells enumerate) — full 측정은 LLM 키 필요 ({latest.name})"}
+                "detail": f"wire-up only ({n_cells} cells enumerate) — full 측정은 LLM 키 필요. "
+                          f"thesis 실측은 §10.7 (eval-full 권위 gold) 참조 ({latest.name})"}
     # full 모드 — thesis.target_met 까지 검사.
     if thesis.get("available") and thesis.get("target_met"):
         return {"id": "10.17.d", "status": "pass",
