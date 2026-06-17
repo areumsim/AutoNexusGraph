@@ -41,6 +41,7 @@ from typing import Any
 
 import psycopg
 
+from autograph.loaders._pg_helpers import savepoint_guard
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
@@ -308,17 +309,15 @@ def load_vpic(*, dry_run: bool = False) -> LoadStats:
         if all_makes.exists():
             data = json.loads(all_makes.read_text(encoding="utf-8"))
             for m in data.get("Results") or []:
-                cur.execute("SAVEPOINT sp_vpic_mfr")
                 try:
-                    _ensure_manufacturer(cur,
-                        manufacturer_id=int(m["Make_ID"]),
-                        name=m["Make_Name"],
-                        source="nhtsa_vpic",
-                        source_ref=str(m["Make_ID"]))
-                    cur.execute("RELEASE SAVEPOINT sp_vpic_mfr")
+                    with savepoint_guard(cur, "sp_vpic_mfr", errors=_ROW_LEVEL_ERRORS):
+                        _ensure_manufacturer(cur,
+                            manufacturer_id=int(m["Make_ID"]),
+                            name=m["Make_Name"],
+                            source="nhtsa_vpic",
+                            source_ref=str(m["Make_ID"]))
                     stats.inserted += 1
                 except _ROW_LEVEL_ERRORS as e:
-                    cur.execute("ROLLBACK TO SAVEPOINT sp_vpic_mfr")
                     stats.errors.append(f"vpic make {m.get('Make_ID')}: {e}")
 
         # 2) {make}/{year}/variants.jsonl → models + variants

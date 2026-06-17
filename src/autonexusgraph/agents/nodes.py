@@ -357,6 +357,20 @@ def _apply_replan_widen(state: AgentState) -> None:
         args["top_k"] = min(cur + 4 * n, 20)
 
 
+# compare_companies 수치 metric 추론 — 질문 어휘 → revenue/operating_income/net_income.
+# 룰 planner 가 다회사 비교 task 를 만들 때 metric 을 질문에 맞춘다 (기존 revenue 고정 →
+# '영업이익/순이익이 가장 큰' 류가 매출로 비교돼 오답이던 한계 해소). compare_companies
+# 가 지원하는 3 metric(`financials._METRIC_ACCOUNTS`)만 반환 — 미매칭은 revenue(기존 보존).
+# LLM planner 경로는 힌트가 이미 metric 을 질문 기반으로 고르므로(llm_planner.py) 무관.
+def _infer_compare_metric(q: str) -> str:
+    s = q or ""
+    if "영업이익" in s:
+        return "operating_income"
+    if "순이익" in s:   # '당기순이익' 부분일치 포함
+        return "net_income"
+    return "revenue"
+
+
 # ── Planner ─────────────────────────────────────────────────
 def planner_node(state: AgentState) -> AgentState:
     """질문 유형 + 회사 → task DAG (PRD §7.5.2 / §7.5.3).
@@ -535,12 +549,13 @@ def planner_node(state: AgentState) -> AgentState:
         # graph 결과(child_corp_code)에서 **런타임 도출**. depends_on 이 선언만이 아니라
         # 실제 데이터가 흐른다. year 없으면 compare_companies 가 동작 못 하므로 생략.
         if year_hint:
+            metric = _infer_compare_metric(q)
             for gid in graph_ids:
                 tasks.append(make_task(
                     _next_id("sql_"), "sql", "compare_companies",
                     {"corp_codes": {"$from": gid, "field": "child_corp_code",
                                     "collect": True},
-                     "year": year_hint, "metric": "revenue"},
+                     "year": year_hint, "metric": metric},
                     depends_on=[gid],
                 ))
         # ReAct mid-execution fan-out: 발견된 자회사마다 영업이익을 개별 조회.

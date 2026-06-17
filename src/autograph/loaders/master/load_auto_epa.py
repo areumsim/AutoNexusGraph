@@ -55,6 +55,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from autograph.loaders._pg_helpers import savepoint_guard
 from autonexusgraph.config import get_settings
 from autonexusgraph.db.postgres import get_connection
 from autonexusgraph.ingestion._common import normalize_corp_name
@@ -255,38 +256,36 @@ def _process_row(cur, row: dict, stats: LoadStats,
     source_ref = f"{make}|{model}|{year}|epaid={row.get('id', '')}"
 
     for vid in variant_ids:
-        cur.execute("SAVEPOINT sp_epa")
         try:
-            # 같은 source 기존 row 모두 삭제 (멱등).
-            cur.execute("""
-                DELETE FROM anxg_auto.spec_measurements
-                 WHERE variant_id = %s AND source = %s
-            """, (vid, _SOURCE_KEY))
-            deleted = cur.rowcount
-
-            inserted = 0
-            for measure_key, v_num, v_text, unit in measurements:
+            with savepoint_guard(cur, "sp_epa"):
+                # 같은 source 기존 row 모두 삭제 (멱등).
                 cur.execute("""
-                    INSERT INTO anxg_auto.spec_measurements
-                      (variant_id, measure_key, value_num, value_text, unit,
-                       source, source_ref, confidence, validated_status,
-                       snapshot_year, raw)
-                    VALUES (%s, %s, %s, %s, %s,
-                            %s, %s, %s, 'verified',
-                            %s, %s::jsonb)
-                """, (
-                    vid, measure_key, v_num, v_text, unit or None,
-                    _SOURCE_KEY, source_ref, _CONFIDENCE,
-                    year, raw_json,
-                ))
-                inserted += 1
-            cur.execute("RELEASE SAVEPOINT sp_epa")
+                    DELETE FROM anxg_auto.spec_measurements
+                     WHERE variant_id = %s AND source = %s
+                """, (vid, _SOURCE_KEY))
+                deleted = cur.rowcount
+
+                inserted = 0
+                for measure_key, v_num, v_text, unit in measurements:
+                    cur.execute("""
+                        INSERT INTO anxg_auto.spec_measurements
+                          (variant_id, measure_key, value_num, value_text, unit,
+                           source, source_ref, confidence, validated_status,
+                           snapshot_year, raw)
+                        VALUES (%s, %s, %s, %s, %s,
+                                %s, %s, %s, 'verified',
+                                %s, %s::jsonb)
+                    """, (
+                        vid, measure_key, v_num, v_text, unit or None,
+                        _SOURCE_KEY, source_ref, _CONFIDENCE,
+                        year, raw_json,
+                    ))
+                    inserted += 1
             stats.variants_touched += 1
             stats.measurements_inserted += inserted
             if deleted:
                 stats.measurements_replaced += min(deleted, inserted)
         except Exception as e:  # noqa: BLE001 — 호출 실패 흡수 → 다음 단계 진행
-            cur.execute("ROLLBACK TO SAVEPOINT sp_epa")
             stats.errors.append(f"variant {vid} {make}/{model}/{year}: {e}")
 
 
