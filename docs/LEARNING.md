@@ -559,11 +559,13 @@ side-effect 로 등록한다(`autograph/agent_handler.py`). core 는 ENV
 `mcp/discovery.py:build_tool_manifest(domain)` 가 도메인별 typed 도구를 MCP 로 노출한다.
 
 - **라이브 카운트(실측)**: finance 21 + auto 40 + ip 19 = **80**(`build_tool_manifest` 길이).
-- **정본 카운트(README/PKG-INFO)**: **59**(finance 21 + auto 38), 2026-06-04 PASS 시점.
+- **정본 카운트(README/BACKLOG/system_review)**: **80**(finance 21 + auto 40 + ip 19) —
+  2026-06-17 라이브와 정합화(이전 78/59 drift 해소).
 
-차이의 원인: 정본 59 는 IP 도메인이 배선되기 **전** 스냅샷이고, 이후 auto 가 38→40,
-ip 19 가 추가되며 80 으로 늘었다. `make audit-mcp` 가 SDK 설치 시 `ListToolsRequest` 핸들러
-round-trip 으로 라이브 수를 재측정한다. 정본 문서 갱신은 후속.
+연혁: 초기 정본 59(finance 21 + auto 38, IP 배선 전 스냅샷) → README 가 ip 19 를 더해
+78 로 적었으나 auto 가 38→40 으로 늘며 라이브 80 과 어긋남(드리프트). 2026-06-17 정본
+문서(README 4곳·BACKLOG·system_review)를 80 으로 일괄 갱신해 해소. `make audit-mcp` 가
+SDK 설치 시 `ListToolsRequest` 핸들러 round-trip 으로 라이브 수를 재측정한다.
 
 ### 8.5 namespace 격리 규약
 

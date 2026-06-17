@@ -59,8 +59,18 @@
 > 절대 EM 은 소표본(n=14)·drift 로 baseline 자체가 0.357(과거 0.750 아님)이고, 잔여 실패는 LLM-planner
 > 의 패러프레이즈 민감(`fallback_used` 체인 미생성)·데이터 아티팩트(매출=1 shell) — 완전 결정화(rule-plan)는
 > 잔여. 즉 **게이트(라우팅 결정)는 일반화 실증, 다운스트림 LLM planner/synth 견고화는 후속**.
-> thesis 는 정확한 scope 하에 CONFIRMED, 경계도 측정·수정까지 기록. 잔여: cross-store 다운스트림 결정화
-> (rule-plan + synth max/min 명시), 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
+> **▶ 다운스트림 결정화 완결 (2026-06-17, 실측)**: 위 "다운스트림 견고화" 잔여를 해소. ① 게이트
+> metric seam: Signal-B 를 `compare_companies` 지원 metric(`policy._METRIC_TRIGGERS` SSOT)으로
+> 한정(미지원 metric over-fire→revenue 조용한 치환 차단). ② 결정적 라우팅(`ANXG_RANK_ROUTE=deterministic`,
+> default): 게이트 발화 시 룰이 graph(get_companies_of_person, dual-josa `_extract_lead_person`)→
+> compare_companies 체인 직접 구성 → LLM 라우팅 비결정성(paraphrase EM 0.214/0.500/0.714, 변동 0.50)
+> 제거 → 0.857. ③ synth max/min 결정화(`compare_companies(direction=)`+`rank_direction`+결측 None 마지막,
+> 구 −1 sentinel 차단) → 변동 0. ④ synth 구조 evidence 인정(`_build_context`) → '정보 부족' 오거부 완화
+> → **cross-store paraphrase 0.929**, main-62 비회귀 0.726~0.758, false_refusal 0.000
+> (`eval/reports/{B_det_v2,A1_dir,A1b_cs,A2_paired_thesis}_*`). paired eval-full = **hybrid 0.726 vs
+> vector 0.048 = +67.7pp**(단일 run). 잔여 MIN007 = gold 동명이인(김병훈 5명, 코드 결함 아님).
+> thesis 는 정확한 scope 하에 CONFIRMED, 경계도 측정·수정까지 기록. 잔여: synth grounding 의 graph 결과
+> 일반화(A-1c 부분), 비-모델 관계 graph 흡수, cross-domain 데이터 sparse(도메인 일반화), 다-family judge.
 
 ---
 
