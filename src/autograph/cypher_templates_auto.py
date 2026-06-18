@@ -251,6 +251,23 @@ AUTO_TEMPLATES: dict[str, dict] = {
         "param_schema": {"make": (str, None), "limit": _LIMIT_500},
     },
 
+    # 제조사 → 차종 → 리콜 → 결함유형 (4-hop, non-local): DefectType 은 derived 분류
+    # 노드라 어떤 공시·NHTSA 문서에도 co-located 되지 않음 → vector 원천 불가, 진짜
+    # multi-hop. validated 엣지만(정제 SOP 통과, 단독 근거 가능).
+    "auto_defect_types_by_manufacturer": {
+        "cypher": """
+        MATCH (mm:Anxg_Manufacturer)-[:MANUFACTURES]->(:Anxg_VehicleModel)
+              -[:AFFECTED_BY]->(:Anxg_Recall)-[dm:DEFECT_MATCHES]->(d:Anxg_DefectType)
+        WHERE (mm.name = $make OR toUpper(mm.name) = toUpper($make))
+          AND dm.validated_status = 'validated'
+        RETURN DISTINCT d.name AS defect_type
+        ORDER BY d.name
+        LIMIT $limit
+        """,
+        "required_params": ["make", "limit"],
+        "param_schema": {"make": (str, None), "limit": _LIMIT_500},
+    },
+
     "auto_recalls_for_component": {        # Module 또는 Part 에 영향을 준 리콜
         "cypher": """
         MATCH (rc:Anxg_Recall)-[rel:RECALL_OF]->(c)

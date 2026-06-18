@@ -42,6 +42,18 @@ def test_auto_template_param_validation():
                         {"variant_id": 1, "limit": 9999})
 
 
+def test_auto_defect_types_template_and_tool_registered():
+    """#3 AUTO non-local — Manufacturer→Model→Recall→DefectType 도구/템플릿/화이트리스트."""
+    import autograph.tools  # noqa: F401
+    from autonexusgraph.tools.cypher_templates import render_template
+    cypher, _ = render_template("auto_defect_types_by_manufacturer",
+                                {"make": "FORD", "limit": 50})
+    assert "DEFECT_MATCHES" in cypher and "DefectType" in cypher
+    from autograph.agent_handler import AUTO_GRAPH_ALLOWED
+    assert "list_defect_types_by_manufacturer" in AUTO_GRAPH_ALLOWED
+    from autograph.tools import list_defect_types_by_manufacturer  # noqa: F401
+
+
 # ── 2. route_domain ─────────────────────────────────────
 def test_route_domain_keywords():
     from autograph.policy import route_domain
